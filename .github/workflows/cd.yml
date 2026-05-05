@@ -90,7 +90,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: >
             pages deploy frontend/dist
-            --project-name=matrixflow-erp
+            --project-name=jujuju
             --branch=${{ needs.prepare.outputs.environment == 'production' && 'main' || 'develop' }}
 
   # ==================== Deploy to Staging ====================
