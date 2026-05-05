@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: matrixflow
+  labels:
+    app.kubernetes.io/name: matrixflow
+    app.kubernetes.io/part-of: matrixflow-erp
+    environment: production
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: matrixflow-staging
+  labels:
+    app.kubernetes.io/name: matrixflow
+    app.kubernetes.io/part-of: matrixflow-erp
+    environment: staging

@@ -1,0 +1,225 @@
+// MatrixFlow ERP - Prisma Schema
+// 数据库: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户与组织 ====================
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  phone       String?  @unique
+  password    String
+  name        String
+  avatar      String?
+  role        Role     @default(MEMBER)
+  status      UserStatus @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  accounts       Account[]
+  auditLogs      AuditLog[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  MANAGER
+  MEMBER
+  VIEWER
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      Plan     @default(FREE)
+  status    OrgStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  teams     Team[]
+
+  @@index([status])
+}
+
+enum Plan {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum OrgStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+model Team {
+  id             String   @id @default(cuid())
+  name           String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  accounts Account[]
+
+  @@index([organizationId])
+}
+
+// ==================== 平台账号 ====================
+
+model Account {
+  id             String   @id @default(cuid())
+  platform       Platform
+  platformUserId String
+  nickname       String
+  avatar         String?
+  bio            String?
+  followers      Int      @default(0)
+  following      Int      @default(0)
+  status         AccountStatus @default(ACTIVE)
+  cookies        String?  @db.Text
+  proxyConfig    Json?
+  metadata       Json?
+  lastActiveAt   DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  owner   User   @relation(fields: [userId], references: [id])
+  userId  String
+  team    Team?  @relation(fields: [teamId], references: [id])
+  teamId  String?
+  posts      Post[]
+  dailyStats DailyStats[]
+
+  @@unique([platform, platformUserId])
+  @@index([userId])
+  @@index([teamId])
+  @@index([platform])
+}
+
+enum Platform {
+  DOUYIN
+  KUAISHOU
+  XIAOHONGSHU
+  WECHAT_VIDEO
+  BILIBILI
+  WEIBO
+  TIKTOK
+}
+
+enum AccountStatus {
+  ACTIVE
+  INACTIVE
+  BANNED
+  EXPIRED
+}
+
+// ==================== 内容发布 ====================
+
+model Post {
+  id          String   @id @default(cuid())
+  title       String?
+  content     String?  @db.Text
+  mediaUrls   Json?
+  tags        String[]
+  publishAt   DateTime?
+  status      PostStatus @default(DRAFT)
+  platformUrl String?
+  errorMsg    String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  account   Account @relation(fields: [accountId], references: [id])
+  accountId String
+  stats     PostStats?
+
+  @@index([accountId])
+  @@index([status])
+  @@index([publishAt])
+}
+
+enum PostStatus {
+  DRAFT
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+}
+
+// ==================== 数据统计 ====================
+
+model PostStats {
+  id         String @id @default(cuid())
+  views      Int    @default(0)
+  likes      Int    @default(0)
+  comments   Int    @default(0)
+  shares     Int    @default(0)
+  saves      Int    @default(0)
+  collectedAt DateTime @default(now())
+
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String @unique
+
+  @@index([postId])
+}
+
+model DailyStats {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  platform  Platform
+  followers Int      @default(0)
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  shares    Int      @default(0)
+  createdAt DateTime @default(now())
+
+  account   Account @relation(fields: [accountId], references: [id])
+  accountId String
+
+  @@unique([accountId, date])
+  @@index([accountId])
+  @@index([date])
+}
+
+// ==================== 审计日志 ====================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  resource  String
+  detail    Json?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+}

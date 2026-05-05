@@ -1,0 +1,58 @@
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 构建输出
+dist/
+build/
+*.tsbuildinfo
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+*.lcov
+
+# 安全扫描报告
+security-scan-report-*.md
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Prisma
+backend/prisma/migrations/
+
+# Docker
+.docker/
+
+# Playwright
+browser-engine/test-results/
+browser-engine/playwright-report/
+
+# 构建缓存
+.vite/
+*.local
+
+# 临时文件
+tmp/
+temp/

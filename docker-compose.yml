@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  # ---------- PostgreSQL ----------
+  postgres:
+    image: postgres:16-alpine
+    container_name: matrixflow-postgres
+    restart: unless-stopped
+    ports:
+      - '${DB_PORT:-5432}:5432'
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-matrixflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-matrixflow}
+      POSTGRES_DB: ${DB_NAME:-matrixflow_erp}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-matrixflow}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------- Redis ----------
+  redis:
+    image: redis:7-alpine
+    container_name: matrixflow-redis
+    restart: unless-stopped
+    ports:
+      - '${REDIS_PORT:-6379}:6379'
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------- 后端 API ----------
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    container_name: matrixflow-backend
+    restart: unless-stopped
+    ports:
+      - '${APP_PORT:-3000}:3000'
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/app/uploads
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------- 浏览器引擎 ----------
+  browser-engine:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.browser-engine
+    container_name: matrixflow-browser
+    restart: unless-stopped
+    ports:
+      - '${BROWSER_ENGINE_PORT:-3001}:3001'
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    shm_size: '2gb'
+    security_opt:
+      - no-new-privileges:true
+
+  # ---------- 前端 (Nginx) ----------
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    container_name: matrixflow-frontend
+    restart: unless-stopped
+    ports:
+      - '80:80'
+    depends_on:
+      backend:
+        condition: service_started
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
