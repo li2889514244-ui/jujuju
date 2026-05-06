@@ -56,3 +56,8 @@ browser-engine/playwright-report/
 # 临时文件
 tmp/
 temp/
+
+# 证书文件
+*.pem
+*.key
+*.p12
