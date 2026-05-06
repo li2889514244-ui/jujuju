@@ -60,3 +60,4 @@ temp/
 *.pem
 *.key
 *.p12
+.pnpm-approved-builds.json

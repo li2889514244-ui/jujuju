@@ -26,9 +26,8 @@ WORKDIR /app/backend
 RUN npx prisma generate
 RUN pnpm build
 
-# Prune dev dependencies (must run from workspace root for monorepo)
-WORKDIR /app
-RUN pnpm prune --prod
+# Prune dev dependencies (--ignore-scripts prevents prepare hook from calling removed husky)
+RUN pnpm prune --prod --ignore-scripts
 
 # Stage 2: Production
 FROM node:20-alpine AS production
@@ -47,7 +46,7 @@ WORKDIR /app
 
 # Copy built application and production dependencies
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/dist ./dist
-COPY --from=builder --chown=matrixflow:matrixflow /app/node_modules ./node_modules
+COPY --from=builder --chown=matrixflow:matrixflow /app/backend/node_modules ./node_modules
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/prisma ./prisma
 
