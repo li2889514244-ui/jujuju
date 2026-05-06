@@ -24,9 +24,12 @@ async function bootstrap() {
   app.setGlobalPrefix('api/v1');
 
   // CORS 配置 — 从环境变量读取，支持多域名
-  const corsOrigin = process.env.CORS_ORIGIN || '*';
+  const corsOrigin = process.env.CORS_ORIGIN || '';
+  if (!corsOrigin) {
+    logger.warn('CORS_ORIGIN not set, CORS allows no cross-origin requests');
+  }
   app.enableCors({
-    origin: parseCorsOrigins(corsOrigin),
+    origin: corsOrigin ? parseCorsOrigins(corsOrigin) : false,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Version'],
