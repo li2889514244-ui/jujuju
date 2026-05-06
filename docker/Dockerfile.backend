@@ -10,6 +10,7 @@ RUN apk add --no-cache python3 make g++
 
 # Install dependencies first (better cache utilization)
 COPY backend/package.json backend/pnpm-lock.yaml ./
+ENV HUSKY=0
 RUN corepack enable && pnpm install --frozen-lockfile
 
 # Copy source and build

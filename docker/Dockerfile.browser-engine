@@ -6,6 +6,7 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 COPY browser-engine/package.json browser-engine/pnpm-lock.yaml ./
+ENV HUSKY=0
 RUN corepack enable && pnpm install --frozen-lockfile
 
 # Stage 2: Build
