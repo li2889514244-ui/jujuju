@@ -185,7 +185,7 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: frontend/pnpm-lock.yaml
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         working-directory: frontend
@@ -203,4 +203,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy frontend/dist --project-name=matrixflow-erp --branch=${{ github.head_ref }}
+          command: pages deploy frontend/dist --project-name=jujuju --branch=${{ github.head_ref }}
