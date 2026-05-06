@@ -24,7 +24,8 @@ WORKDIR /build/backend
 RUN npx prisma generate
 RUN pnpm build
 
-# 裁剪 devDependencies
+# 裁剪 devDependencies（monorepo 需在 workspace 根目录执行）
+WORKDIR /build
 RUN pnpm prune --prod
 
 # ---- Production Stage ----
@@ -39,7 +40,7 @@ WORKDIR /app
 
 # 从 builder 复制构建产物
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
-COPY --from=builder --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
+COPY --from=builder --chown=matrixflow:matrixflow /build/node_modules ./node_modules
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 
