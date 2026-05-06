@@ -40,7 +40,7 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: CORS_ORIGIN
-        value: https://jujuju-28b.pages.dev
+        value: https://ddddkiii.com
       - key: LOG_LEVEL
         value: warn
     healthCheckPath: /api/v1/health
