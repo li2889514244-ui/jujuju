@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { PrismaModule } from './prisma/prisma.module';
+import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { TeamsModule } from './modules/teams/teams.module';
@@ -13,6 +14,7 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AIModule } from './modules/ai/ai.module';
 import { PlatformsModule } from './modules/platforms/platforms.module';
 import { HealthModule } from './modules/health/health.module';
+import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
 import databaseConfig from './config/database.config';
@@ -47,6 +49,7 @@ import databaseConfig from './config/database.config';
 
     // 基础设施模块
     PrismaModule,
+    RedisModule,
 
     // 业务模块
     AuthModule,
@@ -61,6 +64,11 @@ import databaseConfig from './config/database.config';
     HealthModule,
   ],
   providers: [
+    // #12 全局认证守卫 — 所有路由默认需要认证，@Public() 装饰器可豁免
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
     // 全局速率限制守卫
     {
       provide: APP_GUARD,

@@ -38,13 +38,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        image: [frontend, backend, browser-engine]
+        image: [frontend, backend]
     steps:
       - uses: actions/checkout@v4
 
       - name: Build image
         run: |
-          docker build -f docker/Dockerfile.${{ matrix.image == 'browser-engine' && 'browser-engine' || matrix.image }} -t matrixflow/${{ matrix.image }}:scan .
+          docker build -f docker/Dockerfile.${{ matrix.image }} -t matrixflow/${{ matrix.image }}:scan .
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master

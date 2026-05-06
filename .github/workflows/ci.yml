@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        app: [frontend, backend, browser-engine]
+        app: [frontend, backend]
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +52,7 @@ jobs:
     needs: lint
     strategy:
       matrix:
-        app: [frontend, backend, browser-engine]
+        app: [frontend, backend]
     services:
       postgres:
         image: postgres:16-alpine
@@ -124,9 +124,6 @@ jobs:
           - app: backend
             context: .
             file: docker/Dockerfile.backend
-          - app: browser-engine
-            context: .
-            file: docker/Dockerfile.browser-engine
     steps:
       - uses: actions/checkout@v4
 

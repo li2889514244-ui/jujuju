@@ -44,16 +44,6 @@ scrape_configs:
         target_label: service
         replacement: 'backend'
 
-  # Browser Engine metrics
-  - job_name: 'matrixflow-browser-engine'
-    metrics_path: '/metrics'
-    static_configs:
-      - targets: ['browser-engine:3001']
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: service
-        replacement: 'browser-engine'
-
   # PostgreSQL metrics (via postgres_exporter)
   - job_name: 'postgresql'
     static_configs:

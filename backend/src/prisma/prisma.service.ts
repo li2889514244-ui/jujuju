@@ -35,15 +35,26 @@ export class PrismaService
 
   /**
    * 清除所有数据（仅用于测试）
+   * #16 修复: 使用 Prisma.dmmf 精确获取模型名，而非遍历 this 上的所有 key
    */
   async cleanDatabase() {
     if (process.env.NODE_ENV === 'production') {
       throw new Error('Cannot clean database in production');
     }
-    // 顺序很重要 — 先删有外键依赖的表
-    const models = Object.keys(this).filter((key) => !key.startsWith('_'));
 
-    for (const modelKey of models) {
+    // 使用 DMMF 获取所有模型名，按依赖关系逆序删除
+    const modelNames = PrismaClient.prototype.constructor.name === 'PrismaClient'
+      ? (this as any)._dmmf?.datamodel?.models?.map((m: any) => m.name) ?? []
+      : [];
+
+    // 如果 DMMF 不可用，fallback 到已知模型列表
+    const models = modelNames.length > 0
+      ? modelNames
+      : ['AuditLog', 'PostStats', 'DailyStats', 'Post', 'Account', 'Team', 'User', 'Organization'];
+
+    for (const modelName of models) {
+      // Prisma 客户端上的属性名是 camelCase
+      const modelKey = modelName.charAt(0).toLowerCase() + modelName.slice(1);
       const model = (this as any)[modelKey];
       if (model?.deleteMany) {
         await model.deleteMany();

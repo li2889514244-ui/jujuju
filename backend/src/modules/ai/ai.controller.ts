@@ -10,6 +10,7 @@ import {
   ApiOperation,
   ApiBearerAuth,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { AIService } from './ai.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import {
@@ -30,18 +31,21 @@ export class AIController {
   // ===== Content Generation =====
 
   @Post('content/generate')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '智能内容生成（脚本/标题/标签/文案）' })
   async generateContent(@Body() dto: GenerateContentDto) {
     return this.aiService.generateContent(dto);
   }
 
   @Post('content/batch')
+  @Throttle({ short: { ttl: 60000, limit: 3 } })
   @ApiOperation({ summary: '批量内容生成' })
   async generateBatch(@Body() items: GenerateContentDto[]) {
     return this.aiService.generateBatchContent(items);
   }
 
   @Post('content/titles')
+  @Throttle({ short: { ttl: 60000, limit: 20 } })
   @ApiOperation({ summary: '快速标题生成' })
   async generateTitles(
     @Body() body: { topic: string; platform?: string; count?: number },
@@ -50,6 +54,7 @@ export class AIController {
   }
 
   @Post('content/tags')
+  @Throttle({ short: { ttl: 60000, limit: 20 } })
   @ApiOperation({ summary: '快速标签推荐' })
   async generateTags(
     @Body() body: { topic: string; platform?: string },
@@ -60,12 +65,14 @@ export class AIController {
   // ===== Publish Optimization =====
 
   @Post('publish/best-time')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '最佳发布时间推荐' })
   async getBestPublishTime(@Body() dto: OptimizePublishDto) {
     return this.aiService.getBestPublishTime(dto);
   }
 
   @Post('publish/frequency')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '发布频率优化建议' })
   async getPublishFrequency(@Body() dto: OptimizePublishDto) {
     return this.aiService.getPublishFrequency(dto);
@@ -74,6 +81,7 @@ export class AIController {
   // ===== Trend Prediction =====
 
   @Post('trend/predict')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '趋势预测（粉丝/播放/互动）' })
   async predictTrend(@Body() dto: PredictTrendDto) {
     return this.aiService.predictTrend(dto);
@@ -82,12 +90,14 @@ export class AIController {
   // ===== Anomaly Detection =====
 
   @Post('anomaly/detect')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '数据异常检测' })
   async detectAnomaly(@Body() dto: DetectAnomalyDto) {
     return this.aiService.detectAnomaly(dto);
   }
 
   @Post('anomaly/account-risk')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '账号风险检测' })
   async detectAccountRisk(
     @Body()
@@ -103,6 +113,7 @@ export class AIController {
   // ===== Content Review =====
 
   @Post('review')
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: '内容审核（违规检测/敏感词过滤）' })
   async reviewContent(@Body() dto: ReviewContentDto) {
     return this.aiService.reviewContent(dto);

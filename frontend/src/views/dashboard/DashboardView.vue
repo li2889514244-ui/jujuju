@@ -107,6 +107,7 @@ import type { PublishTask } from '@/types'
 
 const trendDays = ref(7)
 
+// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
 const overviewCards = ref([
   { title: '账号总数', value: '128', icon: 'UserFilled', color: '#409eff', trend: 5.2 },
   { title: '总粉丝数', value: '2.8M', icon: 'Star', color: '#e6a23c', trend: 3.1 },
@@ -114,18 +115,21 @@ const overviewCards = ref([
   { title: '发布总数', value: '1,024', icon: 'List', color: '#f56c6c', trend: -1.2 },
 ])
 
+// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
 const recentTasks = ref<PublishTask[]>([
   { id: '1', contentId: '1', contentTitle: '探店vlog-朝阳大悦城', accountId: '1', accountNickname: '小明', platform: 'douyin', status: 'success', scheduledAt: null, publishedAt: '2025-05-05T10:00:00', errorMessage: null, createdAt: '2025-05-05T09:30:00' },
   { id: '2', contentId: '2', contentTitle: '美食教程-红烧肉', accountId: '2', accountNickname: '美食家', platform: 'xiaohongshu', status: 'publishing', scheduledAt: '2025-05-05T14:00:00', publishedAt: null, errorMessage: null, createdAt: '2025-05-05T09:00:00' },
   { id: '3', contentId: '3', contentTitle: '旅行日记-三亚', accountId: '3', accountNickname: '旅行者', platform: 'bilibili', status: 'failed', scheduledAt: null, publishedAt: null, errorMessage: 'Cookie已过期', createdAt: '2025-05-04T18:00:00' },
 ])
 
+// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
 const notifications = ref([
   { message: '账号"美食家"Cookie即将过期，请及时更新', icon: 'WarningFilled', color: '#e6a23c', time: '10分钟前' },
   { message: '3个发布任务已完成', icon: 'SuccessFilled', color: '#67c23a', time: '30分钟前' },
   { message: '新成员"张三"加入了团队', icon: 'InfoFilled', color: '#409eff', time: '1小时前' },
 ])
 
+// TODO: 图表数据为 mock（随机生成），正式环境需从 analyticsApi 获取真实数据
 const followerChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
   legend: { data: ['抖音', '快手', '小红书', 'B站'] },

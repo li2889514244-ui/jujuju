@@ -98,7 +98,7 @@ export class PlatformsController {
     return this.platformsService.getAuthorizedAccounts({
       userId,
       ...filter,
-      skip: filter as any,
+      skip: filter.skip || 0,
     });
   }
 

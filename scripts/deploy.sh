@@ -77,7 +77,6 @@ deploy_services() {
     log_info "Deploying Services..."
     kubectl apply -f "$PROJECT_DIR/k8s/frontend/service.yaml" -n "$NAMESPACE"
     kubectl apply -f "$PROJECT_DIR/k8s/backend/service.yaml" -n "$NAMESPACE"
-    kubectl apply -f "$PROJECT_DIR/k8s/browser-engine/service.yaml" -n "$NAMESPACE"
     kubectl apply -f "$PROJECT_DIR/k8s/postgres/service.yaml" -n "$NAMESPACE"
     kubectl apply -f "$PROJECT_DIR/k8s/redis/service.yaml" -n "$NAMESPACE"
     log_success "Services deployed"
@@ -106,17 +105,14 @@ deploy_applications() {
     # Set image tags
     export FRONTEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/frontend:${IMAGE_TAG}"
     export BACKEND_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/backend:${IMAGE_TAG}"
-    export BROWSER_ENGINE_IMAGE="${REGISTRY}/${IMAGE_PREFIX}/browser-engine:${IMAGE_TAG}"
 
     kubectl apply -f "$PROJECT_DIR/k8s/frontend/deployment.yaml" -n "$NAMESPACE"
     kubectl apply -f "$PROJECT_DIR/k8s/backend/deployment.yaml" -n "$NAMESPACE"
-    kubectl apply -f "$PROJECT_DIR/k8s/browser-engine/deployment.yaml" -n "$NAMESPACE"
     kubectl apply -f "$PROJECT_DIR/k8s/backend/hpa.yaml" -n "$NAMESPACE"
 
     log_info "Waiting for deployments..."
     kubectl rollout status deployment/frontend -n "$NAMESPACE" --timeout=300s
     kubectl rollout status deployment/backend -n "$NAMESPACE" --timeout=300s
-    kubectl rollout status deployment/browser-engine -n "$NAMESPACE" --timeout=300s
 
     log_success "Applications deployed"
 }

@@ -18,7 +18,7 @@
 
         <!-- Platform & Account Selection -->
         <el-form-item label="发布平台">
-          <el-checkbox-group v-model="selectedPlatforms" @change="filterAccounts">
+          <el-checkbox-group v-model="selectedPlatforms">
             <el-checkbox-button v-for="(label, key) in PLATFORM_LABELS" :key="key" :value="key">
               {{ label }}
             </el-checkbox-button>
@@ -128,14 +128,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import dayjs from 'dayjs'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useContentStore } from '@/store/content'
 import { useAccountStore } from '@/store/account'
 import { contentApi } from '@/api/content'
-import { PLATFORM_LABELS, type Account, type Platform } from '@/types'
+import { PLATFORM_LABELS, type Platform } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 
@@ -159,24 +159,21 @@ const rules: FormRules = {
   accountIds: [{ required: true, message: '请选择至少一个账号', trigger: 'change' }],
 }
 
-const filteredAccounts = ref<Account[]>([])
+// 使用 computed 保持响应性，当 store 中的 accounts 更新时自动同步
+const filteredAccounts = computed(() => {
+  if (selectedPlatforms.value.length === 0) {
+    return accountStore.accounts
+  }
+  return accountStore.accounts.filter((a) =>
+    selectedPlatforms.value.includes(a.platform)
+  )
+})
 
 onMounted(() => {
   contentStore.fetchContents()
   contentStore.fetchPublishTasks()
   accountStore.fetchAccounts()
-  filteredAccounts.value = accountStore.accounts
 })
-
-function filterAccounts() {
-  if (selectedPlatforms.value.length === 0) {
-    filteredAccounts.value = accountStore.accounts
-  } else {
-    filteredAccounts.value = accountStore.accounts.filter((a) =>
-      selectedPlatforms.value.includes(a.platform)
-    )
-  }
-}
 
 function disabledDate(date: Date) {
   return date.getTime() < Date.now() - 86400000
@@ -194,8 +191,9 @@ async function handlePublish() {
       publishMode.value === 'scheduled' ? form.scheduledAt : undefined
     )
     ElMessage.success(publishMode.value === 'now' ? '发布任务已创建' : '定时发布已设置')
-  } catch {
-    // handled
+  } catch (e) {
+    ElMessage.error('发布失败')
+    console.error('发布失败:', e)
   } finally {
     publishing.value = false
   }

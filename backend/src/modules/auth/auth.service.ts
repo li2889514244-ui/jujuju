@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
+import { RedisService } from '../../redis/redis.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -24,6 +25,7 @@ export class AuthService implements OnModuleInit {
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
+    private redis: RedisService,
   ) {}
 
   onModuleInit() {
@@ -136,9 +138,16 @@ export class AuthService implements OnModuleInit {
 
   /**
    * 刷新令牌
+   * #2 修复: refresh 时将旧 token 存入 Redis 黑名单
    */
   async refreshTokens(refreshToken: string) {
     try {
+      // 检查旧 token 是否已在黑名单中
+      const isBlacklisted = await this.redis.exists(`token:blacklist:${refreshToken}`);
+      if (isBlacklisted) {
+        throw new UnauthorizedException('刷新令牌已被吊销');
+      }
+
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.jwtRefreshSecret,
       });
@@ -151,11 +160,36 @@ export class AuthService implements OnModuleInit {
         throw new UnauthorizedException('无效的刷新令牌');
       }
 
+      // 将旧 refresh token 加入黑名单（TTL 设为 refresh token 的最大有效期 7 天）
+      await this.redis.setWithTTL(`token:blacklist:${refreshToken}`, '1', 7 * 24 * 60 * 60);
+
       const tokens = await this.generateTokens(user.id, user.email);
       return tokens;
-    } catch {
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('刷新令牌已过期或无效');
     }
+  }
+
+  /**
+   * #2 修复: 用户登出 — 将当前 refresh token 加入黑名单
+   */
+  async logout(refreshToken: string) {
+    try {
+      // 验证 token 有效性（不抛异常，只解析）
+      this.jwtService.verify(refreshToken, {
+        secret: this.jwtRefreshSecret,
+      });
+    } catch {
+      // token 已过期也正常处理
+    }
+
+    // 无论如何都将 token 加入黑名单
+    await this.redis.setWithTTL(`token:blacklist:${refreshToken}`, '1', 7 * 24 * 60 * 60);
+    this.logger.log('用户登出成功，refresh token 已吊销');
+    return { success: true, message: '登出成功' };
   }
 
   /**
@@ -180,6 +214,7 @@ export class AuthService implements OnModuleInit {
 
   /**
    * 密码策略校验
+   * #15 修复: 统一为 8 位
    * - 至少8个字符
    * - 包含大写字母
    * - 包含小写字母

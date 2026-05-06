@@ -12,7 +12,6 @@
 **MatrixFlow ERP** 是一个企业级 SaaS 矩阵账号管理平台，核心能力：
 
 - 多平台账号集中管理（抖音、快手、小红书、视频号等）
-- 内置 Playwright 浏览器引擎，支持免登录发布
 - 跨平台数据统计与可视化
 - 团队协作（5-20 人），角色权限管理
 - AI 辅助内容生成与分析
@@ -23,7 +22,6 @@
 |------|---------|
 | 前端 | Vue 3 + TypeScript + Element Plus + Pinia + Vue Router |
 | 后端 | NestJS + Prisma ORM + PostgreSQL + Redis + BullMQ |
-| 浏览器引擎 | Playwright (无头/有头模式) |
 | 容器化 | Docker + Docker Compose (dev) / Kubernetes (prod) |
 | CI/CD | GitHub Actions → Docker Registry → K8s Rolling Update |
 | 监控 | Prometheus + Grafana + ELK |

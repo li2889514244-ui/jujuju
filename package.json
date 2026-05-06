@@ -6,7 +6,6 @@
   "workspaces": [
     "frontend",
     "backend",
-    "browser-engine",
     "packages/*"
   ],
   "scripts": {

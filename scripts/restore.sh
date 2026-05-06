@@ -55,7 +55,6 @@ download_from_s3() {
 scale_down() {
     log_info "Scaling down applications to prevent writes..."
     kubectl scale deployment/backend -n "$NAMESPACE" --replicas=0
-    kubectl scale deployment/browser-engine -n "$NAMESPACE" --replicas=0
     log_success "Applications scaled down"
 }
 
@@ -63,7 +62,6 @@ scale_down() {
 scale_up() {
     log_info "Scaling up applications..."
     kubectl scale deployment/backend -n "$NAMESPACE" --replicas=3
-    kubectl scale deployment/browser-engine -n "$NAMESPACE" --replicas=2
     log_success "Applications scaled up"
 }
 

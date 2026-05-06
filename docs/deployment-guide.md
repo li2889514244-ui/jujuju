@@ -79,9 +79,6 @@ docker build -f docker/Dockerfile.frontend -t matrixflow/frontend:local .
 
 # 后端
 docker build -f docker/Dockerfile.backend -t matrixflow/backend:local .
-
-# 浏览器引擎
-docker build -f docker/Dockerfile.browser-engine -t matrixflow/browser-engine:local ./packages/browser-engine
 ```
 
 ### Docker Compose (本地开发)
@@ -112,17 +109,6 @@ services:
     depends_on:
       - postgres
       - redis
-
-  browser-engine:
-    build:
-      context: ./packages/browser-engine
-      dockerfile: docker/Dockerfile.browser-engine
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=development
-    cap_add:
-      - SYS_ADMIN
 
   postgres:
     image: postgres:16-alpine
@@ -198,9 +184,6 @@ kubectl apply -f k8s/backend/deployment.yaml -n matrixflow
 kubectl apply -f k8s/backend/service.yaml -n matrixflow
 kubectl apply -f k8s/backend/hpa.yaml -n matrixflow
 
-# 浏览器引擎
-kubectl apply -f k8s/browser-engine/deployment.yaml -n matrixflow
-kubectl apply -f k8s/browser-engine/service.yaml -n matrixflow
 ```
 
 ### Ingress

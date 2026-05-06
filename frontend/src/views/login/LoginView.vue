@@ -176,7 +176,7 @@ async function handleLogin() {
     const redirect = (route.query.redirect as string) || '/dashboard'
     router.push(redirect)
   } catch {
-    // Error handled by interceptor
+    // 错误已由响应拦截器统一处理并弹出提示
   } finally {
     loading.value = false
   }
@@ -188,13 +188,15 @@ async function handleRegister() {
 
   loading.value = true
   try {
-    await authApi.register(registerForm)
+    // 过滤掉 confirmPassword，不发送到后端
+    const { confirmPassword: _, ...registerData } = registerForm
+    await authApi.register(registerData)
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
     loginForm.username = registerForm.username
     loginForm.password = ''
   } catch {
-    // Error handled by interceptor
+    // 错误已由响应拦截器统一处理并弹出提示
   } finally {
     loading.value = false
   }

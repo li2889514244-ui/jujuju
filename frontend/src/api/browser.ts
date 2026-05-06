@@ -1,40 +1,48 @@
-import { get, post } from './request'
+/**
+ * 浏览器引擎 API - 已禁用
+ * 浏览器引擎（browser-engine）已从项目中移除。
+ * 所有 API 调用将返回 501 Not Implemented。
+ */
 import type { BrowserSession, BrowserAction, PaginatedResponse } from '@/types'
 
+function disabledResponse(): Promise<never> {
+  return Promise.reject(new Error('浏览器引擎功能已禁用'))
+}
+
 export const browserApi = {
-  getSessions(params?: Record<string, unknown>) {
-    return get<PaginatedResponse<BrowserSession>>('/browser/sessions', params)
+  getSessions(_params?: Record<string, unknown>) {
+    return disabledResponse() as unknown as Promise<PaginatedResponse<BrowserSession>>
   },
 
-  getSession(id: string) {
-    return get<BrowserSession>(`/browser/sessions/${id}`)
+  getSession(_id: string) {
+    return disabledResponse() as unknown as Promise<BrowserSession>
   },
 
-  createSession(accountId: string) {
-    return post<BrowserSession>('/browser/sessions', { accountId })
+  createSession(_accountId: string) {
+    return disabledResponse() as unknown as Promise<BrowserSession>
   },
 
-  closeSession(id: string) {
-    return post(`/browser/sessions/${id}/close`)
+  closeSession(_id: string) {
+    return disabledResponse()
   },
 
-  refreshSession(id: string) {
-    return post(`/browser/sessions/${id}/refresh`)
+  refreshSession(_id: string) {
+    return disabledResponse()
   },
 
-  getScreenshot(id: string) {
-    return get<{ screenshot: string }>(`/browser/sessions/${id}/screenshot`)
+  getScreenshot(_id: string) {
+    return disabledResponse() as unknown as Promise<{ screenshot: string }>
   },
 
-  getActions(sessionId: string, params?: Record<string, unknown>) {
-    return get<PaginatedResponse<BrowserAction>>(`/browser/sessions/${sessionId}/actions`, params)
+  getActions(_sessionId: string, _params?: Record<string, unknown>) {
+    return disabledResponse() as unknown as Promise<PaginatedResponse<BrowserAction>>
   },
 
-  executeAction(sessionId: string, action: { type: string; target: string; value?: string }) {
-    return post<BrowserAction>(`/browser/sessions/${sessionId}/execute`, action)
+  executeAction(_sessionId: string, _action: { type: string; target: string; value?: string }) {
+    return disabledResponse() as unknown as Promise<BrowserAction>
   },
 
-  navigateTo(sessionId: string, url: string) {
-    return post(`/browser/sessions/${sessionId}/navigate`, { url })
+  navigateTo(_sessionId: string, _url: string) {
+    return disabledResponse()
   },
 }

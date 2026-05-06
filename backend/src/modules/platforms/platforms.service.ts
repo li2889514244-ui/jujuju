@@ -80,7 +80,7 @@ export class PlatformsService {
   /**
    * 获取OAuth授权URL
    */
-  getAuthorizeUrl(platform: string, userId: string, teamId?: string): string {
+  async getAuthorizeUrl(platform: string, userId: string, teamId?: string): Promise<string> {
     if (!PLATFORM_CONFIGS[platform]) {
       throw new BadRequestException(`不支持的平台: ${platform}`);
     }

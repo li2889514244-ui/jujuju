@@ -109,8 +109,8 @@ const tagInputValue = ref('')
 const videoUrl = ref('')
 const coverUrl = ref('')
 
-const contentId = route.query.id as string | undefined
-const isEditing = ref(!!contentId)
+const contentId = ref(route.query.id as string | undefined)
+const isEditing = ref(!!contentId.value)
 
 const form = reactive({
   title: '',
@@ -124,8 +124,8 @@ const rules: FormRules = {
 }
 
 onMounted(async () => {
-  if (contentId) {
-    await contentStore.fetchContentDetail(contentId)
+  if (contentId.value) {
+    await contentStore.fetchContentDetail(contentId.value)
     const content = contentStore.currentContent
     if (content) {
       form.title = content.title
@@ -170,18 +170,23 @@ async function handleSaveDraft() {
   if (!valid) return
 
   const content = await contentStore.saveContent({
-    id: contentId,
+    id: contentId.value,
     ...form,
   })
   ElMessage.success('草稿已保存')
-  if (!contentId && content?.id) {
-    router.replace({ query: { id: content.id } })
+  // 保存后从返回值获取最新 id，避免使用过期的 contentId
+  if (content?.id) {
+    contentId.value = content.id
+    if (!route.query.id) {
+      router.replace({ query: { id: content.id } })
+    }
   }
 }
 
 async function handleSaveAndPublish() {
   await handleSaveDraft()
-  router.push(`/publish?contentId=${contentId}`)
+  // 使用最新的 contentId（可能已在 handleSaveDraft 中更新）
+  router.push(`/publish?contentId=${contentId.value}`)
 }
 </script>
 

@@ -125,8 +125,7 @@ jobs:
           cd k8s
           kustomize edit set image \
             frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${IMAGE_TAG} \
-            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG} \
-            browser-engine=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/browser-engine:${IMAGE_TAG}
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG}
 
           # Apply with rolling update
           kubectl apply -k . --namespace=${NAMESPACE}
@@ -134,7 +133,6 @@ jobs:
           # Wait for rollout
           kubectl rollout status deployment/frontend -n ${NAMESPACE} --timeout=300s
           kubectl rollout status deployment/backend -n ${NAMESPACE} --timeout=300s
-          kubectl rollout status deployment/browser-engine -n ${NAMESPACE} --timeout=300s
 
       - name: Run smoke tests
         run: |
@@ -185,8 +183,7 @@ jobs:
           # Update image tags
           kustomize edit set image \
             frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${IMAGE_TAG} \
-            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG} \
-            browser-engine=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/browser-engine:${IMAGE_TAG}
+            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG}
 
           # Deploy new color
           kubectl apply -k . --namespace=${NAMESPACE} \

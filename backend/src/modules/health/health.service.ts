@@ -6,7 +6,7 @@ export interface HealthCheckResult {
   timestamp: string;
   uptime: number;
   version: string;
-  checks: {
+  checks?: {
     database: { status: 'ok' | 'error'; responseTime?: number; error?: string };
     memory: { status: 'ok' | 'error'; usedMB: number; totalMB: number; percentage: number };
   };
@@ -37,16 +37,24 @@ export class HealthService {
 
     const allOk = dbResult.status === 'ok' && memResult.status === 'ok';
 
-    return {
+    // #21 修复: 生产环境只返回 status，不暴露内部错误细节
+    const isProd = process.env.NODE_ENV === 'production';
+
+    const result: HealthCheckResult = {
       status: allOk ? 'ok' : 'error',
       timestamp: new Date().toISOString(),
       uptime: Math.floor((Date.now() - this.startTime) / 1000),
       version: process.env.npm_package_version || '0.1.0',
-      checks: {
+    };
+
+    if (!isProd) {
+      result.checks = {
         database: dbResult,
         memory: memResult,
-      },
-    };
+      };
+    }
+
+    return result;
   }
 
   private async checkDatabase(): Promise<{

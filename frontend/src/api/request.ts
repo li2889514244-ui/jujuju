@@ -23,7 +23,10 @@ service.interceptors.request.use(
 
 // Response interceptor
 let isRefreshing = false
-let pendingRequests: Array<(token: string) => void> = []
+let pendingRequests: Array<{
+  resolve: (token: string) => void
+  reject: (error: Error) => void
+}> = []
 
 function handleTokenRefresh(response: AxiosResponse<ApiResponse>): Promise<AxiosResponse> {
   const userStore = useUserStore()
@@ -33,10 +36,13 @@ function handleTokenRefresh(response: AxiosResponse<ApiResponse>): Promise<Axios
     userStore
       .doRefreshToken()
       .then(() => {
-        pendingRequests.forEach((cb) => cb(userStore.token))
+        pendingRequests.forEach((cb) => cb.resolve(userStore.token))
         pendingRequests = []
       })
-      .catch(() => {
+      .catch((err: Error) => {
+        // 刷新失败时，reject 所有等待中的请求，然后登出
+        pendingRequests.forEach((cb) => cb.reject(err))
+        pendingRequests = []
         userStore.logout()
       })
       .finally(() => {
@@ -44,10 +50,15 @@ function handleTokenRefresh(response: AxiosResponse<ApiResponse>): Promise<Axios
       })
   }
 
-  return new Promise<AxiosResponse>((resolve) => {
-    pendingRequests.push((token: string) => {
-      response.config.headers.Authorization = `Bearer ${token}`
-      resolve(service(response.config))
+  return new Promise<AxiosResponse>((resolve, reject) => {
+    pendingRequests.push({
+      resolve: (token: string) => {
+        response.config.headers.Authorization = `Bearer ${token}`
+        resolve(service(response.config))
+      },
+      reject: (error: Error) => {
+        reject(error)
+      },
     })
   })
 }

@@ -106,9 +106,9 @@ export class ContentService {
   }
 
   /**
-   * 获取内容详情
+   * #8 修复: 获取内容详情 — 添加 userId 跨租户隔离校验
    */
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
     const post = await this.prisma.post.findUnique({
       where: { id },
       include: {
@@ -118,6 +118,7 @@ export class ContentService {
             platform: true,
             nickname: true,
             avatar: true,
+            userId: true,
             owner: {
               select: { id: true, name: true },
             },
@@ -129,6 +130,14 @@ export class ContentService {
 
     if (!post) {
       throw new NotFoundException('内容不存在');
+    }
+
+    // #8: 跨租户隔离 — 非管理员只能查看自己账号下的内容
+    if (userId && post.account.userId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+        throw new ForbiddenException('无权查看此内容');
+      }
     }
 
     return post;
@@ -269,7 +278,6 @@ export class ContentService {
             id: true,
             platform: true,
             nickname: true,
-            cookies: true,
           },
         },
       },

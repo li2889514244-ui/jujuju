@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as compression from 'compression';
+import * as express from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -20,17 +21,32 @@ async function bootstrap() {
   });
 
   const logger = new Logger('Bootstrap');
+  const isDev = process.env.NODE_ENV !== 'production';
 
   // 全局前缀
   app.setGlobalPrefix('api/v1');
 
-  // CORS 配置 — 从环境变量读取，支持多域名
+  // #18 修复: CORS 配置 — 开发环境默认允许 localhost
   const corsOrigin = process.env.CORS_ORIGIN || '';
-  if (!corsOrigin) {
+  let origin: string[] | boolean;
+  if (corsOrigin) {
+    origin = parseCorsOrigins(corsOrigin);
+  } else if (isDev) {
+    // 开发环境默认允许 localhost
+    origin = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      'http://localhost:8080',
+    ];
+    logger.log('CORS: 开发环境默认允许 localhost 端口');
+  } else {
     logger.warn('CORS_ORIGIN not set, CORS allows no cross-origin requests');
+    origin = false;
   }
+
   app.enableCors({
-    origin: corsOrigin ? parseCorsOrigins(corsOrigin) : false,
+    origin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Version'],
@@ -47,6 +63,10 @@ async function bootstrap() {
       level: 6,
     }),
   );
+
+  // #20 修复: 请求体大小限制
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
   // 全局验证管道
   app.useGlobalPipes(
@@ -73,7 +93,7 @@ async function bootstrap() {
   });
 
   // Swagger 文档配置（仅非生产环境启用）
-  if (process.env.NODE_ENV !== 'production') {
+  if (isDev) {
     const swaggerConfig = new DocumentBuilder()
       .setTitle('MatrixFlow ERP API')
       .setDescription('矩阵账号管理平台 - 企业级SaaS ERP 后端API文档')
@@ -113,7 +133,7 @@ async function bootstrap() {
   await app.listen(port);
 
   logger.log(`🚀 MatrixFlow ERP 后端服务已启动: http://localhost:${port}`);
-  if (process.env.NODE_ENV !== 'production') {
+  if (isDev) {
     logger.log(`📚 Swagger 文档地址: http://localhost:${port}/api/docs`);
   }
 }

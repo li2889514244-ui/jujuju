@@ -96,6 +96,7 @@ const dateLabels = computed(() =>
   )
 )
 
+// TODO: 图表数据为 mock（随机生成），正式环境需从 analyticsApi 获取真实数据
 const followerChart = computed(() => ({
   tooltip: { trigger: 'axis' as const },
   legend: { data: ['新增粉丝'] },

@@ -49,12 +49,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '发布管理', icon: 'Promotion' },
       },
       {
-        path: 'publish/browser',
-        name: 'BrowserPublish',
-        component: () => import('@/views/content/BrowserPublishView.vue'),
-        meta: { title: '浏览器发布', hidden: true },
-      },
-      {
         path: 'analytics',
         name: 'Analytics',
         component: () => import('@/views/analytics/AnalyticsView.vue'),
@@ -77,12 +71,6 @@ const routes: RouteRecordRaw[] = [
         name: 'Platforms',
         component: () => import('@/views/platforms/PlatformManageView.vue'),
         meta: { title: '平台管理', icon: 'Connection' },
-      },
-      {
-        path: 'browser',
-        name: 'Browser',
-        component: () => import('@/views/browser/BrowserView.vue'),
-        meta: { title: '浏览器管理', icon: 'Monitor' },
       },
       {
         path: 'ai',

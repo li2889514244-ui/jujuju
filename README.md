@@ -1,15 +1,15 @@
 # MatrixFlow ERP
 
-矩阵账号管理平台 — 全栈 ERP 系统，基于 Vue 3 + NestJS + Playwright 架构。
+矩阵账号管理平台 — 全栈 ERP 系统，基于 Vue 3 + NestJS 架构。
 
 ## 架构
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────────┐
-│   Frontend   │────▶│   Backend    │────▶│  Browser Engine  │
-│  Vue 3/Vite  │     │   NestJS     │     │   Playwright     │
-│  Nginx/CfP   │     │  Port 3000   │     │   Port 3001      │
-└──────────────┘     └──────┬───────┘     └──────────────────┘
+┌──────────────┐     ┌──────────────┐
+│   Frontend   │────▶│   Backend    │
+│  Vue 3/Vite  │     │   NestJS     │
+│  Nginx/CfP   │     │  Port 3000   │
+└──────────────┘     └──────┬───────┘
                             │
                    ┌────────┴────────┐
                    │                 │
@@ -23,7 +23,6 @@
 |------|--------|---------|
 | Frontend | Vue 3, Vite, Element Plus | Cloudflare Pages / Nginx (Docker) |
 | Backend | NestJS, TypeORM | Docker / Kubernetes (EKS) |
-| Browser Engine | Playwright | Docker / Kubernetes |
 | Database | PostgreSQL 16 | StatefulSet (K8s) / Docker Compose |
 | Cache | Redis 7 | Deployment (K8s) / Docker Compose |
 
@@ -56,7 +55,6 @@ docker compose up -d
 服务启动后:
 - 前端: http://localhost
 - 后端 API: http://localhost:3000/api
-- 浏览器引擎: http://localhost:3001
 
 ### 3. 本地开发 (无 Docker)
 
@@ -79,16 +77,13 @@ cd frontend && pnpm dev
 ```
 ├── frontend/          # Vue 3 前端
 ├── backend/           # NestJS 后端 API
-├── browser-engine/    # Playwright 浏览器引擎
 ├── docker/            # Dockerfiles & Nginx 配置
 │   ├── Dockerfile.frontend
 │   ├── Dockerfile.backend
-│   ├── Dockerfile.browser-engine
 │   └── nginx/         # Nginx 配置
 ├── k8s/               # Kubernetes 清单
 │   ├── frontend/
 │   ├── backend/
-│   ├── browser-engine/
 │   ├── postgres/
 │   ├── redis/
 │   ├── ingress.yaml
@@ -133,7 +128,7 @@ cd frontend && pnpm dev
 | `VITE_API_BASE_URL` | `https://api.matrixflow.io/api` |
 | `VITE_WS_URL` | `wss://api.matrixflow.io` |
 
-### Kubernetes (后端 + 浏览器引擎)
+### Kubernetes (后端)
 
 ```bash
 # 配置密钥 (必须!)

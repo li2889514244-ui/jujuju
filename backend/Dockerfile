@@ -5,20 +5,27 @@ WORKDIR /build
 # 安装构建依赖
 RUN apk add --no-cache python3 make g++
 
-# 复制整个项目（monorepo 需要根目录的 package-lock.json）
-COPY . .
+# 复制根 package.json 和 pnpm 配置（monorepo）
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# 安装 backend workspace 的依赖
-RUN npm install --workspace=backend
+# 复制 backend workspace 的 package.json 和 prisma
+COPY backend/package.json ./backend/
+COPY backend/prisma ./backend/prisma
+
+# 安装 pnpm 并安装依赖（仅 backend workspace）
+ENV HUSKY=0
+RUN corepack enable && pnpm install --frozen-lockfile --filter matrixflow-backend
+
+# 复制 backend 源码
+COPY backend/ ./backend/
 
 # 生成 Prisma Client 并构建
 WORKDIR /build/backend
 RUN npx prisma generate
-RUN npm run build
+RUN pnpm build
 
 # 裁剪 devDependencies
-WORKDIR /build
-RUN npm prune --omit=dev --workspace=backend
+RUN pnpm prune --prod
 
 # ---- Production Stage ----
 FROM node:20-alpine AS production
@@ -40,12 +47,12 @@ RUN mkdir -p /app/logs /app/uploads && chown -R matrixflow:matrixflow /app/logs 
 
 USER matrixflow
 
-ENV NODE_ENV=production PORT=3000
+ENV NODE_ENV=production PORT=3000 HUSKY=0
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:3000/api/v1/health || exit 1
+    CMD curl -f http://localhost:3000/api/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]

@@ -1,6 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
 
 export interface BrowserInstance {
   id: string;
@@ -9,134 +7,48 @@ export interface BrowserInstance {
   startedAt: Date;
 }
 
+/**
+ * 浏览器引擎服务 - 已禁用
+ * 浏览器引擎（browser-engine）已从项目中移除。
+ * 所有方法将抛出 NotImplementedException (501)。
+ *
+ * #10 注意: 如果未来重新启用浏览器引擎，浏览器实例状态应使用 Redis 持久化，
+ * 而非内存 Map。当前内存方案在服务重启后会丢失所有实例信息，
+ * 多实例部署时也无法共享状态。
+ */
 @Injectable()
 export class BrowserService {
   private readonly logger = new Logger(BrowserService.name);
-  private readonly browserEngineUrl: string;
 
-  // 内存中的浏览器实例管理
-  private instances: Map<string, BrowserInstance> = new Map();
-
-  constructor(
-    private prisma: PrismaService,
-    private configService: ConfigService,
-  ) {
-    this.browserEngineUrl =
-      this.configService.get<string>('BROWSER_ENGINE_URL') || 'http://localhost:3001';
-  }
-
-  /**
-   * 获取浏览器实例列表
-   */
   getInstances(): BrowserInstance[] {
-    return Array.from(this.instances.values());
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 
-  /**
-   * 创建浏览器实例
-   */
-  async createInstance(accountId: string): Promise<BrowserInstance> {
-    const instanceId = `browser-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-    const instance: BrowserInstance = {
-      id: instanceId,
-      status: 'idle',
-      accountId,
-      startedAt: new Date(),
-    };
-
-    this.instances.set(instanceId, instance);
-    this.logger.log(`浏览器实例创建: ${instanceId} -> 账号 ${accountId}`);
-
-    return instance;
+  async createInstance(_accountId: string): Promise<BrowserInstance> {
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 
-  /**
-   * 关闭浏览器实例
-   */
-  async closeInstance(instanceId: string): Promise<void> {
-    const instance = this.instances.get(instanceId);
-    if (!instance) {
-      return;
-    }
-
-    this.instances.delete(instanceId);
-    this.logger.log(`浏览器实例关闭: ${instanceId}`);
+  async closeInstance(_instanceId: string): Promise<void> {
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 
-  /**
-   * 设置账号Cookie到浏览器
-   */
-  async setCookies(instanceId: string, cookies: string): Promise<void> {
-    const instance = this.instances.get(instanceId);
-    if (!instance) {
-      throw new Error('浏览器实例不存在');
-    }
-
-    // 实际调用 browser-engine 微服务
-    // await fetch(`${this.browserEngineUrl}/api/cookies`, {
-    //   method: 'POST',
-    //   body: JSON.stringify({ instanceId, cookies }),
-    // });
-
-    this.logger.log(`Cookie已设置到实例: ${instanceId}`);
+  async setCookies(_instanceId: string, _cookies: string): Promise<void> {
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 
-  /**
-   * 执行发布任务
-   */
   async executePublish(
-    instanceId: string,
-    platform: string,
-    content: {
+    _instanceId: string,
+    _platform: string,
+    _content: {
       title?: string;
       content?: string;
       mediaUrls?: string[];
     },
   ): Promise<{ success: boolean; platformUrl?: string; error?: string }> {
-    const instance = this.instances.get(instanceId);
-    if (!instance) {
-      return { success: false, error: '浏览器实例不存在' };
-    }
-
-    instance.status = 'busy';
-
-    try {
-      // 实际调用 browser-engine 微服务执行发布
-      // const response = await fetch(`${this.browserEngineUrl}/api/publish`, {
-      //   method: 'POST',
-      //   body: JSON.stringify({ instanceId, platform, content }),
-      // });
-
-      // 模拟发布成功
-      this.logger.log(`发布任务执行: ${instanceId} -> ${platform}`);
-
-      instance.status = 'idle';
-      return {
-        success: true,
-        platformUrl: `https://${platform}.com/post/mock-id`,
-      };
-    } catch (error) {
-      instance.status = 'error';
-      this.logger.error(`发布失败: ${instanceId}`, error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : '发布失败',
-      };
-    }
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 
-  /**
-   * 截图（用于数据采集）
-   */
-  async screenshot(instanceId: string): Promise<string | null> {
-    const instance = this.instances.get(instanceId);
-    if (!instance) {
-      return null;
-    }
-
-    // 调用 browser-engine 截图
-    this.logger.log(`截图: ${instanceId}`);
-    return null; // 返回截图URL
+  async screenshot(_instanceId: string): Promise<string | null> {
+    throw new NotImplementedException('浏览器引擎功能已禁用');
   }
 }

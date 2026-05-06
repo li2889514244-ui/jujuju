@@ -50,7 +50,6 @@ export function createMockConfigService(overrides: Record<string, string> = {}):
     JWT_ACCESS_EXPIRES: '15m',
     JWT_REFRESH_EXPIRES: '7d',
     COOKIE_ENCRYPTION_KEY: 'test-cookie-encryption-key-32bytes!',
-    BROWSER_ENGINE_URL: 'http://localhost:3001',
     DATABASE_URL: 'postgresql://test:test@localhost:5432/matrixflow_test',
     REDIS_URL: 'redis://localhost:6379/1',
   };

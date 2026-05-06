@@ -15,7 +15,6 @@ import * as crypto from 'crypto';
 export class AccountsService {
   private readonly logger = new Logger(AccountsService.name);
   private readonly encryptionKey: string;
-  private readonly algorithm = 'aes-256-cbc';
 
   constructor(private prisma: PrismaService) {
     const key = process.env.COOKIE_ENCRYPTION_KEY;
@@ -28,25 +27,41 @@ export class AccountsService {
   }
 
   /**
-   * 加密Cookie
+   * #4 修复: 加密Cookie — 使用 aes-256-gcm，每条记录独立随机 IV
    */
   private encryptCookie(text: string): string {
     const iv = crypto.randomBytes(16);
     const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
-    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     let encrypted = cipher.update(text, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
+    const authTag = cipher.getAuthTag().toString('hex');
+    return iv.toString('hex') + ':' + authTag + ':' + encrypted;
   }
 
   /**
-   * 解密Cookie
+   * #4 修复: 解密Cookie — 兼容旧 CBC 格式
    */
   private decryptCookie(text: string): string {
-    const [ivHex, encrypted] = text.split(':');
+    const parts = text.split(':');
+    if (parts.length === 2) {
+      // 兼容旧的 CBC 格式
+      this.logger.warn('检测到旧格式 CBC 加密 Cookie，建议重新设置以升级为 GCM');
+      const [ivHex, encrypted] = parts;
+      const iv = Buffer.from(ivHex, 'hex');
+      const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return decrypted;
+    }
+    // 新的 GCM 格式: iv:authTag:encrypted
+    const [ivHex, authTagHex, encrypted] = parts;
     const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
     const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
-    const decipher = crypto.createDecipheriv(this.algorithm, key, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
@@ -148,9 +163,9 @@ export class AccountsService {
   }
 
   /**
-   * 获取账号详情
+   * #8 修复: 获取账号详情 — 添加 userId 跨租户隔离校验
    */
-  async findById(id: string) {
+  async findById(id: string, userId?: string) {
     const account = await this.prisma.account.findUnique({
       where: { id },
       include: {
@@ -179,6 +194,14 @@ export class AccountsService {
 
     if (!account) {
       throw new NotFoundException('账号不存在');
+    }
+
+    // #8: 跨租户隔离 — 非管理员只能查看自己的账号
+    if (userId && account.userId !== userId) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+        throw new ForbiddenException('无权查看此账号');
+      }
     }
 
     return this.sanitizeAccount(account);

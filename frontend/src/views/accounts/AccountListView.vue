@@ -164,8 +164,9 @@ async function handleCheckCookie(id: string) {
   try {
     const result = await accountStore.checkCookieStatus(id)
     ElMessage.success(`Cookie状态: ${result.status}`)
-  } catch {
-    // handled
+  } catch (e) {
+    ElMessage.error('检测 Cookie 状态失败')
+    console.error('Cookie 检测失败:', e)
   }
 }
 
@@ -177,10 +178,16 @@ async function handleDelete(id: string) {
 
 async function handleBatchDelete() {
   await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个账号？`, '提示', { type: 'warning' })
-  for (const id of selectedIds.value) {
-    await accountsApi.delete(id)
+  const results = await Promise.allSettled(
+    selectedIds.value.map((id) => accountsApi.delete(id))
+  )
+  const successCount = results.filter((r) => r.status === 'fulfilled').length
+  const failCount = results.filter((r) => r.status === 'rejected').length
+  if (failCount === 0) {
+    ElMessage.success(`批量删除成功，共 ${successCount} 个`)
+  } else {
+    ElMessage.warning(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`)
   }
-  ElMessage.success('批量删除成功')
   accountStore.fetchAccounts()
 }
 

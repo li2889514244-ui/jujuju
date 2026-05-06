@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsString, MinLength, Matches } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class LoginDto {
@@ -6,8 +6,8 @@ export class LoginDto {
   @IsEmail({}, { message: '请输入有效的邮箱地址' })
   email: string;
 
-  @ApiProperty({ description: '密码', example: 'Password123!' })
+  @ApiProperty({ description: '密码（至少8位）', example: 'Password123' })
   @IsString()
-  @MinLength(6, { message: '密码长度不能少于6位' })
+  @MinLength(8, { message: '密码长度不能少于8位' })
   password: string;
 }

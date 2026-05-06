@@ -1,4 +1,5 @@
 import { get } from './request'
+import service from './request'
 import type { AnalyticsOverview, TrendData, PlatformStats, PublishEffect } from '@/types'
 
 export const analyticsApi = {
@@ -26,8 +27,10 @@ export const analyticsApi = {
     return get<TrendData[]>('/analytics/engagement', params as Record<string, unknown>)
   },
 
+  // Blob 响应需绕过响应拦截器（拦截器会尝试解析 JSON 导致报错）
   exportReport(params: { startDate: string; endDate: string; format: 'csv' | 'xlsx' }) {
-    return get<Blob>('/analytics/export', params as Record<string, unknown>, {
+    return service.get('/analytics/export', {
+      params,
       responseType: 'blob',
     })
   },

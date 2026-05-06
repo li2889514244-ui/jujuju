@@ -13,7 +13,6 @@ export default async function globalSetup(): Promise<void> {
   process.env.COOKIE_ENCRYPTION_KEY = 'test-cookie-encryption-key-32bytes!';
   process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/matrixflow_test';
   process.env.REDIS_URL = 'redis://localhost:6379/1';
-  process.env.BROWSER_ENGINE_URL = 'http://localhost:3001';
 
   console.log('\n🧪 测试环境已初始化');
 }

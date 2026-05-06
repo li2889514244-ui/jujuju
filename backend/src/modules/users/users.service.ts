@@ -1,6 +1,9 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
+
+// #7 修复: 允许用户自行更新的白名单字段
+const ALLOWED_SELF_UPDATE_FIELDS = new Set(['name', 'phone', 'avatar']);
 
 @Injectable()
 export class UsersService {
@@ -87,7 +90,7 @@ export class UsersService {
   }
 
   /**
-   * 更新用户信息
+   * #7 修复: 更新用户信息 — 只允许更新白名单字段，防止 role/status 被篡改
    */
   async update(id: string, data: Prisma.UserUpdateInput) {
     const user = await this.prisma.user.findUnique({ where: { id } });
@@ -95,9 +98,21 @@ export class UsersService {
       throw new NotFoundException('用户不存在');
     }
 
+    // 过滤: 只保留白名单字段
+    const safeData: Prisma.UserUpdateInput = {};
+    for (const key of Object.keys(data)) {
+      if (ALLOWED_SELF_UPDATE_FIELDS.has(key)) {
+        (safeData as any)[key] = (data as any)[key];
+      }
+    }
+
+    if (Object.keys(safeData).length === 0) {
+      throw new ForbiddenException('没有可更新的合法字段');
+    }
+
     return this.prisma.user.update({
       where: { id },
-      data,
+      data: safeData,
       select: {
         id: true,
         email: true,

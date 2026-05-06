@@ -1,12 +1,18 @@
 /**
  * OAuth流程管理
  * 授权URL生成、Token交换、Token刷新、状态管理
+ *
+ * 修复:
+ * - #1: OAuth state 改为 Redis 存储，5分钟 TTL，Redis 不可用时 fallback 内存并打 warn
+ * - #4: 加密算法从 aes-256-cbc 改为 aes-256-gcm（带 auth tag）
+ * - #11: 平台客户端改为惰性单例，避免每次 new
  */
 
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { RedisService } from '../../../redis/redis.service';
 import { BasePlatformClient, PlatformToken } from '../clients/base-client';
 import { DouyinClient } from '../clients/douyin.client';
 import { KuaishouClient } from '../clients/kuaishou.client';
@@ -31,15 +37,23 @@ export interface TokenData {
   scope?: string;
 }
 
+const OAUTH_STATE_TTL = 300; // 5 分钟
+
 @Injectable()
 export class OAuthService {
   private readonly logger = new Logger(OAuthService.name);
   private readonly encryptionKey: string;
-  private readonly stateStore = new Map<string, OAuthState>();
+
+  // #11: 平台客户端惰性单例缓存
+  private readonly clientCache = new Map<string, BasePlatformClient>();
+
+  // #1: 内存 fallback（仅当 Redis 不可用时使用）
+  private readonly stateStoreFallback = new Map<string, OAuthState>();
 
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private redis: RedisService,
   ) {
     const tokenKey = this.configService.get<string>('TOKEN_ENCRYPTION_KEY');
     if (!tokenKey || tokenKey.length < 32) {
@@ -51,9 +65,13 @@ export class OAuthService {
   }
 
   /**
-   * 获取平台客户端
+   * 获取平台客户端（单例）
    */
   getClient(platform: string): BasePlatformClient {
+    if (this.clientCache.has(platform)) {
+      return this.clientCache.get(platform)!;
+    }
+
     const clientMap: Record<string, () => BasePlatformClient> = {
       DOUYIN: () => new DouyinClient(),
       KUAISHOU: () => new KuaishouClient(),
@@ -67,13 +85,55 @@ export class OAuthService {
     if (!factory) {
       throw new BadRequestException(`不支持的平台: ${platform}`);
     }
-    return factory();
+
+    const client = factory();
+    this.clientCache.set(platform, client);
+    return client;
+  }
+
+  // ==================== #1: OAuth State 管理（Redis 优先） ====================
+
+  private stateRedisKey(nonce: string): string {
+    return `oauth:state:${nonce}`;
+  }
+
+  private async storeState(nonce: string, state: OAuthState): Promise<void> {
+    try {
+      await this.redis.setWithTTL(
+        this.stateRedisKey(nonce),
+        JSON.stringify(state),
+        OAUTH_STATE_TTL,
+      );
+    } catch {
+      this.logger.warn('Redis 存储 OAuth state 失败，fallback 到内存存储');
+      this.stateStoreFallback.set(nonce, state);
+    }
+  }
+
+  private async retrieveState(nonce: string): Promise<OAuthState | null> {
+    try {
+      const raw = await this.redis.get(this.stateRedisKey(nonce));
+      if (raw) return JSON.parse(raw) as OAuthState;
+    } catch {
+      this.logger.warn('Redis 读取 OAuth state 失败，尝试内存 fallback');
+    }
+    // fallback 内存
+    return this.stateStoreFallback.get(nonce) ?? null;
+  }
+
+  private async deleteState(nonce: string): Promise<void> {
+    try {
+      await this.redis.del(this.stateRedisKey(nonce));
+    } catch {
+      // ignore
+    }
+    this.stateStoreFallback.delete(nonce);
   }
 
   /**
    * 生成OAuth授权URL
    */
-  buildAuthorizeUrl(platform: string, userId: string, teamId?: string): string {
+  async buildAuthorizeUrl(platform: string, userId: string, teamId?: string): Promise<string> {
     const nonce = crypto.randomBytes(16).toString('hex');
     const state: OAuthState = {
       userId,
@@ -85,10 +145,7 @@ export class OAuthService {
 
     // 将state编码为URL安全的字符串
     const stateStr = Buffer.from(JSON.stringify(state)).toString('base64url');
-    this.stateStore.set(nonce, state);
-
-    // 清理过期state（5分钟前）
-    this.cleanExpiredStates();
+    await this.storeState(nonce, state);
 
     const client = this.getClient(platform);
     return client.buildAuthorizeUrl(stateStr);
@@ -116,18 +173,18 @@ export class OAuthService {
     }
 
     // 验证state
-    const storedState = this.stateStore.get(stateData.nonce);
+    const storedState = await this.retrieveState(stateData.nonce);
     if (!storedState) {
       throw new BadRequestException('OAuth state已过期或无效');
     }
 
     // 检查时间戳（5分钟有效期）
-    if (Date.now() - stateData.timestamp > 5 * 60 * 1000) {
-      this.stateStore.delete(stateData.nonce);
+    if (Date.now() - stateData.timestamp > OAUTH_STATE_TTL * 1000) {
+      await this.deleteState(stateData.nonce);
       throw new BadRequestException('OAuth state已过期');
     }
 
-    this.stateStore.delete(stateData.nonce);
+    await this.deleteState(stateData.nonce);
 
     const { platform, userId, teamId } = stateData;
 
@@ -279,37 +336,41 @@ export class OAuthService {
     return { refreshed, failed };
   }
 
-  // ==================== Token加密存储 ====================
+  // ==================== #4: Token加密存储（aes-256-gcm） ====================
 
   private encryptToken(token: PlatformToken): string {
     const iv = crypto.randomBytes(16);
     const key = crypto.scryptSync(this.encryptionKey, 'matrixflow-salt', 32);
-    const cipher = crypto.createCipheriv('aes-256-cbc', key, iv);
+    const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
     const json = JSON.stringify(token);
     let encrypted = cipher.update(json, 'utf8', 'hex');
     encrypted += cipher.final('hex');
-    return iv.toString('hex') + ':' + encrypted;
+    const authTag = cipher.getAuthTag().toString('hex');
+    return iv.toString('hex') + ':' + authTag + ':' + encrypted;
   }
 
   private decryptToken(encryptedToken: string): PlatformToken {
-    const [ivHex, encrypted] = encryptedToken.split(':');
+    const parts = encryptedToken.split(':');
+    if (parts.length === 2) {
+      // 兼容旧的 CBC 格式（迁移期）
+      this.logger.warn('检测到旧格式 CBC 加密 Token，建议重新授权以升级为 GCM');
+      const [ivHex, encrypted] = parts;
+      const iv = Buffer.from(ivHex, 'hex');
+      const key = crypto.scryptSync(this.encryptionKey, 'matrixflow-salt', 32);
+      const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+      let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+      return JSON.parse(decrypted);
+    }
+    // 新的 GCM 格式: iv:authTag:encrypted
+    const [ivHex, authTagHex, encrypted] = parts;
     const iv = Buffer.from(ivHex, 'hex');
+    const authTag = Buffer.from(authTagHex, 'hex');
     const key = crypto.scryptSync(this.encryptionKey, 'matrixflow-salt', 32);
-    const decipher = crypto.createDecipheriv('aes-256-cbc', key, iv);
+    const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return JSON.parse(decrypted);
-  }
-
-  /**
-   * 清理过期的state缓存
-   */
-  private cleanExpiredStates(): void {
-    const now = Date.now();
-    for (const [nonce, state] of this.stateStore) {
-      if (now - state.timestamp > 5 * 60 * 1000) {
-        this.stateStore.delete(nonce);
-      }
-    }
   }
 }

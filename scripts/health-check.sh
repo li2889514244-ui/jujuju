@@ -30,7 +30,7 @@ echo ""
 
 # 1. Check pods
 echo "📦 Pods:"
-for deploy in frontend backend browser-engine redis; do
+for deploy in frontend backend redis; do
     local_ready=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=${deploy}" \
         --field-selector=status.phase=Running -o name 2>/dev/null | wc -l)
     local_total=$(kubectl get pods -n "$NAMESPACE" -l "app.kubernetes.io/name=${deploy}" \
@@ -57,7 +57,7 @@ echo ""
 
 # 2. Check services
 echo "🔌 Services:"
-for svc in frontend backend browser-engine postgres redis; do
+for svc in frontend backend postgres redis; do
     if kubectl get svc "$svc" -n "$NAMESPACE" &>/dev/null; then
         check_pass "${svc}: service exists"
     else
@@ -69,7 +69,7 @@ echo ""
 
 # 3. Check endpoints
 echo "🌐 Endpoints:"
-for svc in frontend backend browser-engine redis; do
+for svc in frontend backend redis; do
     ep_count=$(kubectl get endpoints "$svc" -n "$NAMESPACE" -o jsonpath='{.subsets[0].addresses}' 2>/dev/null | jq length 2>/dev/null || echo "0")
     if [[ "$ep_count" -gt 0 ]]; then
         check_pass "${svc}: ${ep_count} endpoint(s)"

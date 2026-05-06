@@ -7,6 +7,7 @@ import {
   Body,
   Query,
   UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -23,6 +24,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '@prisma/client';
+import { PrismaService } from '../../prisma/prisma.service';
 
 class UpdateUserDto {
   @ApiPropertyOptional({ description: '用户名' })
@@ -46,7 +48,10 @@ class UpdateUserDto {
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   @Roles(Role.OWNER, Role.ADMIN)
@@ -81,10 +86,22 @@ export class UsersController {
     return this.usersService.findById(userId);
   }
 
+  /**
+   * #5 修复: 普通用户只能查看自己，管理员/所有者可查看他人
+   */
   @Get(':id')
   @ApiOperation({ summary: '获取指定用户详情' })
+  @ApiResponse({ status: 403, description: '无权查看他人信息' })
   @ApiResponse({ status: 404, description: '用户不存在' })
-  async findOne(@Param('id') id: string) {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('id') currentUserId: string,
+    @CurrentUser('role') currentRole: Role,
+  ) {
+    // 普通用户只能查看自己
+    if (id !== currentUserId && !['OWNER', 'ADMIN'].includes(currentRole)) {
+      throw new ForbiddenException('无权查看其他用户信息');
+    }
     return this.usersService.findById(id);
   }
 

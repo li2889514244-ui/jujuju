@@ -164,6 +164,7 @@ export class TeamsService {
 
   /**
    * 更新成员角色
+   * #6 修复: 校验不能设置比自己更高的角色
    */
   async updateMemberRole(
     organizationId: string,
@@ -191,6 +192,20 @@ export class TeamsService {
 
     if (!member) {
       throw new NotFoundException('成员不存在');
+    }
+
+    // #6 修复: 角色等级校验 — 不能设置比自己更高的角色
+    const roleHierarchy: Record<string, number> = {
+      OWNER: 5,
+      ADMIN: 4,
+      MANAGER: 3,
+      MEMBER: 2,
+      VIEWER: 1,
+    };
+    const operatorLevel = roleHierarchy[operator.role] || 0;
+    const targetLevel = roleHierarchy[newRole] || 0;
+    if (targetLevel >= operatorLevel) {
+      throw new ForbiddenException('不能设置与自己相同或更高的角色');
     }
 
     return this.prisma.user.update({

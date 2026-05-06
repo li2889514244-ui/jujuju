@@ -552,8 +552,21 @@ async function handleReview() {
 
 // ===== Helpers =====
 
+function escapeHtml(text: string): string {
+  const map: Record<string, string> = {
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  }
+  return text.replace(/[&<>"']/g, (c) => map[c])
+}
+
 function formatContent(text: string): string {
-  return text
+  // 先转义 HTML 实体，防止 XSS，再做 Markdown 转换
+  const safe = escapeHtml(text)
+  return safe
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/^(\d+\.\s)/gm, '<br><strong>$1</strong>')
@@ -580,8 +593,8 @@ onMounted(async () => {
     if (Array.isArray(providers) && providers.length > 0) {
       providerStatus.value = providers[0]
     }
-  } catch {
-    // ignore
+  } catch (e) {
+    console.warn('获取 AI Provider 状态失败:', e)
   }
 })
 </script>

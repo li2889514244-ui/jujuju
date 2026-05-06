@@ -66,7 +66,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -83,7 +83,8 @@ const accountStore = useAccountStore()
 const loading = ref(false)
 const historyLoading = ref(false)
 const history = ref<AccountHistory[]>([])
-const account = ref(accountStore.currentAccount)
+// 使用 computed 保持响应性，避免 ref 捕获初始值导致 store 更新后视图不同步
+const account = computed(() => accountStore.currentAccount)
 
 const accountId = route.params.id as string
 
@@ -91,7 +92,6 @@ onMounted(async () => {
   loading.value = true
   try {
     await accountStore.fetchAccountDetail(accountId)
-    account.value = accountStore.currentAccount
 
     historyLoading.value = true
     const res = await accountsApi.getHistory(accountId)
