@@ -41,6 +41,10 @@ services:
         generateValue: true
       - key: CORS_ORIGIN
         value: https://ddddkiii.com
+      - key: COOKIE_ENCRYPTION_KEY
+        generateValue: true
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
       - key: LOG_LEVEL
         value: warn
     healthCheckPath: /api/v1/health

@@ -8,6 +8,8 @@
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
+    "typecheck": "vue-tsc --noEmit",
+    "test:ci": "echo 'no tests yet'",
     "format": "prettier --write \"src/**/*.{vue,ts,tsx,css}\""
   },
   "dependencies": {
@@ -27,6 +29,8 @@
   "devDependencies": {
     "@types/nprogress": "^0.2.3",
     "@vitejs/plugin-vue": "^5.0.0",
+    "eslint-plugin-vue": "^9.27.0",
+    "vue-eslint-parser": "^9.4.0",
     "sass": "^1.77.0",
     "typescript": "^5.4.0",
     "unplugin-auto-import": "^0.17.0",
