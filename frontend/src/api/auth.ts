@@ -6,7 +6,7 @@ export const authApi = {
     return post<LoginResponse>('/auth/login', form)
   },
 
-  register(form: RegisterForm) {
+  register(form: Omit<RegisterForm, 'confirmPassword'>) {
     return post<LoginResponse>('/auth/register', form)
   },
 
