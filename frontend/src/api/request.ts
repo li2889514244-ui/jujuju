@@ -4,7 +4,7 @@ import { useUserStore } from '@/store/user'
 import type { ApiResponse } from '@/types'
 
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
