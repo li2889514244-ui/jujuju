@@ -40,7 +40,6 @@ yarn-error.log*
 pnpm-debug.log*
 
 # Prisma
-backend/prisma/migrations/
 
 # Docker
 .docker/
