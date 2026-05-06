@@ -1,27 +1,24 @@
 FROM node:20-alpine AS builder
 
-WORKDIR /app
+WORKDIR /build
 
 # 安装构建依赖
 RUN apk add --no-cache python3 make g++
 
-# 先复制根目录的 package 文件（monorepo）
-COPY package.json package-lock.json ./
-COPY backend/package.json ./backend/
+# 复制整个项目（monorepo 需要根目录的 package-lock.json）
+COPY . .
 
-# 安装依赖（只装 backend workspace）
+# 安装 backend workspace 的依赖
 RUN npm install --workspace=backend
 
-# 复制 backend 源码
-COPY backend/ ./backend/
-
 # 生成 Prisma Client 并构建
-WORKDIR /app/backend
+WORKDIR /build/backend
 RUN npx prisma generate
 RUN npm run build
 
 # 裁剪 devDependencies
-RUN npm prune --omit=dev
+WORKDIR /build
+RUN npm prune --omit=dev --workspace=backend
 
 # ---- Production Stage ----
 FROM node:20-alpine AS production
@@ -33,10 +30,11 @@ RUN addgroup -g 1001 -S matrixflow \
 
 WORKDIR /app
 
-COPY --from=builder --chown=matrixflow:matrixflow /app/backend/dist ./dist
-COPY --from=builder --chown=matrixflow:matrixflow /app/backend/node_modules ./node_modules
-COPY --from=builder --chown=matrixflow:matrixflow /app/backend/package.json ./
-COPY --from=builder --chown=matrixflow:matrixflow /app/backend/prisma ./prisma
+# 从 builder 复制构建产物
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 
 RUN mkdir -p /app/logs /app/uploads && chown -R matrixflow:matrixflow /app/logs /app/uploads
 
