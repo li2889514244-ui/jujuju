@@ -41,8 +41,13 @@ async function bootstrap() {
     ];
     logger.log('CORS: 开发环境默认允许 localhost 端口');
   } else {
-    logger.warn('CORS_ORIGIN not set, CORS allows no cross-origin requests');
-    origin = false;
+    // 未配置 CORS_ORIGIN 时，允许 Cloudflare Pages 域名及 Railway 预览域名
+    origin = [
+      'https://fda2071c.jujuju-28b.pages.dev',
+      /\.jujuju-28b\.pages\.dev$/,
+      /\.pages\.dev$/,
+    ] as any;
+    logger.warn('CORS_ORIGIN not set, falling back to Cloudflare Pages domains');
   }
 
   app.enableCors({
