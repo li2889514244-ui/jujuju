@@ -41,8 +41,5 @@ ENV NODE_ENV=production PORT=3000 HUSKY=0
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
-
 ENTRYPOINT ["/sbin/tini", "--"]
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
