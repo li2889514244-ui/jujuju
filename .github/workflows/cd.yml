@@ -1,62 +1,25 @@
 name: CD Pipeline
 
 on:
-  workflow_run:
-    workflows: ["CI Pipeline"]
-    types: [completed]
-    branches: [master, main, develop]
+  push:
+    branches: [master, main]
+    paths:
+      - 'backend/**'
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Deploy environment'
-        required: true
-        type: choice
-        options:
-          - production
-          - staging
-
-concurrency:
-  group: cd-${{ github.ref }}
-  cancel-in-progress: false
 
 jobs:
-  # ==================== Deploy Backend to Railway ====================
   deploy-backend:
     name: Deploy Backend (Railway)
     runs-on: ubuntu-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        run: |
-          curl -X POST "${{ secrets.RAILWAY_DEPLOY_HOOK_URL }}"
-
-  # ==================== Deploy Frontend to Cloudflare Pages ====================
-  deploy-frontend:
-    name: Deploy Frontend (Cloudflare Pages)
-    runs-on: ubuntu-latest
-    if: ${{ (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch') && vars.CLOUDFLARE_ENABLED == 'true' }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Install and build frontend
-        working-directory: frontend
-        run: |
-          npm install
-          npm run build
+        working-directory: backend
+        run: railway up --service jujuju-backend --detach
         env:
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-          VITE_WS_URL: ${{ vars.VITE_WS_URL }}
-
-      - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy frontend/dist --project-name=jujuju --branch=main
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+          RAILWAY_PROJECT_ID: 372d8faa-0cd5-42cd-b59d-aa36a1f180d6
