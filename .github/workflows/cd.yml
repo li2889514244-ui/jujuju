@@ -4,7 +4,7 @@ on:
   workflow_run:
     workflows: ["CI Pipeline"]
     types: [completed]
-    branches: [main, develop]
+    branches: [master, main, develop]
   workflow_dispatch:
     inputs:
       environment:
@@ -12,73 +12,44 @@ on:
         required: true
         type: choice
         options:
-          - staging
           - production
-      image_tag:
-        description: 'Image tag to deploy'
-        required: false
-        type: string
+          - staging
 
 concurrency:
-  group: cd-${{ github.event.inputs.environment || (github.ref == 'refs/heads/main' && 'production' || 'staging') }}
+  group: cd-${{ github.ref }}
   cancel-in-progress: false
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/matrixflow
-
 jobs:
-  # ==================== Determine Environment ====================
-  prepare:
-    name: Prepare Deployment
+  # ==================== Deploy Backend to Railway ====================
+  deploy-backend:
+    name: Deploy Backend (Railway)
     runs-on: ubuntu-latest
     if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
-    outputs:
-      environment: ${{ steps.env.outputs.environment }}
-      image_tag: ${{ steps.env.outputs.image_tag }}
     steps:
-      - name: Determine environment
-        id: env
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Railway
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            echo "environment=${{ github.event.inputs.environment }}" >> $GITHUB_OUTPUT
-            echo "image_tag=${{ github.event.inputs.image_tag || github.sha }}" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "environment=production" >> $GITHUB_OUTPUT
-            echo "image_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          else
-            echo "environment=staging" >> $GITHUB_OUTPUT
-            echo "image_tag=${{ github.sha }}" >> $GITHUB_OUTPUT
-          fi
+          curl -X POST "${{ secrets.RAILWAY_DEPLOY_HOOK_URL }}"
 
   # ==================== Deploy Frontend to Cloudflare Pages ====================
   deploy-frontend:
     name: Deploy Frontend (Cloudflare Pages)
     runs-on: ubuntu-latest
-    needs: prepare
-    if: always() && needs.prepare.result == 'success'
+    if: ${{ (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch') && vars.CLOUDFLARE_ENABLED == 'true' }}
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 8
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
-          cache-dependency-path: pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install and build frontend
         working-directory: frontend
-        run: pnpm install --frozen-lockfile
-
-      - name: Build frontend
-        working-directory: frontend
-        run: pnpm build
+        run: |
+          npm install
+          npm run build
         env:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_WS_URL: ${{ vars.VITE_WS_URL }}
@@ -88,153 +59,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: >
-            pages deploy frontend/dist
-            --project-name=jujuju
-            --branch=${{ needs.prepare.outputs.environment == 'production' && 'main' || 'develop' }}
-
-  # ==================== Deploy to Staging ====================
-  deploy-staging:
-    name: Deploy Backend to Staging
-    runs-on: ubuntu-latest
-    needs: prepare
-    if: needs.prepare.outputs.environment == 'staging'
-    environment:
-      name: staging
-      url: https://staging.erp.matrixflow.io
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name matrixflow-staging --region ${{ secrets.AWS_REGION }}
-
-      - name: Deploy with kustomize
-        run: |
-          export IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
-          export NAMESPACE=matrixflow-staging
-
-          # Update image tags
-          cd k8s
-          kustomize edit set image \
-            frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${IMAGE_TAG} \
-            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG}
-
-          # Apply with rolling update
-          kubectl apply -k . --namespace=${NAMESPACE}
-
-          # Wait for rollout
-          kubectl rollout status deployment/frontend -n ${NAMESPACE} --timeout=300s
-          kubectl rollout status deployment/backend -n ${NAMESPACE} --timeout=300s
-
-      - name: Run smoke tests
-        run: |
-          sleep 10
-          curl -sf https://staging.erp.matrixflow.io/health || exit 1
-          curl -sf https://staging-api.matrixflow.io/api/health || exit 1
-
-  # ==================== Deploy to Production ====================
-  deploy-production:
-    name: Deploy Backend to Production
-    runs-on: ubuntu-latest
-    needs: [prepare, deploy-staging]
-    if: needs.prepare.outputs.environment == 'production'
-    environment:
-      name: production
-      url: https://erp.matrixflow.io
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Update kubeconfig
-        run: |
-          aws eks update-kubeconfig --name matrixflow-production --region ${{ secrets.AWS_REGION }}
-
-      - name: Blue-Green Deployment
-        run: |
-          export IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
-          export NAMESPACE=matrixflow
-
-          cd k8s
-
-          # Get current deployment color
-          CURRENT_COLOR=$(kubectl get svc backend -n ${NAMESPACE} -o jsonpath='{.spec.selector.deployment-color}' 2>/dev/null || echo "blue")
-          if [[ "$CURRENT_COLOR" == "blue" ]]; then
-            NEW_COLOR="green"
-          else
-            NEW_COLOR="blue"
-          fi
-
-          echo "Deploying to ${NEW_COLOR} environment..."
-
-          # Update image tags
-          kustomize edit set image \
-            frontend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/frontend:${IMAGE_TAG} \
-            backend=${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}/backend:${IMAGE_TAG}
-
-          # Deploy new color
-          kubectl apply -k . --namespace=${NAMESPACE} \
-            -l deployment-color=${NEW_COLOR}
-
-          # Wait for rollout
-          kubectl rollout status deployment/backend-${NEW_COLOR} -n ${NAMESPACE} --timeout=300s
-
-          # Health check on new deployment
-          NEW_POD=$(kubectl get pods -n ${NAMESPACE} -l deployment-color=${NEW_COLOR},app.kubernetes.io/name=backend -o jsonpath='{.items[0].metadata.name}')
-          kubectl exec -n ${NAMESPACE} ${NEW_POD} -- curl -sf http://localhost:3000/api/health
-
-          # Switch traffic
-          kubectl patch svc backend -n ${NAMESPACE} -p "{\"spec\":{\"selector\":{\"deployment-color\":\"${NEW_COLOR}\"}}}"
-
-          echo "Traffic switched to ${NEW_COLOR}"
-
-      - name: Verify production health
-        run: |
-          sleep 15
-          curl -sf https://erp.matrixflow.io/health || exit 1
-          curl -sf https://api.matrixflow.io/api/health || exit 1
-
-      - name: Rollback on failure
-        if: failure()
-        run: |
-          NAMESPACE=matrixflow
-          CURRENT_COLOR=$(kubectl get svc backend -n ${NAMESPACE} -o jsonpath='{.spec.selector.deployment-color}' 2>/dev/null || echo "blue")
-          if [[ "$CURRENT_COLOR" == "blue" ]]; then
-            ROLLBACK_COLOR="green"
-          else
-            ROLLBACK_COLOR="blue"
-          fi
-          kubectl patch svc backend -n ${NAMESPACE} -p "{\"spec\":{\"selector\":{\"deployment-color\":\"${ROLLBACK_COLOR}\"}}}"
-          echo "Rolled back to ${ROLLBACK_COLOR}"
-
-  # ==================== Notify ====================
-  notify:
-    name: Notify
-    runs-on: ubuntu-latest
-    needs: [prepare, deploy-frontend, deploy-staging, deploy-production]
-    if: always()
-    steps:
-      - name: Notify Slack
-        uses: 8398a7/action-slack@v3
-        with:
-          status: ${{ job.status }}
-          text: |
-            Deployment ${{ needs.prepare.outputs.environment }}: ${{ job.status }}
-            Image tag: ${{ needs.prepare.outputs.image_tag }}
-            Frontend: ${{ needs.deploy-frontend.result }}
-          fields: repo,message,commit,author,action,eventName,workflow
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          command: pages deploy frontend/dist --project-name=jujuju --branch=main
