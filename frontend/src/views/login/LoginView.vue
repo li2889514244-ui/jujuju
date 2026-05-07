@@ -16,11 +16,11 @@
             size="large"
             @submit.prevent="handleLogin"
           >
-            <el-form-item prop="username">
+            <el-form-item prop="email">
               <el-input
-                v-model="loginForm.username"
-                placeholder="用户名 / 邮箱"
-                :prefix-icon="User"
+                v-model="loginForm.email"
+                placeholder="邮箱"
+                :prefix-icon="Message"
               />
             </el-form-item>
             <el-form-item prop="password">
@@ -55,10 +55,10 @@
             size="large"
             @submit.prevent="handleRegister"
           >
-            <el-form-item prop="username">
+            <el-form-item prop="name">
               <el-input
-                v-model="registerForm.username"
-                placeholder="用户名"
+                v-model="registerForm.name"
+                placeholder="用户名 / 昵称"
                 :prefix-icon="User"
               />
             </el-form-item>
@@ -122,19 +122,22 @@ const loading = ref(false)
 const loginFormRef = ref<FormInstance>()
 const registerFormRef = ref<FormInstance>()
 
-const loginForm = reactive({ username: '', password: '' })
+const loginForm = reactive({ email: '', password: '' })
 const registerForm = reactive({
-  username: '',
+  name: '',
   email: '',
   password: '',
   confirmPassword: '',
 })
 
 const loginRules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  email: [
+    { required: true, message: '请输入邮箱', trigger: 'blur' },
+    { type: 'email', message: '请输入正确的邮箱', trigger: 'blur' },
+  ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少6位', trigger: 'blur' },
+    { min: 8, message: '密码至少8位', trigger: 'blur' },
   ],
 }
 
@@ -147,9 +150,9 @@ const validateConfirmPassword = (_rule: unknown, value: string, callback: (error
 }
 
 const registerRules: FormRules = {
-  username: [
+  name: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 20, message: '用户名3-20个字符', trigger: 'blur' },
+    { min: 1, max: 20, message: '用户名1-20个字符', trigger: 'blur' },
   ],
   email: [
     { required: true, message: '请输入邮箱', trigger: 'blur' },
@@ -157,7 +160,7 @@ const registerRules: FormRules = {
   ],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码至少6位', trigger: 'blur' },
+    { min: 8, message: '密码至少8位', trigger: 'blur' },
   ],
   confirmPassword: [
     { required: true, message: '请确认密码', trigger: 'blur' },
@@ -193,7 +196,7 @@ async function handleRegister() {
     await authApi.register(registerData)
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
-    loginForm.username = registerForm.username
+    loginForm.email = registerForm.email
     loginForm.password = ''
   } catch {
     // 错误已由响应拦截器统一处理并弹出提示
