@@ -1,6 +1,7 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
+import { Public } from '../../common/decorators/public.decorator';
 import { HealthService, HealthCheckResult } from './health.service';
 
 @ApiTags('health')
@@ -9,6 +10,7 @@ export class HealthController {
   constructor(private readonly healthService: HealthService) {}
 
   @Get()
+  @Public()
   @SkipThrottle()
   @ApiOperation({ summary: '健康检查' })
   @ApiResponse({ status: 200, description: '服务正常' })
