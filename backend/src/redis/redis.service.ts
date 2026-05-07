@@ -4,8 +4,8 @@ import Redis from 'ioredis';
 
 /**
  * 全局 Redis 服务
- * - 如果 REDIS_HOST 未配置或连接失败，自动 fallback 到内存存储并打 warn 日志
- * - 提供 get/set/del/setWithTTL 等通用方法
+ * - 生产环境：Redis 连接失败则 fail-fast（进程退出）
+ * - 开发环境：自动 fallback 到内存存储并打 warn 日志
  */
 @Injectable()
 export class RedisService implements OnModuleDestroy {
@@ -15,6 +15,7 @@ export class RedisService implements OnModuleDestroy {
   private useMemory = false;
 
   constructor(private configService: ConfigService) {
+    const isProd = process.env.NODE_ENV === 'production';
     const host = this.configService.get<string>('REDIS_HOST');
     const redisUrl = this.configService.get<string>('REDIS_URL');
 
@@ -31,7 +32,11 @@ export class RedisService implements OnModuleDestroy {
           maxRetriesPerRequest: 3,
           retryStrategy: (times: number) => {
             if (times > 3) {
-              this.logger.error('Redis 连接失败超过 3 次，切换到内存 fallback');
+              if (isProd) {
+                this.logger.error('FATAL: Redis 连接失败，生产环境不允许内存 fallback');
+                process.exit(1);
+              }
+              this.logger.warn('Redis 连接失败超过 3 次，切换到内存 fallback');
               this.useMemory = true;
               return null;
             }
@@ -46,6 +51,10 @@ export class RedisService implements OnModuleDestroy {
     }
 
     if (!host) {
+      if (isProd) {
+        this.logger.error('FATAL: 生产环境必须配置 REDIS_URL 或 REDIS_HOST');
+        process.exit(1);
+      }
       this.logger.warn('REDIS_HOST 未配置，Redis 服务将使用内存 fallback（不适用于生产环境）');
       this.useMemory = true;
       return;
@@ -60,7 +69,11 @@ export class RedisService implements OnModuleDestroy {
         maxRetriesPerRequest: 3,
         retryStrategy: (times: number) => {
           if (times > 3) {
-            this.logger.error('Redis 连接失败超过 3 次，切换到内存 fallback');
+            if (isProd) {
+              this.logger.error('FATAL: Redis 连接失败，生产环境不允许内存 fallback');
+              process.exit(1);
+            }
+            this.logger.warn('Redis 连接失败超过 3 次，切换到内存 fallback');
             this.useMemory = true;
             return null;
           }
