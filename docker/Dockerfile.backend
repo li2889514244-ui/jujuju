@@ -27,6 +27,7 @@ RUN npx prisma generate
 RUN pnpm build
 
 # Prune dev dependencies (--ignore-scripts prevents prepare hook from calling removed husky)
+ENV CI=true
 RUN pnpm prune --prod --ignore-scripts
 
 # Stage 2: Production
