@@ -2,12 +2,12 @@
 
 // ===== Auth =====
 export interface LoginForm {
-  username: string
+  email: string
   password: string
 }
 
 export interface RegisterForm {
-  username: string
+  name: string
   email: string
   password: string
   confirmPassword: string
@@ -15,11 +15,11 @@ export interface RegisterForm {
 
 export interface UserInfo {
   id: string
-  username: string
+  name: string
   email: string
-  avatar: string
+  avatar?: string
   role: string
-  teamId: string
+  teamId?: string
   createdAt: string
 }
 

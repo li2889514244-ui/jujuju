@@ -12,7 +12,7 @@ export const useUserStore = defineStore(
     const userInfo = ref<UserInfo | null>(null)
 
     const isLoggedIn = computed(() => !!token.value)
-    const username = computed(() => userInfo.value?.username || '')
+    const username = computed(() => userInfo.value?.name || '')
     const avatar = computed(() => userInfo.value?.avatar || '')
 
     async function login(form: LoginForm) {
