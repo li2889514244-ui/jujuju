@@ -30,10 +30,22 @@ WORKDIR /app/backend
 RUN ./node_modules/.bin/prisma generate
 RUN ./node_modules/.bin/nest build
 
-# Prune dev dependencies
-RUN pnpm prune --prod --ignore-scripts
+# Stage 2: Production Dependencies (clean install, no broken symlinks)
+FROM node:20-alpine AS prod-deps
 
-# Stage 2: Production
+WORKDIR /app
+
+RUN apk add --no-cache openssl libc6-compat
+ENV CI=true
+RUN npm install -g pnpm@9
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY backend/package.json ./backend/
+
+# Only install production dependencies (fresh install, no broken symlinks)
+RUN pnpm install --frozen-lockfile --filter matrixflow-backend --prod --ignore-scripts
+
+# Stage 3: Production
 FROM node:20-alpine AS production
 
 # Install runtime dependencies + OpenSSL (Prisma needs it)
@@ -50,9 +62,9 @@ RUN addgroup -g 1001 -S matrixflow \
 
 WORKDIR /app
 
-# Copy built application and production dependencies
+# Copy built app from builder, production deps from prod-deps
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/dist ./dist
-COPY --from=builder --chown=matrixflow:matrixflow /app/backend/node_modules ./node_modules
+COPY --from=prod-deps --chown=matrixflow:matrixflow /app/backend/node_modules ./node_modules
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/prisma ./prisma
 

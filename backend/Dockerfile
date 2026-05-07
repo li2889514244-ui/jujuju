@@ -18,7 +18,7 @@ ENV HUSKY=0
 ENV CI=true
 RUN npm install -g pnpm@9
 
-# 安装依赖（--ignore-scripts 避免 husky 等钩子干扰）
+# 安装全部依赖（--ignore-scripts 避免 husky 等钩子干扰）
 RUN pnpm install --frozen-lockfile --filter matrixflow-backend --ignore-scripts
 
 # 复制 backend 源码
@@ -29,9 +29,20 @@ WORKDIR /build/backend
 RUN ./node_modules/.bin/prisma generate
 RUN ./node_modules/.bin/nest build
 
-# 裁剪 devDependencies
+# ---- Production Dependencies Stage ----
+FROM node:20-alpine AS prod-deps
+
+WORKDIR /build
+
+RUN apk add --no-cache openssl libc6-compat
 ENV CI=true
-RUN pnpm prune --prod --ignore-scripts
+RUN npm install -g pnpm@9
+
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY backend/package.json ./backend/
+
+# 只安装生产依赖（干净安装，不会有 broken symlinks）
+RUN pnpm install --frozen-lockfile --filter matrixflow-backend --prod --ignore-scripts
 
 # ---- Production Stage ----
 FROM node:20-alpine AS production
@@ -43,9 +54,9 @@ RUN addgroup -g 1001 -S matrixflow \
 
 WORKDIR /app
 
-# 从 builder 复制构建产物
+# 从 builder 复制构建产物，从 prod-deps 复制干净的生产依赖
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
-COPY --from=builder --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
+COPY --from=prod-deps --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 
@@ -57,7 +68,6 @@ ENV NODE_ENV=production PORT=3000 HUSKY=0
 
 EXPOSE 3000
 
-# 使用 Railway 动态端口（Railway 会覆盖 PORT 环境变量）
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
 
