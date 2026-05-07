@@ -26,8 +26,8 @@ COPY backend/ ./backend/
 
 # 生成 Prisma Client 并构建
 WORKDIR /build/backend
-RUN npx prisma generate
-RUN npx nest build
+RUN ./node_modules/.bin/prisma generate
+RUN ./node_modules/.bin/nest build
 
 # 裁剪 devDependencies
 ENV CI=true

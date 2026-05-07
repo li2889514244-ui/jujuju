@@ -18,7 +18,7 @@ services:
     plan: free
     runtime: node
     region: singapore
-    buildCommand: npm i -g pnpm@9 && pnpm install --frozen-lockfile --filter matrixflow-backend && cd backend && npx prisma generate && npx nest build
+    buildCommand: npm i -g pnpm@9 && pnpm install --frozen-lockfile --filter matrixflow-backend && cd backend && ./node_modules/.bin/prisma generate && ./node_modules/.bin/nest build
     startCommand: sh -c "cd backend && ./node_modules/.bin/prisma migrate deploy && node dist/main.js"
     envVars:
       - key: NODE_ENV
