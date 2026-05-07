@@ -5,12 +5,16 @@ on:
     branches: [master, main]
     paths:
       - 'backend/**'
+      - 'frontend/**'
   workflow_dispatch:
 
 jobs:
   deploy-backend:
     name: Deploy Backend (Railway)
     runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '"backend/')
     steps:
       - uses: actions/checkout@v4
 
@@ -24,3 +28,42 @@ jobs:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: 372d8faa-0cd5-42cd-b59d-aa36a1f180d6
           RAILWAY_ENVIRONMENT_ID: 00718f1f-395e-4d08-a0e2-8279ac1e9a57
+
+  deploy-frontend:
+    name: Deploy Frontend (Cloudflare Pages)
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      contains(toJson(github.event.commits.*.modified + github.event.commits.*.added + github.event.commits.*.removed), '"frontend/')
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: pnpm install
+
+      - name: Build
+        working-directory: frontend
+        run: pnpm build
+        env:
+          VITE_API_BASE_URL: https://jujuju-backend-production.up.railway.app/api/v1
+          VITE_WS_URL: wss://jujuju-backend-production.up.railway.app/ws
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: jujuju-frontend
+          directory: frontend/dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
