@@ -28,7 +28,7 @@ WORKDIR /app/backend
 
 # Generate Prisma Client and build
 RUN npx prisma generate
-RUN pnpm build
+RUN npx nest build
 
 # Prune dev dependencies
 RUN pnpm prune --prod --ignore-scripts
