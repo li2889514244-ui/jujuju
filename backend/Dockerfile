@@ -16,7 +16,7 @@ COPY backend/prisma ./backend/prisma
 # 安装 pnpm（不依赖 corepack，更稳定）
 ENV HUSKY=0
 ENV CI=true
-RUN npm install -g pnpm@8
+RUN npm install -g pnpm@9
 
 # 安装依赖（--ignore-scripts 避免 husky 等钩子干扰）
 RUN pnpm install --frozen-lockfile --filter matrixflow-backend --ignore-scripts
