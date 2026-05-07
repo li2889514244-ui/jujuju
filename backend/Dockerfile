@@ -9,7 +9,7 @@ RUN apk add --no-cache python3 make g++ openssl libc6-compat
 # 复制根 package.json 和 pnpm 配置（monorepo）
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
 
-# 复制 backend workspace 的 package.json 和 prisma
+# 复制 backend workspace 的 package.json 和 prisma schema
 COPY backend/package.json ./backend/
 COPY backend/prisma ./backend/prisma
 
@@ -18,16 +18,16 @@ ENV HUSKY=0
 ENV CI=true
 RUN npm install -g pnpm@9
 
-# 安装全部依赖（--ignore-scripts 避免 husky 等钩子干扰）
-RUN pnpm install --frozen-lockfile --filter matrixflow-backend --ignore-scripts
+# 安装全部依赖（monorepo 过滤只装 backend）
+RUN pnpm install --frozen-lockfile --filter matrixflow-backend... --ignore-scripts
 
 # 复制 backend 源码
 COPY backend/ ./backend/
 
-# 生成 Prisma Client 并构建
+# 生成 Prisma Client 并构建 NestJS
 WORKDIR /build/backend
-RUN ./node_modules/.bin/prisma generate
-RUN ./node_modules/.bin/nest build
+RUN pnpm exec prisma generate
+RUN pnpm exec nest build
 
 # ---- Production Stage ----
 FROM node:20-alpine AS production
@@ -39,13 +39,18 @@ RUN addgroup -g 1001 -S matrixflow \
 
 WORKDIR /app
 
-# 复制构建产物
-COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
+# 复制 package.json 和 prisma schema
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 
-# 用 npm 安装生产依赖（npm 的扁平 node_modules 没有符号链接问题）
+# 复制构建产物
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
+
+# 用 npm 安装生产依赖（扁平 node_modules，无符号链接问题）
 RUN npm install --omit=dev --ignore-scripts
+
+# ★ 关键：在生产环境中重新生成 Prisma Client（包含平台特定的引擎二进制文件）
+RUN npx prisma generate
 
 RUN mkdir -p /app/logs /app/uploads && chown -R matrixflow:matrixflow /app/logs /app/uploads
 
