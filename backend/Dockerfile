@@ -29,21 +29,6 @@ WORKDIR /build/backend
 RUN ./node_modules/.bin/prisma generate
 RUN ./node_modules/.bin/nest build
 
-# ---- Production Dependencies Stage ----
-FROM node:20-alpine AS prod-deps
-
-WORKDIR /build
-
-RUN apk add --no-cache openssl libc6-compat
-ENV CI=true
-RUN npm install -g pnpm@9
-
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
-COPY backend/package.json ./backend/
-
-# 只安装生产依赖（干净安装，不会有 broken symlinks）
-RUN pnpm install --frozen-lockfile --filter matrixflow-backend --prod --ignore-scripts
-
 # ---- Production Stage ----
 FROM node:20-alpine AS production
 
@@ -54,11 +39,13 @@ RUN addgroup -g 1001 -S matrixflow \
 
 WORKDIR /app
 
-# 从 builder 复制构建产物，从 prod-deps 复制干净的生产依赖
+# 复制构建产物
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
-COPY --from=prod-deps --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
+
+# 用 npm 安装生产依赖（npm 的扁平 node_modules 没有符号链接问题）
+RUN npm install --omit=dev --ignore-scripts
 
 RUN mkdir -p /app/logs /app/uploads && chown -R matrixflow:matrixflow /app/logs /app/uploads
 
@@ -72,4 +59,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
 
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "./node_modules/.bin/prisma migrate deploy && node dist/main.js"]
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
