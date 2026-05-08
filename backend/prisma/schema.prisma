@@ -223,3 +223,45 @@ model AuditLog {
   @@index([createdAt])
   @@index([action])
 }
+
+// ==================== 竞对监测 ====================
+
+model Competitor {
+  id             String   @id @default(cuid())
+  platform       Platform
+  platformUserId String
+  nickname       String
+  avatar         String?
+  bio            String?
+  followers      Int      @default(0)
+  following      Int      @default(0)
+  status         AccountStatus @default(ACTIVE)
+  note           String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  userId    String
+  snapshots CompetitorSnapshot[]
+
+  @@unique([platform, platformUserId, userId])
+  @@index([userId])
+  @@index([platform])
+}
+
+model CompetitorSnapshot {
+  id        String   @id @default(cuid())
+  date      DateTime @db.Date
+  followers Int      @default(0)
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  posts     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  competitorId String
+
+  @@unique([competitorId, date])
+  @@index([competitorId])
+  @@index([date])
+}

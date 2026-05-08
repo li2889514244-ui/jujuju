@@ -188,4 +188,80 @@ export class AnalyticsService {
 
     return result;
   }
+
+  /**
+   * 生成数据报表
+   */
+  async generateReport(userId: string, params: {
+    startDate?: Date;
+    endDate?: Date;
+    platform?: string;
+  }) {
+    const { startDate, endDate, platform } = params;
+
+    // 默认最近30天
+    const end = endDate || new Date();
+    const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        userId,
+        ...(platform ? { platform: platform as Platform } : {}),
+      },
+      select: { id: true, platform: true, nickname: true, followers: true },
+    });
+
+    const accountIds = accounts.map((a) => a.id);
+
+    // 每日数据趋势
+    const dailyStats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { gte: start, lte: end },
+      },
+      orderBy: { date: 'asc' },
+      include: {
+        account: { select: { nickname: true, platform: true } },
+      },
+    });
+
+    // 内容表现 Top 10
+    const topPosts = await this.prisma.post.findMany({
+      where: {
+        accountId: { in: accountIds },
+        status: 'PUBLISHED',
+        createdAt: { gte: start, lte: end },
+      },
+      include: {
+        stats: true,
+        account: { select: { nickname: true, platform: true } },
+      },
+      orderBy: { stats: { views: 'desc' } },
+      take: 10,
+    });
+
+    // 汇总
+    const overview = await this.getOverview(userId);
+
+    return {
+      period: { start, end },
+      overview,
+      accounts: accounts.map((a) => ({
+        ...a,
+        dailyStats: dailyStats.filter((d) => d.accountId === a.id),
+      })),
+      topPosts: topPosts.map((p) => ({
+        id: p.id,
+        title: p.title,
+        platform: p.account.platform,
+        account: p.account.nickname,
+        views: p.stats?.views || 0,
+        likes: p.stats?.likes || 0,
+        comments: p.stats?.comments || 0,
+        shares: p.stats?.shares || 0,
+        publishedAt: p.updatedAt,
+      })),
+      dailyTrend: dailyStats,
+    };
+  }
 }

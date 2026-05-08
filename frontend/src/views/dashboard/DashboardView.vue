@@ -103,36 +103,58 @@ import dayjs from 'dayjs'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import { analyticsApi } from '@/api/analytics'
+import { contentApi } from '@/api/content'
 import type { PublishTask } from '@/types'
 
 const trendDays = ref(7)
+const loading = ref(false)
 
-// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
+// 真实数据，初始为 0
 const overviewCards = ref([
-  { title: '账号总数', value: '128', icon: 'UserFilled', color: '#409eff', trend: 5.2 },
-  { title: '总粉丝数', value: '2.8M', icon: 'Star', color: '#e6a23c', trend: 3.1 },
-  { title: '总点赞数', value: '15.6M', icon: 'DataLine', color: '#67c23a', trend: 8.7 },
-  { title: '发布总数', value: '1,024', icon: 'List', color: '#f56c6c', trend: -1.2 },
+  { title: '账号总数', value: '0', icon: 'UserFilled', color: '#409eff', trend: 0 },
+  { title: '总粉丝数', value: '0', icon: 'Star', color: '#e6a23c', trend: 0 },
+  { title: '总互动数', value: '0', icon: 'DataLine', color: '#67c23a', trend: 0 },
+  { title: '发布总数', value: '0', icon: 'List', color: '#f56c6c', trend: 0 },
 ])
 
-// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
-const recentTasks = ref<PublishTask[]>([
-  { id: '1', contentId: '1', contentTitle: '探店vlog-朝阳大悦城', accountId: '1', accountNickname: '小明', platform: 'douyin', status: 'success', scheduledAt: null, publishedAt: '2025-05-05T10:00:00', errorMessage: null, createdAt: '2025-05-05T09:30:00' },
-  { id: '2', contentId: '2', contentTitle: '美食教程-红烧肉', accountId: '2', accountNickname: '美食家', platform: 'xiaohongshu', status: 'publishing', scheduledAt: '2025-05-05T14:00:00', publishedAt: null, errorMessage: null, createdAt: '2025-05-05T09:00:00' },
-  { id: '3', contentId: '3', contentTitle: '旅行日记-三亚', accountId: '3', accountNickname: '旅行者', platform: 'bilibili', status: 'failed', scheduledAt: null, publishedAt: null, errorMessage: 'Cookie已过期', createdAt: '2025-05-04T18:00:00' },
-])
+const recentTasks = ref<PublishTask[]>([])
 
-// TODO: 以下为 mock 数据，正式环境需替换为 API 调用
-const notifications = ref([
-  { message: '账号"美食家"Cookie即将过期，请及时更新', icon: 'WarningFilled', color: '#e6a23c', time: '10分钟前' },
-  { message: '3个发布任务已完成', icon: 'SuccessFilled', color: '#67c23a', time: '30分钟前' },
-  { message: '新成员"张三"加入了团队', icon: 'InfoFilled', color: '#409eff', time: '1小时前' },
-])
+const notifications = ref<{ message: string; icon: string; color: string; time: string }[]>([])
 
-// TODO: 图表数据为 mock（随机生成），正式环境需从 analyticsApi 获取真实数据
+// 平台分布数据（从 API 获取）
+const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
+
+const PLATFORM_COLORS: Record<string, string> = {
+  DOUYIN: '#000',
+  KUAISHOU: '#ff4906',
+  XIAOHONGSHU: '#ff2442',
+  BILIBILI: '#fb7299',
+  WECHAT_VIDEO: '#07c160',
+  WEIBO: '#ff8200',
+  TIKTOK: '#010101',
+}
+
+const PLATFORM_CN: Record<string, string> = {
+  DOUYIN: '抖音',
+  KUAISHOU: '快手',
+  XIAOHONGSHU: '小红书',
+  BILIBILI: 'B站',
+  WECHAT_VIDEO: '视频号',
+  WEIBO: '微博',
+  TIKTOK: 'TikTok',
+}
+
+function formatNumber(num: number): string {
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
+  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
+  return num.toLocaleString()
+}
+
+// 图表：粉丝增长趋势（暂用占位，后续接 daily stats API）
 const followerChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
-  legend: { data: ['抖音', '快手', '小红书', 'B站'] },
+  legend: { data: Object.values(PLATFORM_CN) },
   grid: { left: 50, right: 20, top: 40, bottom: 30 },
   xAxis: {
     type: 'category' as const,
@@ -141,12 +163,7 @@ const followerChartOption = computed(() => ({
     ),
   },
   yAxis: { type: 'value' as const, name: '新增粉丝' },
-  series: [
-    { name: '抖音', type: 'line' as const, smooth: true, data: generateRandomData(trendDays.value, 500, 2000) },
-    { name: '快手', type: 'line' as const, smooth: true, data: generateRandomData(trendDays.value, 200, 800) },
-    { name: '小红书', type: 'line' as const, smooth: true, data: generateRandomData(trendDays.value, 300, 1500) },
-    { name: 'B站', type: 'line' as const, smooth: true, data: generateRandomData(trendDays.value, 100, 600) },
-  ],
+  series: [] as unknown[],
 }))
 
 const platformChartOption = computed(() => ({
@@ -160,27 +177,75 @@ const platformChartOption = computed(() => ({
       itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
       label: { show: false },
       emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' as const } },
-      data: [
-        { value: 35, name: '抖音', itemStyle: { color: '#000' } },
-        { value: 25, name: '快手', itemStyle: { color: '#ff4906' } },
-        { value: 20, name: '小红书', itemStyle: { color: '#ff2442' } },
-        { value: 12, name: 'B站', itemStyle: { color: '#fb7299' } },
-        { value: 8, name: '视频号', itemStyle: { color: '#07c160' } },
-      ],
+      data: platformDistribution.value.length > 0
+        ? platformDistribution.value
+        : [{ value: 0, name: '暂无数据' }],
     },
   ],
 }))
-
-function generateRandomData(count: number, min: number, max: number) {
-  return Array.from({ length: count }, () => Math.floor(Math.random() * (max - min) + min))
-}
 
 function formatTime(time: string) {
   return dayjs(time).format('MM-DD HH:mm')
 }
 
+async function fetchDashboardData() {
+  loading.value = true
+  try {
+    const res = await analyticsApi.getOverview()
+    const data = res.data as any
+
+    // 适配后端返回格式
+    const totalAccounts = data.accounts?.total || 0
+    const totalFollowers = data.accounts?.totalFollowers || 0
+    const totalEngagement = (data.engagement?.totalLikes || 0) + (data.engagement?.totalComments || 0) + (data.engagement?.totalShares || 0)
+    const totalPosts = data.posts?.total || 0
+
+    overviewCards.value = [
+      { title: '账号总数', value: formatNumber(totalAccounts), icon: 'UserFilled', color: '#409eff', trend: 0 },
+      { title: '总粉丝数', value: formatNumber(totalFollowers), icon: 'Star', color: '#e6a23c', trend: 0 },
+      { title: '总互动数', value: formatNumber(totalEngagement), icon: 'DataLine', color: '#67c23a', trend: 0 },
+      { title: '发布总数', value: formatNumber(totalPosts), icon: 'List', color: '#f56c6c', trend: 0 },
+    ]
+
+    // 平台分布饼图
+    const byPlatform = data.accounts?.byPlatform || {}
+    platformDistribution.value = Object.entries(byPlatform).map(([key, count]) => ({
+      value: count as number,
+      name: PLATFORM_CN[key] || key,
+      itemStyle: { color: PLATFORM_COLORS[key] || '#999' },
+    }))
+  } catch (e) {
+    console.error('获取概览数据失败:', e)
+  }
+
+  // 获取最近发布任务
+  try {
+    const res = await contentApi.getList({ page: 1, limit: 5, status: 'PUBLISHED' })
+    const data = res.data as any
+    if (data?.posts) {
+      recentTasks.value = data.posts.map((p: any) => ({
+        id: p.id,
+        contentId: p.id,
+        contentTitle: p.title || '无标题',
+        accountId: p.accountId,
+        accountNickname: p.account?.nickname || '',
+        platform: (p.account?.platform || '').toLowerCase(),
+        status: p.status === 'PUBLISHED' ? 'success' : p.status === 'FAILED' ? 'failed' : 'publishing',
+        scheduledAt: p.publishAt,
+        publishedAt: p.updatedAt,
+        errorMessage: p.errorMsg,
+        createdAt: p.createdAt,
+      }))
+    }
+  } catch (e) {
+    console.error('获取发布任务失败:', e)
+  }
+
+  loading.value = false
+}
+
 onMounted(() => {
-  // Fetch real data in production
+  fetchDashboardData()
 })
 </script>
 

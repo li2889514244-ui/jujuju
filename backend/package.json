@@ -49,7 +49,8 @@
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.0",
     "winston": "^3.13.0",
-    "prisma": "^5.14.0"
+    "prisma": "^5.14.0",
+    "playwright": "^1.44.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",
@@ -87,7 +88,4 @@
     "testEnvironment": "node",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/dist/"
-    ]
-  }
-}
+ 

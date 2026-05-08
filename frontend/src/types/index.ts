@@ -57,6 +57,16 @@ export interface Account {
   createdAt: string
 }
 
+export interface CreateAccountForm {
+  platform: string
+  platformUserId: string
+  nickname: string
+  avatar?: string
+  bio?: string
+  cookies?: string
+  teamId?: string
+}
+
 export interface AccountFilter {
   platform: string
   group: string
