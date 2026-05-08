@@ -17,7 +17,7 @@ export const useUserStore = defineStore(
 
     async function login(form: LoginForm) {
       const res = await authApi.login(form)
-      token.value = res.data.token
+      token.value = res.data.accessToken
       refreshToken.value = res.data.refreshToken
       userInfo.value = res.data.user
       return res
@@ -31,7 +31,7 @@ export const useUserStore = defineStore(
 
     async function doRefreshToken() {
       const res = await authApi.refreshToken(refreshToken.value)
-      token.value = res.data.token
+      token.value = res.data.accessToken
       refreshToken.value = res.data.refreshToken
       return res
     }
