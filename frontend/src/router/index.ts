@@ -55,6 +55,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '数据分析', icon: 'DataAnalysis' },
       },
       {
+        path: 'report',
+        name: 'Report',
+        component: () => import('@/views/report/ReportView.vue'),
+        meta: { title: '数据报表', icon: 'Document' },
+      },
+      {
         path: 'team',
         name: 'Team',
         component: () => import('@/views/team/TeamView.vue'),
@@ -71,6 +77,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Platforms',
         component: () => import('@/views/platforms/PlatformManageView.vue'),
         meta: { title: '平台管理', icon: 'Connection' },
+      },
+      {
+        path: 'competitors',
+        name: 'Competitors',
+        component: () => import('@/views/competitors/CompetitorView.vue'),
+        meta: { title: '竞对监测', icon: 'Aim' },
       },
       {
         path: 'ai',
@@ -97,20 +109,4 @@ router.beforeEach((to, _from, next) => {
   NProgress.start()
   document.title = `${to.meta.title || 'MatrixFlow'} - 矩阵管理平台`
 
-  const userStore = useUserStore()
-  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)
-
-  if (requiresAuth && !userStore.token) {
-    next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'Login' && userStore.token) {
-    next({ name: 'Dashboard' })
-  } else {
-    next()
-  }
-})
-
-router.afterEach(() => {
-  NProgress.done()
-})
-
-export default router
+  const userStore = useUs

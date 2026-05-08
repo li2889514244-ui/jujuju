@@ -96,6 +96,23 @@ export class ContentController {
     return this.contentService.publish(id, userId);
   }
 
+  @Post('batch-publish')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '一键分发：同一内容发布到多个账号' })
+  async batchPublish(
+    @CurrentUser('id') userId: string,
+    @Body() dto: {
+      title: string;
+      content: string;
+      mediaUrls?: string[];
+      tags?: string[];
+      accountIds: string[];
+      publishAt?: string;
+    },
+  ) {
+    return this.contentService.batchPublish(dto, userId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '删除内容' })

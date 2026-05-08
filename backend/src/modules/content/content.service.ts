@@ -284,4 +284,57 @@ export class ContentService {
       orderBy: { publishAt: 'asc' },
     });
   }
+
+  /**
+   * 一键分发：同一内容发布到多个账号
+   */
+  async batchPublish(dto: {
+    title: string;
+    content: string;
+    mediaUrls?: string[];
+    tags?: string[];
+    accountIds: string[];
+    publishAt?: string;
+  }, userId: string) {
+    const { accountIds, ...contentData } = dto;
+
+    if (!accountIds || accountIds.length === 0) {
+      throw new BadRequestException('至少选择一个账号');
+    }
+
+    // 验证所有账号归属
+    const accounts = await this.prisma.account.findMany({
+      where: { id: { in: accountIds }, userId },
+      select: { id: true, platform: true, nickname: true },
+    });
+
+    if (accounts.length !== accountIds.length) {
+      throw new ForbiddenException('部分账号不属于当前用户');
+    }
+
+    // 为每个账号创建一条内容
+    const posts = await Promise.all(
+      accounts.map((account) =>
+        this.prisma.post.create({
+          data: {
+            title: contentData.title,
+            content: contentData.content,
+            mediaUrls: contentData.mediaUrls || undefined,
+            tags: contentData.tags || [],
+            publishAt: contentData.publishAt ? new Date(contentData.publishAt) : null,
+            status: contentData.publishAt ? 'SCHEDULED' : 'PUBLISHING',
+            accountId: account.id,
+          },
+          include: {
+            account: {
+              select: { id: true, platform: true, nickname: true },
+            },
+          },
+        })
+      )
+    );
+
+    this.logger.log(`一键分发: ${posts.length} 条内容已创建 (用户: ${userId})`);
+    return { success: true, count: posts.length, posts };
+  }
 }

@@ -3,11 +3,11 @@ import type { Content, ContentForm, PublishTask, PublishForm, PaginatedResponse 
 
 export const contentApi = {
   getList(params?: Record<string, unknown>) {
-    return get<PaginatedResponse<Content>>('/contents', params)
+    return get<PaginatedResponse<Content>>('/content', params)
   },
 
   getDetail(id: string) {
-    return get<Content>(`/contents/${id}`)
+    return get<Content>(`/content/${id}`)
   },
 
   save(form: ContentForm) {
@@ -19,28 +19,28 @@ export const contentApi = {
     if (form.videoFile) formData.append('video', form.videoFile)
     if (form.coverFile) formData.append('cover', form.coverFile)
 
-    return post<Content>('/contents', formData, {
+    return post<Content>('/content', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 
   delete(id: string) {
-    return del(`/contents/${id}`)
+    return del(`/content/${id}`)
   },
 
   publish(form: PublishForm) {
-    return post<PublishTask[]>('/contents/publish', form)
+    return post<PublishTask[]>('/content/publish', form)
   },
 
   getPublishTasks(params?: Record<string, unknown>) {
-    return get<PaginatedResponse<PublishTask>>('/contents/publish-tasks', params)
+    return get<PaginatedResponse<PublishTask>>('/content/scheduled', params)
   },
 
   cancelPublish(taskId: string) {
-    return post(`/contents/publish-tasks/${taskId}/cancel`)
+    return post(`/content/${taskId}/cancel`)
   },
 
   retryPublish(taskId: string) {
-    return post(`/contents/publish-tasks/${taskId}/retry`)
+    return post(`/content/${taskId}/retry`)
   },
 }

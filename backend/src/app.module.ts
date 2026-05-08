@@ -14,6 +14,8 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { AIModule } from './modules/ai/ai.module';
 import { PlatformsModule } from './modules/platforms/platforms.module';
 import { HealthModule } from './modules/health/health.module';
+import { CompetitorsModule } from './modules/competitors/competitors.module';
+import { UploaderModule } from './modules/uploader/uploader.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -62,6 +64,8 @@ import databaseConfig from './config/database.config';
     AIModule,
     PlatformsModule,
     HealthModule,
+    CompetitorsModule,
+    UploaderModule,
   ],
   providers: [
     // #12 全局认证守卫 — 所有路由默认需要认证，@Public() 装饰器可豁免
@@ -71,9 +75,4 @@ import databaseConfig from './config/database.config';
     },
     // 全局速率限制守卫
     {
-      provide: APP_GUARD,
-      useClass: ThrottlerGuard,
-    },
-  ],
-})
-export class AppModule {}
+      provide:

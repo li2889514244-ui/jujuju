@@ -1,9 +1,13 @@
 import { get, post, put, del } from './request'
-import type { Account, AccountFilter, AccountGroup, AccountHistory, PaginatedResponse } from '@/types'
+import type { Account, AccountFilter, AccountGroup, AccountHistory, PaginatedResponse, CreateAccountForm } from '@/types'
 
 export const accountsApi = {
   getList(filter: AccountFilter) {
     return get<PaginatedResponse<Account>>('/accounts', filter as unknown as Record<string, unknown>)
+  },
+
+  create(data: CreateAccountForm) {
+    return post<Account>('/accounts', data)
   },
 
   getDetail(id: string) {

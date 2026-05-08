@@ -240,4 +240,59 @@ export class AuthService implements OnModuleInit {
       throw new ConflictException(errors.join('; '));
     }
   }
+
+  /**
+   * 获取当前用户资料
+   */
+  async getProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatar: true,
+        phone: true,
+        role: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedException('用户不存在');
+    }
+
+    return user;
+  }
+
+  /**
+   * 更新用户资料
+   */
+  async updateProfile(userId: string, data: { name?: string; avatar?: string; phone?: string }) {
+    const updateData: Record<string, string> = {};
+    if (data.name) updateData.name = data.name;
+    if (data.avatar) updateData.avatar = data.avatar;
+    if (data.phone) updateData.phone = data.phone;
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        avatar: true,
+        phone: true,
+        role: true,
+        status: true,
+        lastLoginAt: true,
+        createdAt: true,
+      },
+    });
+
+    this.logger.log(`用户资料更新: ${userId}`);
+    return user;
+  }
 }

@@ -70,6 +70,21 @@ export class AnalyticsController {
     return this.analyticsService.getPlatformComparison(userId);
   }
 
+  @Get('report')
+  @ApiOperation({ summary: '生成数据报表（JSON格式，前端可导出为Excel/PDF）' })
+  async getReport(
+    @CurrentUser('id') userId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.generateReport(userId, {
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+      platform,
+    });
+  }
+
   /**
    * 校验账号是否属于当前用户（管理员除外）
    */
