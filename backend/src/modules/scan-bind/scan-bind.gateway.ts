@@ -19,7 +19,11 @@ import { ScanBindService } from './scan-bind.service';
 @WebSocketGateway({
   namespace: '/scan-bind',
   cors: {
-    origin: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:3000'],
+    origin: process.env.CORS_ORIGINS?.split(',') || process.env.CORS_ORIGIN?.split(',') || [
+      'http://localhost:5173',
+      'http://localhost:3000',
+      'https://jujuju-28b.pages.dev',
+    ],
     credentials: true,
   },
 })
