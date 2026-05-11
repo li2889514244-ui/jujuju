@@ -184,25 +184,29 @@ export class ScanBindService {
         if (!qrSent) {
           let qrElement = null;
 
-          // Try each selector
-          for (const selector of QR_SELECTORS) {
-            try {
-              qrElement = page.locator(selector).first();
-              const count = await page.locator(selector).count();
-              if (count > 0) {
-                // Check if it's a visible/large enough image
-                const box = await qrElement.boundingBox().catch(() => null);
-                if (box && box.width > 80 && box.height > 80) {
-                  this.logger.log(`Found QR via: ${selector} (${box.width}x${box.height})`);
-                  break;
-                } else {
-                  qrElement = null;
-                }
-              } else {
-                qrElement = null;
-              }
-            } catch {
-              qrElement = null;
+          // Method 1: Semantic selector (same as social-auto-upload)
+          qrElement = page.getByRole('img', { name: /二维码|QR|qr|扫码|scan/i }).first();
+          try {
+            const box = await qrElement.boundingBox().catch(() => null);
+            if (box && box.width > 80 && box.height > 80) {
+              this.logger.log(`Found QR via getByRole (${box.width}x${box.height})`);
+            } else { qrElement = null; }
+          } catch { qrElement = null; }
+
+          // Method 2: CSS selectors
+          if (!qrElement) {
+            for (const selector of QR_SELECTORS) {
+              try {
+                qrElement = page.locator(selector).first();
+                const count = await page.locator(selector).count();
+                if (count > 0) {
+                  const box = await qrElement.boundingBox().catch(() => null);
+                  if (box && box.width > 80 && box.height > 80) {
+                    this.logger.log(`Found QR via: ${selector} (${box.width}x${box.height})`);
+                    break;
+                  } else { qrElement = null; }
+                } else { qrElement = null; }
+              } catch { qrElement = null; }
             }
           }
 
