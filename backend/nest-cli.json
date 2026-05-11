@@ -3,6 +3,7 @@
   "collection": "@nestjs/schematics",
   "sourceRoot": "src",
   "compilerOptions": {
+    "assets": ["src/modules/uploader/stealth.min.js"],
     "deleteOutDir": true,
     "webpack": false,
     "tsConfigPath": "tsconfig.build.json"

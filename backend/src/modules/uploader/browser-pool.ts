@@ -1,6 +1,8 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { chromium, Browser, BrowserContext, Page } from 'playwright';
 import { FingerprintGenerator } from './fingerprint-generator';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class BrowserPool implements OnModuleDestroy {
@@ -8,6 +10,7 @@ export class BrowserPool implements OnModuleDestroy {
   private browser: Browser | null = null;
   private launching = false;
   private fingerprintGen = new FingerprintGenerator();
+  private stealthScript: string | null = null;
 
   async getBrowser(retries = 0): Promise<Browser> {
     if (this.browser?.isConnected()) return this.browser;
@@ -29,13 +32,18 @@ export class BrowserPool implements OnModuleDestroy {
           '--disable-blink-features=AutomationControlled',
           '--disable-features=IsolateOrigins,site-per-process',
           '--disable-web-security',
-          '--disable-features=VizDisplayCompositor',
           '--disable-infobars',
           '--window-size=1280,800',
-          '--enable-features=NetworkService,NetworkServiceInProcess',
           '--disable-background-timer-throttling',
           '--disable-backgrounding-occluded-windows',
           '--disable-renderer-backgrounding',
+          '--disable-field-trial-config',
+          '--disable-hang-monitor',
+          '--disable-ipc-flooding-protection',
+          '--disable-popup-blocking',
+          '--disable-prompt-on-repost',
+          '--disable-sync',
+          '--enable-features=NetworkService,NetworkServiceInProcess',
         ],
       });
       this.logger.log('Chromium launched');
@@ -43,6 +51,19 @@ export class BrowserPool implements OnModuleDestroy {
     } finally {
       this.launching = false;
     }
+  }
+
+  private loadStealthScript(): string {
+    if (this.stealthScript) return this.stealthScript;
+    const scriptPath = path.join(__dirname, 'stealth.min.js');
+    if (fs.existsSync(scriptPath)) {
+      this.stealthScript = fs.readFileSync(scriptPath, 'utf-8');
+      this.logger.log(`Loaded stealth.min.js (${this.stealthScript.length} bytes)`);
+    } else {
+      this.logger.warn('stealth.min.js not found, using basic stealth');
+      this.stealthScript = '';
+    }
+    return this.stealthScript;
   }
 
   async createContext(options?: {
@@ -68,8 +89,6 @@ export class BrowserPool implements OnModuleDestroy {
         'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Encoding': 'gzip, deflate, br',
-        'DNT': '1',
-        'Upgrade-Insecure-Requests': '1',
         'Sec-Fetch-Dest': 'document',
         'Sec-Fetch-Mode': 'navigate',
         'Sec-Fetch-Site': 'none',
@@ -78,54 +97,14 @@ export class BrowserPool implements OnModuleDestroy {
       },
     });
 
-    // Comprehensive stealth injection
-    await context.addInitScript(() => {
-      // ---- Navigator properties ----
-      const od = Object.defineProperty;
-      od(navigator, 'webdriver', { get: () => undefined });
-      od(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-      od(navigator, 'languages', { get: () => ['zh-CN', 'zh', 'en-US', 'en'] });
-      od(navigator, 'language', { get: () => 'zh-CN' });
-      od(navigator, 'platform', { get: () => 'Win32' });
-      od(navigator, 'hardwareConcurrency', { get: () => 8 });
-      od(navigator as any, 'deviceMemory', { get: () => 8 });
-      od(navigator, 'maxTouchPoints', { get: () => 0 });
-      od(navigator, 'vendor', { get: () => 'Google Inc.' });
-      od(navigator, 'productSub', { get: () => '20030107' });
-      od(navigator, 'appVersion', { get: () => navigator.appVersion.replace('Headless', '') });
+    // Inject puppeteer-extra stealth script (industry standard anti-detection)
+    const stealth = this.loadStealthScript();
+    if (stealth) {
+      await context.addInitScript(stealth);
+      this.logger.log('Stealth script injected');
+    }
 
-      // ---- Chrome runtime ----
-      (window as any).chrome = {
-        runtime: { onConnect: { addListener: () => {} }, onMessage: { addListener: () => {} } },
-        loadTimes: () => ({}),
-        csi: () => ({}),
-        app: { isInstalled: false, InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' }, RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' } },
-      };
-
-      // ---- Permissions ----
-      const origQuery = (navigator.permissions as any)?.query;
-      if (origQuery) {
-        (navigator.permissions as any).query = (p: any) =>
-          p.name === 'notifications' ? Promise.resolve({ state: 'denied' } as PermissionStatus) : origQuery(p);
-      }
-
-      // ---- Connection ----
-      od(navigator, 'connection', { get: () => ({ effectiveType: '4g', rtt: 50, downlink: 10, saveData: false }) });
-
-      // ---- Media devices ----
-      if (navigator.mediaDevices?.enumerateDevices) {
-        const origEnum = navigator.mediaDevices.enumerateDevices;
-        (navigator.mediaDevices as any).enumerateDevices = () => origEnum.call(navigator.mediaDevices);
-      }
-
-      // ---- Intl ----
-      const origDateTime = Intl.DateTimeFormat;
-      (Intl as any).DateTimeFormat = function (...args: any[]) {
-        return new origDateTime(...args);
-      };
-    });
-
-    // Canvas/WebGL fingerprint noise
+    // Additional Canvas/WebGL fingerprint noise (layer on top of stealth)
     await context.addInitScript(`
       const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
       HTMLCanvasElement.prototype.toDataURL = function(t) {
