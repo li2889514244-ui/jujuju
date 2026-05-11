@@ -5,4 +5,9 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { UploaderModule } from '../uploader/uploader.module';
 
 @Module({
-  impo
+  imports: [PrismaModule, forwardRef(() => UploaderModule)],
+  controllers: [ContentController],
+  providers: [ContentService],
+  exports: [ContentService],
+})
+export class ContentModule {}

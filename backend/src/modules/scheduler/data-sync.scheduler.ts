@@ -54,7 +54,7 @@ export class DataSyncScheduler {
       for (const account of accounts) {
         try {
           const cookies = account.cookies
-            ? this.cookieManager.decryptCookies(account.cookies)
+            ? this.cookieManager.decryptCookie(account.cookies)
             : [];
 
           if (cookies.length === 0) {
