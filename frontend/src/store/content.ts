@@ -36,8 +36,8 @@ export const useContentStore = defineStore('content', () => {
     return res.data
   }
 
-  async function publishContent(contentId: string, accountIds: string[], scheduledAt?: string) {
-    const res = await contentApi.publish({ contentId, accountIds, scheduledAt })
+  async function publishContent(title: string, desc: string, accountIds: string[], tags?: string[], scheduledAt?: string) {
+    const res = await contentApi.publish({ title, content: desc, accountIds, tags, publishAt: scheduledAt })
     await fetchPublishTasks()
     return res.data
   }

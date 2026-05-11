@@ -29,7 +29,7 @@ export const contentApi = {
   },
 
   publish(form: PublishForm) {
-    return post<PublishTask[]>('/content/publish', form)
+    return post<PublishTask[]>('/content/batch-publish', form)
   },
 
   getPublishTasks(params?: Record<string, unknown>) {

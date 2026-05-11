@@ -183,11 +183,16 @@ async function handlePublish() {
   const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
 
+  const selected = contentStore.contents.find(c => c.id === form.contentId)
+  if (!selected) { ElMessage.error('no content'); return }
+
   publishing.value = true
   try {
     await contentStore.publishContent(
-      form.contentId,
+      selected.title,
+      selected.description,
       form.accountIds,
+      selected.tags,
       publishMode.value === 'scheduled' ? form.scheduledAt : undefined
     )
     ElMessage.success(publishMode.value === 'now' ? '发布任务已创建' : '定时发布已设置')

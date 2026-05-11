@@ -160,7 +160,8 @@ function startScan() {
   }, 120000)
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin
-  socket = io(`${baseUrl}/scan-bind`, {
+  const wsBase = baseUrl.replace(/\/api\/v1$/, '')
+  socket = io(`${wsBase}/scan-bind`, {
     transports: ['websocket'],
     auth: {
       token: userStore.token,

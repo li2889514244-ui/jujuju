@@ -127,6 +127,7 @@ import FileUpload from '@/components/common/FileUpload.vue'
 const route = useRoute()
 const router = useRouter()
 const contentStore = useContentStore()
+const accountStore = useAccountStore()
 
 const formRef = ref<FormInstance>()
 const tagInputRef = ref()
