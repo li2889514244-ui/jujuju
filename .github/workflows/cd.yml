@@ -19,6 +19,7 @@ jobs:
 
       - name: Deploy to Railway
         # Run from root where railway.json lives
+        working-directory: backend
         run: railway up --service jujuju-backend --detach
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
