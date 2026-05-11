@@ -122,15 +122,17 @@ export class AccountsService {
   async findAll(params: {
     userId?: string;
     teamId?: string;
+    groupId?: string;
     platform?: Platform;
     skip?: number;
     take?: number;
   }) {
-    const { userId, teamId, platform, skip = 0, take = 20 } = params;
+    const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params;
 
     const where: Prisma.AccountWhereInput = {};
     if (userId) where.userId = userId;
     if (teamId) where.teamId = teamId;
+    if (groupId) where.groupId = groupId;
     if (platform) where.platform = platform;
 
     const [accounts, total] = await Promise.all([

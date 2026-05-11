@@ -266,15 +266,15 @@ export class DouyinUploader extends BaseUploader implements OnModuleInit {
    * 下载文件到本地临时目录
    */
   private async downloadFile(url: string, destPath: string): Promise<void> {
-    const { execSync } = require('child_process');
-    execSync(`curl -L -o "${destPath}" "${url}"`, { timeout: 300000 });
+    const { safeDownload } = require('../utils/safe-file-ops');
+    await safeDownload(url, destPath);
   }
 
   /**
    * 清理临时文件
    */
   private async cleanup(): Promise<void> {
-    const { execSync } = require('child_process');
-    execSync('rm -f /tmp/douyin_upload_*', { stdio: 'ignore' });
+    const { safeCleanupTempFiles } = require('../utils/safe-file-ops');
+    safeCleanupTempFiles('douyin_upload_');
   }
 }

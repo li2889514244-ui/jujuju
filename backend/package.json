@@ -32,6 +32,9 @@
     "@nestjs/jwt": "^10.2.0",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.3.0",
+    "@nestjs/platform-socket.io": "^10.3.0",
+    "@nestjs/websockets": "^10.3.0",
+    "@nestjs/schedule": "^4.0.0",
     "@nestjs/swagger": "^7.3.0",
     "@nestjs/throttler": "^5.2.0",
     "@prisma/client": "^5.14.0",
@@ -50,7 +53,8 @@
     "rxjs": "^7.8.0",
     "winston": "^3.13.0",
     "prisma": "^5.14.0",
-    "playwright": "^1.44.0"
+    "playwright": "^1.44.0",
+    "socket.io": "^4.7.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.3.0",
@@ -88,7 +92,3 @@
     "testEnvironment": "node",
     "testPathIgnorePatterns": [
       "/node_modules/",
-      "/dist/"
-    ]
-  }
-}

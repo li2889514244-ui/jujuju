@@ -75,6 +75,71 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <!-- 数据同比环比 -->
+    <el-card shadow="hover" class="analytics__comparison">
+      <template #header>数据对比（同比/环比）</template>
+      <el-row :gutter="20">
+        <el-col :xs="24" :md="8" v-for="(item, key) in comparisonLabels" :key="key">
+          <div class="comparison-card">
+            <div class="comparison-card__title">{{ item.label }}</div>
+            <div class="comparison-card__metrics" v-if="comparison">
+              <div class="comparison-metric" v-for="metric in metricKeys" :key="metric">
+                <span class="comparison-metric__label">{{ metricLabels[metric] }}</span>
+                <span class="comparison-metric__value">{{ formatNum(comparison[key]?.current?.[metric]) }}</span>
+                <span
+                  class="comparison-metric__change"
+                  :class="getChangeClass(comparison[key]?.change?.[metric])"
+                >
+                  {{ formatChange(comparison[key]?.change?.[metric]) }}
+                </span>
+              </div>
+            </div>
+            <el-skeleton v-else :rows="4" animated />
+          </div>
+        </el-col>
+      </el-row>
+    </el-card>
+
+    <!-- 播放量榜单 -->
+    <el-card shadow="hover" class="analytics__ranking">
+      <template #header>
+        <div class="ranking-header">
+          <span>播放量榜单</span>
+          <el-radio-group v-model="rankingPeriod" size="small" @change="loadRanking">
+            <el-radio-button value="week">本周</el-radio-button>
+            <el-radio-button value="month">本月</el-radio-button>
+            <el-radio-button value="all">全部</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
+      <el-table :data="viewsRanking" stripe v-loading="rankingLoading">
+        <el-table-column label="排名" width="70" align="center">
+          <template #default="{ row }">
+            <span class="rank-badge" :class="'rank-' + row.rank" v-if="row.rank <= 3">{{ row.rank }}</span>
+            <span v-else>{{ row.rank }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="内容" min-width="200">
+          <template #default="{ row }">
+            <div class="ranking-title">{{ row.title || '无标题' }}</div>
+            <div class="ranking-meta">{{ row.accountName }} · <PlatformIcon :platform="row.platform" size="small" /></div>
+          </template>
+        </el-table-column>
+        <el-table-column label="播放量" width="120" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.views) }}</template>
+        </el-table-column>
+        <el-table-column label="点赞" width="100" align="right">
+          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
+        </el-table-column>
+        <el-table-column label="评论" width="100" align="right">
+          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
+        </el-table-column>
+        <el-table-column label="分享" width="100" align="right">
+          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
   </div>
 </template>
 
@@ -89,6 +154,26 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue'
 const days = ref(30)
 const platform = ref('')
 const platformStats = ref<PlatformStatsType[]>([])
+const comparison = ref<any>(null)
+const viewsRanking = ref<any[]>([])
+const rankingPeriod = ref<'week' | 'month' | 'all'>('week')
+const rankingLoading = ref(false)
+
+const comparisonLabels: Record<string, { label: string }> = {
+  weekOverWeek: { label: '周环比（本周 vs 上周）' },
+  monthOverMonth: { label: '月环比（本月 vs 上月）' },
+  yearOverYear: { label: '年同比（本月 vs 去年同月）' },
+}
+
+const metricKeys = ['views', 'likes', 'comments', 'followers', 'posts'] as const
+const metricLabels: Record<string, string> = {
+  views: '播放量',
+  likes: '点赞',
+  comments: '评论',
+  shares: '分享',
+  followers: '新增粉丝',
+  posts: '发布数',
+}
 
 const dateLabels = computed(() =>
   Array.from({ length: days.value }, (_, i) =>
@@ -167,6 +252,8 @@ const platformCompareChart = computed(() => ({
 
 function refreshData() {
   loadStats()
+  loadComparison()
+  loadRanking()
 }
 
 async function loadStats() {
@@ -174,8 +261,43 @@ async function loadStats() {
   platformStats.value = res.data
 }
 
+async function loadComparison() {
+  try {
+    const res = await analyticsApi.getComparison()
+    comparison.value = res
+  } catch { /* silent */ }
+}
+
+async function loadRanking() {
+  rankingLoading.value = true
+  try {
+    const res = await analyticsApi.getViewsRanking({ period: rankingPeriod.value, limit: 50 })
+    viewsRanking.value = res.ranking
+  } catch { /* silent */ }
+  rankingLoading.value = false
+}
+
+function formatNum(num: number | undefined | null): string {
+  if (num == null) return '-'
+  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
+  return num.toLocaleString()
+}
+
+function formatChange(val: number | undefined | null): string {
+  if (val == null) return '-'
+  const prefix = val > 0 ? '+' : ''
+  return `${prefix}${val}%`
+}
+
+function getChangeClass(val: number | undefined | null): string {
+  if (val == null || val === 0) return ''
+  return val > 0 ? 'change--up' : 'change--down'
+}
+
 onMounted(() => {
   loadStats()
+  loadComparison()
+  loadRanking()
 })
 </script>
 
@@ -188,5 +310,101 @@ onMounted(() => {
   &__charts {
     margin-bottom: 20px;
   }
+
+  &__comparison {
+    margin-top: 20px;
+  }
+
+  &__ranking {
+    margin-top: 20px;
+  }
 }
+
+.comparison-card {
+  padding: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+
+  &__title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
+    margin-bottom: 12px;
+  }
+}
+
+.comparison-metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #f5f7fa;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &__label {
+    font-size: 13px;
+    color: #606266;
+  }
+
+  &__value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #303133;
+  }
+
+  &__change {
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 50px;
+    text-align: right;
+  }
+}
+
+.change--up {
+  color: #67c23a;
+}
+
+.change--down {
+  color: #f56c6c;
+}
+
+.ranking-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.ranking-title {
+  font-size: 14px;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-meta {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.rank-1 { background: #f5a623; }
+.rank-2 { background: #909399; }
+.rank-3 { background: #b87333; }
 </style>

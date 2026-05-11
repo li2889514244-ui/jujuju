@@ -85,6 +85,30 @@ export class AnalyticsController {
     });
   }
 
+  @Get('comparison')
+  @ApiOperation({ summary: '数据同比环比对比（周环比、月环比、年同比）' })
+  async getComparison(@CurrentUser('id') userId: string) {
+    return this.analyticsService.getComparison(userId);
+  }
+
+  @Get('views-ranking')
+  @ApiOperation({ summary: '播放量榜单（按播放量排名）' })
+  @ApiQuery({ name: 'limit', required: false, description: '返回条数（默认50）' })
+  @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'all'], description: '时间范围' })
+  @ApiQuery({ name: 'platform', required: false, description: '平台筛选' })
+  async getViewsRanking(
+    @CurrentUser('id') userId: string,
+    @Query('limit') limit?: number,
+    @Query('period') period?: 'week' | 'month' | 'all',
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.getViewsRanking(userId, {
+      limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+      period: period || 'all',
+      platform,
+    });
+  }
+
   /**
    * 校验账号是否属于当前用户（管理员除外）
    */

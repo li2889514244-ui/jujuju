@@ -4,16 +4,24 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { PostStatus, Prisma } from '@prisma/client';
+import { UploaderService } from '../uploader/uploader.service';
+import { PublishTask } from '../uploader/base-uploader';
 
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => UploaderService))
+    private uploaderService: UploaderService,
+  ) {}
 
   /**
    * 创建内容（草稿）
@@ -278,11 +286,24 @@ export class ContentService {
             id: true,
             platform: true,
             nickname: true,
+            userId: true,
           },
         },
       },
       orderBy: { publishAt: 'asc' },
     });
+  }
+
+  /**
+   * 原子抢占：将 SCHEDULED 状态改为 PUBLISHING（多实例安全）
+   * 返回 true 表示抢占成功，false 表示已被其他实例处理
+   */
+  async claimForPublish(postId: string): Promise<boolean> {
+    const result = await this.prisma.post.updateMany({
+      where: { id: postId, status: 'SCHEDULED' },
+      data: { status: 'PUBLISHING' },
+    });
+    return result.count > 0;
   }
 
   /**
@@ -335,6 +356,42 @@ export class ContentService {
     );
 
     this.logger.log(`一键分发: ${posts.length} 条内容已创建 (用户: ${userId})`);
+
+    // 立即发布的任务异步触发 uploader（不阻塞响应）
+    const immediatePosts = posts.filter((p) => p.status === 'PUBLISHING');
+    if (immediatePosts.length > 0) {
+      this.executeImmediatePublish(immediatePosts).catch((err) =>
+        this.logger.error('立即发布执行异常', err.stack),
+      );
+    }
+
     return { success: true, count: posts.length, posts };
+  }
+
+  /**
+   * 异步执行立即发布任务（串行，避免并发浏览器实例过多）
+   */
+  private async executeImmediatePublish(posts: any[]) {
+    for (const post of posts) {
+      try {
+        const task: PublishTask = {
+          contentId: post.id,
+          accountId: post.accountId,
+          platform: post.account.platform,
+          title: post.title || '',
+          content: post.content || '',
+          mediaUrls: (post.mediaUrls as string[]) || [],
+          tags: post.tags || [],
+        };
+
+        await this.uploaderService.executePublish(task);
+
+        // 发布间隔 3-6 秒
+        await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
+      } catch (error: any) {
+        this.logger.error(`立即发布失败: ${post.id}`, error.message);
+        await this.updatePublishStatus(post.id, 'FAILED', undefined, error.message);
+      }
+    }
   }
 }

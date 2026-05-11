@@ -110,12 +110,15 @@ model Account {
   userId  String
   team    Team?  @relation(fields: [teamId], references: [id])
   teamId  String?
+  group   AccountGroup? @relation(fields: [groupId], references: [id])
+  groupId String?
   posts      Post[]
   dailyStats DailyStats[]
 
   @@unique([platform, platformUserId])
   @@index([userId])
   @@index([teamId])
+  @@index([groupId])
   @@index([platform])
 }
 
@@ -264,4 +267,77 @@ model CompetitorSnapshot {
   @@unique([competitorId, date])
   @@index([competitorId])
   @@index([date])
+}
+
+// ==================== 账号分组 ====================
+
+model AccountGroup {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#409EFF")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  accounts Account[]
+
+  @@index([userId])
+}
+
+// ==================== 素材库 ====================
+
+model Asset {
+  id          String    @id @default(cuid())
+  name        String
+  type        AssetType
+  url         String
+  size        Int       @default(0)
+  width       Int?
+  height      Int?
+  duration    Int?
+  mimeType    String?
+  tags        String[]
+  folderId    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  userId String
+
+  @@index([userId])
+  @@index([type])
+  @@index([folderId])
+}
+
+enum AssetType {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+// ==================== 通知 ====================
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  content   String?
+  read      Boolean          @default(false)
+  metadata  Json?
+  createdAt DateTime         @default(now())
+
+  userId String
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+enum NotificationType {
+  ACCOUNT_EXPIRED
+  PUBLISH_FAILED
+  PUBLISH_SUCCESS
+  FOLLOWER_ALERT
+  SYSTEM
 }
