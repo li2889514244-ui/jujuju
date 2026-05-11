@@ -61,3 +61,5 @@ temp/
 *.key
 *.p12
 .pnpm-approved-builds.json
+*.ps1  
+!frontend/**/*.ps1  
