@@ -9,6 +9,7 @@ import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
+  ApiQuery,
 } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
