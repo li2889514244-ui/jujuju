@@ -61,5 +61,7 @@ temp/
 *.key
 *.p12
 .pnpm-approved-builds.json
-*.ps1  
-!frontend/**/*.ps1  
+*.ps1
+social-auto-upload/  
+!frontend/**/*.ps1
+social-auto-upload/  
