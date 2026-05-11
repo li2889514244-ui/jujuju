@@ -22,6 +22,11 @@
       </template>
     </el-menu>
 
+    <div v-if="!isCollapsed" class="sidebar__version">
+      <span class="sidebar__version-dot" :class="{ 'sidebar__version-dot--ok': backendOk }"></span>
+      {{ backendVersion }}
+    </div>
+
     <div class="sidebar__toggle" @click="toggleCollapse" role="button" :aria-label="isCollapsed ? '展开侧边栏' : '收起侧边栏'" tabindex="0" @keyup.enter="toggleCollapse">
       <el-icon>
         <Fold v-if="!isCollapsed" />
@@ -39,6 +44,19 @@ import { Fold, Expand } from '@element-plus/icons-vue'
 const route = useRoute()
 const router = useRouter()
 const isCollapsed = ref(false)
+const backendVersion = ref('')
+const backendOk = ref(false)
+
+onMounted(async () => {
+  try {
+    const base = (import.meta as any).env?.VITE_API_BASE_URL || ''
+    const url = base ? base.replace(/\/api\/v1$/, '') + '/api/v1/health' : '/api/v1/health'
+    const resp = await fetch(url)
+    const json = await resp.json()
+    backendVersion.value = json.data?.version || '0.1.0'
+    backendOk.value = json.data?.status === 'ok'
+  } catch { backendVersion.value = 'offline' }
+})
 
 const activeMenu = computed(() => route.path)
 
