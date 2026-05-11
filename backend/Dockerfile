@@ -24,10 +24,12 @@ COPY --from=builder --chown=matrixflow:matrixflow /build/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/prisma ./prisma
 COPY --from=builder --chown=matrixflow:matrixflow /build/dist ./dist
 
-# Copy Python bridge + social-auto-upload
+# Copy Python bridge
 COPY --chown=matrixflow:matrixflow bridge.py ./
 COPY --chown=matrixflow:matrixflow requirements.txt ./
-COPY --chown=matrixflow:matrixflow social-auto-upload ./social-auto-upload
+
+# Clone social-auto-upload (10k stars, battle-tested platform uploaders)
+RUN git clone --depth 1 https://github.com/dreammis/social-auto-upload.git ./social-auto-upload
 
 # Install Node deps
 RUN npm install --omit=dev --ignore-scripts
