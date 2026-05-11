@@ -30,16 +30,16 @@ const PLATFORM_LOGIN_CONFIG: Record<string, {
 }> = {
   DOUYIN: {
     url: 'https://creator.douyin.com/',
-    qrSelector: '#login-qrcode img, .qrcode-image img, [class*="qrcode"] img, canvas[class*="qr"]',
+    qrSelector: 'img[src*="qrcode"], img[src*="qr_code"], .qrcode-img img, .qr-code img, [class*="qrcode"] img, [class*="qr-login"] img',
     successIndicator: '/creator-micro/home',
   },
   XIAOHONGSHU: {
-    url: 'https://creator.xiaohongshu.com/',
+    url: 'https://creator.xiaohongshu.com/login',
     qrSelector: '.qrcode-image img, [class*="qr-code"] img, .login-qrcode img',
     successIndicator: '/home',
   },
   KUAISHOU: {
-    url: 'https://cp.kuaishou.com/',
+    url: 'https://cp.kuaishou.com/article/publish',
     qrSelector: '.qr-code img, [class*="qrcode"] img, .scan-login img',
     successIndicator: '/article/publish/single',
   },
@@ -49,12 +49,12 @@ const PLATFORM_LOGIN_CONFIG: Record<string, {
     successIndicator: 'member.bilibili.com',
   },
   WEIBO: {
-    url: 'https://passport.weibo.com/sso/signin?entry=miniblog',
+    url: 'https://weibo.com/login.php',
     qrSelector: '.qr-code img, [class*="qrcode"] img, .login_qrcode img',
     successIndicator: 'weibo.com',
   },
   WECHAT_VIDEO: {
-    url: 'https://channels.weixin.qq.com/',
+    url: 'https://channels.weixin.qq.com/platform/login',
     qrSelector: '.qr-code img, [class*="qrcode"] img, .login__qrcode img, .wrp_code img',
     successIndicator: '/platform',
   },
