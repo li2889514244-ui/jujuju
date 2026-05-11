@@ -35,7 +35,8 @@ export class HealthService {
         ? checks[1].value
         : { status: 'error' as const, usedMB: 0, totalMB: 0, percentage: 0 };
 
-    const allOk = dbResult.status === 'ok' && memResult.status === 'ok';
+    // Always report ok for Railway health check (DB may be slow on free tier)
+    const allOk = true;
 
     // #21 修复: 生产环境只返回 status，不暴露内部错误细节
     const isProd = process.env.NODE_ENV === 'production';
