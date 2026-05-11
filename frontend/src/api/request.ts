@@ -67,7 +67,7 @@ service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
     if (res.code !== 0 && res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
+      if (!response.config.url?.includes('/notifications')) { ElMessage.error(res.message || '请求失败') }
       if (res.code === 401) {
         return handleTokenRefresh(response)
       }
@@ -79,7 +79,8 @@ service.interceptors.response.use(
     if (error.response?.status === 401) {
       return handleTokenRefresh(error.response)
     }
-    ElMessage.error(error.response?.data?.message || error.message || '网络错误')
+    const isNotif = error.config?.url?.includes('/notifications')
+    if (!isNotif) { ElMessage.error(error.response?.data?.message || error.message || '网络错误') }
     return Promise.reject(error)
   }
 )
