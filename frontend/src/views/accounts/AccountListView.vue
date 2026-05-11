@@ -30,7 +30,7 @@
     <!-- Action Bar -->
     <div class="account-list__actions">
       <el-button type="primary" @click="showAddDialog = true">
-        <el-icon><Plus /></el-icon>添加账号
+        <el-icon><Plus /></el-icon>扫码添加
       </el-button>
       <el-button @click="showGroupDialog = true">
         <el-icon><FolderAdd /></el-icon>新建分组
@@ -130,6 +130,7 @@ import { PLATFORM_LABELS } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 import ScanBindDialog from '@/components/account/ScanBindDialog.vue'
+import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 
 const accountStore = useAccountStore()
 
@@ -145,6 +146,7 @@ const selectedIds = ref<string[]>([])
 const showGroupDialog = ref(false)
 const newGroupName = ref('')
 const showAddDialog = ref(false)
+const showManualDialog = ref(false)
 
 onMounted(() => {
   accountStore.fetchAccounts()
