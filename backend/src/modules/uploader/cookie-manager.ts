@@ -86,6 +86,14 @@ export class CookieManager {
     }
   }
 
+  decryptCookie(encrypted: string): StoredCookie[] {
+    try {
+      return JSON.parse(this.decrypt(encrypted)) as StoredCookie[];
+    } catch {
+      return [];
+    }
+  }
+
   /**
    * 清除 Cookie
    */
