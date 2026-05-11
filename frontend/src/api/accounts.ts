@@ -23,11 +23,11 @@ export const accountsApi = {
   },
 
   getGroups() {
-    return get<AccountGroup[]>('/accounts/groups')
+    return get<AccountGroup[]>('/account-groups')
   },
 
   createGroup(name: string) {
-    return post<AccountGroup>('/accounts/groups', { name })
+    return post<AccountGroup>('/account-groups', { name })
   },
 
   checkCookie(id: string) {
