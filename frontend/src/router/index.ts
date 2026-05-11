@@ -109,4 +109,20 @@ router.beforeEach((to, _from, next) => {
   NProgress.start()
   document.title = `${to.meta.title || 'MatrixFlow'} - 矩阵管理平台`
 
-  const userStore = useUs
+  const userStore = useUserStore()
+  const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)
+
+  if (requiresAuth && !userStore.token) {
+    next({ name: 'Login', query: { redirect: to.fullPath } })
+  } else if (to.name === 'Login' && userStore.token) {
+    next({ name: 'Dashboard' })
+  } else {
+    next()
+  }
+})
+
+router.afterEach(() => {
+  NProgress.done()
+})
+
+export default router

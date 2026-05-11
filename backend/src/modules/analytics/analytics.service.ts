@@ -264,4 +264,205 @@ export class AnalyticsService {
       dailyTrend: dailyStats,
     };
   }
+
+  /**
+   * 数据同比环比对比
+   * 返回本周vs上周、本月vs上月、本月vs去年同月的核心指标对比
+   */
+  async getComparison(userId: string) {
+    const accounts = await this.prisma.account.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const accountIds = accounts.map((a) => a.id);
+
+    const now = new Date();
+
+    // 本周（周一到今天）
+    const thisWeekStart = this.getWeekStart(now);
+    const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const lastWeekEnd = new Date(thisWeekStart.getTime() - 1);
+
+    // 本月
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastMonthEnd = new Date(thisMonthStart.getTime() - 1);
+
+    // 去年同月
+    const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+    const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0);
+
+    const [thisWeek, lastWeek, thisMonth, lastMonth, lastYearSameMonth] = await Promise.all([
+      this.aggregateStats(accountIds, thisWeekStart, now),
+      this.aggregateStats(accountIds, lastWeekStart, lastWeekEnd),
+      this.aggregateStats(accountIds, thisMonthStart, now),
+      this.aggregateStats(accountIds, lastMonthStart, lastMonthEnd),
+      this.aggregateStats(accountIds, lastYearSameMonthStart, lastYearSameMonthEnd),
+    ]);
+
+    return {
+      weekOverWeek: {
+        current: thisWeek,
+        previous: lastWeek,
+        change: this.calcChange(thisWeek, lastWeek),
+      },
+      monthOverMonth: {
+        current: thisMonth,
+        previous: lastMonth,
+        change: this.calcChange(thisMonth, lastMonth),
+      },
+      yearOverYear: {
+        current: thisMonth,
+        previous: lastYearSameMonth,
+        change: this.calcChange(thisMonth, lastYearSameMonth),
+      },
+    };
+  }
+
+  /**
+   * 播放量榜单 — 按播放量排名的视频列表
+   */
+  async getViewsRanking(userId: string, params: {
+    limit?: number;
+    period?: 'week' | 'month' | 'all';
+    platform?: string;
+  }) {
+    const { limit = 50, period = 'all', platform } = params;
+
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        userId,
+        ...(platform ? { platform: platform as Platform } : {}),
+      },
+      select: { id: true },
+    });
+    const accountIds = accounts.map((a) => a.id);
+
+    // 时间范围
+    let dateFilter: Prisma.PostWhereInput = {};
+    const now = new Date();
+    if (period === 'week') {
+      dateFilter = { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
+    } else if (period === 'month') {
+      dateFilter = { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+    }
+
+    const posts = await this.prisma.post.findMany({
+      where: {
+        accountId: { in: accountIds },
+        status: 'PUBLISHED',
+        stats: { isNot: null },
+        ...dateFilter,
+      },
+      include: {
+        stats: true,
+        account: {
+          select: { id: true, nickname: true, platform: true, avatar: true },
+        },
+      },
+      orderBy: { stats: { views: 'desc' } },
+      take: limit,
+    });
+
+    return {
+      ranking: posts.map((p, index) => ({
+        rank: index + 1,
+        postId: p.id,
+        title: p.title,
+        platform: p.account.platform,
+        accountName: p.account.nickname,
+        accountAvatar: p.account.avatar,
+        views: p.stats?.views || 0,
+        likes: p.stats?.likes || 0,
+        comments: p.stats?.comments || 0,
+        shares: p.stats?.shares || 0,
+        publishedAt: p.updatedAt,
+      })),
+      total: posts.length,
+      period,
+    };
+  }
+
+  /**
+   * 聚合指定时间段内的核心指标
+   */
+  private async aggregateStats(accountIds: string[], start: Date, end: Date) {
+    if (accountIds.length === 0) {
+      return { views: 0, likes: 0, comments: 0, shares: 0, followers: 0, posts: 0 };
+    }
+
+    const [dailyAgg, postCount] = await Promise.all([
+      this.prisma.dailyStats.aggregate({
+        where: {
+          accountId: { in: accountIds },
+          date: { gte: start, lte: end },
+        },
+        _sum: { views: true, likes: true, comments: true, shares: true },
+      }),
+      this.prisma.post.count({
+        where: {
+          accountId: { in: accountIds },
+          status: 'PUBLISHED',
+          updatedAt: { gte: start, lte: end },
+        },
+      }),
+    ]);
+
+    // 粉丝增长 = 期末 - 期初
+    const [latestFollowers, earliestFollowers] = await Promise.all([
+      this.prisma.dailyStats.findFirst({
+        where: { accountId: { in: accountIds }, date: { lte: end } },
+        orderBy: { date: 'desc' },
+        select: { followers: true },
+      }),
+      this.prisma.dailyStats.findFirst({
+        where: { accountId: { in: accountIds }, date: { gte: start } },
+        orderBy: { date: 'asc' },
+        select: { followers: true },
+      }),
+    ]);
+
+    const followerGrowth = (latestFollowers?.followers || 0) - (earliestFollowers?.followers || 0);
+
+    return {
+      views: dailyAgg._sum.views || 0,
+      likes: dailyAgg._sum.likes || 0,
+      comments: dailyAgg._sum.comments || 0,
+      shares: dailyAgg._sum.shares || 0,
+      followers: Math.max(0, followerGrowth),
+      posts: postCount,
+    };
+  }
+
+  /**
+   * 计算变化率
+   */
+  private calcChange(current: Record<string, number>, previous: Record<string, number>) {
+    const result: Record<string, number | null> = {};
+    for (const key of Object.keys(current)) {
+      const cur = current[key] || 0;
+      const prev = previous[key] || 0;
+      if (prev === 0) {
+        result[key] = cur > 0 ? 100 : 0;
+      } else {
+        result[key] = Math.round(((cur - prev) / prev) * 100);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * 获取本周一的日期（UTC+8 中国时区）
+   */
+  private getWeekStart(date: Date): Date {
+    // 转换为 UTC+8
+    const utc8Offset = 8 * 60 * 60 * 1000;
+    const localTime = new Date(date.getTime() + utc8Offset);
+    const day = localTime.getUTCDay();
+    const diff = localTime.getUTCDate() - day + (day === 0 ? -6 : 1);
+    localTime.setUTCDate(diff);
+    localTime.setUTCHours(0, 0, 0, 0);
+    // 转回 UTC
+    return new Date(localTime.getTime() - utc8Offset);
+  }
 }

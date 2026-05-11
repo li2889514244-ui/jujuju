@@ -35,4 +35,41 @@ export const analyticsApi = {
     })
   },
 
- 
+  getReport(params?: { startDate?: string; endDate?: string; platform?: string }) {
+    return get<{
+      period: { start: string; end: string }
+      overview: any
+      accounts: any[]
+      topPosts: any[]
+      dailyTrend: any[]
+    }>('/analytics/report', params as Record<string, unknown>)
+  },
+
+  getComparison() {
+    return get<{
+      weekOverWeek: { current: any; previous: any; change: any }
+      monthOverMonth: { current: any; previous: any; change: any }
+      yearOverYear: { current: any; previous: any; change: any }
+    }>('/analytics/comparison')
+  },
+
+  getViewsRanking(params?: { limit?: number; period?: 'week' | 'month' | 'all'; platform?: string }) {
+    return get<{
+      ranking: Array<{
+        rank: number
+        postId: string
+        title: string
+        platform: string
+        accountName: string
+        accountAvatar: string
+        views: number
+        likes: number
+        comments: number
+        shares: number
+        publishedAt: string
+      }>
+      total: number
+      period: string
+    }>('/analytics/views-ranking', params as Record<string, unknown>)
+  },
+}

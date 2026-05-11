@@ -47,19 +47,21 @@ export class AccountsController {
   @ApiOperation({ summary: '获取账号列表' })
   @ApiQuery({ name: 'platform', required: false, enum: Platform })
   @ApiQuery({ name: 'teamId', required: false })
+  @ApiQuery({ name: 'groupId', required: false })
   @ApiQuery({ name: 'page', required: false, description: '页码（从1开始）' })
   @ApiQuery({ name: 'limit', required: false, description: '每页条数（最大100）' })
   async findAll(
     @Query('platform') platform?: Platform,
     @Query('teamId') teamId?: string,
+    @Query('groupId') groupId?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
     @CurrentUser('id') userId?: string,
   ) {
-    const pageNum = Math.max(1, page || 1);
-    const limitNum = Math.min(100, Math.max(1, limit || 20));
+    const pageNum = Math.max(1, Number(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
-    return this.accountsService.findAll({ userId, teamId, platform, skip, take: limitNum });
+    return this.accountsService.findAll({ userId, teamId, groupId, platform, skip, take: limitNum });
   }
 
   @Get(':id')

@@ -59,7 +59,31 @@
             :rows="4"
             maxlength="2000"
             show-word-limit
+            @input="debouncedCheck"
           />
+        </el-form-item>
+
+        <!-- 违规检测提示 -->
+        <el-form-item v-if="reviewHighlights.length > 0" label="内容检测">
+          <div class="content-editor__review">
+            <el-alert
+              :title="`检测到 ${reviewHighlights.length} 处风险词`"
+              :type="hasHighRisk ? 'error' : 'warning'"
+              :closable="false"
+              show-icon
+            />
+            <div class="content-editor__review-list">
+              <el-tag
+                v-for="(item, idx) in reviewHighlights"
+                :key="idx"
+                :type="item.severity === 'HIGH' ? 'danger' : item.severity === 'MEDIUM' ? 'warning' : 'info'"
+                size="small"
+                style="margin: 4px"
+              >
+                {{ item.word }}
+              </el-tag>
+            </div>
+          </div>
         </el-form-item>
 
         <!-- Tags -->
@@ -92,10 +116,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, nextTick, onMounted } from 'vue'
+import { ref, reactive, nextTick, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useDebounceFn } from '@vueuse/core'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useContentStore } from '@/store/content'
+import { contentReviewApi } from '@/api/content-review'
 import FileUpload from '@/components/common/FileUpload.vue'
 
 const route = useRoute()
@@ -108,6 +134,8 @@ const tagInputVisible = ref(false)
 const tagInputValue = ref('')
 const videoUrl = ref('')
 const coverUrl = ref('')
+const reviewHighlights = ref<{ word: string; severity: string }[]>([])
+const hasHighRisk = computed(() => reviewHighlights.value.some((h) => h.severity === 'HIGH'))
 
 const contentId = ref(route.query.id as string | undefined)
 const isEditing = ref(!!contentId.value)
@@ -164,6 +192,21 @@ function addTag() {
 function removeTag(tag: string) {
   form.tags = form.tags.filter((t) => t !== tag)
 }
+
+// 违规检测 - 防抖 800ms
+const debouncedCheck = useDebounceFn(async () => {
+  const text = `${form.title} ${form.description}`
+  if (text.trim().length < 5) {
+    reviewHighlights.value = []
+    return
+  }
+  try {
+    const result = await contentReviewApi.quickCheck(text)
+    reviewHighlights.value = result.highlights || []
+  } catch {
+    // 静默失败，不影响编辑体验
+  }
+}, 800)
 
 async function handleSaveDraft() {
   const valid = await formRef.value?.validate().catch(() => false)
@@ -229,6 +272,16 @@ async function handleSaveAndPublish() {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+  }
+
+  &__review {
+    width: 100%;
+  }
+
+  &__review-list {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
   }
 }
 </style>

@@ -115,41 +115,8 @@
       </template>
     </el-dialog>
 
-    <!-- Add Account Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加平台账号" width="500px">
-      <el-form :model="addForm" label-width="100px">
-        <el-form-item label="平台" required>
-          <el-select v-model="addForm.platform" placeholder="选择平台" style="width: 100%">
-            <el-option label="抖音" value="DOUYIN" />
-            <el-option label="快手" value="KUAISHOU" />
-            <el-option label="小红书" value="XIAOHONGSHU" />
-            <el-option label="B站" value="BILIBILI" />
-            <el-option label="视频号" value="WECHAT_VIDEO" />
-            <el-option label="微博" value="WEIBO" />
-            <el-option label="TikTok" value="TIKTOK" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="平台用户ID" required>
-          <el-input v-model="addForm.platformUserId" placeholder="该平台上的用户ID" />
-        </el-form-item>
-        <el-form-item label="昵称" required>
-          <el-input v-model="addForm.nickname" placeholder="账号昵称" />
-        </el-form-item>
-        <el-form-item label="头像URL">
-          <el-input v-model="addForm.avatar" placeholder="头像链接（可选）" />
-        </el-form-item>
-        <el-form-item label="简介">
-          <el-input v-model="addForm.bio" type="textarea" :rows="2" placeholder="账号简介（可选）" />
-        </el-form-item>
-        <el-form-item label="Cookie">
-          <el-input v-model="addForm.cookies" type="textarea" :rows="3" placeholder="平台Cookie（可选，用于自动化操作）" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="showAddDialog = false">取消</el-button>
-        <el-button type="primary" :loading="addLoading" @click="handleAddAccount">确定添加</el-button>
-      </template>
-    </el-dialog>
+    <!-- Add Account Dialog (扫码绑定) -->
+    <ScanBindDialog v-model:visible="showAddDialog" @success="handleBindSuccess" />
   </div>
 </template>
 
@@ -162,6 +129,7 @@ import { accountsApi } from '@/api/accounts'
 import { PLATFORM_LABELS } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import ScanBindDialog from '@/components/account/ScanBindDialog.vue'
 
 const accountStore = useAccountStore()
 
@@ -177,15 +145,6 @@ const selectedIds = ref<string[]>([])
 const showGroupDialog = ref(false)
 const newGroupName = ref('')
 const showAddDialog = ref(false)
-const addLoading = ref(false)
-const addForm = reactive({
-  platform: '',
-  platformUserId: '',
-  nickname: '',
-  avatar: '',
-  bio: '',
-  cookies: '',
-})
 
 onMounted(() => {
   accountStore.fetchAccounts()
@@ -257,35 +216,9 @@ async function handleCreateGroup() {
   ElMessage.success('创建成功')
 }
 
-async function handleAddAccount() {
-  if (!addForm.platform || !addForm.platformUserId || !addForm.nickname) {
-    ElMessage.warning('请填写平台、平台用户ID和昵称')
-    return
-  }
-  addLoading.value = true
-  try {
-    await accountsApi.create({
-      platform: addForm.platform,
-      platformUserId: addForm.platformUserId,
-      nickname: addForm.nickname,
-      avatar: addForm.avatar || undefined,
-      bio: addForm.bio || undefined,
-      cookies: addForm.cookies || undefined,
-    })
-    ElMessage.success('添加成功')
-    showAddDialog.value = false
-    addForm.platform = ''
-    addForm.platformUserId = ''
-    addForm.nickname = ''
-    addForm.avatar = ''
-    addForm.bio = ''
-    addForm.cookies = ''
-    accountStore.fetchAccounts()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '添加失败')
-  } finally {
-    addLoading.value = false
-  }
+function handleBindSuccess() {
+  ElMessage.success('账号绑定成功')
+  accountStore.fetchAccounts()
 }
 
 function formatNumber(num: number) {

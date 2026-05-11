@@ -228,12 +228,12 @@ export class WechatVideoUploader extends BaseUploader implements OnModuleInit {
   }
 
   private async downloadFile(url: string, destPath: string): Promise<void> {
-    const { execSync } = require('child_process');
-    execSync(`curl -L -o "${destPath}" "${url}"`, { timeout: 300000 });
+    const { safeDownload } = require('../utils/safe-file-ops');
+    await safeDownload(url, destPath);
   }
 
   private async cleanup(): Promise<void> {
-    const { execSync } = require('child_process');
-    execSync('rm -f /tmp/wechat_video_upload_*', { stdio: 'ignore' });
+    const { safeCleanupTempFiles } = require('../utils/safe-file-ops');
+    safeCleanupTempFiles('wechat_video_upload_');
   }
 }
