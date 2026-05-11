@@ -28,28 +28,28 @@ const PLATFORM_LOGIN_CONFIG: Record<string, {
   successIndicator: string | RegExp;
 }> = {
   DOUYIN: {
-    url: 'https://creator.douyin.com/',
-    successIndicator: /creator\.douyin\.com\/creator-micro/,
+    url: 'https://www.douyin.com/',
+    successIndicator: /www\.douyin\.com\/user/,
   },
   XIAOHONGSHU: {
-    url: 'https://creator.xiaohongshu.com/',
-    successIndicator: /creator\.xiaohongshu\.com\/(?!login)/,
+    url: 'https://www.xiaohongshu.com/explore',
+    successIndicator: /www\.xiaohongshu\.com/,
   },
   KUAISHOU: {
-    url: 'https://cp.kuaishou.com/',
-    successIndicator: /cp\.kuaishou\.com\/(article|profile)/,
+    url: 'https://www.kuaishou.com/',
+    successIndicator: /www\.kuaishou\.com\/profile/,
   },
   BILIBILI: {
-    url: 'https://passport.bilibili.com/x/passport-login/web/qr',
-    successIndicator: /bilibili\.com/,
+    url: 'https://www.bilibili.com/',
+    successIndicator: /www\.bilibili\.com/,
   },
   WEIBO: {
-    url: 'https://weibo.com/login.php',
-    successIndicator: /weibo\.com\/(u\/\d+|home)/,
+    url: 'https://weibo.com/newlogin?tabtype=scan',
+    successIndicator: /weibo\.com\/u\/\d+/,
   },
   WECHAT_VIDEO: {
     url: 'https://channels.weixin.qq.com/',
-    successIndicator: /channels\.weixin\.qq\.com\/(platform\/post|cgi-bin)/,
+    successIndicator: /channels\.weixin\.qq\.com\/(platform|web)/,
   },
 };
 
@@ -269,43 +269,43 @@ export class ScanBindService {
 
       switch (platform) {
         case 'DOUYIN':
-          await page.goto('https://creator.douyin.com/creator-micro/content', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
+          await page.goto('https://www.douyin.com/user/self', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
           await page.waitForTimeout(3000);
-          nickname = await page.$eval('[class*="name"], [class*="nickname"], .account-name span', el => el.textContent?.trim() || '').catch(() => '');
-          avatar = await page.$eval('[class*="avatar"] img, .avatar-img img', el => (el as HTMLImageElement).src || '').catch(() => '');
+          nickname = await page.$eval('[data-e2e="user-info"] [class*="nickname"], [class*="profile"] [class*="name"], [data-e2e="user-info"] span', el => el.textContent?.trim() || '').catch(() => '');
+          avatar = await page.$eval('img[class*="avatar"], [data-e2e="user-info"] img', el => (el as HTMLImageElement).src || '').catch(() => '');
           platformUserId = await page.evaluate(() => {
-            const match = document.cookie.match(/(?:uid|user_id|passport_csrf_token)=([^;]+)/);
-            return match ? match[1].substring(0, 30) : '';
+            const match = document.cookie.match(/(?:uid|sec_user_id|passport_csrf_token)=([^;]+)/);
+            return match ? match[1].substring(0, 40) : '';
           });
           break;
 
         case 'XIAOHONGSHU':
-          await page.goto('https://creator.xiaohongshu.com/publish/publish', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
+          await page.goto('https://www.xiaohongshu.com/user/profile/self', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
           await page.waitForTimeout(3000);
-          nickname = await page.$eval('[class*="name"], [class*="nickname"], .username', el => el.textContent?.trim() || '').catch(() => '');
-          avatar = await page.$eval('[class*="avatar"] img, .avatar-img img', el => (el as HTMLImageElement).src || '').catch(() => '');
+          nickname = await page.$eval('[class*="nickname"], [class*="username"], .user-name, [class*="name"]', el => el.textContent?.trim() || '').catch(() => '');
+          avatar = await page.$eval('[class*="avatar"] img, .avatar-item img, [class*="avatar"]', el => (el as HTMLImageElement).src || '').catch(() => '');
           platformUserId = await page.evaluate(() => {
-            const match = document.cookie.match(/a1=([^;]+)/);
-            return match ? match[1].substring(0, 20) : '';
+            const match = document.cookie.match(/(?:a1|web_session|red_id)=([^;]+)/);
+            return match ? match[1].substring(0, 30) : '';
           });
           break;
 
         case 'KUAISHOU':
-          await page.goto('https://cp.kuaishou.com/profile', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
+          await page.goto('https://www.kuaishou.com/profile/self', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
           await page.waitForTimeout(3000);
-          nickname = await page.$eval('[class*="name"], [class*="nickname"]', el => el.textContent?.trim() || '').catch(() => '');
-          avatar = await page.$eval('[class*="avatar"] img, [class*="head"] img', el => (el as HTMLImageElement).src || '').catch(() => '');
+          nickname = await page.$eval('[class*="nickname"], [class*="profile-name"], [class*="name"]', el => el.textContent?.trim() || '').catch(() => '');
+          avatar = await page.$eval('[class*="avatar"] img, [class*="avatar-img"]', el => (el as HTMLImageElement).src || '').catch(() => '');
           platformUserId = await page.evaluate(() => {
-            const match = document.cookie.match(/userId=([^;]+)/);
+            const match = document.cookie.match(/(?:userId|kuaishou\.web\.user_id)=([^;]+)/);
             return match ? match[1] : '';
           });
           break;
 
         case 'BILIBILI':
-          await page.goto('https://member.bilibili.com/platform/home', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
+          await page.goto('https://space.bilibili.com/', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
           await page.waitForTimeout(2000);
-          nickname = await page.$eval('[class*="nickname"], .h-name', el => el.textContent?.trim() || '').catch(() => '');
-          avatar = await page.$eval('[class*="avatar"] img, .h-avatar img', el => (el as HTMLImageElement).src || '').catch(() => '');
+          nickname = await page.$eval('#h-name, [class*="nickname"], .h-name', el => el.textContent?.trim() || '').catch(() => '');
+          avatar = await page.$eval('#h-avatar img, [class*="avatar"] img', el => (el as HTMLImageElement).src || '').catch(() => '');
           platformUserId = await page.evaluate(() => {
             const match = document.cookie.match(/DedeUserID=(\d+)/);
             return match ? match[1] : '';
@@ -313,13 +313,14 @@ export class ScanBindService {
           break;
 
         case 'WEIBO':
-          await page.goto('https://weibo.com/', { waitUntil: 'domcontentloaded', timeout: 20000 }).catch(() => null);
           await page.waitForTimeout(3000);
-          nickname = await page.$eval('[class*="name"], .username', el => el.textContent?.trim() || '').catch(() => '');
-          avatar = await page.$eval('[class*="avatar"] img, .face img', el => (el as HTMLImageElement).src || '').catch(() => '');
+          nickname = await page.$eval('[class*="name"], .username, .ProfileHeader-name', el => el.textContent?.trim() || '').catch(() => '');
+          avatar = await page.$eval('[class*="avatar"] img, .face img, .woo-box-avatar img', el => (el as HTMLImageElement).src || '').catch(() => '');
           platformUserId = await page.evaluate(() => {
-            const match = document.cookie.match(/uid=(\d+)/);
-            return match ? match[1] : '';
+            const match = document.cookie.match(/(?:uid|wb_cusLike_|SUBP=)/);
+            if (match) return match[0];
+            const uidMatch = document.cookie.match(/uid=(\d+)/);
+            return uidMatch ? uidMatch[1] : '';
           });
           break;
 
