@@ -18,10 +18,31 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        # Run from root where railway.json lives
         working-directory: backend
         run: railway up --service jujuju-backend --detach
         env:
           RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
           RAILWAY_PROJECT_ID: 372d8faa-0cd5-42cd-b59d-aa36a1f180d6
           RAILWAY_ENVIRONMENT_ID: 00718f1f-395e-4d08-a0e2-8279ac1e9a57
+
+  verify:
+    name: Verify Deployment
+    needs: deploy-backend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deploy
+        run: sleep 180
+
+      - name: Check backend version
+        run: |
+          for i in 1 2 3 4 5; do
+            RESP=$(curl -s https://jujuju-backend-production.up.railway.app/api/v1/health)
+            echo "Health: $RESP"
+            if echo "$RESP" | grep -q '"status":"ok"'; then
+              echo "✅ Backend is healthy"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo "❌ Backend health check failed"
+          exit 1
