@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { Platform } from '@prisma/client';
 import { BaseUploader, PublishTask, PublishResult, LoginStatus } from './base-uploader';
 import { CookieManager } from './cookie-manager';
