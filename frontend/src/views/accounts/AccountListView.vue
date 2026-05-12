@@ -115,8 +115,25 @@
       </template>
     </el-dialog>
 
-    <!-- Add Account Dialog (扫码绑定) -->
-    <ScanBindDialog v-model:visible="showAddDialog" @success="handleBindSuccess" />
+    <!-- Add Account Guide Dialog -->
+    <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
+      <div style="text-align:center;padding:20px">
+        <p style="font-size:16px;margin-bottom:16px">请使用 <strong>MatrixFlow 桌面伴侣</strong> 绑定账号</p>
+        <div style="background:#f5f7fa;border-radius:8px;padding:16px;text-align:left;margin-bottom:16px">
+          <p style="margin:4px 0">1. 打开桌面伴侣（双击 start.bat）</p>
+          <p style="margin:4px 0">2. 登录你的 MatrixFlow 账号</p>
+          <p style="margin:4px 0">3. 选择平台，扫码登录</p>
+          <p style="margin:4px 0">4. Cookie 自动上传，刷新本页即可见</p>
+        </div>
+        <p style="color:#909399;font-size:13px">
+          桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。
+        </p>
+      </div>
+      <template #footer>
+        <el-button @click="showAddDialog = false">关闭</el-button>
+        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false">手动输入 Cookie</el-button>
+      </template>
+    </el-dialog>
     <!-- Manual Add Dialog -->
     <ManualAddDialog v-model:visible="showManualDialog" @success="handleBindSuccess" />
   </div>
@@ -131,7 +148,6 @@ import { accountsApi } from '@/api/accounts'
 import { PLATFORM_LABELS } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
-import ScanBindDialog from '@/components/account/ScanBindDialog.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 
 const accountStore = useAccountStore()
