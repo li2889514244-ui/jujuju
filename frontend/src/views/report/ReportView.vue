@@ -91,7 +91,8 @@ import { ref, computed } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
 import { analyticsApi } from '@/api/analytics'
-import { PLATFORM_LABELS } from '@/types'
+import { PLATFORM_LABELS as _PL } from '@/types'
+const PLATFORM_LABELS: Record<string, string> = _PL
 import DataChart from '@/components/common/DataChart.vue'
 
 const loading = ref(false)
@@ -226,8 +227,3 @@ async function exportExcel() {
     margin-bottom: 20px;
   }
 
-  &__section {
-    margin-bottom: 20px;
-  }
-}
-</style>

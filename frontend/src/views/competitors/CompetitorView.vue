@@ -105,7 +105,8 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { competitorsApi, type Competitor } from '@/api/competitors'
-import { PLATFORM_LABELS } from '@/types'
+import { PLATFORM_LABELS as _PL } from '@/types'
+const PLATFORM_LABELS: Record<string, string> = _PL
 import DataChart from '@/components/common/DataChart.vue'
 import MiniTrend from '@/components/common/MiniTrend.vue'
 
@@ -130,15 +131,15 @@ const filteredList = computed(() => {
   return list.value.filter((c) => c.platform === filterPlatform.value)
 })
 
-function platformTagType(platform: string) {
-  const map: Record<string, string> = {
-    DOUYIN: '',
+function platformTagType(platform: string): 'success' | 'primary' | 'warning' | 'info' | 'danger' | undefined {
+  const map: Record<string, 'success' | 'primary' | 'warning' | 'info' | 'danger' | undefined> = {
+    DOUYIN: undefined,
     XIAOHONGSHU: 'danger',
     KUAISHOU: 'warning',
     WECHAT_VIDEO: 'success',
     BILIBILI: 'info',
   }
-  return map[platform] || ''
+  return map[platform]
 }
 
 function getFollowerTrend(row: Competitor): number[] {
@@ -241,18 +242,4 @@ onMounted(() => {
   }
 
   &__account-info {
-    display: flex;
-    flex-direction: column;
-  }
-
-  &__account-name {
-    font-weight: 500;
-    font-size: 14px;
-  }
-
-  &__account-id {
-    font-size: 12px;
-    color: #999;
-  }
-}
-</style>
+    display: flex;

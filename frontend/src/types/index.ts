@@ -129,9 +129,14 @@ export interface PublishTask {
 }
 
 export interface PublishForm {
-  contentId: string
+  contentId?: string
+  title?: string
+  content?: string
+  mediaUrls?: string[]
+  tags?: string[]
   accountIds: string[]
   scheduledAt?: string
+  publishAt?: string
 }
 
 // ===== Analytics =====
