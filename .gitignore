@@ -65,3 +65,7 @@ temp/
 social-auto-upload/  
 !frontend/**/*.ps1
 social-auto-upload/  
+
+# 调试脚本
+_*.js
+_*.py
