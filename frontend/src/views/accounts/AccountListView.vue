@@ -119,8 +119,15 @@
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
       <div style="text-align:center;padding:20px">
         <p style="font-size:16px;margin-bottom:16px">请使用 <strong>MatrixFlow 桌面伴侣</strong> 绑定账号</p>
+        <el-button type="primary" size="large" style="margin-bottom:16px" tag="a"
+          href="https://github.com/li2889514244-ui/matrixflow-desktop/archive/refs/heads/master.zip"
+          target="_blank">
+          <el-icon><Download /></el-icon>
+          下载桌面伴侣
+        </el-button>
         <div style="background:#f5f7fa;border-radius:8px;padding:16px;text-align:left;margin-bottom:16px">
-          <p style="margin:4px 0">1. 打开桌面伴侣（双击 start.bat）</p>
+          <p style="margin:4px 0">1. 下载并解压桌面伴侣</p>
+          <p style="margin:4px 0">2. 双击 start.bat（首次会自动安装依赖）</p>
           <p style="margin:4px 0">2. 登录你的 MatrixFlow 账号</p>
           <p style="margin:4px 0">3. 选择平台，扫码登录</p>
           <p style="margin:4px 0">4. Cookie 自动上传，刷新本页即可见</p>
