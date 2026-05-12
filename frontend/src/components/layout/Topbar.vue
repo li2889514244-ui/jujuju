@@ -227,15 +227,15 @@ function handleUserCommand(command: string) {
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .topbar {
   height: $topbar-height;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 0 20px;
-  flex-shrink: 0;
+  @include glass;
+  border-bottom: 1px solid $color-border;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px; flex-shrink: 0;
+  z-index: 5;
 
   &__right {
     display: flex;

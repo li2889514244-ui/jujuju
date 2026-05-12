@@ -1,43 +1,125 @@
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
+// MatrixFlow — Global
+@import './variables';
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #app {
-  width: 100%;
-  height: 100%;
-  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB',
-    'Microsoft YaHei', '微软雅黑', Arial, sans-serif;
+  width: 100%; height: 100%;
+  font-family: $font-family;
+  background: $color-bg-primary;
+  color: $color-text-primary;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
 }
 
 body {
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  color: #303133;
-  background-color: #f5f7fa;
-}
-
-a {
-  text-decoration: none;
-  color: inherit;
-}
-
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-thumb {
-  background-color: #dcdfe6;
-  border-radius: 3px;
-
-  &:hover {
-    background-color: #c0c4cc;
+  &::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+    background:
+      radial-gradient(ellipse 80% 40% at 20% 10%, rgba(10, 132, 255, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 50% at 80% 80%, rgba(191, 90, 242, 0.03) 0%, transparent 60%);
   }
 }
 
-// Element Plus overrides
-.el-menu--vertical {
-  border-right: none !important;
+a { text-decoration: none; color: $color-blue; }
+
+// === Scrollbar ===
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  &:hover { background: rgba(255, 255, 255, 0.2); }
 }
+
+// === Selection ===
+::selection {
+  background: rgba(10, 132, 255, 0.3);
+  color: $color-text-primary;
+}
+
+// === Transitions ===
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s $ease-out; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s $ease-spring; }
+.slide-up-enter-from { opacity: 0; transform: translateY(12px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(-8px); }
+
+// === Element Plus deep overrides ===
+.el-button--primary {
+  --el-button-bg-color: #{$color-blue};
+  --el-button-border-color: #{$color-blue};
+  --el-button-hover-bg-color: #{lighten($color-blue, 8%)};
+  border-radius: $radius-full;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  transition: all 0.2s $ease-out;
+  &:active { transform: scale(0.97); }
+}
+
+.el-card {
+  background: $color-bg-elevated;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  color: $color-text-primary;
+  box-shadow: $shadow-sm;
+  transition: border-color 0.2s $ease-out, box-shadow 0.2s $ease-out;
+  &:hover {
+    border-color: $color-border-active;
+    box-shadow: $shadow-md;
+  }
+}
+
+.el-input__wrapper {
+  background: $color-bg-tertiary;
+  border-radius: $radius-md;
+  box-shadow: none;
+  border: 1px solid $color-border;
+  transition: border-color 0.2s $ease-out;
+  &:hover, &.is-focus { border-color: $color-blue; box-shadow: 0 0 0 2px rgba(10, 132, 255, 0.15); }
+}
+.el-input__inner { color: $color-text-primary; &::placeholder { color: $color-text-placeholder; } }
+
+.el-select .el-input__wrapper { background: $color-bg-tertiary; }
+.el-select-dropdown { background: $color-bg-elevated; border: 1px solid $color-border; border-radius: $radius-md; }
+.el-select-dropdown__item { color: $color-text-secondary; &.selected, &:hover { color: $color-text-primary; background: rgba(10, 132, 255, 0.1); } }
+
+.el-dialog {
+  background: $color-bg-elevated;
+  border: 1px solid $color-border;
+  border-radius: $radius-xl;
+  box-shadow: $shadow-lg;
+  .el-dialog__header { padding: 24px 24px 0; }
+  .el-dialog__title { color: $color-text-primary; font-weight: 600; font-size: 17px; }
+  .el-dialog__body { padding: 20px 24px; color: $color-text-secondary; }
+}
+
+.el-table {
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
+  --el-table-header-bg-color: rgba(255, 255, 255, 0.03);
+  --el-table-border-color: #{$color-separator};
+  --el-table-text-color: #{$color-text-primary};
+  --el-table-header-text-color: #{$color-text-secondary};
+  --el-table-row-hover-bg-color: rgba(255, 255, 255, 0.04);
+}
+
+.el-pagination {
+  --el-pagination-bg-color: transparent;
+  --el-pagination-text-color: #{$color-text-secondary};
+  .btn-prev, .btn-next { background: $color-bg-tertiary; border-radius: $radius-sm; }
+}
+
+.el-message-box {
+  background: $color-bg-elevated;
+  border: 1px solid $color-border;
+  border-radius: $radius-xl;
+}
+
+.el-menu { --el-menu-bg-color: transparent; }
+.el-tag { border-radius: $radius-full; }
+.el-avatar { border-radius: $radius-full; }
+.el-badge__content { border-radius: $radius-full; }
