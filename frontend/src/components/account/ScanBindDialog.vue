@@ -9,7 +9,7 @@
   >
     <!-- Step 1: 选择平台 -->
     <div v-if="step === 'select'" class="scan-bind__platforms">
-      <p class="scan-bind__tip">选择要绑定的平台，系统将打开该平台登录页供您扫码</p>
+      <p class="scan-bind__tip">选择要绑定的平台，系统将在本地浏览器中打开登录页供您扫码</p>
       <div class="scan-bind__grid">
         <div
           v-for="p in platforms"
@@ -28,7 +28,7 @@
     <!-- Step 2: 扫码中 -->
     <div v-else-if="step === 'scanning'" class="scan-bind__scanning">
       <div class="scan-bind__status">
-        <el-icon v-if="scanStatus === 'launching' || scanStatus === 'navigating' || scanStatus === 'waiting_qr'" class="is-loading"><Loading /></el-icon>
+        <el-icon v-if="!qrImage" class="is-loading"><Loading /></el-icon>
         <span>{{ statusMessage }}</span>
       </div>
 
@@ -36,15 +36,14 @@
         <img v-if="qrImage" :src="qrImage" class="scan-bind__qr-image" alt="扫码登录" />
         <div v-else class="scan-bind__qr-placeholder">
           <el-icon class="is-loading" :size="32"><Loading /></el-icon>
-          <span>正在加载二维码...</span>
+          <span>正在启动本地浏览器...</span>
         </div>
       </div>
 
-      <p class="scan-bind__hint">请使用「{{ selectedPlatformLabel }}」App 扫描上方二维码完成登录</p>
+      <p class="scan-bind__hint">本地 Chrome 窗口已打开，请用「{{ selectedPlatformLabel }}」App 扫描窗口中的二维码</p>
 
       <div class="scan-bind__actions">
         <el-button @click="handleCancel">取消</el-button>
-        <el-button type="warning" @click="handleRetry">重新获取</el-button>
       </div>
     </div>
 
@@ -83,7 +82,6 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { io, Socket } from 'socket.io-client'
 import { useUserStore } from '@/store/user'
 
 const props = defineProps<{ visible: boolean }>()
@@ -95,23 +93,27 @@ const emit = defineEmits<{
 const userStore = useUserStore()
 
 const platforms = [
-  { value: 'DOUYIN', label: '抖音', icon: '抖', color: '#000000' },
-  { value: 'XIAOHONGSHU', label: '小红书', icon: '红', color: '#FF2442' },
-  { value: 'KUAISHOU', label: '快手', icon: '快', color: '#FF4906' },
-  { value: 'BILIBILI', label: 'B站', icon: 'B', color: '#00A1D6' },
-  { value: 'WEIBO', label: '微博', icon: '微', color: '#E6162D' },
-  { value: 'WECHAT_VIDEO', label: '视频号', icon: '视', color: '#07C160' },
+  { value: 'douyin', label: '抖音', icon: '抖', color: '#000000' },
+  { value: 'xiaohongshu', label: '小红书', icon: '红', color: '#FF2442' },
+  { value: 'kuaishou', label: '快手', icon: '快', color: '#FF4906' },
+  { value: 'tencent', label: '视频号', icon: '视', color: '#07C160' },
 ]
+
+const PLATFORM_TO_FLASK: Record<string, string> = {
+  douyin: 'douyin',
+  xiaohongshu: 'xiaohongshu',
+  kuaishou: 'kuaishou',
+  tencent: 'tencent',
+}
 
 const step = ref<'select' | 'scanning' | 'success' | 'error'>('select')
 const selectedPlatform = ref('')
-const scanStatus = ref('')
-const statusMessage = ref('')
+const statusMessage = ref('正在启动本地浏览器...')
 const qrImage = ref('')
 const errorMessage = ref('')
 const boundAccount = ref<any>(null)
 
-let socket: Socket | null = null
+let eventSource: EventSource | null = null
 let scanTimeout: ReturnType<typeof setTimeout> | null = null
 
 const selectedPlatformLabel = computed(() => {
@@ -123,18 +125,17 @@ watch(() => props.visible, (val) => {
     step.value = 'select'
     resetState()
   } else {
-    disconnectSocket()
+    disconnectSSE()
   }
 })
 
 onUnmounted(() => {
-  disconnectSocket()
+  disconnectSSE()
 })
 
 function resetState() {
   selectedPlatform.value = ''
-  scanStatus.value = ''
-  statusMessage.value = ''
+  statusMessage.value = '正在启动本地浏览器...'
   qrImage.value = ''
   errorMessage.value = ''
   boundAccount.value = null
@@ -147,66 +148,86 @@ function handleSelectPlatform(platform: string) {
 }
 
 function startScan() {
-  disconnectSocket()
+  disconnectSSE()
   qrImage.value = ''
-  scanStatus.value = 'launching'
-  statusMessage.value = '正在启动浏览器...'
+  statusMessage.value = '正在启动本地浏览器...'
 
-  // 2分钟超时
+  // 3 分钟超时
   scanTimeout = setTimeout(() => {
     errorMessage.value = '扫码超时，请重试'
     step.value = 'error'
-    disconnectSocket()
-  }, 120000)
+    disconnectSSE()
+  }, 180000)
 
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || window.location.origin
-  const wsBase = baseUrl.replace(/\/api\/v1$/, '')
-  socket = io(`${wsBase}/scan-bind`, {
-    transports: ['websocket'],
-    auth: {
-      token: userStore.token,
-    },
+  const flaskPlatform = PLATFORM_TO_FLASK[selectedPlatform.value] || selectedPlatform.value
+  const token = userStore.token
+  const apiUrl = import.meta.env.VITE_API_BASE_URL || `${window.location.origin}/api/v1`
+
+  const params = new URLSearchParams({
+    platform: flaskPlatform,
+    token: token,
+    api_url: apiUrl,
   })
 
-  socket.on('connect', () => {
-    socket!.emit('start-scan', {
-      platform: selectedPlatform.value,
-      userId: userStore.userInfo?.id,
-    })
-  })
+  const url = `http://localhost:5409/api/scan-bind/start?${params.toString()}`
 
-  socket.on('qr-code', (data: { image: string }) => {
-    qrImage.value = data.image
-  })
+  eventSource = new EventSource(url)
 
-  socket.on('scan-status', (data: { status: string; message?: string }) => {
-    scanStatus.value = data.status
-    statusMessage.value = data.message || ''
-  })
+  eventSource.onmessage = (event) => {
+    try {
+      const msg = JSON.parse(event.data)
+      switch (msg.type) {
+        case 'qr_code':
+          // 二维码可能是 base64 data URL 或普通 URL
+          const raw = msg.data || ''
+          if (raw.startsWith('data:') || raw.startsWith('http')) {
+            qrImage.value = raw
+          }
+          statusMessage.value = '已获取二维码，请在本地浏览器窗口中扫码'
+          break
 
-  socket.on('scan-success', (data: any) => {
-    boundAccount.value = data
-    step.value = 'success'
-    disconnectSocket()
-  })
+        case 'status':
+          statusMessage.value = msg.data || '处理中...'
+          break
 
-  socket.on('scan-error', (data: { error: string }) => {
-    errorMessage.value = data.error
-    step.value = 'error'
-    disconnectSocket()
-  })
+        case 'success':
+          const nestjsResp = msg.data?.nestjs
+          boundAccount.value = {
+            nickname: msg.data?.nickname || '已绑定',
+            platform: msg.data?.platform,
+            avatar: nestjsResp?.data?.avatar,
+          }
+          step.value = 'success'
+          disconnectSSE()
+          break
 
-  socket.on('connect_error', () => {
-    errorMessage.value = '连接服务器失败，请检查网络'
-    step.value = 'error'
-  })
+        case 'error':
+          errorMessage.value = msg.data || '扫码失败'
+          step.value = 'error'
+          disconnectSSE()
+          break
+
+        case 'heartbeat':
+          // ignore
+          break
+      }
+    } catch {
+      // 非 JSON 消息忽略
+    }
+  }
+
+  eventSource.onerror = () => {
+    // SSE 连接失败 — 可能是本地 Flask 没启动
+    if (step.value === 'scanning') {
+      errorMessage.value = '无法连接本地扫码服务，请确认已运行 start-win.bat'
+      step.value = 'error'
+    }
+    disconnectSSE()
+  }
 }
 
 function handleCancel() {
-  if (socket) {
-    socket.emit('cancel-scan')
-  }
-  disconnectSocket()
+  disconnectSSE()
   step.value = 'select'
 }
 
@@ -226,19 +247,18 @@ function handleAddAnother() {
 }
 
 function handleClose() {
-  disconnectSocket()
+  disconnectSSE()
   emit('update:visible', false)
 }
 
-function disconnectSocket() {
+function disconnectSSE() {
   if (scanTimeout) {
     clearTimeout(scanTimeout)
     scanTimeout = null
   }
-  if (socket) {
-    socket.emit('cancel-scan')
-    socket.disconnect()
-    socket = null
+  if (eventSource) {
+    eventSource.close()
+    eventSource = null
   }
 }
 </script>
