@@ -1,0 +1,26 @@
+name: Deploy Backend to ECS
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install deps
+        run: npm install @alicloud/pop-core
+
+      - name: Deploy
+        run: node .github/workflows/deploy.mjs
+        env:
+          ALI_ACCESS_KEY: ${{ secrets.ECS_ACCESS_KEY }}
+          ALI_SECRET_KEY: ${{ secrets.ECS_SECRET_KEY }}
