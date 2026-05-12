@@ -7,10 +7,6 @@
         <span class="subtitle">管理已授权的第三方平台账号</span>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="showAddPlatformDialog">
-          <el-icon><Plus /></el-icon>
-          添加平台
-        </el-button>
         <el-button @click="refreshAllTokens" :loading="refreshing">
           <el-icon><Refresh /></el-icon>
           刷新Token
