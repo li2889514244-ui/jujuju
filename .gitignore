@@ -62,9 +62,7 @@ temp/
 *.p12
 .pnpm-approved-builds.json
 *.ps1
-social-auto-upload/  
-!frontend/**/*.ps1
-social-auto-upload/  
+social-auto-upload/
 !social-auto-upload/conf.py
 !social-auto-upload/sau_backend.py
 !social-auto-upload/start.bat
