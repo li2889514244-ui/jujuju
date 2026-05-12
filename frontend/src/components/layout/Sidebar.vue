@@ -3,7 +3,7 @@
     <!-- Logo -->
     <div class="sidebar__logo" @click="$router.push('/dashboard')">
       <div class="sidebar__logo-icon">M</div>
-      <span v-if="!isCollapsed" class="sidebar__logo-text">MatrixFlow</span>
+      <span v-if="!isCollapsed" class="sidebar__logo-text">披星云</span>
     </div>
 
     <!-- Menu -->

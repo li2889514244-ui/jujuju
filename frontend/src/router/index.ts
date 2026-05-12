@@ -107,7 +107,7 @@ const router = createRouter({
 // Navigation guard
 router.beforeEach((to, _from, next) => {
   NProgress.start()
-  document.title = `${to.meta.title || 'MatrixFlow'} - 矩阵管理平台`
+  document.title = `${to.meta.title || '披星云'} - 矩阵管理平台`
 
   const userStore = useUserStore()
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)

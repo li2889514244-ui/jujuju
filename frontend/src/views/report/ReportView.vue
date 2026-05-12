@@ -207,7 +207,7 @@ async function exportExcel() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `MatrixFlow报表_${dateRange.value?.[0] || ''}_${dateRange.value?.[1] || ''}.xlsx`
+    a.download = `披星云报表_${dateRange.value?.[0] || ''}_${dateRange.value?.[1] || ''}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
     ElMessage.success('导出成功')
