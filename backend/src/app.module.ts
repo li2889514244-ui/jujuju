@@ -19,7 +19,6 @@ import { UploaderModule } from './modules/uploader/uploader.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { ContentReviewModule } from './modules/content-review/content-review.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
-import { ScanBindModule } from './modules/scan-bind/scan-bind.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -73,7 +72,6 @@ import databaseConfig from './config/database.config';
     SchedulerModule,
     ContentReviewModule,
     NotificationsModule,
-    ScanBindModule,
   ],
   providers: [
     // #12 全局认证守卫 — 所有路由默认需要认证，@Public() 装饰器可豁免
