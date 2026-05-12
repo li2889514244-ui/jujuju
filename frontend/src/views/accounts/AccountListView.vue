@@ -117,6 +117,8 @@
 
     <!-- Add Account Dialog (扫码绑定) -->
     <ScanBindDialog v-model:visible="showAddDialog" @success="handleBindSuccess" />
+    <!-- Manual Add Dialog -->
+    <ManualAddDialog v-model:visible="showManualDialog" @success="handleBindSuccess" />
   </div>
 </template>
 
