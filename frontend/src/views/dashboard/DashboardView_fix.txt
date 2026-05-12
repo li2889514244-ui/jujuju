@@ -1,0 +1,93 @@
+// 修复版 DashboardView — 全部真实数据
+<script setup lang="ts">
+import { ref, computed, onMounted, watch } from 'vue'
+import dayjs from 'dayjs'
+import DataChart from '@/components/common/DataChart.vue'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import StatusBadge from '@/components/common/StatusBadge.vue'
+import { analyticsApi } from '@/api/analytics'
+import { contentApi } from '@/api/content'
+import type { PublishTask } from '@/types'
+
+const trendDays = ref(7)
+const loading = ref(false)
+
+const overviewCards = ref([
+  { title: '账号总数', value: '0', icon: 'UserFilled', color: '#409eff', trend: 0 },
+  { title: '总粉丝数', value: '0', icon: 'Star', color: '#e6a23c', trend: 0 },
+  { title: '总互动数', value: '0', icon: 'DataLine', color: '#67c23a', trend: 0 },
+  { title: '发布总数', value: '0', icon: 'List', color: '#f56c6c', trend: 0 },
+])
+const recentTasks = ref<PublishTask[]>([])
+const notifications = ref<{ message: string; icon: string; color: string; time: string }[]>([])
+const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
+
+const PLATFORM_COLORS: Record<string, string> = { DOUYIN: '#000', KUAISHOU: '#ff4906', XIAOHONGSHU: '#ff2442', BILIBILI: '#fb7299', WECHAT_VIDEO: '#07c160', WEIBO: '#ff8200', TIKTOK: '#010101' }
+const PLATFORM_CN: Record<string, string> = { DOUYIN: '抖音', KUAISHOU: '快手', XIAOHONGSHU: '小红书', BILIBILI: 'B站', WECHAT_VIDEO: '视频号', WEIBO: '微博', TIKTOK: 'TikTok' }
+
+function formatNumber(num: number): string {
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
+  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
+  return num.toLocaleString()
+}
+
+// 粉丝增长趋势 — 真实数据
+const followerTrendData = ref<number[]>([])
+const followerChartLoading = ref(false)
+
+async function loadFollowerTrend() {
+  followerChartLoading.value = true
+  try {
+    const res = await analyticsApi.getFollowerTrend({ days: trendDays.value })
+    const data = res.data || []
+    followerTrendData.value = data.map((d: any) => d.value || 0)
+  } catch { followerTrendData.value = [] }
+  followerChartLoading.value = false
+}
+
+const followerChartOption = computed(() => ({
+  tooltip: { trigger: 'axis' as const },
+  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  xAxis: { type: 'category' as const, data: Array.from({ length: trendDays.value }, (_, i) => dayjs().subtract(trendDays.value - 1 - i, 'day').format('MM-DD')) },
+  yAxis: { type: 'value' as const, name: '新增粉丝' },
+  series: followerTrendData.value.length > 0 ? [{ name: '粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.2 }, data: followerTrendData.value }] : [],
+}))
+
+const platformChartOption = computed(() => ({
+  tooltip: { trigger: 'item' as const }, legend: { bottom: 0 },
+  series: [{ type: 'pie' as const, radius: ['40%', '70%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 }, label: { show: false }, emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' as const } }, data: platformDistribution.value.length > 0 ? platformDistribution.value : [{ value: 0, name: '暂无数据' }] }],
+}))
+
+function formatTime(time: string) { return dayjs(time).format('MM-DD HH:mm') }
+
+async function fetchDashboardData() {
+  loading.value = true
+  try {
+    const res = await analyticsApi.getOverview()
+    const data = res.data as any
+    const totalAccounts = data.accounts?.total || 0
+    const totalFollowers = data.accounts?.totalFollowers || 0
+    const totalEngagement = (data.engagement?.totalLikes || 0) + (data.engagement?.totalComments || 0) + (data.engagement?.totalShares || 0)
+    const totalPosts = data.posts?.total || 0
+    overviewCards.value = [
+      { title: '账号总数', value: formatNumber(totalAccounts), icon: 'UserFilled', color: '#409eff', trend: 0 },
+      { title: '总粉丝数', value: formatNumber(totalFollowers), icon: 'Star', color: '#e6a23c', trend: 0 },
+      { title: '总互动数', value: formatNumber(totalEngagement), icon: 'DataLine', color: '#67c23a', trend: 0 },
+      { title: '发布总数', value: formatNumber(totalPosts), icon: 'List', color: '#f56c6c', trend: 0 },
+    ]
+    const byPlatform = data.accounts?.byPlatform || {}
+    platformDistribution.value = Object.entries(byPlatform).map(([key, count]) => ({ value: count as number, name: PLATFORM_CN[key] || key, itemStyle: { color: PLATFORM_COLORS[key] || '#999' } }))
+  } catch (e) { console.error('概览失败:', e) }
+  try {
+    const res = await contentApi.getList({ page: 1, limit: 5, status: 'PUBLISHED' })
+    const data = res.data as any
+    if (data?.posts) {
+      recentTasks.value = data.posts.map((p: any) => ({ id: p.id, contentId: p.id, contentTitle: p.title || '无标题', accountId: p.accountId, accountNickname: p.account?.nickname || '', platform: (p.account?.platform || '').toLowerCase(), status: p.status === 'PUBLISHED' ? 'success' : p.status === 'FAILED' ? 'failed' : 'publishing', scheduledAt: p.publishAt, publishedAt: p.updatedAt, errorMessage: p.errorMsg, createdAt: p.createdAt }))
+    }
+  } catch (e) { console.error('任务失败:', e) }
+  loading.value = false
+}
+
+onMounted(() => { fetchDashboardData(); loadFollowerTrend() })
+watch(trendDays, () => loadFollowerTrend())
+</script>
