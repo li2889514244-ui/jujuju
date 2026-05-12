@@ -21,7 +21,7 @@ jobs:
         run: npm install @alicloud/pop-core
 
       - name: Deploy
-        run: node .github/workflows/deploy.mjs
+        run: node .github/workflows/deploy.cjs
         env:
           ALI_ACCESS_KEY: ${{ secrets.ECS_ACCESS_KEY }}
           ALI_SECRET_KEY: ${{ secrets.ECS_SECRET_KEY }}
