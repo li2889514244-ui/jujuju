@@ -227,3 +227,8 @@ async function exportExcel() {
     margin-bottom: 20px;
   }
 
+  &__section {
+    margin-bottom: 20px;
+  }
+}
+</style>

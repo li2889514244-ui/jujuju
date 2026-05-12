@@ -242,4 +242,18 @@ onMounted(() => {
   }
 
   &__account-info {
-    display: flex;
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__account-name {
+    font-weight: 500;
+    font-size: 14px;
+  }
+
+  &__account-id {
+    font-size: 12px;
+    color: #999;
+  }
+}
+</style>

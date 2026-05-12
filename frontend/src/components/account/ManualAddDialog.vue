@@ -47,7 +47,7 @@ import { ref, reactive } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { accountsApi } from '@/api/accounts'
 
-const props = defineProps<{ visible: boolean }>()
+defineProps<{ visible: boolean }>()
 const emit = defineEmits<{
   'update:visible': [value: boolean]
   'success': []

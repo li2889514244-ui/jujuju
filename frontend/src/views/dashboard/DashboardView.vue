@@ -163,7 +163,7 @@ const followerChartOption = computed(() => ({
     ),
   },
   yAxis: { type: 'value' as const, name: '新增粉丝' },
-  series: [] as unknown[],
+  series: [] as any[],
 }))
 
 const platformChartOption = computed(() => ({

@@ -1,56 +1,48 @@
 #!/bin/bash
 # MatrixFlow 一键部署 - 阿里云 ECS
-# 在阿里云控制台「远程连接」执行或 SSH 登录后运行
+# 直接粘贴到远程终端执行
 
 set -e
 echo "===== MatrixFlow 部署开始 ====="
 
-# 1. 更新系统
-apt update -y && apt upgrade -y
+# 1. 安装 Docker
+echo "[1/4] 安装 Docker..."
+if ! command -v docker &> /dev/null; then
+    curl -fsSL https://get.docker.com | sh
+    systemctl enable docker --now
+fi
 
-# 2. 安装 Docker
-curl -fsSL https://get.docker.com | sh
-systemctl enable docker
-systemctl start docker
+# 2. 安装 Docker Compose
+echo "[2/4] 安装 Docker Compose..."
+if ! command -v docker-compose &> /dev/null; then
+    curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+    chmod +x /usr/local/bin/docker-compose
+fi
 
-# 3. 安装 Git
-apt install -y git
+# 3. 下载部署文件
+echo "[3/4] 下载部署配置..."
+mkdir -p /opt/matrixflow
+cd /opt/matrixflow
+curl -fsSL -o docker-compose.yml https://raw.githubusercontent.com/li2889514244-ui/jujuju/master/backend/docker-compose.yml
 
-# 4. 克隆项目
-cd /opt
-git clone https://github.com/li2889514244-ui/jujuju.git matrixflow
-cd matrixflow
-
-# 5. 写环境变量
+# 4. 创建环境变量
+echo "[4/4] 配置环境变量..."
 cat > .env << 'ENVEOF'
+# 匹配 docker-compose.yml 的 service name (db)
 DATABASE_URL=postgresql://postgres:postgres@db:5432/matrixflow
-JWT_SECRET=CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE
-JWT_REFRESH_SECRET=CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE
-COOKIE_ENCRYPTION_KEY=CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE
-TOKEN_ENCRYPTION_KEY=CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE
 REDIS_URL=redis://redis:6379
-NODE_ENV=production
+JWT_SECRET=CHANGE_ME_RANDOM_32_CHARS_PLEASE
+JWT_REFRESH_SECRET=CHANGE_ME_RANDOM_32_CHARS_PLEASE_TOO
+COOKIE_ENCRYPTION_KEY=CHANGE_ME_COOKIE_KEY_32_BYTES_
 PORT=3000
+PYTHON_BRIDGE_URL=http://bridge:8000
 ENVEOF
 
-# 6. 生成随机密钥
-JWT_SECRET=$(openssl rand -hex 32)
-JWT_REFRESH=$(openssl rand -hex 32)
-COOKIE_KEY=$(openssl rand -hex 32)
-TOKEN_KEY=$(openssl rand -hex 32)
-DB_PASS=$(openssl rand -hex 16)
+# 5. 启动
+echo "启动服务..."
+docker-compose up -d
 
-sed -i "s/CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE/$JWT_SECRET/" .env
-sed -i "0,/CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE/s//$JWT_REFRESH/" .env
-sed -i "0,/CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE/s//$COOKIE_KEY/" .env
-sed -i "0,/CHANGEME_RANDOM_32_CHARS_PLEASE_REPLACE/s//$TOKEN_KEY/" .env
-
-# 7. 启动（Docker Compose）
-cd backend
-docker compose up -d --build
-
-# 8. 等待启动
-sleep 10
+echo ""
 echo "===== 部署完成 ====="
-echo "访问: http://8.134.218.39:3000/api/v1/health"
-curl -s http://localhost:3000/api/v1/health
+echo "查看状态: docker-compose ps"
+echo "健康检查: curl http://localhost:3000/api/v1/health"

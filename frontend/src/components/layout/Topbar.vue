@@ -133,7 +133,7 @@ onUnmounted(() => {
 async function fetchUnreadCount() {
   try {
     const res = await notificationApi.getUnreadCount()
-    unreadCount.value = res.unreadCount
+    unreadCount.value = res.data.unreadCount
   } catch { /* silent */ }
 }
 
@@ -141,8 +141,8 @@ async function fetchNotifications() {
   notifLoading.value = true
   try {
     const res = await notificationApi.getAll({ limit: 10 })
-    notifications.value = res.notifications
-    unreadCount.value = res.unreadCount
+    notifications.value = res.data.notifications
+    unreadCount.value = res.data.unreadCount
   } catch { /* silent */ }
   notifLoading.value = false
 }

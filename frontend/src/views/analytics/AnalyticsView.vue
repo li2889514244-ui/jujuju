@@ -272,7 +272,7 @@ async function loadRanking() {
   rankingLoading.value = true
   try {
     const res = await analyticsApi.getViewsRanking({ period: rankingPeriod.value, limit: 50 })
-    viewsRanking.value = res.ranking
+    viewsRanking.value = res.data.ranking
   } catch { /* silent */ }
   rankingLoading.value = false
 }

@@ -69,3 +69,14 @@ social-auto-upload/
 # 调试脚本
 _*.js
 _*.py
+
+# 部署脚本（含阿里云凭证，禁止提交）
+deploy-ali.js
+deploy-ali.ps1
+check-ecs.js
+scan-ecs.js
+sshconn.py
+check-cmd.js
+test-cmd.js
+gen-secrets.js
+genkey.bat

@@ -56,5 +56,8 @@
     "extends": [
       "@commitlint/config-conventional"
     ]
+  },
+  "dependencies": {
+    "@alicloud/pop-core": "^1.8.0"
   }
 }
