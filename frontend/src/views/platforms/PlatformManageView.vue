@@ -175,7 +175,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Plus, Refresh } from '@element-plus/icons-vue'
+import { Refresh } from '@element-plus/icons-vue'
 import { platformsApi, type SupportedPlatform, type AuthorizedAccount } from '@/api/platforms'
 import type { Platform } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
@@ -302,11 +302,6 @@ async function loadAccounts() {
     loading.value = false
   }
 }
-
-function showAddPlatformDialog() {
-  addDialogVisible.value = true
-}
-
 async function authorizePlatform(platform: SupportedPlatform) {
   if (isAuthorized(platform.key)) {
     ElMessage.info(`${platform.name} 已授权`)
