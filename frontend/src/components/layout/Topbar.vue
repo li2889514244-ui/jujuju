@@ -10,6 +10,14 @@
     </div>
 
     <div class="topbar__right">
+      <!-- Desktop Download -->
+      <el-tooltip content="下载桌面伴侣，扫码绑定平台账号" placement="bottom">
+        <a href="https://github.com/li2889514244-ui/matrixflow-desktop/archive/refs/heads/master.zip" target="_blank" class="topbar__download">
+          <el-icon :size="20"><Download /></el-icon>
+          <span>桌面端</span>
+        </a>
+      </el-tooltip>
+
       <!-- Team Switcher -->
       <el-dropdown trigger="click" @command="handleTeamSwitch">
         <div class="topbar__team">
@@ -233,6 +241,21 @@ function handleUserCommand(command: string) {
     display: flex;
     align-items: center;
     gap: 20px;
+  }
+
+  &__download {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: #409eff;
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    &:hover {
+      background: #ecf5ff;
+    }
   }
 
   &__team {
