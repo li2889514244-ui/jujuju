@@ -1,28 +1,26 @@
 <template>
   <div class="analytics">
-    <!-- Filters -->
     <el-card shadow="hover" class="analytics__filter">
       <el-form :inline="true">
         <el-form-item label="时间范围">
-          <el-select v-model="days" style="width: 140px">
+          <el-select v-model="days" style="width: 140px" @change="refreshData">
             <el-option label="近7天" :value="7" />
             <el-option label="近30天" :value="30" />
             <el-option label="近90天" :value="90" />
           </el-select>
         </el-form-item>
         <el-form-item label="平台">
-          <el-select v-model="platform" placeholder="全部平台" clearable style="width: 140px">
+          <el-select v-model="platform" placeholder="全部平台" clearable style="width: 140px" @change="refreshData">
             <el-option label="全部" value="" />
             <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="refreshData">查询</el-button>
+          <el-button type="primary" @click="refreshData" :loading="loadingCharts">查询</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <!-- Charts -->
     <el-row :gutter="20" class="analytics__charts">
       <el-col :xs="24" :lg="12">
         <el-card shadow="hover">
@@ -53,14 +51,11 @@
       </el-col>
     </el-row>
 
-    <!-- Platform Stats Table -->
     <el-card shadow="hover">
       <template #header>平台数据明细</template>
       <el-table :data="platformStats" stripe>
         <el-table-column label="平台" width="100">
-          <template #default="{ row }">
-            <PlatformIcon :platform="row.platform" show-label />
-          </template>
+          <template #default="{ row }"><PlatformIcon :platform="row.platform" show-label /></template>
         </el-table-column>
         <el-table-column prop="accounts" label="账号数" width="100" />
         <el-table-column prop="followers" label="粉丝数" width="120">
@@ -76,7 +71,6 @@
       </el-table>
     </el-card>
 
-    <!-- 数据同比环比 -->
     <el-card shadow="hover" class="analytics__comparison">
       <template #header>数据对比（同比/环比）</template>
       <el-row :gutter="20">
@@ -87,56 +81,44 @@
               <div class="comparison-metric" v-for="metric in metricKeys" :key="metric">
                 <span class="comparison-metric__label">{{ metricLabels[metric] }}</span>
                 <span class="comparison-metric__value">{{ formatNum(comparison[key]?.current?.[metric]) }}</span>
-                <span
-                  class="comparison-metric__change"
-                  :class="getChangeClass(comparison[key]?.change?.[metric])"
-                >
+                <span class="comparison-metric__change" :class="getChangeClass(comparison[key]?.change?.[metric])">
                   {{ formatChange(comparison[key]?.change?.[metric]) }}
                 </span>
               </div>
             </div>
-            <el-skeleton v-else :rows="4" animated />
           </div>
         </el-col>
       </el-row>
     </el-card>
 
-    <!-- 播放量榜单 -->
     <el-card shadow="hover" class="analytics__ranking">
       <template #header>
         <div class="ranking-header">
-          <span>播放量榜单</span>
+          <span>播放量排行榜</span>
           <el-radio-group v-model="rankingPeriod" size="small" @change="loadRanking">
-            <el-radio-button value="week">本周</el-radio-button>
-            <el-radio-button value="month">本月</el-radio-button>
-            <el-radio-button value="all">全部</el-radio-button>
+            <el-radio-button value="week">周榜</el-radio-button>
+            <el-radio-button value="month">月榜</el-radio-button>
+            <el-radio-button value="all">总榜</el-radio-button>
           </el-radio-group>
         </div>
       </template>
-      <el-table :data="viewsRanking" stripe v-loading="rankingLoading">
-        <el-table-column label="排名" width="70" align="center">
+      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe>
+        <el-table-column label="排名" width="70">
           <template #default="{ row }">
-            <span class="rank-badge" :class="'rank-' + row.rank" v-if="row.rank <= 3">{{ row.rank }}</span>
-            <span v-else>{{ row.rank }}</span>
+            <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{ row.rank }}</span>
           </template>
         </el-table-column>
         <el-table-column label="内容" min-width="200">
           <template #default="{ row }">
-            <div class="ranking-title">{{ row.title || '无标题' }}</div>
-            <div class="ranking-meta">{{ row.accountName }} · <PlatformIcon :platform="row.platform" size="small" /></div>
+            <div class="ranking-title">{{ row.title }}</div>
+            <div class="ranking-meta">{{ row.accountName }} · {{ row.platform }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="播放量" width="120" align="right" sortable>
-          <template #default="{ row }">{{ formatNum(row.views) }}</template>
+        <el-table-column prop="views" label="播放量" width="120">
+          <template #default="{ row }">{{ row.views?.toLocaleString() }}</template>
         </el-table-column>
-        <el-table-column label="点赞" width="100" align="right">
-          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
-        </el-table-column>
-        <el-table-column label="评论" width="100" align="right">
-          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
-        </el-table-column>
-        <el-table-column label="分享" width="100" align="right">
-          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+        <el-table-column prop="likes" label="点赞" width="100">
+          <template #default="{ row }">{{ row.likes?.toLocaleString() }}</template>
         </el-table-column>
       </el-table>
     </el-card>
@@ -146,265 +128,173 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
-import { analyticsApi } from '@/api/analytics'
-import { PLATFORM_LABELS, type PlatformStats as PlatformStatsType } from '@/types'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import { analyticsApi } from '@/api/analytics'
+import { PLATFORM_LABELS } from '@/types'
 
-const days = ref(30)
+const days = ref(7)
 const platform = ref('')
-const platformStats = ref<PlatformStatsType[]>([])
+const platformStats = ref<any[]>([])
 const comparison = ref<any>(null)
 const viewsRanking = ref<any[]>([])
-const rankingPeriod = ref<'week' | 'month' | 'all'>('week')
 const rankingLoading = ref(false)
+const rankingPeriod = ref('week')
 
-const comparisonLabels: Record<string, { label: string }> = {
-  weekOverWeek: { label: '周环比（本周 vs 上周）' },
-  monthOverMonth: { label: '月环比（本月 vs 上月）' },
-  yearOverYear: { label: '年同比（本月 vs 去年同月）' },
-}
+// Real chart data
+const followerTrend = ref<number[]>([])
+const engagementData = ref<number[]>([])
+const publishData = ref<any[]>([])
+const loadingCharts = ref(false)
 
-const metricKeys = ['views', 'likes', 'comments', 'followers', 'posts'] as const
-const metricLabels: Record<string, string> = {
-  views: '播放量',
-  likes: '点赞',
-  comments: '评论',
-  shares: '分享',
-  followers: '新增粉丝',
-  posts: '发布数',
-}
+const dates = computed(() => Array.from({ length: days.value }, (_, i) =>
+  dayjs().subtract(days.value - 1 - i, 'day').format('MM-DD')))
 
-const dateLabels = computed(() =>
-  Array.from({ length: days.value }, (_, i) =>
-    dayjs().subtract(days.value - 1 - i, 'day').format('MM-DD')
-  )
-)
-
-// TODO: 图表数据为 mock（随机生成），正式环境需从 analyticsApi 获取真实数据
 const followerChart = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: { data: ['新增粉丝'] },
+  tooltip: { trigger: 'axis' as const }, legend: { data: ['新增粉丝'] },
   grid: { left: 50, right: 20, top: 40, bottom: 30 },
-  xAxis: { type: 'category' as const, data: dateLabels.value },
-  yAxis: { type: 'value' as const, name: '新增粉丝' },
-  series: [
-    {
-      name: '新增粉丝',
-      type: 'line' as const,
-      smooth: true,
-      areaStyle: { opacity: 0.3 },
-      data: Array.from({ length: days.value }, () => Math.floor(Math.random() * 1500 + 500)),
-    },
-  ],
+  xAxis: { type: 'category' as const, data: dates.value },
+  yAxis: { type: 'value' as const, name: '粉丝' },
+  series: [{ name: '新增粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.3 },
+    data: followerTrend.value.length > 0 ? followerTrend.value : [] }],
 }))
 
 const engagementChart = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: { data: ['点赞率', '评论率', '分享率'] },
+  tooltip: { trigger: 'axis' as const }, legend: { data: ['互动率'] },
   grid: { left: 50, right: 20, top: 40, bottom: 30 },
-  xAxis: { type: 'category' as const, data: dateLabels.value },
-  yAxis: { type: 'value' as const, name: '百分比(%)' },
-  series: [
-    { name: '点赞率', type: 'line' as const, smooth: true, data: Array.from({ length: days.value }, () => +(Math.random() * 5 + 2).toFixed(1)) },
-    { name: '评论率', type: 'line' as const, smooth: true, data: Array.from({ length: days.value }, () => +(Math.random() * 2 + 0.5).toFixed(1)) },
-    { name: '分享率', type: 'line' as const, smooth: true, data: Array.from({ length: days.value }, () => +(Math.random() * 1 + 0.2).toFixed(1)) },
-  ],
+  xAxis: { type: 'category' as const, data: dates.value },
+  yAxis: { type: 'value' as const, name: '%' },
+  series: [{ name: '互动率', type: 'line' as const, smooth: true,
+    data: engagementData.value.length > 0 ? engagementData.value : [] }],
 }))
 
 const publishEffectChart = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: { data: ['播放量', '点赞', '评论', '分享'] },
-  grid: { left: 60, right: 20, top: 40, bottom: 30 },
-  xAxis: { type: 'category' as const, data: dateLabels.value },
+  tooltip: { trigger: 'axis' as const }, legend: { data: ['播放量', '点赞', '评论', '分享'] },
+  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  xAxis: { type: 'category' as const, data: dates.value },
   yAxis: { type: 'value' as const },
-  series: [
-    { name: '播放量', type: 'bar' as const, data: Array.from({ length: days.value }, () => Math.floor(Math.random() * 50000 + 10000)) },
-    { name: '点赞', type: 'bar' as const, data: Array.from({ length: days.value }, () => Math.floor(Math.random() * 5000 + 1000)) },
-    { name: '评论', type: 'bar' as const, data: Array.from({ length: days.value }, () => Math.floor(Math.random() * 500 + 100)) },
-    { name: '分享', type: 'bar' as const, data: Array.from({ length: days.value }, () => Math.floor(Math.random() * 200 + 50)) },
-  ],
+  series: publishData.value.length > 0 ? [
+    { name: '播放量', type: 'bar' as const, data: publishData.value.map((d: any) => d.views || 0) },
+    { name: '点赞', type: 'bar' as const, data: publishData.value.map((d: any) => d.likes || 0) },
+    { name: '评论', type: 'bar' as const, data: publishData.value.map((d: any) => d.comments || 0) },
+    { name: '分享', type: 'bar' as const, data: publishData.value.map((d: any) => d.shares || 0) },
+  ] : [],
 }))
 
-const platformCompareChart = computed(() => ({
-  tooltip: { trigger: 'axis' as const },
-  legend: { bottom: 0 },
-  radar: {
-    indicator: [
-      { name: '粉丝', max: 1000000 },
-      { name: '点赞', max: 5000000 },
-      { name: '发布', max: 500 },
-      { name: '互动率', max: 10 },
+const platformCompareChart = computed(() => {
+  const stats = platformStats.value || []
+  if (!stats.length) return { title: { text: '暂无数据', left: 'center', top: 'center' } }
+  const maxF = Math.max(...stats.map((s: any) => s.followers || 0), 1)
+  const maxL = Math.max(...stats.map((s: any) => s.likes || 0), 1)
+  return {
+    tooltip: { trigger: 'axis' as const }, legend: { bottom: 0 },
+    radar: { indicator: [
+      { name: '粉丝', max: maxF }, { name: '点赞', max: maxL },
+      { name: '发布', max: Math.max(...stats.map((s: any) => s.publishes || 0), 1) },
+      { name: '互动率', max: Math.max(...stats.map((s: any) => s.engagementRate || 0), 1) },
       { name: '增长', max: 20 },
-    ],
-  },
-  series: [
-    {
-      type: 'radar' as const,
-      data: [
-        { value: [800000, 3000000, 300, 6.5, 12], name: '抖音' },
-        { value: [400000, 1500000, 200, 4.2, 8], name: '快手' },
-        { value: [300000, 800000, 150, 5.8, 15], name: '小红书' },
-      ],
-    },
-  ],
-}))
+    ]},
+    series: [{ type: 'radar' as const, data: stats.map((s: any) => ({
+      value: [s.followers||0, s.likes||0, s.publishes||0, s.engagementRate||0, 10],
+      name: (PLATFORM_LABELS as any)[s.platform] || s.platform })) }],
+  }
+})
+
+const comparisonLabels: Record<string, { label: string }> = {
+  weekOverWeek: { label: '周环比' },
+  monthOverMonth: { label: '月环比' },
+  yearOverYear: { label: '年同比' },
+}
+const metricKeys = ['followers', 'likes', 'comments', 'shares', 'views']
+const metricLabels: Record<string, string> = { followers: '粉丝', likes: '点赞', comments: '评论', shares: '分享', views: '播放' }
+
+async function loadChartData() {
+  loadingCharts.value = true
+  const p = platform.value || undefined
+  const d = days.value
+  try {
+    const [ft, eg, pe] = await Promise.all([
+      analyticsApi.getFollowerTrend({ days: d, platform: p }),
+      analyticsApi.getEngagementRate({ days: d, platform: p }),
+      analyticsApi.getPublishEffect({ days: d }),
+    ])
+    followerTrend.value = (ft.data || []).map((x: any) => x.value || 0)
+    engagementData.value = (eg.data || []).map((x: any) => x.value || 0)
+    publishData.value = pe.data || []
+  } catch { /* keep empty charts if API fails */ }
+  loadingCharts.value = false
+}
 
 function refreshData() {
   loadStats()
   loadComparison()
   loadRanking()
+  loadChartData()
 }
 
 async function loadStats() {
   const res = await analyticsApi.getPlatformStats()
-  platformStats.value = res.data
+  platformStats.value = res.data || []
 }
 
 async function loadComparison() {
-  try {
-    const res = await analyticsApi.getComparison()
-    comparison.value = res
-  } catch { /* silent */ }
+  try { comparison.value = await analyticsApi.getComparison() } catch { /* silent */ }
 }
 
 async function loadRanking() {
   rankingLoading.value = true
   try {
-    const res = await analyticsApi.getViewsRanking({ period: rankingPeriod.value, limit: 50 })
-    viewsRanking.value = res.data.ranking
-  } catch { /* silent */ }
+    const r = await analyticsApi.getViewsRanking({ period: rankingPeriod.value as any, limit: 50 })
+    viewsRanking.value = r.data?.ranking || []
+  } catch { }
   rankingLoading.value = false
 }
 
-function formatNum(num: number | undefined | null): string {
-  if (num == null) return '-'
-  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
-  return num.toLocaleString()
+function formatNum(n: any): string {
+  if (n == null) return '-'
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万'
+  return n.toLocaleString()
 }
-
-function formatChange(val: number | undefined | null): string {
-  if (val == null) return '-'
-  const prefix = val > 0 ? '+' : ''
-  return `${prefix}${val}%`
+function formatChange(v: any): string {
+  if (v == null) return '-'
+  return `${v > 0 ? '+' : ''}${v}%`
 }
-
-function getChangeClass(val: number | undefined | null): string {
-  if (val == null || val === 0) return ''
-  return val > 0 ? 'change--up' : 'change--down'
+function getChangeClass(v: any): string {
+  if (v == null || v === 0) return ''
+  return v > 0 ? 'change--up' : 'change--down'
 }
 
 onMounted(() => {
   loadStats()
   loadComparison()
   loadRanking()
+  loadChartData()
 })
 </script>
 
 <style lang="scss" scoped>
 .analytics {
-  &__filter {
-    margin-bottom: 20px;
-  }
-
-  &__charts {
-    margin-bottom: 20px;
-  }
-
-  &__comparison {
-    margin-top: 20px;
-  }
-
-  &__ranking {
-    margin-top: 20px;
-  }
+  &__filter { margin-bottom: 20px; }
+  &__charts { margin-bottom: 20px; }
+  &__comparison { margin-top: 20px; }
+  &__ranking { margin-top: 20px; }
 }
-
 .comparison-card {
-  padding: 12px;
-  border: 1px solid #ebeef5;
-  border-radius: 8px;
-
-  &__title {
-    font-size: 14px;
-    font-weight: 600;
-    color: #303133;
-    margin-bottom: 12px;
-  }
+  padding: 12px; border: 1px solid #ebeef5; border-radius: 8px;
+  &__title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 12px; }
 }
-
 .comparison-metric {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 0;
-  border-bottom: 1px solid #f5f7fa;
-
-  &:last-child {
-    border-bottom: none;
-  }
-
-  &__label {
-    font-size: 13px;
-    color: #606266;
-  }
-
-  &__value {
-    font-size: 14px;
-    font-weight: 500;
-    color: #303133;
-  }
-
-  &__change {
-    font-size: 12px;
-    font-weight: 500;
-    min-width: 50px;
-    text-align: right;
-  }
+  display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f7fa;
+  &:last-child { border-bottom: none; }
+  &__label { font-size: 13px; color: #606266; }
+  &__value { font-size: 14px; font-weight: 500; color: #303133; }
+  &__change { font-size: 12px; font-weight: 500; min-width: 50px; text-align: right; }
 }
-
-.change--up {
-  color: #67c23a;
-}
-
-.change--down {
-  color: #f56c6c;
-}
-
-.ranking-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-}
-
-.ranking-title {
-  font-size: 14px;
-  color: #303133;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.ranking-meta {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 2px;
-}
-
-.rank-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  font-size: 12px;
-  font-weight: bold;
-  color: #fff;
-}
-
-.rank-1 { background: #f5a623; }
-.rank-2 { background: #909399; }
-.rank-3 { background: #b87333; }
+.change--up { color: #67c23a; }
+.change--down { color: #f56c6c; }
+.ranking-header { display: flex; align-items: center; justify-content: space-between; width: 100%; }
+.ranking-title { font-size: 14px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-meta { font-size: 12px; color: #909399; margin-top: 2px; }
+.rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: bold; color: #fff; }
+.rank-1 { background: #f5a623; } .rank-2 { background: #909399; } .rank-3 { background: #b87333; }
 </style>

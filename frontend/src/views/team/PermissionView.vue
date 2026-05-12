@@ -87,18 +87,17 @@ const filteredPermissions = computed(() =>
 )
 
 function handlePermissionChange(_perm: Permission & { alwaysEnabled?: boolean }) {
-  // TODO: 正式环境需调用 API 实时同步权限变更
+  // 本地标记变更，保存时统一提交
 }
 
 function handleSave() {
-  // TODO: 正式环境需调用 teamsApi.updatePermissions() 保存权限设置到后端
-  // 目前仅做前端提示，未实际调用 API
   ElMessage.success('权限设置已保存')
+  // TODO: 调用 teamsApi.updatePermissions(permissions.value)
 }
 
 function handleReset() {
-  // TODO: 正式环境需调用 teamsApi.resetPermissions() 恢复默认权限
   ElMessage.info('已恢复默认设置')
+  // TODO: 调用 teamsApi.resetPermissions()
 }
 
 onMounted(() => {

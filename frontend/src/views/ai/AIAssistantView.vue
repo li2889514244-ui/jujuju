@@ -425,7 +425,12 @@ import {
 
 // ===== State =====
 const activeTab = ref('content')
-const providerStatus = ref('mock')
+const providerStatus = ref('loading')
+
+onMounted(async () => {
+  try { await getAIProviders(); providerStatus.value = 'connected' }
+  catch { providerStatus.value = 'mock' }
+})
 
 // Content Generation
 const contentForm = ref({
