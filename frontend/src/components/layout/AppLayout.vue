@@ -5,7 +5,7 @@
       <Topbar />
       <div class="app-layout__content">
         <router-view v-slot="{ Component }">
-          <transition name="fade" mode="out-in">
+          <transition name="slide-up" mode="out-in">
             <component :is="Component" />
           </transition>
         </router-view>
@@ -20,34 +20,22 @@ import Topbar from './Topbar.vue'
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .app-layout {
-  display: flex;
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
+  display: flex; width: 100%; height: 100vh; overflow: hidden;
+  background: $color-bg-primary;
 
   &__main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
+    flex: 1; display: flex; flex-direction: column;
+    overflow: hidden; position: relative; z-index: 1;
   }
 
   &__content {
-    flex: 1;
-    padding: 20px;
-    overflow-y: auto;
-    background-color: #f5f7fa;
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    padding: 28px 32px;
+    // Apple-style content area
+    &::-webkit-scrollbar { width: 4px; }
   }
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
 }
 </style>

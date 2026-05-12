@@ -1,27 +1,81 @@
-// SCSS Variables for MatrixFlow ERP
+// MatrixFlow — Apple Design System
+// 暗黑为主、克制配色、毛玻璃、流畅动画
 
-// Colors
-$primary-color: #409eff;
-$success-color: #67c23a;
-$warning-color: #e6a23c;
-$danger-color: #f56c6c;
-$info-color: #909399;
+// === 基础色 ===
+$color-bg-primary: #000000;
+$color-bg-secondary: #0d0d0d;
+$color-bg-tertiary: #1a1a1a;
+$color-bg-elevated: #1c1c1e;
+$color-bg-glass: rgba(28, 28, 30, 0.85);
 
-// Layout
+$color-text-primary: #f5f5f7;
+$color-text-secondary: #98989d;
+$color-text-tertiary: #6e6e73;
+$color-text-placeholder: #48484a;
+
+$color-border: rgba(255, 255, 255, 0.08);
+$color-border-active: rgba(255, 255, 255, 0.15);
+$color-separator: rgba(255, 255, 255, 0.06);
+
+// === 系统色 (Apple palette) ===
+$color-blue: #0a84ff;
+$color-green: #30d158;
+$color-orange: #ff9f0a;
+$color-red: #ff453a;
+$color-pink: #ff375f;
+$color-purple: #bf5af2;
+$color-teal: #64d2ff;
+$color-indigo: #5e5ce6;
+
+$primary-color: $color-blue;
+$success-color: $color-green;
+$warning-color: $color-orange;
+$danger-color: $color-red;
+$info-color: $color-teal;
+
+// === Layout ===
 $sidebar-width: 220px;
-$sidebar-collapsed-width: 64px;
-$topbar-height: 56px;
+$sidebar-collapsed-width: 68px;
+$topbar-height: 52px;
 
-// Platform colors
+// === 圆角 ===
+$radius-sm: 8px;
+$radius-md: 12px;
+$radius-lg: 16px;
+$radius-xl: 20px;
+$radius-full: 9999px;
+
+// === 阴影 ===
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+$shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+
+// === 动画 ===
+$ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+$ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+$ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+
+// === 字体 ===
+$font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
+  'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+$font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+// === 平台色 ===
 $douyin-color: #000000;
 $kuaishou-color: #ff4906;
 $xiaohongshu-color: #ff2442;
-$video-account-color: #07c160;
 $bilibili-color: #fb7299;
 $weibo-color: #ff8200;
 
-// Breakpoints
-$breakpoint-sm: 640px;
-$breakpoint-md: 768px;
-$breakpoint-lg: 1024px;
-$breakpoint-xl: 1280px;
+// === 毛玻璃 ===
+@mixin glass {
+  background: rgba(28, 28, 30, 0.75);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+}
+
+@mixin glass-heavy {
+  background: rgba(28, 28, 30, 0.9);
+  backdrop-filter: blur(60px) saturate(200%);
+  -webkit-backdrop-filter: blur(60px) saturate(200%);
+}
