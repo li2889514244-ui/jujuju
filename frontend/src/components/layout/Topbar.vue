@@ -227,149 +227,62 @@ function handleUserCommand(command: string) {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .topbar {
-  height: $topbar-height;
-  @include glass;
-  border-bottom: 1px solid $color-border;
+  height: 52px;
+  background: rgba(28, 28, 30, 0.75);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 24px; flex-shrink: 0;
   z-index: 5;
 
-  &__right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
+  &__right { display: flex; align-items: center; gap: 20px; }
 
   &__download {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: #409eff;
-    text-decoration: none;
-    font-size: 13px;
-    padding: 4px 10px;
-    border-radius: 6px;
+    display: flex; align-items: center; gap: 4px;
+    color: var(--el-color-primary); text-decoration: none;
+    font-size: 13px; padding: 4px 10px; border-radius: 6px;
     transition: background 0.2s;
-    &:hover {
-      background: #ecf5ff;
-    }
+    &:hover { background: rgba(10, 132, 255, 0.1); }
   }
 
   &__team {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    color: #606266;
-    font-size: 14px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    transition: background 0.2s;
-
-    &:hover {
-      background: #f5f7fa;
-    }
+    display: flex; align-items: center; gap: 6px; cursor: pointer;
+    color: var(--el-text-color-secondary); font-size: 14px;
+    padding: 6px 12px; border-radius: 6px; transition: background 0.2s;
+    &:hover { background: rgba(255,255,255,0.06); }
   }
 
-  &__notification {
-    cursor: pointer;
-  }
+  &__notification { cursor: pointer; }
 
   &__icon {
-    color: #606266;
-    cursor: pointer;
-    transition: color 0.2s;
-
-    &:hover {
-      color: $primary-color;
-    }
+    color: var(--el-text-color-secondary); cursor: pointer; transition: color 0.2s;
+    &:hover { color: var(--el-color-primary); }
   }
 
-  &__user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-  }
-
-  &__username {
-    font-size: 14px;
-    color: #303133;
-  }
+  &__user { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  &__username { font-size: 14px; color: var(--el-text-color-primary); }
 }
 
 .notification-panel {
   &__header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #ebeef5;
-    font-weight: 600;
-    font-size: 15px;
+    display: flex; justify-content: space-between; align-items: center;
+    padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-weight: 600; font-size: 15px;
   }
-
-  &__body {
-    max-height: 360px;
-    overflow-y: auto;
-    padding-top: 8px;
-  }
-
-  &__empty {
-    text-align: center;
-    color: #909399;
-    padding: 40px 0;
-    font-size: 14px;
-  }
+  &__body { max-height: 360px; overflow-y: auto; padding-top: 8px; }
+  &__empty { text-align: center; color: var(--el-text-color-secondary); padding: 40px 0; font-size: 14px; }
 }
 
 .notification-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  padding: 10px 4px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-
-  &:hover {
-    background: #f5f7fa;
-  }
-
-  &--unread {
-    background: #ecf5ff;
-
-    &:hover {
-      background: #d9ecff;
-    }
-  }
-
-  &__icon {
-    padding-top: 2px;
-    font-size: 18px;
-  }
-
-  &__content {
-    flex: 1;
-    min-width: 0;
-  }
-
-  &__title {
-    font-size: 13px;
-    color: #303133;
-    line-height: 1.4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  &__time {
-    font-size: 12px;
-    color: #909399;
-    margin-top: 4px;
-  }
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 4px; border-radius: 6px; cursor: pointer; transition: background 0.2s;
+  &:hover { background: rgba(255,255,255,0.04); }
+  &--unread { background: rgba(10, 132, 255, 0.08); &:hover { background: rgba(10, 132, 255, 0.14); } }
+  &__icon { padding-top: 2px; font-size: 18px; }
+  &__content { flex: 1; min-width: 0; }
+  &__title { font-size: 13px; color: var(--el-text-color-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &__time { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
 }
 </style>

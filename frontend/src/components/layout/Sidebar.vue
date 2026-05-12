@@ -75,18 +75,18 @@ function toggleCollapse() { isCollapsed.value = !isCollapsed.value }
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .sidebar {
-  width: $sidebar-width; height: 100vh;
-  @include glass-heavy;
-  border-right: 1px solid $color-border;
+  width: 220px; height: 100vh;
+  background: rgba(28, 28, 30, 0.9);
+  backdrop-filter: blur(60px) saturate(200%);
+  -webkit-backdrop-filter: blur(60px) saturate(200%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
   display: flex; flex-direction: column;
-  transition: width 0.3s $ease-out;
+  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0; z-index: 10;
   user-select: none;
 
-  &--collapsed { width: $sidebar-collapsed-width; }
+  &--collapsed { width: 68px; }
 
   &__logo {
     height: 56px; display: flex; align-items: center; gap: 10px;
