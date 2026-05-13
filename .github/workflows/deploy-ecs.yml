@@ -3,7 +3,6 @@ name: Deploy Backend to ECS
 on:
   push:
     branches: [master]
-  workflow_dispatch:
     paths:
       - 'backend/**'
 
@@ -11,17 +10,19 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      - name: Install deps
-        run: npm install @alicloud/pop-core
-
-      - name: Deploy
-        run: node .github/workflows/deploy.cjs
+      - name: Trigger ECS deploy
+        run: |
+          npm install @alicloud/pop-core
+          node -e "
+          const Core=require('@alicloud/pop-core');
+          const c=new Core({accessKeyId:process.env.ALI_KEY,accessKeySecret:process.env.ALI_SEC, endpoint:'https://ecs.cn-guangzhou.aliyuncs.com',apiVersion:'2014-05-26'});
+          const b64=Buffer.from('#!/bin/bash\ncd /opt/matrixflow && git fetch origin master && git reset --hard origin/master && pm2 restart matrixflow 2>/dev/null || (cd backend && pm2 start dist/main.js --name matrixflow) && sleep 5 && curl -sf --max-time 5 http://localhost:3000/api/v1/health && echo DEPLOY_OK || echo DEPLOY_FAIL').toString('base64');
+          c.request('CreateCommand',{RegionId:'cn-guangzhou',Name:'gh-deploy',Type:'RunShellScript',CommandContent:b64,ContentEncoding:'Base64',Timeout:'60',WorkingDir:'/root'}).then(r=>c.request('InvokeCommand',{RegionId:'cn-guangzhou',CommandId:r.CommandId,'InstanceId.1':'i-7xvb9wno2duq8msd35l1',Timed:false}).then(inv=>{setTimeout(()=>c.request('DescribeInvocationResults',{RegionId:'cn-guangzhou',InvokeId:inv.InvokeId}).then(res=>{const o=(res.Invocation.InvocationResults.InvocationResult[0]);console.log(o.Output?Buffer.from(o.Output,'base64').toString():'DONE')}),60000)}))
+          "
         env:
-          ALI_ACCESS_KEY: ${{ secrets.ECS_ACCESS_KEY }}
-          ALI_SECRET_KEY: ${{ secrets.ECS_SECRET_KEY }}
+          ALI_KEY: ${{ secrets.ECS_ACCESS_KEY }}
+          ALI_SEC: ${{ secrets.ECS_SECRET_KEY }}
