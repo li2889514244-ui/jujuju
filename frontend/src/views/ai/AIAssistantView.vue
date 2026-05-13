@@ -8,7 +8,7 @@
           <p class="subtitle">基于AI的内容创作、发布优化、趋势预测与风险检测</p>
         </div>
         <el-tag :type="providerStatus === 'mock' ? 'warning' : 'success'" size="large">
-          {{ providerStatus === 'mock' ? '演示模式' : 'AI 已连接' }}
+          {{ providerStatus === 'loading' ? '连接中...' : providerStatus === 'connected' ? 'AI 已连接' : '演示模式 (Mock)' }}
         </el-tag>
       </div>
     </el-card>
@@ -589,19 +589,7 @@ function copyContent() {
     ElMessage.success('已复制到剪贴板')
   }
 }
-
-// ===== Init =====
-onMounted(async () => {
-  try {
-    const res = await getAIProviders()
-    const providers = res.data
-    if (Array.isArray(providers) && providers.length > 0) {
-      providerStatus.value = providers[0]
-    }
-  } catch (e) {
-    console.warn('获取 AI Provider 状态失败:', e)
-  }
-})
+// ===== Init (see onMounted above) =====
 </script>
 
 <style scoped>
