@@ -1,16 +1,18 @@
-// MatrixFlow ERP - Prisma Schema
-// 数据库: PostgreSQL
+// MatrixFlow - Prisma Schema
+// 数据库: SQLite（轻量化，单文件，不依赖外部进程）
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 // ==================== 用户与组织 ====================
+// SQLite 不支持 enum，所有原 enum 字段改为 String，由 class-validator 在 DTO 层校验。
+// 应用层从 src/common/prisma-enums.ts 导入常量（保留 Platform.DOUYIN 等用法）。
 
 model User {
   id          String   @id @default(cuid())
@@ -19,8 +21,8 @@ model User {
   password    String
   name        String
   avatar      String?
-  role        Role     @default(MEMBER)
-  status      UserStatus @default(ACTIVE)
+  role        String   @default("MEMBER")
+  status      String   @default("ACTIVE")
   lastLoginAt DateTime?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -34,25 +36,11 @@ model User {
   @@index([email])
 }
 
-enum Role {
-  OWNER
-  ADMIN
-  MANAGER
-  MEMBER
-  VIEWER
-}
-
-enum UserStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
 model Organization {
   id        String   @id @default(cuid())
   name      String
-  plan      Plan     @default(FREE)
-  status    OrgStatus @default(ACTIVE)
+  plan      String   @default("FREE")
+  status    String   @default("ACTIVE")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -60,18 +48,6 @@ model Organization {
   teams     Team[]
 
   @@index([status])
-}
-
-enum Plan {
-  FREE
-  PRO
-  ENTERPRISE
-}
-
-enum OrgStatus {
-  ACTIVE
-  SUSPENDED
-  CANCELLED
 }
 
 model Team {
@@ -91,17 +67,17 @@ model Team {
 
 model Account {
   id             String   @id @default(cuid())
-  platform       Platform
+  platform       String
   platformUserId String
   nickname       String
   avatar         String?
   bio            String?
   followers      Int      @default(0)
   following      Int      @default(0)
-  status         AccountStatus @default(ACTIVE)
-  cookies        String?  @db.Text
-  proxyConfig    Json?
-  metadata       Json?
+  status         String   @default("ACTIVE")
+  cookies        String?
+  proxyConfig    String?  // JSON 字符串
+  metadata       String?  // JSON 字符串
   lastActiveAt   DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -122,36 +98,19 @@ model Account {
   @@index([platform])
 }
 
-enum Platform {
-  DOUYIN
-  KUAISHOU
-  XIAOHONGSHU
-  WECHAT_VIDEO
-  BILIBILI
-  WEIBO
-  TIKTOK
-}
-
-enum AccountStatus {
-  ACTIVE
-  INACTIVE
-  BANNED
-  EXPIRED
-}
-
 // ==================== 内容发布 ====================
 
 model Post {
   id          String   @id @default(cuid())
   title       String?
-  content     String?  @db.Text
-  mediaUrls   Json?
-  tags        String[]
+  content     String?
+  mediaUrls   String?  // JSON 字符串
+  tags        String?  // JSON 字符串数组
   publishAt   DateTime?
-  status      PostStatus @default(DRAFT)
+  status      String   @default("DRAFT")
   platformUrl String?
   errorMsg    String?
-  metadata    Json?
+  metadata    String?  // JSON 字符串
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -162,14 +121,6 @@ model Post {
   @@index([accountId])
   @@index([status])
   @@index([publishAt])
-}
-
-enum PostStatus {
-  DRAFT
-  SCHEDULED
-  PUBLISHING
-  PUBLISHED
-  FAILED
 }
 
 // ==================== 数据统计 ====================
@@ -191,8 +142,8 @@ model PostStats {
 
 model DailyStats {
   id        String   @id @default(cuid())
-  date      DateTime @db.Date
-  platform  Platform
+  date      DateTime
+  platform  String
   followers Int      @default(0)
   views     Int      @default(0)
   likes     Int      @default(0)
@@ -214,7 +165,7 @@ model AuditLog {
   id        String   @id @default(cuid())
   action    String
   resource  String
-  detail    Json?
+  detail    String?  // JSON 字符串
   ip        String?
   userAgent String?
   createdAt DateTime @default(now())
@@ -231,14 +182,14 @@ model AuditLog {
 
 model Competitor {
   id             String   @id @default(cuid())
-  platform       Platform
+  platform       String
   platformUserId String
   nickname       String
   avatar         String?
   bio            String?
   followers      Int      @default(0)
   following      Int      @default(0)
-  status         AccountStatus @default(ACTIVE)
+  status         String   @default("ACTIVE")
   note           String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -253,7 +204,7 @@ model Competitor {
 
 model CompetitorSnapshot {
   id        String   @id @default(cuid())
-  date      DateTime @db.Date
+  date      DateTime
   followers Int      @default(0)
   views     Int      @default(0)
   likes     Int      @default(0)
@@ -290,14 +241,14 @@ model AccountGroup {
 model Asset {
   id          String    @id @default(cuid())
   name        String
-  type        AssetType
+  type        String
   url         String
   size        Int       @default(0)
   width       Int?
   height      Int?
   duration    Int?
   mimeType    String?
-  tags        String[]
+  tags        String?   // JSON 字符串数组
   folderId    String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -309,22 +260,15 @@ model Asset {
   @@index([folderId])
 }
 
-enum AssetType {
-  IMAGE
-  VIDEO
-  AUDIO
-  DOCUMENT
-}
-
 // ==================== 通知 ====================
 
 model Notification {
   id        String           @id @default(cuid())
-  type      NotificationType
+  type      String
   title     String
   content   String?
   read      Boolean          @default(false)
-  metadata  Json?
+  metadata  String?          // JSON 字符串
   createdAt DateTime         @default(now())
 
   userId String
@@ -332,12 +276,4 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([createdAt])
-}
-
-enum NotificationType {
-  ACCOUNT_EXPIRED
-  PUBLISH_FAILED
-  PUBLISH_SUCCESS
-  FOLLOWER_ALERT
-  SYSTEM
 }
