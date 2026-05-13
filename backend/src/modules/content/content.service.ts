@@ -1,26 +1,17 @@
 import {
   Injectable,
   NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-  Inject,
-  forwardRef,
+  ForbiddenException, BadRequestException, Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { PostStatus, Prisma } from '@prisma/client';
-import { UploaderService } from '../uploader/uploader.service';
-import { PublishTask } from '../uploader/base-uploader';
-
 @Injectable()
 export class ContentService {
   private readonly logger = new Logger(ContentService.name);
 
   constructor(
-    private prisma: PrismaService,
-    @Inject(forwardRef(() => UploaderService))
-    private uploaderService: UploaderService,
+    private prisma: PrismaService
   ) {}
 
   /**
