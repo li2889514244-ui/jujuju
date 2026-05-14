@@ -1,4 +1,4 @@
-import { AccountStatus } from '@prisma/client';
+import { AccountStatus } from '../../../common/prisma-enums';
 export declare class UpdateAccountDto {
     nickname?: string;
     avatar?: string;

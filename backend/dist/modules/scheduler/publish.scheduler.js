@@ -14,12 +14,10 @@ exports.PublishScheduler = void 0;
 const common_1 = require("@nestjs/common");
 const schedule_1 = require("@nestjs/schedule");
 const content_service_1 = require("../content/content.service");
-const uploader_service_1 = require("../uploader/uploader.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 let PublishScheduler = PublishScheduler_1 = class PublishScheduler {
-    constructor(contentService, uploaderService, notificationsService) {
+    constructor(contentService, notificationsService) {
         this.contentService = contentService;
-        this.uploaderService = uploaderService;
         this.notificationsService = notificationsService;
         this.logger = new common_1.Logger(PublishScheduler_1.name);
         this.isProcessing = false;
@@ -43,44 +41,23 @@ let PublishScheduler = PublishScheduler_1 = class PublishScheduler {
                         this.logger.debug(`跳过已被其他实例抢占的内容: ${post.id}`);
                         continue;
                     }
-                    const task = {
-                        contentId: post.id,
-                        accountId: post.accountId,
-                        platform: post.account.platform,
-                        title: post.title || '',
-                        content: post.content || '',
-                        mediaUrls: post.mediaUrls || [],
-                        tags: post.tags || [],
-                    };
-                    await this.uploaderService.executePublish(task);
+                    const reason = '服务器无浏览器环境，定时发布暂不可用，请使用本地客户端发布';
+                    await this.contentService.updatePublishStatus(post.id, 'FAILED', undefined, reason);
                     await this.notificationsService.create({
                         userId: post.account.userId,
-                        type: 'PUBLISH_SUCCESS',
-                        title: `定时发布成功: ${post.title || '无标题'}`,
-                        content: `账号「${post.account.nickname}」内容已成功发布`,
+                        type: 'PUBLISH_FAILED',
+                        title: `定时发布失败: ${post.title || '无标题'}`,
+                        content: reason,
                         metadata: { postId: post.id, platform: post.account.platform },
                     });
-                    await this.delay(3000 + Math.random() * 3000);
                 }
                 catch (error) {
-                    this.logger.error(`定时发布失败: ${post.id}`, error.stack);
+                    this.logger.error(`定时发布处理失败: ${post.id}`, error.stack);
                     try {
                         await this.contentService.updatePublishStatus(post.id, 'FAILED', undefined, error.message || '定时发布执行异常');
                     }
                     catch (updateErr) {
                         this.logger.error(`更新发布状态失败: ${post.id}`, updateErr.message);
-                    }
-                    try {
-                        await this.notificationsService.create({
-                            userId: post.account.userId,
-                            type: 'PUBLISH_FAILED',
-                            title: `定时发布失败: ${post.title || '无标题'}`,
-                            content: error.message || '定时发布执行异常',
-                            metadata: { postId: post.id, platform: post.account.platform },
-                        });
-                    }
-                    catch (notifErr) {
-                        this.logger.error(`发送通知失败: ${post.id}`, notifErr.message);
                     }
                 }
             }
@@ -107,7 +84,6 @@ __decorate([
 exports.PublishScheduler = PublishScheduler = PublishScheduler_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [content_service_1.ContentService,
-        uploader_service_1.UploaderService,
         notifications_service_1.NotificationsService])
 ], PublishScheduler);
 //# sourceMappingURL=publish.scheduler.js.map

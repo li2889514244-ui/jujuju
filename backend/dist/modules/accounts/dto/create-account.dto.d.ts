@@ -1,4 +1,4 @@
-import { Platform } from '@prisma/client';
+import { Platform } from '../../../common/prisma-enums';
 export declare class CreateAccountDto {
     platform: Platform;
     platformUserId: string;

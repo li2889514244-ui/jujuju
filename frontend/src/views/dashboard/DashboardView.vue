@@ -1,6 +1,22 @@
 <template>
   <div class="dashboard">
-    <el-row :gutter="20" class="dashboard__cards">
+        <!-- 新用户空状态引导 -->
+    <el-alert
+      v-if="overviewCards[0].value === '0'"
+      title="欢迎使用 MatrixFlow！"
+      type="info"
+      :closable="false"
+      show-icon
+      class="dashboard__welcome"
+    >
+      <template #default>
+        您的数据面板还是空的 — 
+        <el-button type="primary" size="small" @click="$router.push('/accounts')">添加平台账号</el-button>
+        开始管理您的多平台矩阵。
+      </template>
+    </el-alert>
+
+<el-row :gutter="20" class="dashboard__cards">
       <el-col :xs="12" :sm="6" v-for="card in overviewCards" :key="card.title">
         <el-card shadow="hover" class="dashboard__card">
           <div class="dashboard__card-header">
@@ -50,6 +66,7 @@
             </div>
           </template>
           <el-table :data="recentTasks" stripe style="width: 100%">
+            <template #empty><el-empty description="暂无发布任务，去创建内容吧" /></template>
             <el-table-column prop="contentTitle" label="内容" show-overflow-tooltip />
             <el-table-column prop="platform" label="平台" width="80">
               <template #default="{ row }"><PlatformIcon :platform="row.platform" /></template>
@@ -94,7 +111,7 @@ import type { PublishTask } from '@/types'
 const trendDays = ref(7)
 const loading = ref(false)
 const overviewCards = ref([
-  { title: '账号总数', value: '0', icon: 'UserFilled', color: '#409eff', trend: 0 },
+  { title: '账号总数', value: '0', hint: '添加账号开始使用', icon: 'UserFilled', color: '#409eff', trend: 0 },
   { title: '总粉丝数', value: '0', icon: 'Star', color: '#e6a23c', trend: 0 },
   { title: '总互动数', value: '0', icon: 'DataLine', color: '#67c23a', trend: 0 },
   { title: '发布总数', value: '0', icon: 'List', color: '#f56c6c', trend: 0 },
@@ -152,11 +169,11 @@ async function fetchDashboardData() {
     ]
     const byPlatform = data.accounts?.byPlatform || {}
     platformDistribution.value = Object.entries(byPlatform).map(([key, count]) => ({ value: count as number, name: PLATFORM_CN[key] || key, itemStyle: { color: PLATFORM_COLORS[key] || '#999' } }))
-  } catch (e) { console.error(e) }
+  } catch (e) { /* silent */ }
   try {
     const r = await contentApi.getList({ page: 1, limit: 5, status: 'PUBLISHED' }); const d = r.data as any
     if (d?.posts) recentTasks.value = d.posts.map((p: any) => ({ id: p.id, contentId: p.id, contentTitle: p.title || '无标题', accountId: p.accountId, accountNickname: p.account?.nickname || '', platform: (p.account?.platform || '').toLowerCase(), status: p.status === 'PUBLISHED' ? 'success' : p.status === 'FAILED' ? 'failed' : 'publishing', scheduledAt: p.publishAt, publishedAt: p.updatedAt, errorMessage: p.errorMsg, createdAt: p.createdAt }))
-  } catch (e) { console.error(e) }
+  } catch (e) { /* silent */ }
   loading.value = false
 }
 
@@ -188,5 +205,6 @@ watch(trendDays, () => loadFollowerTrend())
     p { font-size: 14px; color: #303133; margin-bottom: 4px; }
     span { font-size: 12px; color: #c0c4cc; }
   }
+  &__welcome { margin-bottom: 20px; }
 }
 </style>

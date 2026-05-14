@@ -22,7 +22,7 @@ const current_user_decorator_1 = require("../../common/decorators/current-user.d
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const class_validator_1 = require("class-validator");
 const swagger_2 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 const prisma_service_1 = require("../../prisma/prisma.service");
 class UpdateUserDto {
 }
@@ -82,7 +82,7 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(client_1.Role.OWNER, client_1.Role.ADMIN),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
     (0, swagger_1.ApiOperation)({ summary: '获取用户列表（管理员）' }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: '页码（从1开始）' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: '每页条数（最大100）' }),
@@ -125,7 +125,7 @@ __decorate([
 ], UsersController.prototype, "updateProfile", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)(client_1.Role.OWNER, client_1.Role.ADMIN),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
     (0, swagger_1.ApiOperation)({ summary: '删除用户（软删除，管理员）' }),
     (0, swagger_1.ApiResponse)({ status: 404, description: '用户不存在' }),
     __param(0, (0, common_1.Param)('id')),

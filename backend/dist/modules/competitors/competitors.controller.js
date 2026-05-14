@@ -18,7 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const competitors_service_1 = require("./competitors.service");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 let CompetitorsController = class CompetitorsController {
     constructor(competitorsService) {
         this.competitorsService = competitorsService;

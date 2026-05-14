@@ -198,7 +198,7 @@ async function handlePublish() {
     ElMessage.success(publishMode.value === 'now' ? '发布任务已创建' : '定时发布已设置')
   } catch (e) {
     ElMessage.error('发布失败')
-    console.error('发布失败:', e)
+    /* silent */
   } finally {
     publishing.value = false
   }

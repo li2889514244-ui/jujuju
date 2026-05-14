@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { NotificationType } from '@prisma/client';
+import { NotificationType } from '../../common/prisma-enums';
 export declare class NotificationsService {
     private prisma;
     private readonly logger;
@@ -12,11 +12,11 @@ export declare class NotificationsService {
         metadata?: Record<string, any>;
     }): Promise<{
         id: string;
-        type: import(".prisma/client").$Enums.NotificationType;
+        type: string;
         title: string;
         content: string | null;
         read: boolean;
-        metadata: import(".prisma/client").Prisma.JsonValue | null;
+        metadata: string | null;
         createdAt: Date;
         userId: string;
     }>;
@@ -27,11 +27,11 @@ export declare class NotificationsService {
     }): Promise<{
         notifications: {
             id: string;
-            type: import(".prisma/client").$Enums.NotificationType;
+            type: string;
             title: string;
             content: string | null;
             read: boolean;
-            metadata: import(".prisma/client").Prisma.JsonValue | null;
+            metadata: string | null;
             createdAt: Date;
             userId: string;
         }[];

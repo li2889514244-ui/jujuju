@@ -20,7 +20,7 @@ const create_account_dto_1 = require("./dto/create-account.dto");
 const update_account_dto_1 = require("./dto/update-account.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 let AccountsController = class AccountsController {
     constructor(accountsService) {
         this.accountsService = accountsService;
@@ -62,7 +62,7 @@ __decorate([
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: '获取账号列表' }),
-    (0, swagger_1.ApiQuery)({ name: 'platform', required: false, enum: client_1.Platform }),
+    (0, swagger_1.ApiQuery)({ name: 'platform', required: false, enum: prisma_enums_1.Platform }),
     (0, swagger_1.ApiQuery)({ name: 'teamId', required: false }),
     (0, swagger_1.ApiQuery)({ name: 'groupId', required: false }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: '页码（从1开始）' }),

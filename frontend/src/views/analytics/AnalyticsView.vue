@@ -53,7 +53,7 @@
 
     <el-card shadow="hover">
       <template #header>平台数据明细</template>
-      <el-table :data="platformStats" stripe>
+      <el-table :data="platformStats" stripe><template #empty><el-empty description="暂无平台数据，请先添加账号" /></template>
         <el-table-column label="平台" width="100">
           <template #default="{ row }"><PlatformIcon :platform="row.platform" show-label /></template>
         </el-table-column>
@@ -102,7 +102,7 @@
           </el-radio-group>
         </div>
       </template>
-      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe>
+      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe><template #empty><el-empty description="暂无排行数据" /></template>
         <el-table-column label="排名" width="70">
           <template #default="{ row }">
             <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{ row.rank }}</span>
@@ -157,6 +157,7 @@ const followerChart = computed(() => ({
   yAxis: { type: 'value' as const, name: '粉丝' },
   series: [{ name: '新增粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.3 },
     data: followerTrend.value.length > 0 ? followerTrend.value : [] }],
+  graphic: followerTrend.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
 }))
 
 const engagementChart = computed(() => ({
@@ -166,6 +167,7 @@ const engagementChart = computed(() => ({
   yAxis: { type: 'value' as const, name: '%' },
   series: [{ name: '互动率', type: 'line' as const, smooth: true,
     data: engagementData.value.length > 0 ? engagementData.value : [] }],
+  graphic: engagementData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
 }))
 
 const publishEffectChart = computed(() => ({
@@ -173,6 +175,7 @@ const publishEffectChart = computed(() => ({
   grid: { left: 50, right: 20, top: 40, bottom: 30 },
   xAxis: { type: 'category' as const, data: dates.value },
   yAxis: { type: 'value' as const },
+  graphic: publishData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
   series: publishData.value.length > 0 ? [
     { name: '播放量', type: 'bar' as const, data: publishData.value.map((d: any) => d.views || 0) },
     { name: '点赞', type: 'bar' as const, data: publishData.value.map((d: any) => d.likes || 0) },

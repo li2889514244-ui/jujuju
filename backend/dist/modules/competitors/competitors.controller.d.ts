@@ -1,5 +1,5 @@
 import { CompetitorsService } from './competitors.service';
-import { Platform } from '@prisma/client';
+import { Platform } from '../../common/prisma-enums';
 export declare class CompetitorsController {
     private readonly competitorsService;
     constructor(competitorsService: CompetitorsService);
@@ -12,14 +12,14 @@ export declare class CompetitorsController {
         note?: string;
     }): Promise<{
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: string;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: import(".prisma/client").$Enums.AccountStatus;
+        status: string;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
@@ -40,14 +40,14 @@ export declare class CompetitorsController {
             }[];
         } & {
             id: string;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: string;
             platformUserId: string;
             nickname: string;
             avatar: string | null;
             bio: string | null;
             followers: number;
             following: number;
-            status: import(".prisma/client").$Enums.AccountStatus;
+            status: string;
             note: string | null;
             createdAt: Date;
             updatedAt: Date;
@@ -71,14 +71,14 @@ export declare class CompetitorsController {
         }[];
     } & {
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: string;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: import(".prisma/client").$Enums.AccountStatus;
+        status: string;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
@@ -98,14 +98,14 @@ export declare class CompetitorsController {
         }[];
     } & {
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: string;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: import(".prisma/client").$Enums.AccountStatus;
+        status: string;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
