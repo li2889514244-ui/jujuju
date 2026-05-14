@@ -201,7 +201,7 @@ async function handleCheckCookie(id: string) {
     ElMessage.success(`Cookie状态: ${result.status}`)
   } catch (e) {
     ElMessage.error('检测 Cookie 状态失败')
-    console.error('Cookie 检测失败:', e)
+    /* silent */
   }
 }
 

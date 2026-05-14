@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.InviteMemberDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../../common/prisma-enums");
 class InviteMemberDto {
 }
 exports.InviteMemberDto = InviteMemberDto;
@@ -22,8 +22,8 @@ __decorate([
     __metadata("design:type", String)
 ], InviteMemberDto.prototype, "email", void 0);
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: '角色', enum: client_1.Role, example: client_1.Role.MEMBER }),
-    (0, class_validator_1.IsEnum)(client_1.Role, { message: '无效的角色类型' }),
+    (0, swagger_1.ApiProperty)({ description: '角色', enum: prisma_enums_1.Role, example: prisma_enums_1.Role.MEMBER }),
+    (0, class_validator_1.IsEnum)(prisma_enums_1.Role, { message: '无效的角色类型' }),
     __metadata("design:type", String)
 ], InviteMemberDto.prototype, "role", void 0);
 //# sourceMappingURL=invite-member.dto.js.map

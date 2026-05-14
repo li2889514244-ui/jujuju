@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.QueryAnalyticsDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../../common/prisma-enums");
 class QueryAnalyticsDto {
 }
 exports.QueryAnalyticsDto = QueryAnalyticsDto;
@@ -23,9 +23,9 @@ __decorate([
     __metadata("design:type", String)
 ], QueryAnalyticsDto.prototype, "accountId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: '平台', enum: client_1.Platform }),
+    (0, swagger_1.ApiPropertyOptional)({ description: '平台', enum: prisma_enums_1.Platform }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(client_1.Platform),
+    (0, class_validator_1.IsEnum)(prisma_enums_1.Platform),
     __metadata("design:type", String)
 ], QueryAnalyticsDto.prototype, "platform", void 0);
 __decorate([

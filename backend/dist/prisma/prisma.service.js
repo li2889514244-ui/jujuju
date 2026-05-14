@@ -13,6 +13,41 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PrismaService = void 0;
 const common_1 = require("@nestjs/common");
 const client_1 = require("@prisma/client");
+const JSON_FIELDS_BY_MODEL = {
+    Account: ['proxyConfig', 'metadata'],
+    Post: ['mediaUrls', 'tags', 'metadata'],
+    AuditLog: ['detail'],
+    Asset: ['tags'],
+    Notification: ['metadata'],
+};
+function serializeJsonFields(modelName, data) {
+    if (!modelName || !data || typeof data !== 'object')
+        return;
+    const fields = JSON_FIELDS_BY_MODEL[modelName];
+    if (!fields)
+        return;
+    for (const f of fields) {
+        if (data[f] !== undefined && data[f] !== null && typeof data[f] !== 'string') {
+            data[f] = JSON.stringify(data[f]);
+        }
+    }
+}
+function deserializeJsonFields(modelName, row) {
+    if (!modelName || !row || typeof row !== 'object')
+        return;
+    const fields = JSON_FIELDS_BY_MODEL[modelName];
+    if (!fields)
+        return;
+    for (const f of fields) {
+        if (typeof row[f] === 'string' && row[f].length > 0) {
+            try {
+                row[f] = JSON.parse(row[f]);
+            }
+            catch {
+            }
+        }
+    }
+}
 let PrismaService = PrismaService_1 = class PrismaService extends client_1.PrismaClient {
     constructor() {
         super({
@@ -23,6 +58,28 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
             ],
         });
         this.logger = new common_1.Logger(PrismaService_1.name);
+        this.$use(async (params, next) => {
+            if (['create', 'update', 'upsert'].includes(params.action)) {
+                if (params.args?.data)
+                    serializeJsonFields(params.model, params.args.data);
+                if (params.args?.create)
+                    serializeJsonFields(params.model, params.args.create);
+                if (params.args?.update)
+                    serializeJsonFields(params.model, params.args.update);
+            }
+            if (params.action === 'createMany' && params.args?.data) {
+                const arr = Array.isArray(params.args.data) ? params.args.data : [params.args.data];
+                arr.forEach((d) => serializeJsonFields(params.model, d));
+            }
+            const result = await next(params);
+            if (Array.isArray(result)) {
+                result.forEach((r) => deserializeJsonFields(params.model, r));
+            }
+            else {
+                deserializeJsonFields(params.model, result);
+            }
+            return result;
+        });
     }
     async onModuleInit() {
         try {

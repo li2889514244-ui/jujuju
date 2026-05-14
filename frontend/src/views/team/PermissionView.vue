@@ -91,17 +91,39 @@ function handlePermissionChange(_perm: Permission & { alwaysEnabled?: boolean })
 }
 
 function handleSave() {
-  ElMessage.success('权限设置已保存')
-  // TODO: 调用 teamsApi.updatePermissions(permissions.value)
+  const data = {
+    admin: adminPermissions.value.map(p => ({ id: p.id, enabled: p.enabled })),
+    member: memberPermissions.value.map(p => ({ id: p.id, enabled: p.enabled })),
+  }
+  localStorage.setItem('matrixflow_permissions', JSON.stringify(data))
+  ElMessage.success('权限设置已保存到本地')
 }
 
 function handleReset() {
+  localStorage.removeItem('matrixflow_permissions')
+  // Rebuild default permissions
+  const admins = adminPermissions.value.map(p => ({ ...p, enabled: true }))
+  const members = memberPermissions.value.map(p => ({ ...p, enabled: true }))
+  adminPermissions.value = admins
+  memberPermissions.value = members
   ElMessage.info('已恢复默认设置')
-  // TODO: 调用 teamsApi.resetPermissions()
 }
 
 onMounted(() => {
   teamStore.fetchTeams()
+  // Restore saved permissions
+  const saved = localStorage.getItem('matrixflow_permissions')
+  if (saved) {
+    try {
+      const data = JSON.parse(saved)
+      if (data.admin) adminPermissions.value = adminPermissions.value.map(p => {
+        const s = data.admin.find((x: any) => x.id === p.id); return s ? { ...p, enabled: s.enabled } : p
+      })
+      if (data.member) memberPermissions.value = memberPermissions.value.map(p => {
+        const s = data.member.find((x: any) => x.id === p.id); return s ? { ...p, enabled: s.enabled } : p
+      })
+    } catch { /* ignore corrupt data */ }
+  }
 })
 </script>
 

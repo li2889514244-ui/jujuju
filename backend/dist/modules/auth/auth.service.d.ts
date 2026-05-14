@@ -25,8 +25,8 @@ export declare class AuthService implements OnModuleInit {
             email: string;
             phone: string | null;
             id: string;
-            role: import(".prisma/client").$Enums.Role;
-            status: import(".prisma/client").$Enums.UserStatus;
+            role: string;
+            status: string;
             createdAt: Date;
         };
     }>;
@@ -37,7 +37,7 @@ export declare class AuthService implements OnModuleInit {
             id: string;
             email: string;
             name: string;
-            role: import(".prisma/client").$Enums.Role;
+            role: string;
         };
     }>;
     validateUser(email: string, password: string): Promise<{
@@ -47,8 +47,8 @@ export declare class AuthService implements OnModuleInit {
         password: string;
         name: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
@@ -70,8 +70,8 @@ export declare class AuthService implements OnModuleInit {
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
     }>;
@@ -85,8 +85,8 @@ export declare class AuthService implements OnModuleInit {
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
     }>;

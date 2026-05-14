@@ -14,15 +14,15 @@ export declare class UsersService {
             organization: {
                 name: string;
                 id: string;
-                plan: import(".prisma/client").$Enums.Plan;
+                plan: string;
             } | null;
             name: string;
             email: string;
             phone: string | null;
             id: string;
             avatar: string | null;
-            role: import(".prisma/client").$Enums.Role;
-            status: import(".prisma/client").$Enums.UserStatus;
+            role: string;
+            status: string;
             lastLoginAt: Date | null;
             createdAt: Date;
             updatedAt: Date;
@@ -35,24 +35,24 @@ export declare class UsersService {
         organization: {
             name: string;
             id: string;
-            status: import(".prisma/client").$Enums.OrgStatus;
-            plan: import(".prisma/client").$Enums.Plan;
+            status: string;
+            plan: string;
         } | null;
         name: string;
         email: string;
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
         accounts: {
             id: string;
             avatar: string | null;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.Platform;
+            status: string;
+            platform: string;
             nickname: string;
             followers: number;
         }[];
@@ -63,8 +63,8 @@ export declare class UsersService {
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
@@ -74,8 +74,8 @@ export declare class UsersService {
         password: string;
         name: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
@@ -86,8 +86,8 @@ export declare class UsersService {
         email: string;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: string;
+        status: string;
         lastLoginAt: Date | null;
         createdAt: Date;
     }[]>;

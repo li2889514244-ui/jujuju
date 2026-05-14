@@ -12,13 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateAccountDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../../common/prisma-enums");
 class CreateAccountDto {
 }
 exports.CreateAccountDto = CreateAccountDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: '平台', enum: client_1.Platform, example: client_1.Platform.DOUYIN }),
-    (0, class_validator_1.IsEnum)(client_1.Platform, { message: '无效的平台类型' }),
+    (0, swagger_1.ApiProperty)({ description: '平台', enum: prisma_enums_1.Platform, example: prisma_enums_1.Platform.DOUYIN }),
+    (0, class_validator_1.IsEnum)(prisma_enums_1.Platform, { message: '无效的平台类型' }),
     __metadata("design:type", String)
 ], CreateAccountDto.prototype, "platform", void 0);
 __decorate([

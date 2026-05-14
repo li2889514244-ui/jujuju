@@ -1,7 +1,7 @@
 import { AccountsService } from './accounts.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
-import { Platform } from '@prisma/client';
+import { Platform } from '../../common/prisma-enums';
 export declare class AccountsController {
     private readonly accountsService;
     constructor(accountsService: AccountsService);

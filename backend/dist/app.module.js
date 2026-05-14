@@ -11,8 +11,8 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const throttler_1 = require("@nestjs/throttler");
 const core_1 = require("@nestjs/core");
-const prisma_module_1 = require("./prisma/prisma.module");
 const redis_module_1 = require("./redis/redis.module");
+const prisma_module_1 = require("./prisma/prisma.module");
 const auth_module_1 = require("./modules/auth/auth.module");
 const users_module_1 = require("./modules/users/users.module");
 const teams_module_1 = require("./modules/teams/teams.module");
@@ -24,7 +24,6 @@ const ai_module_1 = require("./modules/ai/ai.module");
 const platforms_module_1 = require("./modules/platforms/platforms.module");
 const health_module_1 = require("./modules/health/health.module");
 const competitors_module_1 = require("./modules/competitors/competitors.module");
-const uploader_module_1 = require("./modules/uploader/uploader.module");
 const scheduler_module_1 = require("./modules/scheduler/scheduler.module");
 const content_review_module_1 = require("./modules/content-review/content-review.module");
 const notifications_module_1 = require("./modules/notifications/notifications.module");
@@ -44,24 +43,12 @@ exports.AppModule = AppModule = __decorate([
                 load: [jwt_config_1.default, redis_config_1.default, database_config_1.default],
             }),
             throttler_1.ThrottlerModule.forRoot([
-                {
-                    name: 'short',
-                    ttl: 1000,
-                    limit: 10,
-                },
-                {
-                    name: 'medium',
-                    ttl: 10000,
-                    limit: 50,
-                },
-                {
-                    name: 'long',
-                    ttl: 60000,
-                    limit: 100,
-                },
+                { name: 'short', ttl: 1000, limit: 10 },
+                { name: 'medium', ttl: 10000, limit: 50 },
+                { name: 'long', ttl: 60000, limit: 100 },
             ]),
-            prisma_module_1.PrismaModule,
             redis_module_1.RedisModule,
+            prisma_module_1.PrismaModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,
             teams_module_1.TeamsModule,
@@ -73,20 +60,13 @@ exports.AppModule = AppModule = __decorate([
             platforms_module_1.PlatformsModule,
             health_module_1.HealthModule,
             competitors_module_1.CompetitorsModule,
-            uploader_module_1.UploaderModule,
             scheduler_module_1.SchedulerModule,
             content_review_module_1.ContentReviewModule,
             notifications_module_1.NotificationsModule,
         ],
         providers: [
-            {
-                provide: core_1.APP_GUARD,
-                useClass: jwt_auth_guard_1.JwtAuthGuard,
-            },
-            {
-                provide: core_1.APP_GUARD,
-                useClass: throttler_1.ThrottlerGuard,
-            },
+            { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },
+            { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },
         ],
     })
 ], AppModule);

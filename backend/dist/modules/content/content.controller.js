@@ -19,7 +19,7 @@ const content_service_1 = require("./content.service");
 const create_content_dto_1 = require("./dto/create-content.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 let ContentController = class ContentController {
     constructor(contentService) {
         this.contentService = contentService;
@@ -67,7 +67,7 @@ __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiOperation)({ summary: '获取内容列表' }),
     (0, swagger_1.ApiQuery)({ name: 'accountId', required: false }),
-    (0, swagger_1.ApiQuery)({ name: 'status', required: false, enum: client_1.PostStatus }),
+    (0, swagger_1.ApiQuery)({ name: 'status', required: false, enum: prisma_enums_1.PostStatus }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: '页码（从1开始）' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: '每页条数（最大100）' }),
     __param(0, (0, common_1.Query)('accountId')),
