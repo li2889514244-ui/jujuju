@@ -1,7 +1,7 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
-import { Platform } from '../../common/prisma-enums';
+import { Platform } from '@prisma/client';
 export declare class AccountsService {
     private prisma;
     private readonly logger;

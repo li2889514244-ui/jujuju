@@ -20,7 +20,7 @@ const create_account_dto_1 = require("./dto/create-account.dto");
 const update_account_dto_1 = require("./dto/update-account.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
-const prisma_enums_1 = require("../../common/prisma-enums");
+const client_1 = require("@prisma/client"); const prisma_enums_1 = require("../../common/prisma-enums");
 let AccountsController = class AccountsController {
     constructor(accountsService) {
         this.accountsService = accountsService;

@@ -1,4 +1,4 @@
-import { Platform } from '../../../common/prisma-enums';
+import { Platform } from '@prisma/client';
 export declare class QueryAnalyticsDto {
     accountId?: string;
     platform?: Platform;

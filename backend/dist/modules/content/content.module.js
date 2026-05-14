@@ -11,12 +11,13 @@ const common_1 = require("@nestjs/common");
 const content_controller_1 = require("./content.controller");
 const content_service_1 = require("./content.service");
 const prisma_module_1 = require("../../prisma/prisma.module");
+const uploader_module_1 = require("../uploader/uploader.module");
 let ContentModule = class ContentModule {
 };
 exports.ContentModule = ContentModule;
 exports.ContentModule = ContentModule = __decorate([
     (0, common_1.Module)({
-        imports: [prisma_module_1.PrismaModule],
+        imports: [prisma_module_1.PrismaModule, (0, common_1.forwardRef)(() => uploader_module_1.UploaderModule)],
         controllers: [content_controller_1.ContentController],
         providers: [content_service_1.ContentService],
         exports: [content_service_1.ContentService],
