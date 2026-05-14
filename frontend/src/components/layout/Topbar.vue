@@ -12,7 +12,7 @@
     <div class="topbar__right">
       <!-- Desktop Download -->
       <el-tooltip content="下载桌面伴侣，扫码绑定平台账号" placement="bottom">
-        <a href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/master.zip" target="_blank" class="topbar__download">
+        <a href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip" target="_blank" class="topbar__download">
           <el-icon :size="20"><Download /></el-icon>
           <span>桌面端</span>
         </a>
