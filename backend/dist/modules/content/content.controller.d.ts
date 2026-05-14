@@ -1,20 +1,26 @@
 import { ContentService } from './content.service';
 import { CreateContentDto } from './dto/create-content.dto';
-import { PostStatus } from '../../common/prisma-enums';
+import { PostStatus } from '@prisma/client';
 export declare class ContentController {
     private readonly contentService;
     constructor(contentService: ContentService);
     create(dto: CreateContentDto, userId: string): Promise<{
+        account: {
+            id: string;
+            platform: import(".prisma/client").$Enums.Platform;
+            nickname: string;
+        };
+    } & {
         id: string;
         title: string | null;
         content: string | null;
-        mediaUrls: string | null;
-        tags: string | null;
+        mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+        tags: string[];
         publishAt: Date | null;
-        status: string;
+        status: import(".prisma/client").$Enums.PostStatus;
         platformUrl: string | null;
         errorMsg: string | null;
-        metadata: string | null;
+        metadata: import(".prisma/client").Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
         accountId: string;
@@ -24,7 +30,7 @@ export declare class ContentController {
             account: {
                 id: string;
                 avatar: string | null;
-                platform: string;
+                platform: import(".prisma/client").$Enums.Platform;
                 nickname: string;
             };
             stats: {
@@ -41,13 +47,13 @@ export declare class ContentController {
             id: string;
             title: string | null;
             content: string | null;
-            mediaUrls: string | null;
-            tags: string | null;
+            mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+            tags: string[];
             publishAt: Date | null;
-            status: string;
+            status: import(".prisma/client").$Enums.PostStatus;
             platformUrl: string | null;
             errorMsg: string | null;
-            metadata: string | null;
+            metadata: import(".prisma/client").Prisma.JsonValue | null;
             createdAt: Date;
             updatedAt: Date;
             accountId: string;
@@ -59,7 +65,7 @@ export declare class ContentController {
     getScheduled(): Promise<({
         account: {
             id: string;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
             userId: string;
         };
@@ -67,13 +73,13 @@ export declare class ContentController {
         id: string;
         title: string | null;
         content: string | null;
-        mediaUrls: string | null;
-        tags: string | null;
+        mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+        tags: string[];
         publishAt: Date | null;
-        status: string;
+        status: import(".prisma/client").$Enums.PostStatus;
         platformUrl: string | null;
         errorMsg: string | null;
-        metadata: string | null;
+        metadata: import(".prisma/client").Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
         accountId: string;
@@ -82,9 +88,13 @@ export declare class ContentController {
         account: {
             id: string;
             avatar: string | null;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
             userId: string;
+            owner: {
+                name: string;
+                id: string;
+            };
         };
         stats: {
             id: string;
@@ -100,13 +110,13 @@ export declare class ContentController {
         id: string;
         title: string | null;
         content: string | null;
-        mediaUrls: string | null;
-        tags: string | null;
+        mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+        tags: string[];
         publishAt: Date | null;
-        status: string;
+        status: import(".prisma/client").$Enums.PostStatus;
         platformUrl: string | null;
         errorMsg: string | null;
-        metadata: string | null;
+        metadata: import(".prisma/client").Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
         accountId: string;
@@ -114,20 +124,20 @@ export declare class ContentController {
     update(id: string, dto: Partial<CreateContentDto>, userId: string): Promise<{
         account: {
             id: string;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
         };
     } & {
         id: string;
         title: string | null;
         content: string | null;
-        mediaUrls: string | null;
-        tags: string | null;
+        mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+        tags: string[];
         publishAt: Date | null;
-        status: string;
+        status: import(".prisma/client").$Enums.PostStatus;
         platformUrl: string | null;
         errorMsg: string | null;
-        metadata: string | null;
+        metadata: import(".prisma/client").Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
         accountId: string;
@@ -136,13 +146,13 @@ export declare class ContentController {
         id: string;
         title: string | null;
         content: string | null;
-        mediaUrls: string | null;
-        tags: string | null;
+        mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+        tags: string[];
         publishAt: Date | null;
-        status: string;
+        status: import(".prisma/client").$Enums.PostStatus;
         platformUrl: string | null;
         errorMsg: string | null;
-        metadata: string | null;
+        metadata: import(".prisma/client").Prisma.JsonValue | null;
         createdAt: Date;
         updatedAt: Date;
         accountId: string;
@@ -157,21 +167,27 @@ export declare class ContentController {
     }): Promise<{
         success: boolean;
         count: number;
-        posts: {
+        posts: ({
+            account: {
+                id: string;
+                platform: import(".prisma/client").$Enums.Platform;
+                nickname: string;
+            };
+        } & {
             id: string;
             title: string | null;
             content: string | null;
-            mediaUrls: string | null;
-            tags: string | null;
+            mediaUrls: import(".prisma/client").Prisma.JsonValue | null;
+            tags: string[];
             publishAt: Date | null;
-            status: string;
+            status: import(".prisma/client").$Enums.PostStatus;
             platformUrl: string | null;
             errorMsg: string | null;
-            metadata: string | null;
+            metadata: import(".prisma/client").Prisma.JsonValue | null;
             createdAt: Date;
             updatedAt: Date;
             accountId: string;
-        }[];
+        })[];
     }>;
     remove(id: string, userId: string): Promise<{
         success: boolean;

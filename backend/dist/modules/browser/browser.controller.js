@@ -19,7 +19,7 @@ const browser_service_1 = require("./browser.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
-const prisma_enums_1 = require("../../common/prisma-enums");
+const client_1 = require("@prisma/client");
 const class_validator_1 = require("class-validator");
 const swagger_2 = require("@nestjs/swagger");
 class CreateBrowserInstanceDto {
@@ -54,7 +54,7 @@ __decorate([
 ], BrowserController.prototype, "getInstances", null);
 __decorate([
     (0, common_1.Post)('instances'),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
     (0, swagger_1.ApiOperation)({ summary: '创建浏览器实例' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: '创建成功' }),
     __param(0, (0, common_1.Body)()),
@@ -64,7 +64,7 @@ __decorate([
 ], BrowserController.prototype, "createInstance", null);
 __decorate([
     (0, common_1.Delete)('instances/:id'),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
     (0, swagger_1.ApiOperation)({ summary: '关闭浏览器实例' }),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

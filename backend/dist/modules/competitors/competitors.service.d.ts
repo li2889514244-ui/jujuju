@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { Platform } from '../../common/prisma-enums';
+import { Platform } from '@prisma/client';
 export declare class CompetitorsService {
     private prisma;
     private readonly logger;
@@ -14,14 +14,14 @@ export declare class CompetitorsService {
         userId: string;
     }): Promise<{
         id: string;
-        platform: string;
+        platform: import(".prisma/client").$Enums.Platform;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: string;
+        status: import(".prisma/client").$Enums.AccountStatus;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
@@ -46,14 +46,14 @@ export declare class CompetitorsService {
             }[];
         } & {
             id: string;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             platformUserId: string;
             nickname: string;
             avatar: string | null;
             bio: string | null;
             followers: number;
             following: number;
-            status: string;
+            status: import(".prisma/client").$Enums.AccountStatus;
             note: string | null;
             createdAt: Date;
             updatedAt: Date;
@@ -77,14 +77,14 @@ export declare class CompetitorsService {
         }[];
     } & {
         id: string;
-        platform: string;
+        platform: import(".prisma/client").$Enums.Platform;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: string;
+        status: import(".prisma/client").$Enums.AccountStatus;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
@@ -124,14 +124,14 @@ export declare class CompetitorsService {
         }[];
     } & {
         id: string;
-        platform: string;
+        platform: import(".prisma/client").$Enums.Platform;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
         bio: string | null;
         followers: number;
         following: number;
-        status: string;
+        status: import(".prisma/client").$Enums.AccountStatus;
         note: string | null;
         createdAt: Date;
         updatedAt: Date;
