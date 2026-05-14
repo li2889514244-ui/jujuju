@@ -31,6 +31,7 @@ const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
 const jwt_config_1 = require("./config/jwt.config");
 const redis_config_1 = require("./config/redis.config");
 const database_config_1 = require("./config/database.config");
+const scan_bind_module_1 = require("./modules/scan-bind/scan-bind.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -75,6 +76,7 @@ exports.AppModule = AppModule = __decorate([
             scheduler_module_1.SchedulerModule,
             content_review_module_1.ContentReviewModule,
             notifications_module_1.NotificationsModule,
+            scan_bind_module_1.ScanBindModule,
         ],
         providers: [
             {
