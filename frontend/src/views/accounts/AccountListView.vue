@@ -206,10 +206,20 @@ function checkCompanion() {
     .catch(() => { companionOnline.value = false })
 }
 
-function openCompanionScan(platform: string) {
+async function openCompanionScan(platform: string) {
   const token = userStore.token
   const api = 'https://ddddkiii.com/api/v1'
-  window.open(`http://localhost:5409/?platform=${platform}&token=${encodeURIComponent(token)}&api=${encodeURIComponent(api)}`, '_blank')
+  try {
+    const resp = await fetch(`http://localhost:5409/api/scan-bind/start?platform=${platform}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(api)}`)
+    const data = await resp.json()
+    if (data.code === 0) {
+      ElMessage.success('已发送到桌面伴侣，请查看桌面伴侣窗口')
+    } else {
+      ElMessage.error(data.msg || '发送失败')
+    }
+  } catch {
+    ElMessage.error('桌面伴侣未启动，请先打开桌面伴侣')
+  }
 }
 
 onMounted(() => {
