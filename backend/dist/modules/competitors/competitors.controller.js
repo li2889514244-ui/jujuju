@@ -26,9 +26,10 @@ let CompetitorsController = class CompetitorsController {
     async create(userId, dto) {
         return this.competitorsService.create({ ...dto, userId });
     }
-    async findAll(userId, platform, skip, take) {
+    async findAll(userId, platform, skip, take, search) {
         return this.competitorsService.findAll(userId, {
             platform,
+            search,
             skip: skip ? parseInt(skip) : undefined,
             take: take ? parseInt(take) : undefined,
         });
@@ -61,8 +62,9 @@ __decorate([
     __param(1, (0, common_1.Query)('platform')),
     __param(2, (0, common_1.Query)('skip')),
     __param(3, (0, common_1.Query)('take')),
+    __param(4, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], CompetitorsController.prototype, "findAll", null);
 __decorate([

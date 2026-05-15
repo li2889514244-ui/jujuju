@@ -14,6 +14,38 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AnalyticsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+// Simple in-memory cache fallback
+var _cache = new Map();
+
+async function cacheGet(key) {
+    try {
+        var Redis = require("ioredis");
+        var client = new Redis({ host: "127.0.0.1", port: 6379, password: "2b6bdc40a4bfc4ff9575326d", maxRetriesPerRequest: 1, lazyConnect: true });
+        await client.connect();
+        var val = await client.get(key);
+        await client.quit();
+        return val ? JSON.parse(val) : null;
+    } catch(e) {
+        var entry = _cache.get(key);
+        if (entry && entry.exp > Date.now()) return entry.val;
+        return null;
+    }
+}
+
+async function cacheSet(key, val, ttl) {
+    ttl = ttl || 300;
+    try {
+        var Redis = require("ioredis");
+        var client = new Redis({ host: "127.0.0.1", port: 6379, password: "2b6bdc40a4bfc4ff9575326d", maxRetriesPerRequest: 1, lazyConnect: true });
+        await client.connect();
+        await client.setex(key, ttl, JSON.stringify(val));
+        await client.quit();
+    } catch(e) {
+        _cache.set(key, { val: val, exp: Date.now() + ttl * 1000 });
+    }
+}
+
+
 let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -46,6 +78,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return this.prisma.postStats.findMany({ where, include: { post: { select: { id: true, title: true, status: true, platformUrl: true, account: { select: { id: true, platform: true, nickname: true } } } } }, orderBy: { collectedAt: 'desc' } });
     }
     async getOverview(userId) {
+        var cacheKey = 'cache:analytics:overview:' + userId;
+        var cached = await cacheGet(cacheKey);
+        if (cached) return cached;
         const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true, followers: true, status: true } });
         const accountIds = accounts.map(a => a.id);
         const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
@@ -57,7 +92,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const platformCounts = {};
         accounts.forEach(a => { platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1; });
         const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
-        return { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews: statsAgg._sum.views || 0, totalLikes: statsAgg._sum.likes || 0, totalComments: statsAgg._sum.comments || 0, totalShares: statsAgg._sum.shares || 0, totalSaves: statsAgg._sum.saves || 0 } };
+        var result = { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews: statsAgg._sum.views || 0, totalLikes: statsAgg._sum.likes || 0, totalComments: statsAgg._sum.comments || 0, totalShares: statsAgg._sum.shares || 0, totalSaves: statsAgg._sum.saves || 0 } };
+        await cacheSet(cacheKey, result, 300);
+        return result;
     }
     async getPlatformComparison(userId) {
         const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true } });

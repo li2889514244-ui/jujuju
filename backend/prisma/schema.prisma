@@ -1,18 +1,50 @@
 // MatrixFlow - Prisma Schema
-// 数据库: SQLite（轻量化，单文件，不依赖外部进程）
+// 数据库: PostgreSQL
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
+// ==================== Enums ====================
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+  OWNER
+  MANAGER
+}
+
+enum AccountStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  SCHEDULED
+  CANCELLED
+}
+
+enum PlatformEnum {
+  DOUYIN
+  KUAISHOU
+  XIAOHONGSHU
+  BILIBILI
+  WEIBO
+  WECHAT_VIDEO
+  TIKTOK
+}
+
 // ==================== 用户与组织 ====================
-// SQLite 不支持 enum，所有原 enum 字段改为 String，由 class-validator 在 DTO 层校验。
-// 应用层从 src/common/prisma-enums.ts 导入常量（保留 Platform.DOUYIN 等用法）。
 
 model User {
   id          String    @id @default(cuid())
@@ -21,8 +53,8 @@ model User {
   password    String
   name        String
   avatar      String?
-  role        String    @default("MEMBER")
-  status      String    @default("ACTIVE")
+  role        UserRole       @default(MEMBER)
+  status      AccountStatus  @default(ACTIVE)
   lastLoginAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -34,13 +66,14 @@ model User {
 
   @@index([organizationId])
   @@index([email])
+  members   TeamMember[]
 }
 
 model Organization {
   id        String   @id @default(cuid())
   name      String
   plan      String   @default("FREE")
-  status    String   @default("ACTIVE")
+  status    AccountStatus @default(ACTIVE)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -61,26 +94,27 @@ model Team {
   accounts Account[]
 
   @@index([organizationId])
+  members   TeamMember[]
 }
 
 // ==================== 平台账号 ====================
 
 model Account {
-  id             String    @id @default(cuid())
-  platform       String
+  id             String        @id @default(cuid())
+  platform       PlatformEnum
   platformUserId String
   nickname       String
   avatar         String?
   bio            String?
-  followers      Int       @default(0)
-  following      Int       @default(0)
-  status         String    @default("ACTIVE")
+  followers      Int           @default(0)
+  following      Int           @default(0)
+  status         AccountStatus @default(ACTIVE)
   cookies        String?
   proxyConfig    String? // JSON 字符串
   metadata       String? // JSON 字符串
   lastActiveAt   DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   owner      User          @relation(fields: [userId], references: [id])
   userId     String
@@ -101,18 +135,18 @@ model Account {
 // ==================== 内容发布 ====================
 
 model Post {
-  id          String    @id @default(cuid())
+  id          String     @id @default(cuid())
   title       String?
   content     String?
   mediaUrls   String? // JSON 字符串
-  tags        String? // JSON 字符串数组
+  tags        String? // JSON 字符串，逗号分隔
   publishAt   DateTime?
-  status      String    @default("DRAFT")
+  status      PostStatus @default(DRAFT)
   platformUrl String?
   errorMsg    String?
   metadata    String? // JSON 字符串
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
 
   account   Account    @relation(fields: [accountId], references: [id])
   accountId String
@@ -123,7 +157,7 @@ model Post {
   @@index([publishAt])
 }
 
-// ==================== 数据统计 ====================
+// ==================== 互动统计 ====================
 
 model PostStats {
   id          String   @id @default(cuid())
@@ -141,15 +175,15 @@ model PostStats {
 }
 
 model DailyStats {
-  id        String   @id @default(cuid())
+  id        String       @id @default(cuid())
   date      DateTime
-  platform  String
-  followers Int      @default(0)
-  views     Int      @default(0)
-  likes     Int      @default(0)
-  comments  Int      @default(0)
-  shares    Int      @default(0)
-  createdAt DateTime @default(now())
+  platform  PlatformEnum
+  followers Int          @default(0)
+  views     Int          @default(0)
+  likes     Int          @default(0)
+  comments  Int          @default(0)
+  shares    Int          @default(0)
+  createdAt DateTime     @default(now())
 
   account   Account @relation(fields: [accountId], references: [id])
   accountId String
@@ -178,21 +212,21 @@ model AuditLog {
   @@index([action])
 }
 
-// ==================== 竞对监测 ====================
+// ==================== 竞品监控 ====================
 
 model Competitor {
-  id             String   @id @default(cuid())
-  platform       String
+  id             String       @id @default(cuid())
+  platform       PlatformEnum
   platformUserId String
   nickname       String
   avatar         String?
   bio            String?
-  followers      Int      @default(0)
-  following      Int      @default(0)
-  status         String   @default("ACTIVE")
+  followers      Int          @default(0)
+  following      Int          @default(0)
+  status         AccountStatus @default(ACTIVE)
   note           String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   userId    String
   snapshots CompetitorSnapshot[]
@@ -248,7 +282,7 @@ model Asset {
   height    Int?
   duration  Int?
   mimeType  String?
-  tags      String? // JSON 字符串数组
+  tags      String? // JSON 字符串，逗号分隔
   folderId  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -276,4 +310,18 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([createdAt])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      UserRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
 }
