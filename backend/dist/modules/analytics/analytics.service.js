@@ -14,35 +14,74 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AnalyticsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
-// Simple in-memory cache fallback
+// In-memory cache fallback (used when Redis is unavailable)
 var _cache = new Map();
 
-async function cacheGet(key) {
+// Redis cache singleton - ONE connection reused across all requests.
+// This replaces the previous connection-per-request pattern which was
+// creating a new Redis connection (and calling client.quit()) on every
+// single cacheGet/cacheSet call - a performance disaster.
+//
+// The singleton is lazily created on first use and persists for the
+// lifetime of the process. Environment-based configuration means no
+// hardcoded passwords in source code.
+var _redisClient = null;
+function getRedisClient() {
+    if (_redisClient) return _redisClient;
     try {
-        var Redis = require("ioredis");
-        var client = new Redis({ host: "127.0.0.1", port: 6379, password: "2b6bdc40a4bfc4ff9575326d", maxRetriesPerRequest: 1, lazyConnect: true });
-        await client.connect();
-        var val = await client.get(key);
-        await client.quit();
-        return val ? JSON.parse(val) : null;
+        var Redis = require('ioredis');
+        var host = process.env.REDIS_HOST || '127.0.0.1';
+        var port = parseInt(process.env.REDIS_PORT || '6379', 10);
+        var password = process.env.REDIS_PASSWORD;
+        if (!password) {
+            // Try to parse from REDIS_URL (format: redis://[:password@]host:port)
+            var redisUrl = process.env.REDIS_URL || '';
+            var m = redisUrl.match(/:\/\/(?:.*?:)?([^@]+)@/);
+            if (m) password = m[1];
+        }
+        _redisClient = new Redis({
+            host: host,
+            port: port,
+            password: password,
+            maxRetriesPerRequest: 3,
+            retryStrategy: function(times) { return Math.min(times * 200, 2000); },
+            lazyConnect: false
+        });
+        console.log('Redis cache singleton connected');
     } catch(e) {
-        var entry = _cache.get(key);
-        if (entry && entry.exp > Date.now()) return entry.val;
+        console.error('Redis cache singleton failed:', e.message);
         return null;
     }
+    return _redisClient;
+}
+
+async function cacheGet(key) {
+    var client = getRedisClient();
+    if (client) {
+        try {
+            var val = await client.get(key);
+            return val ? JSON.parse(val) : null;
+        } catch(e) {
+            // Fallback to in-memory cache on Redis error
+        }
+    }
+    var entry = _cache.get(key);
+    if (entry && entry.exp > Date.now()) return entry.val;
+    return null;
 }
 
 async function cacheSet(key, val, ttl) {
     ttl = ttl || 300;
-    try {
-        var Redis = require("ioredis");
-        var client = new Redis({ host: "127.0.0.1", port: 6379, password: "2b6bdc40a4bfc4ff9575326d", maxRetriesPerRequest: 1, lazyConnect: true });
-        await client.connect();
-        await client.setex(key, ttl, JSON.stringify(val));
-        await client.quit();
-    } catch(e) {
-        _cache.set(key, { val: val, exp: Date.now() + ttl * 1000 });
+    var client = getRedisClient();
+    if (client) {
+        try {
+            await client.setex(key, ttl, JSON.stringify(val));
+            return;
+        } catch(e) {
+            // Fallback to in-memory cache on Redis error
+        }
     }
+    _cache.set(key, { val: val, exp: Date.now() + ttl * 1000 });
 }
 
 

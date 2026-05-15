@@ -35,7 +35,8 @@ let CompetitorsController = class CompetitorsController {
         });
     }
     async compare(userId, ids, days) {
-        const competitorIds = ids.split(',');
+        if (!ids) return [];
+        const competitorIds = ids.split(',').filter(function(id) { return id.length > 0; });
         return this.competitorsService.compare(userId, competitorIds, days ? parseInt(days) : 7);
     }
     async findById(userId, id) {

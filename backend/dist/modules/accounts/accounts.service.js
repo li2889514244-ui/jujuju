@@ -253,12 +253,6 @@ AccountsService.prototype.bulkDelete = async function(ids, userId) {
 
 /** Bulk move accounts to a group */
 AccountsService.prototype.bulkMove = async function(ids, groupId, userId) {
-    const group = await this.prisma.group.findFirst({
-        where: { id: groupId, userId: userId }
-    });
-    if (!group) {
-        throw new common_1.NotFoundException('Group not found');
-    }
     return this.prisma.account.updateMany({
         where: { id: { in: ids }, userId: userId },
         data: { groupId: groupId }
