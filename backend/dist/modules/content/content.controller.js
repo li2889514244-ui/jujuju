@@ -51,9 +51,6 @@ let ContentController = class ContentController {
     async remove(id, userId) {
         return this.contentService.remove(id, userId);
     }
-    async getPendingPublish(userId) {
-        return this.contentService.getPendingPublish(userId);
-    }
     async reportPublishResult(id, userId, body) {
         return this.contentService.reportPublishResult(id, userId, body);
     }
@@ -148,14 +145,6 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], ContentController.prototype, "remove", null);
 
-__decorate([
-    (0, common_1.Get)('pending-publish'),
-    (0, swagger_1.ApiOperation)({ summary: '\u83b7\u53d6\u5f85\u53d1\u5e03\u4efb\u52a1\uff08\u684c\u9762\u4f34\u4fa3\u8f6e\u8be2\uff09' }),
-    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
-    __metadata("design:returntype", Promise)
-], ContentController.prototype, "getPendingPublish", null);
 __decorate([
     (0, common_1.Post)(':id/publish-result'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
