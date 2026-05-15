@@ -46,6 +46,14 @@ enum PlatformEnum {
 
 // ==================== 用户与组织 ====================
 
+
+enum EventType {
+  RECORDING
+  LIVESTREAM
+  MEETING
+  OTHER
+}
+
 model User {
   id          String    @id @default(cuid())
   email       String    @unique
@@ -67,6 +75,7 @@ model User {
   @@index([organizationId])
   @@index([email])
   members   TeamMember[]
+  events CalendarEvent[]
 }
 
 model Organization {
@@ -155,6 +164,7 @@ model Post {
   @@index([accountId])
   @@index([status])
   @@index([publishAt])
+  @@index([accountId, status])
 }
 
 // ==================== 互动统计 ====================
@@ -191,6 +201,7 @@ model DailyStats {
   @@unique([accountId, date])
   @@index([accountId])
   @@index([date])
+  @@index([accountId, date])
 }
 
 // ==================== 审计日志 ====================
@@ -210,6 +221,7 @@ model AuditLog {
   @@index([userId])
   @@index([createdAt])
   @@index([action])
+  @@index([userId, createdAt])
 }
 
 // ==================== 竞品监控 ====================
@@ -310,6 +322,7 @@ model Notification {
   @@index([userId])
   @@index([read])
   @@index([createdAt])
+  @@index([userId, read, createdAt])
 }
 
 model TeamMember {
@@ -324,4 +337,26 @@ model TeamMember {
   @@unique([userId, teamId])
   @@index([teamId])
   @@index([userId])
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  eventType   EventType @default(OTHER)
+  startTime   DateTime
+  endTime     DateTime
+  color       String    @default("#409EFF")
+  allDay      Boolean   @default(false)
+  location    String?
+  userId      String
+  teamId      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([startTime])
 }

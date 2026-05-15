@@ -32,6 +32,7 @@ const jwt_config_1 = require("./config/jwt.config");
 const redis_config_1 = require("./config/redis.config");
 const database_config_1 = require("./config/database.config");
 const scan_bind_module_1 = require("./modules/scan-bind/scan-bind.module");
+const calendar_module_1 = require("./modules/calendar/calendar.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -41,7 +42,8 @@ exports.AppModule = AppModule = __decorate([
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
                 envFilePath: '.env',
-                load: [jwt_config_1.default, redis_config_1.default, database_config_1.default],
+                load: [jwt_config_1.default, redis_config_1.default, database_config_1.default
+      ],
             }),
             throttler_1.ThrottlerModule.forRoot([
                 {
@@ -77,6 +79,7 @@ exports.AppModule = AppModule = __decorate([
             content_review_module_1.ContentReviewModule,
             notifications_module_1.NotificationsModule,
             scan_bind_module_1.ScanBindModule,
+            calendar_module_1.CalendarModule,
         ],
         providers: [
             {

@@ -3,7 +3,7 @@
 用法: python companion_app.py
 打开浏览器访问 http://localhost:5409
 """
-import asyncio, json, os, threading, time, uuid
+import asyncio, json, os, re, threading, time, uuid
 from pathlib import Path
 from queue import Queue, Empty
 
@@ -143,6 +143,308 @@ createApp({
 </script>
 </body>
 </html>'''
+
+# ══════════════════════════════════════════════════════════════════
+# Data Collection (Task 1)
+# ══════════════════════════════════════════════════════════════════
+
+# ── Config persistence ────────────────────────────────────────────
+CONFIG_FILE = Path(__file__).parent / 'companion_config.json'
+
+
+def _load_config() -> dict:
+    if CONFIG_FILE.exists():
+        try:
+            return json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
+        except Exception:
+            pass
+    return {'api_url': '', 'token': ''}
+
+
+def _save_config(cfg: dict):
+    CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2),
+                           encoding='utf-8')
+
+
+_CONFIG_CACHE = _load_config()
+
+# ── Platform dashboard URLs ──────────────────────────────────────
+# (url, cookie_domain)
+PLATFORM_DASHBOARDS = {
+    'DOUYIN':       ('https://creator.douyin.com',       '.douyin.com'),
+    'KUAISHOU':     ('https://cp.kuaishou.com',          '.kuaishou.com'),
+    'XIAOHONGSHU':  ('https://creator.xiaohongshu.com',  '.xiaohongshu.com'),
+    'BILIBILI':     ('https://member.bilibili.com',      '.bilibili.com'),
+    'WEIBO':        ('https://weibo.com',                '.weibo.com'),
+    'WECHAT_VIDEO': ('https://channels.weixin.qq.com',   '.weixin.qq.com'),
+}
+
+# ── Collector state ──────────────────────────────────────────────
+_collector_running = False
+_collector_last_run = None
+_collector_last_error = None
+
+# ── Config endpoints ─────────────────────────────────────────────
+
+
+@app.route('/api/config', methods=['GET', 'POST'])
+def handle_config():
+    global _CONFIG_CACHE
+    if request.method == 'POST':
+        data = request.get_json(silent=True) or {}
+        cfg = _load_config()
+        for key in ('api_url', 'token'):
+            if key in data:
+                cfg[key] = data[key].strip() if isinstance(data[key], str) else str(data[key])
+        _save_config(cfg)
+        _CONFIG_CACHE = cfg
+        return jsonify({'status': 'ok'})
+    safe = {k: v for k, v in _CONFIG_CACHE.items() if k != 'token'}
+    if _CONFIG_CACHE.get('token'):
+        safe['token_set'] = True
+    return jsonify(safe)
+
+
+@app.route('/api/data-collection/status')
+def data_collection_status():
+    return jsonify({
+        'running': _collector_running,
+        'configured': bool(_CONFIG_CACHE.get('api_url')
+                           and _CONFIG_CACHE.get('token')),
+        'last_run': _collector_last_run,
+        'last_error': _collector_last_error,
+    })
+
+
+@app.route('/api/data-collection/trigger', methods=['POST'])
+def data_collection_trigger():
+    t = threading.Thread(target=_run_collection_once, daemon=True)
+    t.start()
+    return jsonify({'status': 'started'})
+
+
+# ── Metric extraction ────────────────────────────────────────────
+
+# Chinese-to-English metric key, with multiple regex patterns per key
+_METRIC_PATTERNS = {
+    'followers': [
+        re.compile(r'粉丝\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'粉丝数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*粉丝'),
+    ],
+    'following': [
+        re.compile(r'关注\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*关注'),
+    ],
+    'likes': [
+        re.compile(r'获赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'点赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*获赞'),
+        re.compile(r'([\d,.]+[万wW]?)\s*点赞'),
+    ],
+    'views': [
+        re.compile(r'播放\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'播放量\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*播放'),
+    ],
+    'comments': [
+        re.compile(r'评论\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*评论'),
+    ],
+    'shares': [
+        re.compile(r'分享\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'([\d,.]+[万wW]?)\s*分享'),
+    ],
+}
+
+
+def _parse_metric_num(s: str) -> int:
+    """Parse a number string that may include a Chinese 万 suffix."""
+    s = s.strip().replace(',', '').replace(' ', '')
+    if s.endswith(('万', 'w', 'W')):
+        return int(float(s[:-1]) * 10000)
+    try:
+        return int(float(s))
+    except ValueError:
+        return 0
+
+
+async def _scrape_dashboard(page) -> dict:
+    """Extract numeric metrics from a dashboard page by text pattern matching."""
+    text = await page.evaluate('() => document.body.innerText')
+    metrics = {}
+    for key, patterns in _METRIC_PATTERNS.items():
+        for pat in patterns:
+            m = pat.search(text)
+            if m:
+                metrics[key] = _parse_metric_num(m.group(1))
+                break
+    return metrics
+
+
+async def _scrape_all(accounts: list) -> list:
+    """Open a single headless Playwright session, scrape every account."""
+    from playwright.async_api import async_playwright
+
+    results = []
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(
+            headless=True,
+            args=['--disable-blink-features=AutomationControlled',
+                  '--no-sandbox'],
+        )
+        for acc in accounts:
+            aid = (acc.get('id') or '').strip()
+            platform = (acc.get('platform') or '').strip().upper()
+            cookies_str = acc.get('cookies') or ''
+            if not aid or not platform or not cookies_str:
+                continue
+
+            entry = PLATFORM_DASHBOARDS.get(platform)
+            if not entry:
+                print(f'[DC] Unknown platform {platform}, skip')
+                continue
+
+            url, domain = entry
+
+            # Parse semicolon-joined cookie string back into Playwright format
+            cookie_list = []
+            for pair in cookies_str.split('; '):
+                if '=' in pair:
+                    n, v = pair.split('=', 1)
+                    cookie_list.append({
+                        'name': n.strip(),
+                        'value': v.strip(),
+                        'domain': domain,
+                        'path': '/',
+                    })
+
+            ctx = await browser.new_context(
+                user_agent=(
+                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                    'AppleWebKit/537.36 (KHTML, like Gecko) '
+                    'Chrome/124.0.0.0 Safari/537.36'),
+                locale='zh-CN',
+            )
+            if cookie_list:
+                try:
+                    await ctx.add_cookies(cookie_list)
+                except Exception:
+                    pass  # some cookies may be rejected, that's ok
+
+            page = await ctx.new_page()
+            metrics = {}
+            try:
+                await page.goto(url, wait_until='domcontentloaded',
+                                timeout=30000)
+                await page.wait_for_timeout(8000)
+                metrics = await _scrape_dashboard(page)
+            except Exception as e:
+                print(f'[DC] scrape error {platform}/{aid}: {e}')
+
+            await ctx.close()
+            results.append({'accountId': aid, 'metrics': metrics})
+
+        await browser.close()
+    return results
+
+
+# ── Data collection runner ───────────────────────────────────────
+
+
+def _run_collection_once():
+    global _collector_running, _collector_last_run
+    global _collector_last_error, _CONFIG_CACHE
+
+    _collector_running = True
+    try:
+        cfg = _load_config()
+        _CONFIG_CACHE = cfg
+        api_url = cfg.get('api_url', '').rstrip('/')
+        token = cfg.get('token', '')
+
+        if not api_url or not token:
+            _collector_last_error = 'Not configured: api_url or token missing'
+            return
+
+        import requests
+
+        print(f'[DC] Fetching accounts from {api_url}/platforms/accounts')
+        resp = requests.get(
+            f'{api_url}/platforms/accounts',
+            headers={'Authorization': f'Bearer {token}'},
+            timeout=30,
+        )
+        if resp.status_code != 200:
+            _collector_last_error = f'GET /accounts returned HTTP {resp.status_code}'
+            return
+
+        raw = resp.json()
+        # Handle NestJS standard response wrapper { code, data: { accounts: [...] } }
+        if isinstance(raw, dict):
+            inner = raw.get('data') or raw
+            if isinstance(inner, dict):
+                accounts = inner.get('accounts') or inner.get('data') or []
+            else:
+                accounts = inner if isinstance(inner, list) else []
+        else:
+            accounts = raw if isinstance(raw, list) else []
+        if not accounts:
+            print('[DC] No accounts with cookies found')
+            _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
+            _collector_last_error = None
+            return
+
+        print(f'[DC] Scraping {len(accounts)} accounts')
+        scraped = asyncio.run(_scrape_all(accounts))
+
+        reported = 0
+        for item in scraped:
+            if item['metrics'] and any(v for v in item['metrics'].values()):
+                payload = {'accountId': item['accountId'],
+                           'metrics': item['metrics']}
+                try:
+                    r = requests.post(
+                        f'{api_url}/platforms/report-metrics',
+                        json=payload,
+                        headers={'Authorization': f'Bearer {token}'},
+                        timeout=30,
+                    )
+                    if r.status_code < 400:
+                        reported += 1
+                        print(
+                            f'[DC] Reported {item["accountId"]}: '
+                            f'{item["metrics"]}')
+                    else:
+                        print(
+                            f'[DC] Report HTTP {r.status_code} for '
+                            f'{item["accountId"]}: {r.text[:200]}')
+                except Exception as e:
+                    print(f'[DC] Report error {item["accountId"]}: {e}')
+
+        _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
+        _collector_last_error = None
+        print(f'[DC] Done: {reported}/{len(scraped)} reported')
+    except Exception as e:
+        _collector_last_error = str(e)
+        print(f'[DC] Fatal: {e}')
+    finally:
+        _collector_running = False
+
+
+def _data_collector_loop():
+    """Background thread: wake up every 30 minutes, collect, sleep."""
+    time.sleep(30)  # short initial delay so the HTTP server starts first
+    while True:
+        try:
+            _run_collection_once()
+        except Exception as e:
+            print(f'[DC] Loop error: {e}')
+        time.sleep(30 * 60)
+
+
+# Start collector in background
+threading.Thread(target=_data_collector_loop, daemon=True).start()
 
 # ── Routes ────────────────────────────────────────────────────
 @app.route('/')

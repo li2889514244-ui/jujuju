@@ -143,6 +143,46 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
     async refreshExpiringTokens() {
         return this.oauthService.refreshExpiringTokens();
     }
+    async reportMetrics(userId, accountId, metrics) {
+        const account = await this.prisma.account.findFirst({
+            where: { id: accountId, userId: userId }
+        });
+        if (!account) throw new common_1.NotFoundException('Account not found');
+
+        await this.prisma.account.update({
+            where: { id: accountId },
+            data: {
+                followers: metrics.followers || account.followers,
+                following: metrics.following || account.following
+            }
+        });
+
+        const today = new Date();
+        today.setHours(0,0,0,0);
+
+        await this.prisma.dailyStats.upsert({
+            where: { accountId_date: { accountId, date: today } },
+            create: {
+                accountId,
+                platform: account.platform,
+                date: today,
+                followers: metrics.followers || 0,
+                views: metrics.views || 0,
+                likes: metrics.likes || 0,
+                comments: metrics.comments || 0,
+                shares: metrics.shares || 0
+            },
+            update: {
+                followers: metrics.followers || 0,
+                views: metrics.views || 0,
+                likes: metrics.likes || 0,
+                comments: metrics.comments || 0,
+                shares: metrics.shares || 0
+            }
+        });
+
+        return { success: true };
+    }
     async getAuthorizedAccounts(params) {
         const { userId, teamId, platform, skip = 0, take = 20 } = params;
         const where = { status: 'ACTIVE' };
@@ -164,6 +204,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     nickname: true,
                     avatar: true,
                     bio: true,
+                    cookies: true,
                     followers: true,
                     following: true,
                     status: true,
