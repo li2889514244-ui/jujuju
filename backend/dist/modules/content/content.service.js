@@ -16,6 +16,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ContentService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
+const uploader_service_1 = require("../uploader/uploader.service");
+const _uploaderInstance = new uploader_service_1.UploaderService();
 let ContentService = ContentService_1 = class ContentService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -193,6 +195,15 @@ let ContentService = ContentService_1 = class ContentService {
             data: { status: 'PUBLISHING' },
         });
         this.logger.log(`内容开始发布: ${contentId}`);
+        // Notify UploaderService so companion can poll
+        try {
+            const task = await _uploaderInstance.executePublish(contentId, post.accountId, post.account.platform, {
+                title: post.title || '', content: post.content || '', mediaUrls: post.mediaUrls || [], tags: post.tags || []
+            });
+            this.logger.log('Publish task queued: ' + task.taskId);
+        } catch (err) {
+            this.logger.warn('UploaderService note: ' + err.message);
+        }
         return updated;
     }
     async updatePublishStatus(contentId, status, platformUrl, errorMsg) {
@@ -269,22 +280,44 @@ let ContentService = ContentService_1 = class ContentService {
     async executeImmediatePublish(posts) {
         for (const post of posts) {
             try {
-                const task = {
-                    contentId: post.id,
-                    accountId: post.accountId,
-                    platform: post.account.platform,
+                const content = {
                     title: post.title || '',
                     content: post.content || '',
                     mediaUrls: post.mediaUrls || [],
                     tags: post.tags || [],
                 };
-                await new Promise((r) => setTimeout(r, 3000 + Math.random() * 3000));
+                const task = await _uploaderInstance.executePublish(post.id, post.accountId, post.account.platform, content);
+                this.logger.log('Batch publish task queued: ' + task.taskId + ' for post ' + post.id);
             }
             catch (error) {
                 this.logger.error(`立即发布失败: ${post.id}`, error.message);
                 await this.updatePublishStatus(post.id, 'FAILED', undefined, error.message);
             }
         }
+    }
+    async getPendingPublish(userId) {
+        return this.prisma.post.findMany({
+            where: { status: 'PUBLISHING', account: { userId } },
+            include: { account: { select: { id: true, platform: true, nickname: true, platformUserId: true } } },
+            orderBy: { createdAt: 'asc' },
+            take: 10,
+        });
+    }
+
+    async reportPublishResult(contentId, userId, result) {
+        const post = await this.prisma.post.findUnique({ where: { id: contentId }, include: { account: true } });
+        if (!post) throw new common_1.NotFoundException('Content not found');
+        if (post.account.userId !== userId) throw new common_1.ForbiddenException('Not authorized');
+
+        const status = result.success ? 'PUBLISHED' : 'FAILED';
+        return this.prisma.post.update({
+            where: { id: contentId },
+            data: {
+                status,
+                platformUrl: result.platformUrl || null,
+                errorMsg: result.error || null,
+            },
+        });
     }
 };
 exports.ContentService = ContentService;

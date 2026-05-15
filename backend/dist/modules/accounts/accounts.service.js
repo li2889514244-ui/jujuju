@@ -242,4 +242,27 @@ exports.AccountsService = AccountsService = AccountsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], AccountsService);
+
+
+/** Bulk delete accounts owned by user */
+AccountsService.prototype.bulkDelete = async function(ids, userId) {
+    return this.prisma.account.deleteMany({
+        where: { id: { in: ids }, userId: userId }
+    });
+};
+
+/** Bulk move accounts to a group */
+AccountsService.prototype.bulkMove = async function(ids, groupId, userId) {
+    const group = await this.prisma.group.findFirst({
+        where: { id: groupId, userId: userId }
+    });
+    if (!group) {
+        throw new common_1.NotFoundException('Group not found');
+    }
+    return this.prisma.account.updateMany({
+        where: { id: { in: ids }, userId: userId },
+        data: { groupId: groupId }
+    });
+};
+
 //# sourceMappingURL=accounts.service.js.map

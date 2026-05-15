@@ -27,11 +27,11 @@ let ContentController = class ContentController {
     async create(dto, userId) {
         return this.contentService.create(dto, userId);
     }
-    async findAll(accountId, status, page, limit, userId) {
+    async findAll(accountId, status, page, limit, userId, search) {
         const pageNum = Math.max(1, page || 1);
         const limitNum = Math.min(100, Math.max(1, limit || 20));
         const skip = (pageNum - 1) * limitNum;
-        return this.contentService.findAll({ userId, accountId, status, skip, take: limitNum });
+        return this.contentService.findAll({ userId, accountId, status, search, skip, take: limitNum });
     }
     async getScheduled() {
         return this.contentService.getScheduledPosts();
@@ -50,6 +50,12 @@ let ContentController = class ContentController {
     }
     async remove(id, userId) {
         return this.contentService.remove(id, userId);
+    }
+    async getPendingPublish(userId) {
+        return this.contentService.getPendingPublish(userId);
+    }
+    async reportPublishResult(id, userId, body) {
+        return this.contentService.reportPublishResult(id, userId, body);
     }
 };
 exports.ContentController = ContentController;
@@ -70,13 +76,15 @@ __decorate([
     (0, swagger_1.ApiQuery)({ name: 'status', required: false, enum: prisma_enums_1.PostStatus }),
     (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: '页码（从1开始）' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: '每页条数（最大100）' }),
+    (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: 'search keyword' }),
     __param(0, (0, common_1.Query)('accountId')),
     __param(1, (0, common_1.Query)('status')),
     __param(2, (0, common_1.Query)('page')),
     __param(3, (0, common_1.Query)('limit')),
     __param(4, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(5, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, Number, Number, String]),
+    __metadata("design:paramtypes", [String, String, Number, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], ContentController.prototype, "findAll", null);
 __decorate([
@@ -139,6 +147,26 @@ __decorate([
     __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], ContentController.prototype, "remove", null);
+
+__decorate([
+    (0, common_1.Get)('pending-publish'),
+    (0, swagger_1.ApiOperation)({ summary: '\u83b7\u53d6\u5f85\u53d1\u5e03\u4efb\u52a1\uff08\u684c\u9762\u4f34\u4fa3\u8f6e\u8be2\uff09' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], ContentController.prototype, "getPendingPublish", null);
+__decorate([
+    (0, common_1.Post)(':id/publish-result'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    (0, swagger_1.ApiOperation)({ summary: '\u4e0a\u62a5\u53d1\u5e03\u7ed3\u679c\uff08\u684c\u9762\u4f34\u4fa3\u56de\u8c03\uff09' }),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(2, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, Object]),
+    __metadata("design:returntype", Promise)
+], ContentController.prototype, "reportPublishResult", null);
 exports.ContentController = ContentController = __decorate([
     (0, swagger_1.ApiTags)('content'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
