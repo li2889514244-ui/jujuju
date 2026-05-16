@@ -1,97 +1,118 @@
 <template>
   <div class="dashboard">
-        <!-- 新用户空状态引导 -->
-    <el-alert
-      v-if="overviewCards[0].value === '0'"
-      title="欢迎使用 MatrixFlow！"
-      type="info"
-      :closable="false"
-      show-icon
-      class="dashboard__welcome"
-    >
-      <template #default>
-        您的数据面板还是空的 — 
-        <el-button type="primary" size="small" @click="$router.push('/accounts')">添加平台账号</el-button>
-        开始管理您的多平台矩阵。
-      </template>
-    </el-alert>
+    <!-- 顶部：标题 + 时间维度 -->
+    <div class="dashboard__header">
+      <div class="dashboard__title">
+        <h2>账号总览</h2>
+        <span class="dashboard__update">最后更新: {{ lastUpdate }}</span>
+      </div>
+      <div class="dashboard__controls">
+        <el-radio-group v-model="period" size="small" @change="onPeriodChange">
+          <el-radio-button value="day">日</el-radio-button>
+          <el-radio-button value="week">周</el-radio-button>
+          <el-radio-button value="month">月</el-radio-button>
+        </el-radio-group>
+        <el-button :icon="Refresh" size="small" circle @click="refreshAll" :loading="loading" />
+      </div>
+    </div>
 
-<el-row :gutter="20" class="dashboard__cards">
-      <el-col :xs="12" :sm="6" v-for="card in overviewCards" :key="card.title">
-        <el-card shadow="hover" class="dashboard__card">
-          <div class="dashboard__card-header">
-            <span class="dashboard__card-title">{{ card.title }}</span>
-            <el-icon :size="24" :style="{ color: card.color }"><component :is="card.icon" /></el-icon>
-          </div>
-          <div class="dashboard__card-value">{{ card.value }}</div>
-          <div class="dashboard__card-trend" :class="card.trend > 0 ? 'up' : 'down'">
-            <el-icon><Top v-if="card.trend > 0" /><Bottom v-else /></el-icon>
-            {{ Math.abs(card.trend) }}% 较昨日
-          </div>
-        </el-card>
+    <!-- 汇总卡片 -->
+    <el-row :gutter="16" class="dashboard__summary">
+      <el-col :xs="12" :sm="6" v-for="card in summaryCards" :key="card.label">
+        <div class="summary-card" :style="{ borderTopColor: card.color }">
+          <div class="summary-card__label">{{ card.label }}</div>
+          <div class="summary-card__value">{{ card.value }}</div>
+        </div>
       </el-col>
     </el-row>
 
-    <el-row :gutter="20" class="dashboard__charts">
+    <!-- 账号数据表格 -->
+    <el-card shadow="hover" class="dashboard__table-card">
+      <template #header>
+        <div class="dashboard__table-header">
+          <span>多账号明细</span>
+          <span class="dashboard__table-hint">展示最近30天累计数据</span>
+        </div>
+      </template>
+      <el-table
+        :data="accountRows"
+        v-loading="loading"
+        stripe
+        @sort-change="onSortChange"
+        :default-sort="{ prop: 'followers', order: 'descending' }"
+      >
+        <el-table-column label="账号" min-width="180" sortable="custom" prop="nickname">
+          <template #default="{ row }">
+            <div class="account-cell">
+              <el-avatar :size="36" :src="row.avatar">{{ row.nickname?.charAt(0) }}</el-avatar>
+              <div class="account-cell__info">
+                <span class="account-cell__name">{{ row.nickname }}</span>
+                <span class="account-cell__platform">
+                  <PlatformIcon :platform="row.platform" />
+                  {{ PLATFORM_CN[row.platform] || row.platform }}
+                </span>
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="粉丝" width="100" sortable="custom" prop="followers" align="right">
+          <template #default="{ row }">{{ formatNum(row.followers) }}</template>
+        </el-table-column>
+        <el-table-column label="播放量" width="110" sortable="custom" prop="views" align="right">
+          <template #default="{ row }">{{ formatNum(row.views) }}</template>
+        </el-table-column>
+        <el-table-column label="点赞" width="100" sortable="custom" prop="likes" align="right">
+          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
+        </el-table-column>
+        <el-table-column label="评论" width="90" sortable="custom" prop="comments" align="right">
+          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
+        </el-table-column>
+        <el-table-column label="分享" width="90" sortable="custom" prop="shares" align="right">
+          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+        </el-table-column>
+        <el-table-column label="发布数" width="90" sortable="custom" prop="postCount" align="right">
+          <template #default="{ row }">{{ row.postCount || 0 }}</template>
+        </el-table-column>
+        <el-table-column label="状态" width="90" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
+              {{ row.hasCookies ? '在线' : '待授权' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="80" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button text type="primary" size="small" @click="$router.push(`/accounts/${row.id}`)">详情</el-button>
+          </template>
+        </el-table-column>
+        <template #empty>
+          <el-empty description="还没有绑定账号">
+            <el-button type="primary" @click="$router.push('/accounts')">添加平台账号</el-button>
+          </el-empty>
+        </template>
+      </el-table>
+    </el-card>
+
+    <!-- 粉丝趋势图 -->
+    <el-row :gutter="16" class="dashboard__charts" v-if="accountRows.length > 0">
       <el-col :xs="24" :lg="16">
         <el-card shadow="hover">
           <template #header>
             <div class="dashboard__chart-header">
               <span>粉丝增长趋势</span>
-              <el-radio-group v-model="trendDays" size="small">
+              <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
                 <el-radio-button :value="7">近7天</el-radio-button>
                 <el-radio-button :value="30">近30天</el-radio-button>
-                <el-radio-button :value="90">近90天</el-radio-button>
               </el-radio-group>
             </div>
           </template>
-          <DataChart :option="followerChartOption" :height="350" />
+          <DataChart :option="followerChartOption" :height="300" />
         </el-card>
       </el-col>
       <el-col :xs="24" :lg="8">
         <el-card shadow="hover">
           <template #header>平台分布</template>
-          <DataChart :option="platformChartOption" :height="350" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="dashboard__bottom">
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="dashboard__chart-header">
-              <span>最近发布任务</span>
-              <el-button text type="primary" @click="$router.push('/publish')">查看全部</el-button>
-            </div>
-          </template>
-          <el-table :data="recentTasks" stripe style="width: 100%">
-            <template #empty><el-empty description="暂无发布任务，去创建内容吧" /></template>
-            <el-table-column prop="contentTitle" label="内容" show-overflow-tooltip />
-            <el-table-column prop="platform" label="平台" width="80">
-              <template #default="{ row }"><PlatformIcon :platform="row.platform" /></template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="90">
-              <template #default="{ row }"><StatusBadge :status="row.status" type="publish" /></template>
-            </el-table-column>
-            <el-table-column prop="createdAt" label="时间" width="160">
-              <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>系统通知</template>
-          <div class="dashboard__notifications">
-            <div v-for="(notice, index) in notifications" :key="index" class="dashboard__notice-item">
-              <el-icon :style="{ color: notice.color }"><component :is="notice.icon" /></el-icon>
-              <div class="dashboard__notice-content">
-                <p>{{ notice.message }}</p><span>{{ notice.time }}</span>
-              </div>
-            </div>
-            <el-empty v-if="notifications.length === 0" description="暂无通知" />
-          </div>
+          <DataChart :option="platformChartOption" :height="300" />
         </el-card>
       </el-col>
     </el-row>
@@ -99,112 +120,196 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
+import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
 import { analyticsApi } from '@/api/analytics'
-import { contentApi } from '@/api/content'
-import type { PublishTask } from '@/types'
-
-const trendDays = ref(7)
-const loading = ref(false)
-const overviewCards = ref([
-  { title: '账号总数', value: '0', hint: '添加账号开始使用', icon: 'UserFilled', color: '#409eff', trend: 0 },
-  { title: '总粉丝数', value: '0', icon: 'Star', color: '#e6a23c', trend: 0 },
-  { title: '总互动数', value: '0', icon: 'DataLine', color: '#67c23a', trend: 0 },
-  { title: '发布总数', value: '0', icon: 'List', color: '#f56c6c', trend: 0 },
-])
-const recentTasks = ref<PublishTask[]>([])
-const notifications = ref<{ message: string; icon: string; color: string; time: string }[]>([])
-const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
+import { accountsApi } from '@/api/accounts'
 
 const PLATFORM_COLORS: Record<string, string> = { DOUYIN: '#000', KUAISHOU: '#ff4906', XIAOHONGSHU: '#ff2442', BILIBILI: '#fb7299', WECHAT_VIDEO: '#07c160', WEIBO: '#ff8200', TIKTOK: '#010101' }
 const PLATFORM_CN: Record<string, string> = { DOUYIN: '抖音', KUAISHOU: '快手', XIAOHONGSHU: '小红书', BILIBILI: 'B站', WECHAT_VIDEO: '视频号', WEIBO: '微博', TIKTOK: 'TikTok' }
 
-function formatNumber(num: number): string {
+const period = ref('week')
+const loading = ref(false)
+const lastUpdate = ref('')
+const trendDays = ref(7)
+
+const summaryCards = ref([
+  { label: '总粉丝', value: '0', color: '#409eff' },
+  { label: '总播放量', value: '0', color: '#e6a23c' },
+  { label: '总点赞', value: '0', color: '#67c23a' },
+  { label: '总互动', value: '0', color: '#f56c6c' },
+])
+
+interface AccountRow {
+  id: string
+  nickname: string
+  avatar: string
+  platform: string
+  followers: number
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  postCount: number
+  hasCookies: boolean
+}
+
+const accountRows = ref<AccountRow[]>([])
+const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
+const followerTrendData = ref<number[]>([])
+
+function formatNum(num: number): string {
   if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
   if (num >= 10000) return (num / 10000).toFixed(1) + '万'
+  if (num === 0) return '-'
   return num.toLocaleString()
 }
 
-// 粉丝趋势 — 真实数据
-const followerTrendData = ref<number[]>([])
-const followerChartLoading = ref(false)
+async function refreshAll() {
+  loading.value = true
+  try {
+    // 1. Load overview for summary cards
+    const overviewRes = await analyticsApi.getOverview()
+    const ov = (overviewRes as any).data || overviewRes
+    summaryCards.value = [
+      { label: '总粉丝', value: formatNum(ov.accounts?.totalFollowers || 0), color: '#409eff' },
+      { label: '总播放量', value: formatNum(ov.engagement?.totalViews || 0), color: '#e6a23c' },
+      { label: '总点赞', value: formatNum(ov.engagement?.totalLikes || 0), color: '#67c23a' },
+      { label: '总互动', value: formatNum((ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0)), color: '#f56c6c' },
+    ]
+
+    // 2. Load accounts for table
+    const accRes = await accountsApi.getList({ pageSize: 100, page: 1 } as any)
+    const accData = (accRes as any).data
+    const accs = accData?.accounts || accData?.list || []
+
+    // 3. Load daily stats via report API
+    let dailyMap: Record<string, any> = {}
+    try {
+      const reportRes = await analyticsApi.getReport()
+      const reportData = (reportRes as any).data || reportRes
+      const rptAccs = reportData?.accounts || []
+      for (const a of rptAccs) {
+        const stats = a.dailyStats?.[0]
+        if (stats) {
+          dailyMap[a.id] = {
+            views: stats.views || 0,
+            likes: stats.likes || 0,
+            comments: stats.comments || 0,
+            shares: stats.shares || 0,
+          }
+        }
+      }
+    } catch { /* daily stats might be empty */ }
+
+    // 4. Merge into rows
+    accountRows.value = accs.map((a: any) => {
+      const daily = dailyMap[a.id] || { views: 0, likes: 0, comments: 0, shares: 0 }
+      return {
+        id: a.id,
+        nickname: a.nickname || '未命名',
+        avatar: a.avatar || '',
+        platform: a.platform,
+        followers: a.followers || 0,
+        views: daily.views,
+        likes: daily.likes,
+        comments: daily.comments,
+        shares: daily.shares,
+        postCount: a._count?.posts || 0,
+        hasCookies: a.hasCookies,
+      }
+    })
+
+    const byPlatform = ov.accounts?.byPlatform || {}
+    platformDistribution.value = Object.entries(byPlatform)
+      .filter(([, count]) => (count as number) > 0)
+      .map(([key, count]) => ({
+        value: count as number,
+        name: PLATFORM_CN[key] || key,
+        itemStyle: { color: PLATFORM_COLORS[key] || '#999' },
+      }))
+
+    lastUpdate.value = dayjs().format('HH:mm:ss')
+  } catch { /* silent */ }
+  loading.value = false
+}
 
 async function loadFollowerTrend() {
-  followerChartLoading.value = true
   try {
     const res = await analyticsApi.getFollowerTrend({ days: trendDays.value })
-    followerTrendData.value = (res.data || []).map((d: any) => d.value || 0)
+    followerTrendData.value = ((res as any).data || res || []).map((d: any) => d.value || 0)
   } catch { followerTrendData.value = [] }
-  followerChartLoading.value = false
+}
+
+function onPeriodChange() { refreshAll() }
+function onSortChange({ prop, order }: any) {
+  if (!prop || !order) return
+  accountRows.value.sort((a: any, b: any) => {
+    const va = a[prop] || 0, vb = b[prop] || 0
+    return order === 'descending' ? vb - va : va - vb
+  })
 }
 
 const followerChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
-  grid: { left: 50, right: 20, top: 40, bottom: 30 },
+  grid: { left: 50, right: 20, top: 20, bottom: 30 },
   xAxis: { type: 'category' as const, data: Array.from({ length: trendDays.value }, (_, i) => dayjs().subtract(trendDays.value - 1 - i, 'day').format('MM-DD')) },
-  yAxis: { type: 'value' as const, name: '新增粉丝' },
-  series: followerTrendData.value.length > 0 ? [{ name: '粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.2 }, data: followerTrendData.value }] : [],
+  yAxis: { type: 'value' as const },
+  series: followerTrendData.value.length > 0 ? [{ name: '粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.15 }, data: followerTrendData.value }] : [],
 }))
 
 const platformChartOption = computed(() => ({
-  tooltip: { trigger: 'item' as const }, legend: { bottom: 0 },
-  series: [{ type: 'pie' as const, radius: ['40%', '70%'], avoidLabelOverlap: false, itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 }, label: { show: false }, emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' as const } }, data: platformDistribution.value.length > 0 ? platformDistribution.value : [{ value: 0, name: '暂无数据' }] }],
+  tooltip: { trigger: 'item' as const },
+  legend: { bottom: 0 },
+  series: [{
+    type: 'pie' as const, radius: ['40%', '70%'],
+    itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+    label: { show: false },
+    emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' as const } },
+    data: platformDistribution.value.length > 0 ? platformDistribution.value : [{ value: 0, name: '暂无数据' }],
+  }],
 }))
 
-function formatTime(time: string) { return dayjs(time).format('MM-DD HH:mm') }
-
-async function fetchDashboardData() {
-  loading.value = true
-  try {
-    const res = await analyticsApi.getOverview(); const data = res.data as any
-    overviewCards.value = [
-      { title: '账号总数', value: formatNumber(data.accounts?.total || 0), icon: 'UserFilled', color: '#409eff', trend: 0 },
-      { title: '总粉丝数', value: formatNumber(data.accounts?.totalFollowers || 0), icon: 'Star', color: '#e6a23c', trend: 0 },
-      { title: '总互动数', value: formatNumber((data.engagement?.totalLikes || 0) + (data.engagement?.totalComments || 0) + (data.engagement?.totalShares || 0)), icon: 'DataLine', color: '#67c23a', trend: 0 },
-      { title: '发布总数', value: formatNumber(data.posts?.total || 0), icon: 'List', color: '#f56c6c', trend: 0 },
-    ]
-    const byPlatform = data.accounts?.byPlatform || {}
-    platformDistribution.value = Object.entries(byPlatform).map(([key, count]) => ({ value: count as number, name: PLATFORM_CN[key] || key, itemStyle: { color: PLATFORM_COLORS[key] || '#999' } }))
-  } catch (e) { /* silent */ }
-  try {
-    const r = await contentApi.getList({ page: 1, limit: 5, status: 'PUBLISHED' }); const d = r.data as any
-    if (d?.posts) recentTasks.value = d.posts.map((p: any) => ({ id: p.id, contentId: p.id, contentTitle: p.title || '无标题', accountId: p.accountId, accountNickname: p.account?.nickname || '', platform: (p.account?.platform || '').toLowerCase(), status: p.status === 'PUBLISHED' ? 'success' : p.status === 'FAILED' ? 'failed' : 'publishing', scheduledAt: p.publishAt, publishedAt: p.updatedAt, errorMessage: p.errorMsg, createdAt: p.createdAt }))
-  } catch (e) { /* silent */ }
-  loading.value = false
-}
-
-onMounted(() => { fetchDashboardData(); loadFollowerTrend() })
-watch(trendDays, () => loadFollowerTrend())
+onMounted(() => { refreshAll(); loadFollowerTrend() })
 </script>
 
 <style lang="scss" scoped>
 .dashboard {
-  &__cards { margin-bottom: 20px; }
-  &__card {
-    .el-card__body { padding: 20px; }
-    &-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    &-title { font-size: 14px; color: #909399; }
-    &-value { font-size: 28px; font-weight: 700; color: #303133; margin-bottom: 8px; }
-    &-trend { font-size: 12px; display: flex; align-items: center; gap: 4px;
-      &.up { color: #67c23a; }
-      &.down { color: #f56c6c; }
-    }
+  &__header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 20px;
   }
+  &__title {
+    h2 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
+  }
+  &__update { font-size: 12px; color: #909399; }
+  &__controls { display: flex; align-items: center; gap: 12px; }
+
+  &__summary { margin-bottom: 20px; }
+
+  &__table-card { margin-bottom: 20px; }
+  &__table-header { display: flex; align-items: baseline; gap: 12px; }
+  &__table-hint { font-size: 12px; color: #a7a7a7; }
+
   &__charts { margin-bottom: 20px; }
   &__chart-header { display: flex; justify-content: space-between; align-items: center; }
-  &__bottom { margin-bottom: 20px; }
-  &__notifications { max-height: 320px; overflow-y: auto; }
-  &__notice-item { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid #f0f0f0;
-    &:last-child { border-bottom: none; }
-  }
-  &__notice-content { flex: 1;
-    p { font-size: 14px; color: #303133; margin-bottom: 4px; }
-    span { font-size: 12px; color: #c0c4cc; }
-  }
-  &__welcome { margin-bottom: 20px; }
+}
+
+.summary-card {
+  background: #fff; border-radius: 8px; padding: 20px;
+  border-top: 3px solid #409eff;
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+  &__label { font-size: 13px; color: #909399; margin-bottom: 8px; }
+  &__value { font-size: 26px; font-weight: 700; color: #303133; }
+}
+
+.account-cell {
+  display: flex; align-items: center; gap: 10px;
+  &__info { display: flex; flex-direction: column; }
+  &__name { font-size: 14px; font-weight: 500; }
+  &__platform { font-size: 12px; color: #909399; display: flex; align-items: center; gap: 4px; }
 }
 </style>

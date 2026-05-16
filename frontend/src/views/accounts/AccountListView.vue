@@ -46,10 +46,11 @@
     <!-- Table -->
     <el-card shadow="hover">
       <el-table
-        v-loading="accountStore.loading"
-        :data="accountStore.accounts"
+        v-loading="loading"
+        :data="enhancedAccounts"
         stripe
         @selection-change="handleSelectionChange"
+        :default-sort="{ prop: 'followers', order: 'descending' }"
       >
         <el-table-column type="selection" width="50" />
         <el-table-column label="平台" width="80">
@@ -57,7 +58,7 @@
             <PlatformIcon :platform="row.platform" />
           </template>
         </el-table-column>
-        <el-table-column prop="nickname" label="账号名称" min-width="150" show-overflow-tooltip>
+        <el-table-column prop="nickname" label="账号名称" min-width="160" show-overflow-tooltip sortable="custom">
           <template #default="{ row }">
             <div class="account-list__name">
               <el-avatar :size="32" :src="row.avatar">{{ row.nickname?.charAt(0) }}</el-avatar>
@@ -65,25 +66,35 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="groupName" label="分组" width="120" />
-        <el-table-column label="Cookie状态" width="100">
+        <el-table-column prop="groupName" label="分组" width="110" />
+        <el-table-column label="状态" width="80" align="center">
           <template #default="{ row }">
-            <StatusBadge :status="row.cookieStatus" type="cookie" size="small" />
+            <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
+              {{ row.hasCookies ? '在线' : '待授权' }}
+            </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="followers" label="粉丝数" width="100" sortable>
+        <el-table-column prop="followers" label="粉丝" width="90" sortable="custom" align="right">
           <template #default="{ row }">{{ formatNumber(row.followers) }}</template>
         </el-table-column>
-        <el-table-column prop="likes" label="获赞数" width="100" sortable>
-          <template #default="{ row }">{{ formatNumber(row.likes) }}</template>
+        <el-table-column prop="dailyViews" label="播放量" width="100" sortable="custom" align="right">
+          <template #default="{ row }">{{ formatNumber(row.dailyViews) }}</template>
         </el-table-column>
-        <el-table-column prop="lastActiveAt" label="最近活跃" width="160">
+        <el-table-column prop="dailyLikes" label="点赞" width="90" sortable="custom" align="right">
+          <template #default="{ row }">{{ formatNumber(row.dailyLikes) }}</template>
+        </el-table-column>
+        <el-table-column prop="dailyComments" label="评论" width="80" sortable="custom" align="right">
+          <template #default="{ row }">{{ formatNumber(row.dailyComments) }}</template>
+        </el-table-column>
+        <el-table-column prop="postCount" label="内容" width="70" sortable="custom" align="right">
+          <template #default="{ row }">{{ row.postCount || 0 }}</template>
+        </el-table-column>
+        <el-table-column prop="lastActiveAt" label="最近活跃" width="140">
           <template #default="{ row }">{{ formatTime(row.lastActiveAt) }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
             <el-button text type="primary" size="small" @click="$router.push(`/accounts/${row.id}`)">详情</el-button>
-            <el-button text type="warning" size="small" @click="handleCheckCookie(row.id)">检测</el-button>
             <el-button text type="danger" size="small" @click="handleDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -164,15 +175,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAccountStore } from '@/store/account'
 import { useUserStore } from '@/store/user'
 import { accountsApi } from '@/api/accounts'
+import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import StatusBadge from '@/components/common/StatusBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 
 const accountStore = useAccountStore()
@@ -192,6 +203,8 @@ const newGroupName = ref('')
 const showAddDialog = ref(false)
 const showManualDialog = ref(false)
 const companionOnline = ref(false)
+const loading = ref(false)
+const dailyStatsMap = ref<Record<string, any>>({})
 const bindablePlatforms = [
   { id: 'douyin', name: '抖音', icon: '🎵', type: 'primary' as const },
   { id: 'xiaohongshu', name: '小红书', icon: '📕', type: 'danger' as const },
@@ -224,16 +237,53 @@ async function openCompanionScan(platform: string) {
   }
 }
 
+const enhancedAccounts = computed(() => {
+  return accountStore.accounts.map((a: any) => {
+    const daily = dailyStatsMap.value[a.id] || {}
+    return {
+      ...a,
+      dailyViews: daily.views || 0,
+      dailyLikes: daily.likes || 0,
+      dailyComments: daily.comments || 0,
+      dailyShares: daily.shares || 0,
+      postCount: a._count?.posts || 0,
+    }
+  })
+})
+
+async function fetchDailyStats() {
+  try {
+    const res = await analyticsApi.getReport()
+    const data = (res as any).data || res
+    const accs = data?.accounts || []
+    const map: Record<string, any> = {}
+    for (const a of accs) {
+      const stats = a.dailyStats?.[0]
+      if (stats) {
+        map[a.id] = {
+          views: stats.views || 0,
+          likes: stats.likes || 0,
+          comments: stats.comments || 0,
+          shares: stats.shares || 0,
+        }
+      }
+    }
+    dailyStatsMap.value = map
+  } catch { /* silent */ }
+}
+
 onMounted(() => {
   accountStore.fetchAccounts()
   accountStore.fetchGroups()
+  fetchDailyStats()
   checkCompanion()
   setInterval(checkCompanion, 5000)
 })
 
-function handleSearch() {
+async function handleSearch() {
   accountStore.setFilter(filter)
-  accountStore.fetchAccounts()
+  await accountStore.fetchAccounts()
+  await fetchDailyStats()
 }
 
 function handleReset() {
@@ -246,16 +296,6 @@ function handleReset() {
 
 function handleSelectionChange(rows: { id: string }[]) {
   selectedIds.value = rows.map((r) => r.id)
-}
-
-async function handleCheckCookie(id: string) {
-  try {
-    const result = await accountStore.checkCookieStatus(id)
-    ElMessage.success(`Cookie状态: ${result.status}`)
-  } catch (e) {
-    ElMessage.error('检测 Cookie 状态失败')
-    /* silent */
-  }
 }
 
 async function handleDelete(id: string) {
