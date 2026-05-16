@@ -14,8 +14,9 @@ export const useContentStore = defineStore('content', () => {
     loading.value = true
     try {
       const res = await contentApi.getList(params)
-      contents.value = res.data.list
-      total.value = res.data.total
+      const data = res.data as any
+      contents.value = data.posts || []
+      total.value = data.total || 0
     } finally {
       loading.value = false
     }
@@ -44,7 +45,7 @@ export const useContentStore = defineStore('content', () => {
 
   async function fetchPublishTasks(params?: Record<string, unknown>) {
     const res = await contentApi.getPublishTasks(params)
-    publishTasks.value = res.data.list
+    publishTasks.value = (res as any).data || []
   }
 
   async function cancelPublish(taskId: string) {
