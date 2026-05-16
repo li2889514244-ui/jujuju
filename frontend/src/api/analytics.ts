@@ -73,7 +73,14 @@ export const analyticsApi = {
     }>('/analytics/views-ranking', params as Record<string, unknown>)
   },
 
-  collectStats() {
-    return post<{ message: string; accounts: number; dailyStatsGenerated: number; postStatsGenerated: number }>('/analytics/collect')
+  // 触发桌面伴侣采集真实数据（伴侣在本地 localhost:5409 运行）
+  async triggerRealDataCollection() {
+    try {
+      const resp = await fetch('http://localhost:5409/api/data-collection/trigger', { method: 'POST' })
+      const json = await resp.json()
+      return json
+    } catch {
+      throw new Error('桌面伴侣未启动，请先打开桌面伴侣')
+    }
   },
 }

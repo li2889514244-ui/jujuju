@@ -19,7 +19,7 @@
           <el-button type="primary" @click="refreshData" :loading="loadingCharts">查询</el-button>
         </el-form-item>
         <el-form-item>
-          <el-button @click="handleCollect" :loading="collecting" type="success">采集数据</el-button>
+          <el-button @click="handleCollect" :loading="collecting" type="success">手动采集真实数据</el-button>
         </el-form-item>
         <el-form-item>
           <el-button @click="handleExport">导出报表</el-button>
@@ -278,10 +278,12 @@ function getChangeClass(v: any): string {
 async function handleCollect() {
   collecting.value = true
   try {
-    const res = await analyticsApi.collectStats()
-    ElMessage.success(res.data?.message || '数据采集成功')
-    await refreshData()
-  } catch { ElMessage.error('数据采集失败') }
+    const res = await analyticsApi.triggerRealDataCollection()
+    ElMessage.success(res?.status === 'started' ? '数据采集已启动，正在从各平台获取真实数据...' : '采集指令已发送')
+    setTimeout(() => refreshData(), 10000)
+  } catch (e: any) {
+    ElMessage.warning(e.message || '请先启动桌面伴侣，然后重试')
+  }
   collecting.value = false
 }
 
