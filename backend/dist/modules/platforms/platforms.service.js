@@ -14,6 +14,7 @@ exports.PlatformsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const oauth_service_1 = require("./oauth/oauth.service");
+const crypto = require("crypto");
 const platform_config_1 = require("./config/platform-config");
 const douyin_collector_1 = require("./collectors/douyin.collector");
 const kuaishou_collector_1 = require("./collectors/kuaishou.collector");
@@ -26,6 +27,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
         this.prisma = prisma;
         this.oauthService = oauthService;
         this.logger = new common_1.Logger(PlatformsService_1.name);
+        this.encryptionKey = process.env.COOKIE_ENCRYPTION_KEY || 'default-key-change-me';
         this.collectors = new Map([
             ['DOUYIN', douyinCollector],
             ['KUAISHOU', kuaishouCollector],
@@ -233,8 +235,26 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     tokenStatus = 'valid';
                 }
             }
+            // Decrypt cookies for data collector
+            let cookiesPlain = null;
+            if (account.cookies) {
+                try {
+                    const parts = account.cookies.split(':');
+                    if (parts.length >= 3) {
+                        const iv = Buffer.from(parts[0], 'hex');
+                        const authTag = Buffer.from(parts[1], 'hex');
+                        const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
+                        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+                        decipher.setAuthTag(authTag);
+                        let decrypted = decipher.update(parts.slice(2).join(':'), 'hex', 'utf8');
+                        decrypted += decipher.final('utf8');
+                        cookiesPlain = decrypted;
+                    }
+                } catch (e) { cookiesPlain = account.cookies; }
+            }
             return {
                 ...account,
+                cookies: cookiesPlain,
                 tokenStatus,
                 hasOAuth: !!metadata?.oauthToken,
             };
