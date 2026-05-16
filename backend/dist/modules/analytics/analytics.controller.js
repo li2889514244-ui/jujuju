@@ -66,6 +66,22 @@ let AnalyticsController = class AnalyticsController {
     async exportReport(userId, startDate, endDate, format) {
         return this.analyticsService.exportReport(userId, startDate, endDate, format);
     }
+    async collectStats(userId) {
+        return this.analyticsService.collectStats(userId);
+    }
+    async getAccountAnalytics(accountId, userId, userRole) {
+        await this.verifyAccountOwnership(accountId, userId, userRole);
+        return this.analyticsService.getAccountAnalytics(accountId);
+    }
+    async getAccountPosts(accountId, userId, userRole, page, pageSize, sortBy, sortOrder) {
+        await this.verifyAccountOwnership(accountId, userId, userRole);
+        return this.analyticsService.getAccountPosts(accountId, {
+            page: page ? Number(page) : 1,
+            pageSize: pageSize ? Math.min(100, Number(pageSize)) : 20,
+            sortBy: sortBy || 'createdAt',
+            sortOrder: sortOrder || 'desc',
+        });
+    }
     async verifyAccountOwnership(accountId, userId, userRole) {
         if (['OWNER', 'ADMIN'].includes(userRole))
             return;
@@ -180,6 +196,35 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "exportReport", null);
+__decorate([
+    (0, common_1.Post)('collect'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "collectStats", null);
+__decorate([
+    (0, common_1.Get)('account/:id'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)('role')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getAccountAnalytics", null);
+__decorate([
+    (0, common_1.Get)('account/:id/posts'),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(2, (0, current_user_decorator_1.CurrentUser)('role')),
+    __param(3, (0, common_1.Query)('page')),
+    __param(4, (0, common_1.Query)('pageSize')),
+    __param(5, (0, common_1.Query)('sortBy')),
+    __param(6, (0, common_1.Query)('sortOrder')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String, Number, Number, String, String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getAccountPosts", null);
 exports.AnalyticsController = AnalyticsController = __decorate([
     (0, swagger_1.ApiTags)('analytics'),
     (0, swagger_1.ApiBearerAuth)('access-token'),
