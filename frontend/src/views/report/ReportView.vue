@@ -92,8 +92,8 @@ import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
 import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS as _PL } from '@/types'
-const PLATFORM_LABELS: Record<string, string> = _PL
 import DataChart from '@/components/common/DataChart.vue'
+const PLATFORM_LABELS: Record<string, string> = _PL
 
 const loading = ref(false)
 const platform = ref('')

@@ -12,6 +12,7 @@
           <el-radio-button value="week">周</el-radio-button>
           <el-radio-button value="month">月</el-radio-button>
         </el-radio-group>
+        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0">导出 CSV</el-button>
         <el-button :icon="Refresh" size="small" circle @click="refreshAll" :loading="loading" />
       </div>
     </div>
@@ -272,6 +273,18 @@ const platformChartOption = computed(() => ({
     data: platformDistribution.value.length > 0 ? platformDistribution.value : [{ value: 0, name: '暂无数据' }],
   }],
 }))
+
+function exportCSV() {
+  const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
+  const rows = accountRows.value.map(r => [
+    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, r.hasCookies ? '在线' : '待授权'
+  ])
+  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
 
 onMounted(() => { refreshAll(); loadFollowerTrend() })
 </script>

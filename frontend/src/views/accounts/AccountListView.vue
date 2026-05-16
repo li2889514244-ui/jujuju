@@ -41,6 +41,9 @@
       <el-button type="danger" :disabled="!selectedIds.length" @click="handleBatchDelete">
         <el-icon><Delete /></el-icon>批量删除
       </el-button>
+      <el-button @click="exportCSV" :disabled="enhancedAccounts.length === 0" style="margin-left:auto">
+        <el-icon><Download /></el-icon>导出 CSV
+      </el-button>
     </div>
 
     <!-- Table -->
@@ -334,6 +337,18 @@ async function handleCreateGroup() {
   newGroupName.value = ''
   accountStore.fetchGroups()
   ElMessage.success('创建成功')
+}
+
+function exportCSV() {
+  const headers = ['账号', '平台', '分组', '粉丝', '播放量', '点赞', '评论', '内容数', '状态']
+  const rows = enhancedAccounts.value.map((r: any) => [
+    r.nickname, r.platform, r.groupName || '-', r.followers, r.dailyViews, r.dailyLikes, r.dailyComments, r.postCount, r.hasCookies ? '在线' : '待授权'
+  ])
+  const csv = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a'); a.href = url; a.download = `账号列表_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
+  URL.revokeObjectURL(url)
 }
 
 function handleBindSuccess() {
