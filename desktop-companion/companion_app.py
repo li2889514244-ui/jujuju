@@ -252,9 +252,9 @@ _METRIC_PATTERNS = {
         re.compile(r'总获赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
     ],
     'views': [
-        # 可参考播放量 / 播放量 / 播放
-        re.compile(r'(?:可参考)?播放量\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'播放\s*[：:]\s*([\d,.]+[万wW]?)'),
+        # 可参考播放量 / 播放量 — must be at line start to avoid matching recommendations
+        re.compile(r'(?:^|\n)(?:可)?参考播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
+        re.compile(r'(?:^|\n)播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
     ],
     'comments': [
         re.compile(r'评论\s*[：:]\s*([\d,.]+[万wW]?)'),
@@ -278,12 +278,57 @@ def _parse_metric_num(s: str) -> int:
 async def _scrape_dashboard(page) -> dict:
     text = await page.evaluate('() => document.body.innerText')
     metrics = {}
-    for key, patterns in _METRIC_PATTERNS.items():
-        for pat in patterns:
-            m = pat.search(text)
+
+    # Only search the first 2000 chars (profile section) for followers/following/likes
+    # to avoid matching nav items and recommendation cards further down
+    profile_section = text[:2000] if len(text) > 2000 else text
+    for key in ['followers', 'following', 'likes', 'comments', 'shares']:
+        for pat in _METRIC_PATTERNS.get(key, []):
+            m = pat.search(profile_section)
             if m:
                 metrics[key] = _parse_metric_num(m.group(1))
                 break
+
+    # Views are further down the page — search in first 4000 chars and filter outliers
+    for pat in _METRIC_PATTERNS.get('views', []):
+        m = pat.search(text[:4000])
+        if m:
+            val = _parse_metric_num(m.group(1))
+            if val < 100_000_000:  # filter recommendation-card numbers like "121万"
+                metrics['views'] = val
+                break
+
+    # Extract real nickname + avatar from page
+    try:
+        info = await page.evaluate('''() => {
+            const result = { nickname: null, avatar: null };
+            // Try various selectors for profile name
+            const nameEls = document.querySelectorAll('[class*="name"], [class*="nickname"], [class*="title"], h1, h2');
+            for (const el of nameEls) {
+                const t = el.textContent?.trim();
+                if (t && t.length > 1 && t.length < 40 && !t.includes('创作者') && !t.includes('服务中心')) {
+                    result.nickname = t;
+                    break;
+                }
+            }
+            // Try to find avatar
+            const avaEls = document.querySelectorAll('img[class*="avatar"], img[src*="avatar"]');
+            for (const el of avaEls) {
+                const src = el.src;
+                if (src && (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp'))) {
+                    result.avatar = src;
+                    break;
+                }
+            }
+            return result;
+        }''')
+        if info.get('nickname'):
+            metrics['_nickname'] = info['nickname']
+        if info.get('avatar'):
+            metrics['_avatar'] = info['avatar']
+    except:
+        pass
+
     return metrics
 
 
@@ -436,6 +481,29 @@ def _run_collection_once():
                             f'{item["accountId"]}: {r.text[:200]}')
                 except Exception as e:
                     print(f'[DC] Report error {item["accountId"]}: {e}')
+
+        # Sync nicknames and avatars extracted from dashboard
+        for item in scraped:
+            m = item.get('metrics', {})
+            nickname = m.pop('_nickname', None)
+            avatar = m.pop('_avatar', None)
+            if nickname or avatar:
+                update = {}
+                if nickname:
+                    update['nickname'] = nickname
+                if avatar:
+                    update['avatar'] = avatar
+                try:
+                    r = requests.put(
+                        f'{api_url}/accounts/{item["accountId"]}',
+                        json=update,
+                        headers={'Authorization': f'Bearer {token}'},
+                        timeout=15,
+                    )
+                    if r.status_code < 400:
+                        print(f'[DC] Synced profile for {item["accountId"]}: {update}')
+                except Exception as e:
+                    print(f'[DC] Profile sync error {item["accountId"]}: {e}')
 
         _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
         _collector_last_error = None
