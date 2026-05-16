@@ -1,5 +1,5 @@
 import { get, post, put, del } from './request'
-import type { Account, AccountFilter, AccountGroup, AccountHistory, PaginatedResponse, CreateAccountForm } from '@/types'
+import type { Account, AccountFilter, AccountGroup, AccountHistory, PaginatedResponse, CreateAccountForm, PostWithStats, AccountAnalytics } from '@/types'
 
 export const accountsApi = {
   getList(filter: AccountFilter) {
@@ -44,5 +44,13 @@ export const accountsApi = {
 
   moveToGroup(accountIds: string[], groupId: string) {
     return post('/accounts/move-group', { accountIds, groupId })
+  },
+
+  getAccountPosts(id: string, params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }) {
+    return get<PaginatedResponse<PostWithStats>>(`/analytics/account/${id}/posts`, params as Record<string, unknown>)
+  },
+
+  getAccountAnalytics(id: string) {
+    return get<AccountAnalytics>(`/analytics/account/${id}`)
   },
 }

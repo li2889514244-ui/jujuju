@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, ForbiddenException } from '@nestjs/common';
+import { Controller, Get, Post, Param, Query, UseGuards, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
@@ -76,6 +76,36 @@ export class AnalyticsController {
   @Get('export')
   async exportReport(@CurrentUser('id') userId: string, @Query('startDate') startDate: string, @Query('endDate') endDate: string, @Query('format') format: 'csv' | 'xlsx') {
     return this.analyticsService.exportReport(userId, startDate, endDate, format);
+  }
+
+  @Post('collect')
+  async collectStats(@CurrentUser('id') userId: string) {
+    return this.analyticsService.collectStats(userId);
+  }
+
+  @Get('account/:id')
+  async getAccountAnalytics(@Param('id') accountId: string, @CurrentUser('id') userId: string, @CurrentUser('role') userRole: string) {
+    await this.verifyAccountOwnership(accountId, userId, userRole);
+    return this.analyticsService.getAccountAnalytics(accountId);
+  }
+
+  @Get('account/:id/posts')
+  async getAccountPosts(
+    @Param('id') accountId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: string,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    await this.verifyAccountOwnership(accountId, userId, userRole);
+    return this.analyticsService.getAccountPosts(accountId, {
+      page: page ? Number(page) : 1,
+      pageSize: pageSize ? Math.min(100, Number(pageSize)) : 20,
+      sortBy: sortBy || 'createdAt',
+      sortOrder: sortOrder || 'desc',
+    });
   }
 
   private async verifyAccountOwnership(accountId: string, userId: string, userRole: string) {

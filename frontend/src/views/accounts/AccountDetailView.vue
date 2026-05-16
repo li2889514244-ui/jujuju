@@ -39,26 +39,62 @@
         </el-card>
       </el-col>
 
-      <!-- Right: History -->
+      <!-- Right: Data + Posts -->
       <el-col :xs="24" :lg="16">
+        <!-- Data Overview Cards -->
+        <el-row :gutter="12" class="account-detail__analytics" v-if="analytics">
+          <el-col :span="8" v-for="card in analyticsCards" :key="card.label">
+            <el-card shadow="hover" class="analytics-mini-card">
+              <div class="analytics-mini-card__label">{{ card.label }}</div>
+              <div class="analytics-mini-card__value">{{ card.value }}</div>
+            </el-card>
+          </el-col>
+        </el-row>
+
+        <!-- Post Performance Table -->
         <el-card shadow="hover">
-          <template #header>发布历史</template>
-          <el-table :data="history" stripe v-loading="historyLoading">
-            <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
-            <el-table-column label="平台" width="80">
-              <template #default="{ row }">
-                <PlatformIcon :platform="row.platform" />
-              </template>
-            </el-table-column>
-            <el-table-column prop="status" label="状态" width="90">
+          <template #header>
+            <div class="post-header">
+              <span>视频数据明细</span>
+              <el-button size="small" @click="exportAccountData">导出数据</el-button>
+            </div>
+          </template>
+          <el-table :data="posts" stripe v-loading="postsLoading" @sort-change="handleSortChange">
+            <template #empty><el-empty description="暂无发布内容" /></template>
+            <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
+            <el-table-column prop="status" label="状态" width="80">
               <template #default="{ row }">
                 <StatusBadge :status="row.status" type="publish" size="small" />
               </template>
             </el-table-column>
-            <el-table-column prop="createdAt" label="发布时间" width="160">
-              <template #default="{ row }">{{ formatTime(row.createdAt) }}</template>
+            <el-table-column prop="publishAt" label="发布时间" width="140" sortable="custom">
+              <template #default="{ row }">{{ formatTime(row.publishAt || row.createdAt) }}</template>
+            </el-table-column>
+            <el-table-column prop="views" label="播放量" width="100" sortable="custom">
+              <template #default="{ row }">{{ formatNum(row.views) }}</template>
+            </el-table-column>
+            <el-table-column prop="likes" label="点赞" width="80" sortable="custom">
+              <template #default="{ row }">{{ formatNum(row.likes) }}</template>
+            </el-table-column>
+            <el-table-column prop="comments" label="评论" width="80" sortable="custom">
+              <template #default="{ row }">{{ formatNum(row.comments) }}</template>
+            </el-table-column>
+            <el-table-column prop="shares" label="分享" width="80" sortable="custom">
+              <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+            </el-table-column>
+            <el-table-column prop="engagementRate" label="互动率" width="80">
+              <template #default="{ row }">{{ row.engagementRate }}%</template>
             </el-table-column>
           </el-table>
+          <div class="post-pagination" v-if="postTotal > postPageSize">
+            <el-pagination
+              v-model:current-page="postPage"
+              :page-size="postPageSize"
+              :total="postTotal"
+              layout="total, prev, pager, next"
+              @current-change="loadPosts"
+            />
+          </div>
         </el-card>
       </el-col>
     </el-row>
@@ -72,7 +108,7 @@ import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAccountStore } from '@/store/account'
 import { accountsApi } from '@/api/accounts'
-import type { AccountHistory } from '@/types'
+import type { AccountAnalytics } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 
@@ -81,26 +117,92 @@ const router = useRouter()
 const accountStore = useAccountStore()
 
 const loading = ref(false)
-const historyLoading = ref(false)
-const history = ref<AccountHistory[]>([])
-// 使用 computed 保持响应性，避免 ref 捕获初始值导致 store 更新后视图不同步
-const account = computed(() => accountStore.currentAccount)
+const postsLoading = ref(false)
+const posts = ref<any[]>([])
+const postPage = ref(1)
+const postPageSize = ref(20)
+const postTotal = ref(0)
+const postSortBy = ref('createdAt')
+const postSortOrder = ref<'asc' | 'desc'>('desc')
+const analytics = ref<AccountAnalytics | null>(null)
 
+const account = computed(() => accountStore.currentAccount)
 const accountId = route.params.id as string
+
+const analyticsCards = computed(() => {
+  if (!analytics.value) return []
+  const a = analytics.value
+  return [
+    { label: '总播放量', value: formatNum(a.totalViews) },
+    { label: '总点赞', value: formatNum(a.totalLikes) },
+    { label: '总评论', value: formatNum(a.totalComments) },
+    { label: '总分享', value: formatNum(a.totalShares) },
+    { label: '发布内容', value: a.totalPosts.toString() },
+    { label: '平均互动率', value: a.avgEngagementRate + '%' },
+  ]
+})
 
 onMounted(async () => {
   loading.value = true
   try {
     await accountStore.fetchAccountDetail(accountId)
-
-    historyLoading.value = true
-    const res = await accountsApi.getHistory(accountId)
-    history.value = (res.data as any).list || (res.data as any).posts || []
+    await Promise.all([loadAnalytics(), loadPosts()])
   } finally {
     loading.value = false
-    historyLoading.value = false
   }
 })
+
+async function loadAnalytics() {
+  try {
+    const res = await accountsApi.getAccountAnalytics(accountId)
+    analytics.value = res.data
+  } catch { analytics.value = null }
+}
+
+async function loadPosts() {
+  postsLoading.value = true
+  try {
+    const res = await accountsApi.getAccountPosts(accountId, {
+      page: postPage.value,
+      pageSize: postPageSize.value,
+      sortBy: postSortBy.value,
+      sortOrder: postSortOrder.value,
+    })
+    const data = res.data as any
+    posts.value = data.items || data.list || []
+    postTotal.value = data.total || 0
+  } catch { posts.value = [] }
+  postsLoading.value = false
+}
+
+function handleSortChange({ prop, order }: any) {
+  if (!prop) return
+  postSortBy.value = prop
+  postSortOrder.value = order === 'ascending' ? 'asc' : 'desc'
+  postPage.value = 1
+  loadPosts()
+}
+
+function exportAccountData() {
+  const rows = posts.value.map((p: any) => ({
+    title: p.title,
+    status: p.status,
+    publishAt: formatTime(p.publishAt || p.createdAt),
+    views: p.views,
+    likes: p.likes,
+    comments: p.comments,
+    shares: p.shares,
+    engagementRate: p.engagementRate + '%',
+  }))
+  const header = '标题,状态,发布时间,播放量,点赞,评论,分享,互动率'
+  const csv = [header, ...rows.map((r: any) => Object.values(r).join(','))].join('\n')
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = `${account.value?.nickname || 'account'}_data.csv`
+  a.click(); URL.revokeObjectURL(url)
+  ElMessage.success('导出成功')
+}
 
 async function handleCheckCookie() {
   const result = await accountStore.checkCookieStatus(accountId)
@@ -123,44 +225,41 @@ async function handleDelete() {
 function formatTime(time: string) {
   return time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
 }
+
+function formatNum(n: any): string {
+  if (n == null || n === 0) return '0'
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万'
+  return Number(n).toLocaleString()
+}
 </script>
 
 <style lang="scss" scoped>
 .account-detail {
-  &__title {
-    font-size: 18px;
-    font-weight: 600;
-  }
-
-  &__content {
-    margin-top: 20px;
-  }
-
+  &__title { font-size: 18px; font-weight: 600; }
+  &__content { margin-top: 20px; }
   &__profile {
-    text-align: center;
-    padding: 20px 0;
-
-    h3 {
-      margin: 12px 0 8px;
-      font-size: 18px;
-    }
+    text-align: center; padding: 20px 0;
+    h3 { margin: 12px 0 8px; font-size: 18px; }
   }
-
-  &__platform {
-    margin: 8px 0;
-    display: flex;
-    justify-content: center;
-  }
-
+  &__platform { margin: 8px 0; display: flex; justify-content: center; }
   &__actions {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .el-button {
-      width: 100%;
-    }
+    margin-top: 20px; display: flex; flex-direction: column; gap: 8px;
+    .el-button { width: 100%; }
   }
+  &__analytics { margin-bottom: 16px; }
+}
+
+.analytics-mini-card {
+  text-align: center;
+  &__label { font-size: 12px; color: #909399; margin-bottom: 6px; }
+  &__value { font-size: 20px; font-weight: 600; color: #303133; }
+}
+
+.post-header {
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+}
+
+.post-pagination {
+  display: flex; justify-content: center; margin-top: 16px;
 }
 </style>

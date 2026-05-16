@@ -18,6 +18,12 @@
         <el-form-item>
           <el-button type="primary" @click="refreshData" :loading="loadingCharts">查询</el-button>
         </el-form-item>
+        <el-form-item>
+          <el-button @click="handleCollect" :loading="collecting" type="success">采集数据</el-button>
+        </el-form-item>
+        <el-form-item>
+          <el-button @click="handleExport">导出报表</el-button>
+        </el-form-item>
       </el-form>
     </el-card>
 
@@ -128,6 +134,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { analyticsApi } from '@/api/analytics'
@@ -140,6 +147,7 @@ const comparison = ref<any>(null)
 const viewsRanking = ref<any[]>([])
 const rankingLoading = ref(false)
 const rankingPeriod = ref('week')
+const collecting = ref(false)
 
 // Real chart data
 const followerTrend = ref<number[]>([])
@@ -265,6 +273,28 @@ function formatChange(v: any): string {
 function getChangeClass(v: any): string {
   if (v == null || v === 0) return ''
   return v > 0 ? 'change--up' : 'change--down'
+}
+
+async function handleCollect() {
+  collecting.value = true
+  try {
+    const res = await analyticsApi.collectStats()
+    ElMessage.success(res.data?.message || '数据采集成功')
+    await refreshData()
+  } catch { ElMessage.error('数据采集失败') }
+  collecting.value = false
+}
+
+function handleExport() {
+  const startDate = dayjs().subtract(days.value, 'day').format('YYYY-MM-DD')
+  const endDate = dayjs().format('YYYY-MM-DD')
+  analyticsApi.exportReport({ startDate, endDate, format: 'csv' }).then((res: any) => {
+    const blob = new Blob(['﻿' + (typeof res === 'string' ? res : JSON.stringify(res))], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `数据报表_${startDate}_${endDate}.csv`; a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  }).catch(() => ElMessage.error('导出失败'))
 }
 
 onMounted(() => {
