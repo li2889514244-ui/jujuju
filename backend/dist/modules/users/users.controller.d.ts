@@ -1,5 +1,5 @@
 import { UsersService } from './users.service';
-import { Role } from '../../common/prisma-enums';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 declare class UpdateUserDto {
     name?: string;
@@ -15,15 +15,15 @@ export declare class UsersController {
             organization: {
                 name: string;
                 id: string;
-                plan: string;
+                plan: import(".prisma/client").$Enums.Plan;
             } | null;
             name: string;
             email: string;
             phone: string | null;
             id: string;
             avatar: string | null;
-            role: string;
-            status: string;
+            role: import(".prisma/client").$Enums.Role;
+            status: import(".prisma/client").$Enums.UserStatus;
             lastLoginAt: Date | null;
             createdAt: Date;
             updatedAt: Date;
@@ -36,24 +36,24 @@ export declare class UsersController {
         organization: {
             name: string;
             id: string;
-            status: string;
-            plan: string;
+            status: import(".prisma/client").$Enums.OrgStatus;
+            plan: import(".prisma/client").$Enums.Plan;
         } | null;
         name: string;
         email: string;
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: string;
-        status: string;
+        role: import(".prisma/client").$Enums.Role;
+        status: import(".prisma/client").$Enums.UserStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
         accounts: {
             id: string;
             avatar: string | null;
-            status: string;
-            platform: string;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
             followers: number;
         }[];
@@ -62,24 +62,24 @@ export declare class UsersController {
         organization: {
             name: string;
             id: string;
-            status: string;
-            plan: string;
+            status: import(".prisma/client").$Enums.OrgStatus;
+            plan: import(".prisma/client").$Enums.Plan;
         } | null;
         name: string;
         email: string;
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: string;
-        status: string;
+        role: import(".prisma/client").$Enums.Role;
+        status: import(".prisma/client").$Enums.UserStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
         accounts: {
             id: string;
             avatar: string | null;
-            status: string;
-            platform: string;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
             followers: number;
         }[];
@@ -90,8 +90,8 @@ export declare class UsersController {
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: string;
-        status: string;
+        role: import(".prisma/client").$Enums.Role;
+        status: import(".prisma/client").$Enums.UserStatus;
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
@@ -101,8 +101,8 @@ export declare class UsersController {
         password: string;
         name: string;
         avatar: string | null;
-        role: string;
-        status: string;
+        role: import(".prisma/client").$Enums.Role;
+        status: import(".prisma/client").$Enums.UserStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;

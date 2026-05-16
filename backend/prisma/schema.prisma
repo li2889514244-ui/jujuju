@@ -1,0 +1,362 @@
+// MatrixFlow - Prisma Schema
+// 数据库: PostgreSQL
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== Enums ====================
+enum UserRole {
+  ADMIN
+  MEMBER
+  VIEWER
+  OWNER
+  MANAGER
+}
+
+enum AccountStatus {
+  ACTIVE
+  EXPIRED
+  DISABLED
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  SCHEDULED
+  CANCELLED
+}
+
+enum PlatformEnum {
+  DOUYIN
+  KUAISHOU
+  XIAOHONGSHU
+  BILIBILI
+  WEIBO
+  WECHAT_VIDEO
+  TIKTOK
+}
+
+// ==================== 用户与组织 ====================
+
+
+enum EventType {
+  RECORDING
+  LIVESTREAM
+  MEETING
+  OTHER
+}
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  phone       String?   @unique
+  password    String
+  name        String
+  avatar      String?
+  role        UserRole       @default(MEMBER)
+  status      AccountStatus  @default(ACTIVE)
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  accounts       Account[]
+  auditLogs      AuditLog[]
+
+  @@index([organizationId])
+  @@index([email])
+  members   TeamMember[]
+  events CalendarEvent[]
+}
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("FREE")
+  status    AccountStatus @default(ACTIVE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+  teams Team[]
+
+  @@index([status])
+}
+
+model Team {
+  id             String       @id @default(cuid())
+  name           String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  organizationId String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  accounts Account[]
+
+  @@index([organizationId])
+  members   TeamMember[]
+}
+
+// ==================== 平台账号 ====================
+
+model Account {
+  id             String        @id @default(cuid())
+  platform       PlatformEnum
+  platformUserId String
+  nickname       String
+  avatar         String?
+  bio            String?
+  followers      Int           @default(0)
+  following      Int           @default(0)
+  status         AccountStatus @default(ACTIVE)
+  cookies        String?
+  proxyConfig    String? // JSON 字符串
+  metadata       String? // JSON 字符串
+  lastActiveAt   DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  owner      User          @relation(fields: [userId], references: [id])
+  userId     String
+  team       Team?         @relation(fields: [teamId], references: [id])
+  teamId     String?
+  group      AccountGroup? @relation(fields: [groupId], references: [id])
+  groupId    String?
+  posts      Post[]
+  dailyStats DailyStats[]
+
+  @@unique([platform, platformUserId])
+  @@index([userId])
+  @@index([teamId])
+  @@index([groupId])
+  @@index([platform])
+}
+
+// ==================== 内容发布 ====================
+
+model Post {
+  id          String     @id @default(cuid())
+  title       String?
+  content     String?
+  mediaUrls   String? // JSON 字符串
+  tags        String? // JSON 字符串，逗号分隔
+  publishAt   DateTime?
+  status      PostStatus @default(DRAFT)
+  platformUrl String?
+  errorMsg    String?
+  metadata    String? // JSON 字符串
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  account   Account    @relation(fields: [accountId], references: [id])
+  accountId String
+  stats     PostStats?
+
+  @@index([accountId])
+  @@index([status])
+  @@index([publishAt])
+  @@index([accountId, status])
+}
+
+// ==================== 互动统计 ====================
+
+model PostStats {
+  id          String   @id @default(cuid())
+  views       Int      @default(0)
+  likes       Int      @default(0)
+  comments    Int      @default(0)
+  shares      Int      @default(0)
+  saves       Int      @default(0)
+  collectedAt DateTime @default(now())
+
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  postId String @unique
+
+  @@index([postId])
+}
+
+model DailyStats {
+  id        String       @id @default(cuid())
+  date      DateTime
+  platform  PlatformEnum
+  followers Int          @default(0)
+  views     Int          @default(0)
+  likes     Int          @default(0)
+  comments  Int          @default(0)
+  shares    Int          @default(0)
+  createdAt DateTime     @default(now())
+
+  account   Account @relation(fields: [accountId], references: [id])
+  accountId String
+
+  @@unique([accountId, date])
+  @@index([accountId])
+  @@index([date])
+  @@index([accountId, date])
+}
+
+// ==================== 审计日志 ====================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  action    String
+  resource  String
+  detail    String? // JSON 字符串
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  userId String
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([action])
+  @@index([userId, createdAt])
+}
+
+// ==================== 竞品监控 ====================
+
+model Competitor {
+  id             String       @id @default(cuid())
+  platform       PlatformEnum
+  platformUserId String
+  nickname       String
+  avatar         String?
+  bio            String?
+  followers      Int          @default(0)
+  following      Int          @default(0)
+  status         AccountStatus @default(ACTIVE)
+  note           String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  userId    String
+  snapshots CompetitorSnapshot[]
+
+  @@unique([platform, platformUserId, userId])
+  @@index([userId])
+  @@index([platform])
+}
+
+model CompetitorSnapshot {
+  id        String   @id @default(cuid())
+  date      DateTime
+  followers Int      @default(0)
+  views     Int      @default(0)
+  likes     Int      @default(0)
+  comments  Int      @default(0)
+  posts     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
+  competitorId String
+
+  @@unique([competitorId, date])
+  @@index([competitorId])
+  @@index([date])
+}
+
+// ==================== 账号分组 ====================
+
+model AccountGroup {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#409EFF")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId   String
+  accounts Account[]
+
+  @@index([userId])
+}
+
+// ==================== 素材库 ====================
+
+model Asset {
+  id        String   @id @default(cuid())
+  name      String
+  type      String
+  url       String
+  size      Int      @default(0)
+  width     Int?
+  height    Int?
+  duration  Int?
+  mimeType  String?
+  tags      String? // JSON 字符串，逗号分隔
+  folderId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+
+  @@index([userId])
+  @@index([type])
+  @@index([folderId])
+}
+
+// ==================== 通知 ====================
+
+model Notification {
+  id        String   @id @default(cuid())
+  type      String
+  title     String
+  content   String?
+  read      Boolean  @default(false)
+  metadata  String? // JSON 字符串
+  createdAt DateTime @default(now())
+
+  userId String
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+  @@index([userId, read, createdAt])
+}
+
+model TeamMember {
+  id        String   @id @default(cuid())
+  userId    String
+  teamId    String
+  role      UserRole @default(MEMBER)
+  joinedAt  DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, teamId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model CalendarEvent {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  eventType   EventType @default(OTHER)
+  startTime   DateTime
+  endTime     DateTime
+  color       String    @default("#409EFF")
+  allDay      Boolean   @default(false)
+  location    String?
+  userId      String
+  teamId      String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([teamId])
+  @@index([startTime])
+}

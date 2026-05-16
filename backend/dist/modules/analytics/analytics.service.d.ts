@@ -7,13 +7,13 @@ export declare class AnalyticsService {
     getDailyStats(dto: QueryAnalyticsDto): Promise<({
         account: {
             id: string;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
         };
     } & {
         id: string;
         date: Date;
-        platform: string;
+        platform: import(".prisma/client").$Enums.Platform;
         followers: number;
         views: number;
         likes: number;
@@ -26,12 +26,12 @@ export declare class AnalyticsService {
         post: {
             account: {
                 id: string;
-                platform: string;
+                platform: import(".prisma/client").$Enums.Platform;
                 nickname: string;
             };
             title: string | null;
             id: string;
-            status: string;
+            status: import(".prisma/client").$Enums.PostStatus;
             platformUrl: string | null;
         };
     } & {
@@ -97,13 +97,13 @@ export declare class AnalyticsService {
         accounts: {
             dailyStats: ({
                 account: {
-                    platform: string;
+                    platform: import(".prisma/client").$Enums.Platform;
                     nickname: string;
                 };
             } & {
                 id: string;
                 date: Date;
-                platform: string;
+                platform: import(".prisma/client").$Enums.Platform;
                 followers: number;
                 views: number;
                 likes: number;
@@ -113,14 +113,14 @@ export declare class AnalyticsService {
                 accountId: string;
             })[];
             id: string;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             nickname: string;
             followers: number;
         }[];
         topPosts: {
             id: string;
             title: string | null;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             account: string;
             views: number;
             likes: number;
@@ -130,13 +130,13 @@ export declare class AnalyticsService {
         }[];
         dailyTrend: ({
             account: {
-                platform: string;
+                platform: import(".prisma/client").$Enums.Platform;
                 nickname: string;
             };
         } & {
             id: string;
             date: Date;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             followers: number;
             views: number;
             likes: number;
@@ -214,7 +214,7 @@ export declare class AnalyticsService {
             rank: number;
             postId: string;
             title: string | null;
-            platform: string;
+            platform: import(".prisma/client").$Enums.Platform;
             accountName: string;
             accountAvatar: string | null;
             views: number;

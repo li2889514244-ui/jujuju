@@ -18,7 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const competitors_service_1 = require("./competitors.service");
-const prisma_enums_1 = require("../../common/prisma-enums");
+const client_1 = require("@prisma/client");
 let CompetitorsController = class CompetitorsController {
     constructor(competitorsService) {
         this.competitorsService = competitorsService;
@@ -26,15 +26,17 @@ let CompetitorsController = class CompetitorsController {
     async create(userId, dto) {
         return this.competitorsService.create({ ...dto, userId });
     }
-    async findAll(userId, platform, skip, take) {
+    async findAll(userId, platform, skip, take, search) {
         return this.competitorsService.findAll(userId, {
             platform,
+            search,
             skip: skip ? parseInt(skip) : undefined,
             take: take ? parseInt(take) : undefined,
         });
     }
     async compare(userId, ids, days) {
-        const competitorIds = ids.split(',');
+        if (!ids) return [];
+        const competitorIds = ids.split(',').filter(function(id) { return id.length > 0; });
         return this.competitorsService.compare(userId, competitorIds, days ? parseInt(days) : 7);
     }
     async findById(userId, id) {
@@ -61,8 +63,9 @@ __decorate([
     __param(1, (0, common_1.Query)('platform')),
     __param(2, (0, common_1.Query)('skip')),
     __param(3, (0, common_1.Query)('take')),
+    __param(4, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], CompetitorsController.prototype, "findAll", null);
 __decorate([

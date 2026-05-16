@@ -22,7 +22,7 @@ const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
-const prisma_enums_1 = require("../../common/prisma-enums");
+const client_1 = require("@prisma/client");
 let TeamsController = class TeamsController {
     constructor(teamsService) {
         this.teamsService = teamsService;
@@ -52,7 +52,7 @@ let TeamsController = class TeamsController {
 exports.TeamsController = TeamsController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
     (0, swagger_1.ApiOperation)({ summary: '创建团队' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: '创建成功' }),
     __param(0, (0, common_1.Body)()),
@@ -79,7 +79,7 @@ __decorate([
 ], TeamsController.prototype, "getMembers", null);
 __decorate([
     (0, common_1.Post)('members/invite'),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
     (0, common_1.HttpCode)(common_1.HttpStatus.CREATED),
     (0, swagger_1.ApiOperation)({ summary: '邀请成员' }),
     (0, swagger_1.ApiResponse)({ status: 201, description: '邀请成功' }),
@@ -93,7 +93,7 @@ __decorate([
 ], TeamsController.prototype, "inviteMember", null);
 __decorate([
     (0, common_1.Put)('members/:memberId/role'),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: '更新成员角色' }),
     __param(0, (0, common_1.Param)('memberId')),
@@ -106,7 +106,7 @@ __decorate([
 ], TeamsController.prototype, "updateMemberRole", null);
 __decorate([
     (0, common_1.Delete)('members/:memberId'),
-    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
+    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),
     (0, swagger_1.ApiOperation)({ summary: '移除成员' }),
     (0, swagger_1.ApiResponse)({ status: 403, description: '无权限操作' }),
