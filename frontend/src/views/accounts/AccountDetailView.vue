@@ -95,7 +95,7 @@ onMounted(async () => {
 
     historyLoading.value = true
     const res = await accountsApi.getHistory(accountId)
-    history.value = res.data.list
+    history.value = (res.data as any).list || (res.data as any).posts || []
   } finally {
     loading.value = false
     historyLoading.value = false
