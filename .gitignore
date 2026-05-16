@@ -6,6 +6,7 @@ node_modules/
 # 构建输出
 dist/
 !backend/dist/main.js
+!frontend/dist/
 build/
 *.tsbuildinfo
 
