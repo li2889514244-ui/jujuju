@@ -78,6 +78,29 @@
       </el-table>
     </el-card>
 
+    <!-- Cross-Platform Comparison -->
+    <el-card shadow="hover" v-if="reportData && crossPlatformItems.length > 0" class="report__section">
+      <template #header>
+        <span>跨平台内容对比</span>
+        <span style="font-size:12px;color:#909399;margin-left:8px">同一内容在不同平台的表现</span>
+      </template>
+      <div v-for="(group, gi) in crossPlatformItems" :key="gi" style="margin-bottom:16px">
+        <div style="font-weight:600;margin-bottom:8px;color:#303133">{{ group.title }}</div>
+        <el-table :data="group.items" stripe size="small">
+          <el-table-column label="平台" width="100">
+            <template #default="{ row }">
+              <el-tag size="small">{{ PLATFORM_LABELS[row.platform] || row.platform }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="account" label="账号" width="120" />
+          <el-table-column prop="views" label="播放" width="100" sortable />
+          <el-table-column prop="likes" label="点赞" width="80" sortable />
+          <el-table-column prop="comments" label="评论" width="80" sortable />
+          <el-table-column prop="shares" label="分享" width="80" sortable />
+        </el-table>
+      </div>
+    </el-card>
+
     <!-- Daily Trend Chart -->
     <el-card shadow="hover" v-if="reportData" class="report__section">
       <template #header>每日数据趋势</template>
@@ -124,6 +147,22 @@ async function loadReport() {
     loading.value = false
   }
 }
+
+const crossPlatformItems = computed(() => {
+  if (!reportData.value?.topPosts?.length) return [] as any[]
+  const posts: any[] = reportData.value.topPosts
+  const groups: Record<string, any[]> = {}
+  for (const p of posts) {
+    const key = (p.title || '').slice(0, 20)
+    if (!groups[key]) groups[key] = []
+    groups[key].push(p)
+  }
+  const result: any[] = []
+  for (const [title, items] of Object.entries(groups)) {
+    if (items.length >= 2) result.push({ title, items })
+  }
+  return result.slice(0, 5)
+})
 
 const trendChart = computed(() => {
   if (!reportData.value?.dailyTrend?.length) {

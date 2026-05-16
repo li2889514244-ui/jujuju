@@ -289,41 +289,73 @@ async def _scrape_dashboard(page) -> dict:
                 metrics[key] = _parse_metric_num(m.group(1))
                 break
 
-    # Views are further down the page — search in first 4000 chars and filter outliers
+    # Views: try to click into data center if not in main text
+    views_val = None
     for pat in _METRIC_PATTERNS.get('views', []):
         m = pat.search(text[:4000])
         if m:
             val = _parse_metric_num(m.group(1))
-            if val < 100_000_000:  # filter recommendation-card numbers like "121万"
-                metrics['views'] = val
+            if val < 100_000_000:
+                views_val = val
                 break
+    if not views_val:
+        try:
+            # Try clicking into 数据中心 / Data Center tab
+            dc_link = await page.query_selector('text=数据中心')
+            if not dc_link:
+                dc_link = await page.query_selector('[class*="data-center"]')
+            if dc_link:
+                await dc_link.click()
+                await page.wait_for_timeout(3000)
+                text2 = await page.evaluate('() => document.body.innerText')
+                for pat in _METRIC_PATTERNS.get('views', []):
+                    m = pat.search(text2[:4000])
+                    if m:
+                        val = _parse_metric_num(m.group(1))
+                        if val < 100_000_000:
+                            views_val = val
+                            break
+        except:
+            pass
+    if views_val:
+        metrics['views'] = views_val
 
-    # Extract real nickname + avatar from page
+    # Extract real nickname — use Douyin ID from profile section
+    # Filter out nav item names (内容管理, 互动管理, etc.)
+    _NAV_NAMES = {'内容管理','互动管理','数据中心','变现中心','创作中心','首页','活动管理','作品管理','合集管理','共创中心','原创保护中心','评论管理','私信消息'}
     try:
         info = await page.evaluate('''() => {
             const result = { nickname: null, avatar: null };
-            // Try various selectors for profile name
-            const nameEls = document.querySelectorAll('[class*="name"], [class*="nickname"], [class*="title"], h1, h2');
-            for (const el of nameEls) {
-                const t = el.textContent?.trim();
-                if (t && t.length > 1 && t.length < 40 && !t.includes('创作者') && !t.includes('服务中心')) {
-                    result.nickname = t;
-                    break;
+            const text = document.body.innerText;
+            const lines = text.split('\\n');
+            for (let i = 0; i < Math.min(lines.length, 30); i++) {
+                const line = lines[i].trim();
+                if (line.startsWith('抖音号') || line.startsWith('快手号') || line.startsWith('小红书号')) {
+                    const id = line.replace(/.*[：:]/, '').trim();
+                    if (id) { result.nickname = id; break; }
                 }
             }
-            // Try to find avatar
-            const avaEls = document.querySelectorAll('img[class*="avatar"], img[src*="avatar"]');
-            for (const el of avaEls) {
-                const src = el.src;
-                if (src && (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp'))) {
-                    result.avatar = src;
-                    break;
+            if (!result.nickname) {
+                for (let i = 0; i < Math.min(lines.length, 25); i++) {
+                    if (lines[i].trim() === '抖音' && i+1 < lines.length) {
+                        const candidate = lines[i+1].trim();
+                        if (/^\d{5,20}$/.test(candidate)) { result.nickname = candidate; break; }
+                    }
+                }
+            }
+            // Try avatar
+            const imgs = document.querySelectorAll('img');
+            for (const el of imgs) {
+                const src = el.src || '';
+                if (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp')) {
+                    if (el.width > 30 || el.height > 30) { result.avatar = src; break; }
                 }
             }
             return result;
         }''')
-        if info.get('nickname'):
-            metrics['_nickname'] = info['nickname']
+        nick = info.get('nickname')
+        if nick and nick not in _NAV_NAMES:
+            metrics['_nickname'] = nick
         if info.get('avatar'):
             metrics['_avatar'] = info['avatar']
     except:
