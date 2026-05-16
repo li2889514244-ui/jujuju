@@ -52,7 +52,7 @@ const routes: RouteRecordRaw[] = [
         path: 'analytics',
         name: 'Analytics',
         component: () => import('@/views/analytics/AnalyticsView.vue'),
-        meta: { title: '数据分析', icon: 'DataAnalysis' },
+        meta: { title: '数据分析', icon: 'DataAnalysis', hidden: true },
       },
       {
         path: 'data-center',
@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
         path: 'report',
         name: 'Report',
         component: () => import('@/views/report/ReportView.vue'),
-        meta: { title: '数据报表', icon: 'Document' },
+        meta: { title: '数据报表', icon: 'Document', hidden: true },
       },
       {
         path: 'team',
