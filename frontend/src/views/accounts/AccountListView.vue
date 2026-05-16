@@ -210,10 +210,12 @@ async function openCompanionScan(platform: string) {
   const token = userStore.token
   const api = 'https://ddddkiii.com/api/v1'
   try {
-    const resp = await fetch(`http://localhost:5409/api/scan-bind/start?platform=${platform}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(api)}`)
+    // 先尝试 JSON trigger 端点（companion v2.3+）
+    const resp = await fetch(`http://localhost:5409/api/scan-bind/trigger?platform=${platform}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(api)}`)
+    if (!resp.ok) throw new Error('HTTP ' + resp.status)
     const data = await resp.json()
     if (data.code === 0) {
-      ElMessage.success('已发送到桌面伴侣，请查看桌面伴侣窗口')
+      ElMessage.success('扫码窗口已打开，请在浏览器中扫码登录。登录成功后回到此页面刷新账号列表。')
     } else {
       ElMessage.error(data.msg || '发送失败')
     }
