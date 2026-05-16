@@ -232,7 +232,11 @@ export interface ApiResponse<T = unknown> {
 
 export interface PaginatedResponse<T> {
   list: T[]
+  accounts?: T[]
+  posts?: T[]
   total: number
-  page: number
-  pageSize: number
+  page?: number
+  pageSize?: number
+  skip?: number
+  take?: number
 }

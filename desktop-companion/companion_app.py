@@ -237,32 +237,30 @@ def data_collection_trigger():
 
 _METRIC_PATTERNS = {
     'followers': [
-        re.compile(r'粉丝\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'粉丝数\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*粉丝'),
+        # 抖音/douyin specific: profile section "粉丝\n159" or "粉丝：159"
+        re.compile(r'(?:^|\n)粉丝\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
+        re.compile(r'粉丝数?\s*[：:]\s*([\d,.]+[万wW]?)'),
     ],
     'following': [
-        re.compile(r'关注\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*关注'),
+        # Use MULTILINE to anchor to line start, avoid matching nav/sidebar "关注"
+        re.compile(r'(?:^|\n)关注\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
     ],
     'likes': [
-        re.compile(r'获赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'点赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*获赞'),
-        re.compile(r'([\d,.]+[万wW]?)\s*点赞'),
+        # 获赞 might be on its own line: "获赞\n132" or "获赞：132"
+        re.compile(r'(?:^|\n)获赞\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
+        re.compile(r'点赞\s*[：:]\s*([\d,.]+[万wW]?)'),
+        re.compile(r'总获赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
     ],
     'views': [
-        re.compile(r'播放\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'播放量\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*播放'),
+        # 可参考播放量 / 播放量 / 播放
+        re.compile(r'(?:可参考)?播放量\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'播放\s*[：:]\s*([\d,.]+[万wW]?)'),
     ],
     'comments': [
-        re.compile(r'评论\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*评论'),
+        re.compile(r'评论\s*[：:]\s*([\d,.]+[万wW]?)'),
     ],
     'shares': [
-        re.compile(r'分享\s*[：:]?\s*([\d,.]+[万wW]?)'),
-        re.compile(r'([\d,.]+[万wW]?)\s*分享'),
+        re.compile(r'分享\s*[：:]\s*([\d,.]+[万wW]?)'),
     ],
 }
 
@@ -394,6 +392,26 @@ def _run_collection_once():
             _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
             _collector_last_error = None
             return
+
+        # Decrypt encrypted cookies via individual account endpoint
+        for acc in accounts:
+            c = acc.get('cookies') or ''
+            if c and '=' not in c[:200] and c.count(':') >= 2:
+                aid = acc.get('id')
+                try:
+                    r = requests.get(
+                        f'{api_url}/accounts/{aid}/cookies',
+                        headers={'Authorization': f'Bearer {token}'},
+                        timeout=15,
+                    )
+                    if r.status_code == 200:
+                        inner = r.json()
+                        dec = (inner.get('data') or inner).get('cookies')
+                        if dec:
+                            acc['cookies'] = dec
+                            print(f'[DC] Decrypted cookies for {aid}')
+                except Exception as e:
+                    print(f'[DC] Decrypt failed for {aid}: {e}')
 
         print(f'[DC] Scraping {len(accounts)} accounts')
         scraped = asyncio.run(_scrape_all(accounts))

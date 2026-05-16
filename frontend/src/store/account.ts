@@ -21,8 +21,9 @@ export const useAccountStore = defineStore('account', () => {
     loading.value = true
     try {
       const res = await accountsApi.getList(filter.value)
-      accounts.value = res.data.list
-      total.value = res.data.total
+      const data = res.data as any
+      accounts.value = data.accounts || []
+      total.value = data.total || 0
     } finally {
       loading.value = false
     }
