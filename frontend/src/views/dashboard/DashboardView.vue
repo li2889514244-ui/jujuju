@@ -30,72 +30,64 @@
       </el-col>
     </el-row>
 
-    <!-- 账号数据表格 -->
-    <el-card shadow="hover" class="dashboard__table-card">
-      <template #header>
-        <div class="dashboard__table-header">
-          <span>多账号明细</span>
-          <span class="dashboard__table-hint">展示最近30天累计数据</span>
+    <!-- 账号分组展示 -->
+    <div class="dashboard__groups">
+      <div v-if="accountGroups.length === 0 && !loading" class="dashboard__empty">
+        <el-empty description="还没有绑定账号">
+          <el-button type="primary" @click="$router.push('/accounts')">添加平台账号</el-button>
+        </el-empty>
+      </div>
+      <div v-for="group in accountGroups" :key="group.name" class="group-card">
+        <div class="group-card__header">
+          <div class="group-card__title">
+            <span class="group-card__name">{{ group.name || '未分组' }}</span>
+            <el-tag size="small">{{ group.accounts.length }} 个账号</el-tag>
+          </div>
+          <div class="group-card__stats">
+            <span>粉丝 <b>{{ formatNum(group.totalFollowers) }}</b></span>
+            <span>播放 <b>{{ formatNum(group.totalViews) }}</b></span>
+            <span>点赞 <b>{{ formatNum(group.totalLikes) }}</b></span>
+          </div>
         </div>
-      </template>
-      <el-table
-        :data="accountRows"
-        v-loading="loading"
-        stripe
-        @sort-change="onSortChange"
-        :default-sort="{ prop: 'followers', order: 'descending' }"
-      >
-        <el-table-column label="账号" min-width="180" sortable="custom" prop="nickname">
-          <template #default="{ row }">
-            <div class="account-cell">
-              <el-avatar :size="36" :src="row.avatar">{{ row.nickname?.charAt(0) }}</el-avatar>
-              <div class="account-cell__info">
-                <span class="account-cell__name">{{ row.nickname }}</span>
-                <span class="account-cell__platform">
-                  <PlatformIcon :platform="row.platform" />
-                  {{ PLATFORM_CN[row.platform] || row.platform }}
-                </span>
+        <el-table :data="group.accounts" stripe size="small">
+          <el-table-column label="账号" min-width="160">
+            <template #default="{ row }">
+              <div class="account-cell">
+                <el-avatar :size="32" :src="row.avatar">{{ row.nickname?.charAt(0) }}</el-avatar>
+                <div class="account-cell__info">
+                  <span class="account-cell__name">{{ row.nickname }}</span>
+                  <span class="account-cell__platform">
+                    <PlatformIcon :platform="row.platform" />
+                    {{ PLATFORM_CN[row.platform] || row.platform }}
+                  </span>
+                </div>
               </div>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="粉丝" width="100" sortable="custom" prop="followers" align="right">
-          <template #default="{ row }">{{ formatNum(row.followers) }}</template>
-        </el-table-column>
-        <el-table-column label="播放量" width="110" sortable="custom" prop="views" align="right">
-          <template #default="{ row }">{{ formatNum(row.views) }}</template>
-        </el-table-column>
-        <el-table-column label="点赞" width="100" sortable="custom" prop="likes" align="right">
-          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
-        </el-table-column>
-        <el-table-column label="评论" width="90" sortable="custom" prop="comments" align="right">
-          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
-        </el-table-column>
-        <el-table-column label="分享" width="90" sortable="custom" prop="shares" align="right">
-          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
-        </el-table-column>
-        <el-table-column label="发布数" width="90" sortable="custom" prop="postCount" align="right">
-          <template #default="{ row }">{{ row.postCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column label="状态" width="90" align="center">
-          <template #default="{ row }">
-            <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
-              {{ row.hasCookies ? '在线' : '待授权' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right" align="center">
-          <template #default="{ row }">
-            <el-button text type="primary" size="small" @click="$router.push(`/accounts/${row.id}`)">详情</el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <el-empty description="还没有绑定账号">
-            <el-button type="primary" @click="$router.push('/accounts')">添加平台账号</el-button>
-          </el-empty>
-        </template>
-      </el-table>
-    </el-card>
+            </template>
+          </el-table-column>
+          <el-table-column label="粉丝" width="90" prop="followers" align="right">
+            <template #default="{ row }">{{ formatNum(row.followers) }}</template>
+          </el-table-column>
+          <el-table-column label="播放量" width="90" prop="views" align="right">
+            <template #default="{ row }">{{ formatNum(row.views) }}</template>
+          </el-table-column>
+          <el-table-column label="点赞" width="80" prop="likes" align="right">
+            <template #default="{ row }">{{ formatNum(row.likes) }}</template>
+          </el-table-column>
+          <el-table-column label="状态" width="80" align="center">
+            <template #default="{ row }">
+              <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
+                {{ row.hasCookies ? '在线' : '待授权' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="70" align="center">
+            <template #default="{ row }">
+              <el-button text type="primary" size="small" @click="$router.push(`/accounts/${row.id}`)">详情</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
 
     <!-- 粉丝趋势图 -->
     <el-row :gutter="16" class="dashboard__charts" v-if="accountRows.length > 0">
@@ -152,6 +144,7 @@ interface AccountRow {
   nickname: string
   avatar: string
   platform: string
+  groupName: string
   followers: number
   views: number
   likes: number
@@ -162,6 +155,7 @@ interface AccountRow {
 }
 
 const accountRows = ref<AccountRow[]>([])
+const accountGroups = ref<{ name: string; accounts: AccountRow[]; totalFollowers: number; totalViews: number; totalLikes: number }[]>([])
 const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
 const followerTrendData = ref<number[]>([])
 
@@ -220,6 +214,7 @@ async function refreshAll() {
         nickname: a.nickname || '未命名',
         avatar: a.avatar || '',
         platform: a.platform,
+        groupName: a.group?.name || '',
         followers: a.followers || 0,
         views: daily.views,
         likes: daily.likes,
@@ -229,6 +224,21 @@ async function refreshAll() {
         hasCookies: a.hasCookies,
       }
     })
+
+    // Group accounts by group name
+    const groupMap: Record<string, AccountRow[]> = {}
+    for (const row of accountRows.value) {
+      const gName = (row as any).groupName || '未分组'
+      if (!groupMap[gName]) groupMap[gName] = []
+      groupMap[gName].push(row)
+    }
+    accountGroups.value = Object.entries(groupMap).map(([name, accounts]) => ({
+      name,
+      accounts,
+      totalFollowers: accounts.reduce((s, a) => s + a.followers, 0),
+      totalViews: accounts.reduce((s, a) => s + a.views, 0),
+      totalLikes: accounts.reduce((s, a) => s + a.likes, 0),
+    }))
 
     const byPlatform = ov.accounts?.byPlatform || {}
     platformDistribution.value = Object.entries(byPlatform)
@@ -252,13 +262,6 @@ async function loadFollowerTrend() {
 }
 
 function onPeriodChange() { refreshAll() }
-function onSortChange({ prop, order }: any) {
-  if (!prop || !order) return
-  accountRows.value.sort((a: any, b: any) => {
-    const va = a[prop] || 0, vb = b[prop] || 0
-    return order === 'descending' ? vb - va : va - vb
-  })
-}
 
 const followerChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
@@ -334,5 +337,17 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
   &__info { display: flex; flex-direction: column; }
   &__name { font-size: 14px; font-weight: 500; }
   &__platform { font-size: 12px; color: #909399; display: flex; align-items: center; gap: 4px; }
+}
+
+.dashboard__groups { display: flex; flex-direction: column; gap: 16px; }
+.dashboard__empty { padding: 40px 0; }
+.group-card {
+  background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.06); overflow: hidden;
+  &__header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #ebeef5; background: #fafafa; }
+  &__title { display: flex; align-items: center; gap: 10px; }
+  &__name { font-size: 15px; font-weight: 600; color: #303133; }
+  &__stats { display: flex; gap: 20px; font-size: 13px; color: #606266;
+    b { color: #303133; margin-left: 4px; }
+  }
 }
 </style>

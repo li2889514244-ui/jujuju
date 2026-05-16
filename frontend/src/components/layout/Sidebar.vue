@@ -20,27 +20,6 @@
       </router-link>
     </nav>
 
-    <!-- Account Switcher -->
-    <div class="sidebar__accounts" v-if="!isCollapsed && accountGroups.length > 0">
-      <div class="sidebar__section-title">我的账号</div>
-      <div v-for="group in accountGroups" :key="group.platform" class="sidebar__acc-group">
-        <div class="sidebar__platform-name">{{ PLATFORM_CN[group.platform] || group.platform }}</div>
-        <div
-          v-for="acc in group.accounts"
-          :key="acc.id"
-          class="sidebar__acc-item"
-          :class="{ 'sidebar__acc-item--active': activeAccountId === acc.id }"
-          @click="selectAccount(acc.id)"
-        >
-          <el-avatar :size="22" :src="acc.avatar" class="sidebar__acc-avatar">
-            {{ acc.nickname?.charAt(0) }}
-          </el-avatar>
-          <span class="sidebar__acc-name">{{ acc.nickname }}</span>
-          <span class="sidebar__acc-followers">{{ formatNum(acc.followers) }}</span>
-        </div>
-      </div>
-    </div>
-
     <!-- Bottom -->
     <div class="sidebar__bottom">
       <div class="sidebar__status" :class="{ 'sidebar__status--ok': backendOk }">
@@ -57,50 +36,12 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { accountsApi } from '@/api/accounts'
 
 const route = useRoute()
 const router = useRouter()
 const isCollapsed = ref(false)
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
-const activeAccountId = ref('')
-
-const PLATFORM_CN: Record<string, string> = {
-  DOUYIN: '抖音', KUAISHOU: '快手', XIAOHONGSHU: '小红书', BILIBILI: 'B站',
-  WECHAT_VIDEO: '视频号', WEIBO: '微博', TIKTOK: 'TikTok',
-}
-
-interface AccountGroup { platform: string; accounts: any[] }
-const accountGroups = ref<AccountGroup[]>([])
-
-function formatNum(num: number): string {
-  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
-  return num?.toLocaleString() || '0'
-}
-
-function selectAccount(id: string) {
-  activeAccountId.value = id
-  router.push(`/accounts/${id}`)
-}
-
-async function loadAccounts() {
-  try {
-    const res = await accountsApi.getList({ pageSize: 100, page: 1 } as any)
-    const accs = (res as any).data?.accounts || []
-    const byPlatform: Record<string, any[]> = {}
-    for (const a of accs) {
-      const p = a.platform
-      if (!byPlatform[p]) byPlatform[p] = []
-      byPlatform[p].push(a)
-    }
-    accountGroups.value = Object.entries(byPlatform).map(([platform, accounts]) => ({
-      platform, accounts,
-    }))
-    // Highlight current account if viewing detail
-    if (route.params.id) activeAccountId.value = route.params.id as string
-  } catch { /* silent */ }
-}
 
 onMounted(async () => {
   try {
@@ -111,7 +52,6 @@ onMounted(async () => {
     backendVersion.value = json.data?.version || '0.1.0'
     backendOk.value = json.data?.status === 'ok'
   } catch { backendVersion.value = '离线'; backendOk.value = false }
-  loadAccounts()
 })
 
 const activeMenu = computed(() => route.path)
@@ -163,7 +103,7 @@ function toggleCollapse() { isCollapsed.value = !isCollapsed.value }
   &__menu {
     overflow-y: auto; padding: 8px 10px;
     display: flex; flex-direction: column; gap: 2px;
-    flex-shrink: 0;
+    flex: 1;
   }
 
   &__item {
