@@ -20,7 +20,7 @@
           <el-button type="primary" @click="refreshAll" :loading="loading">查询</el-button>
         </el-form-item>
         <el-form-item>
-          <el-button @click="handleCollect" :loading="collecting" type="success">采集数据</el-button>
+          <el-button @click="handleCollect" :loading="collecting" type="success">手动采集真实数据</el-button>
         </el-form-item>
       </el-form>
     </el-card>
@@ -274,11 +274,12 @@ async function refreshAll() {
 async function handleCollect() {
   collecting.value = true
   try {
-    const res = await analyticsApi.collectStats()
-    ElMessage.success(res.data?.message || '数据采集成功')
-    await refreshAll()
-  } catch {
-    ElMessage.error('数据采集失败，请稍后重试')
+    const res = await analyticsApi.triggerRealDataCollection()
+    ElMessage.success(res?.status === 'started' ? '数据采集已启动，正在从各平台获取真实数据...' : '采集指令已发送')
+    // 等 10 秒后刷新（给伴侣时间去采集）
+    setTimeout(() => refreshAll(), 10000)
+  } catch (e: any) {
+    ElMessage.warning(e.message || '请先启动桌面伴侣，然后重试')
   }
   collecting.value = false
 }
