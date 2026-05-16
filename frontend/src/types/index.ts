@@ -30,7 +30,7 @@ export interface LoginResponse {
 }
 
 // ===== Platform =====
-export type Platform = 'douyin' | 'kuaishou' | 'xiaohongshu' | 'video_account' | 'bilibili' | 'weibo'
+export type Platform = 'douyin' | 'kuaishou' | 'xiaohongshu' | 'video_account' | 'bilibili' | 'weibo' | 'tiktok'
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   douyin: '抖音',
@@ -39,6 +39,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   video_account: '视频号',
   bilibili: 'B站',
   weibo: '微博',
+  tiktok: 'TikTok',
 }
 
 // ===== Account =====
@@ -141,12 +142,24 @@ export interface PublishForm {
 
 // ===== Analytics =====
 export interface AnalyticsOverview {
-  totalAccounts: number
-  totalFollowers: number
-  totalLikes: number
-  totalPublishes: number
-  followersGrowth: number
-  likesGrowth: number
+  accounts: {
+    total: number
+    active: number
+    byPlatform: Record<string, number>
+    totalFollowers: number
+  }
+  posts: {
+    total: number
+    published: number
+    failed: number
+  }
+  engagement: {
+    totalViews: number
+    totalLikes: number
+    totalComments: number
+    totalShares: number
+    totalSaves: number
+  }
 }
 
 export interface TrendData {
@@ -164,7 +177,13 @@ export interface PlatformStats {
 }
 
 export interface PublishEffect {
+  id?: string
+  title?: string
+  platform?: string
+  accountName?: string
+  status?: string
   date: string
+  publishedAt?: string
   views: number
   likes: number
   comments: number
@@ -234,9 +253,36 @@ export interface PaginatedResponse<T> {
   list: T[]
   accounts?: T[]
   posts?: T[]
+  items?: T[]
   total: number
   page?: number
   pageSize?: number
   skip?: number
   take?: number
+}
+
+// ===== Account Posts & Analytics =====
+export interface PostWithStats {
+  id: string
+  title: string
+  platform: string
+  status: string
+  publishAt: string | null
+  createdAt: string
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  saves: number
+  engagementRate: number
+}
+
+export interface AccountAnalytics {
+  totalViews: number
+  totalLikes: number
+  totalComments: number
+  totalShares: number
+  totalSaves: number
+  totalPosts: number
+  avgEngagementRate: number
 }

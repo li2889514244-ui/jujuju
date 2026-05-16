@@ -55,6 +55,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '数据分析', icon: 'DataAnalysis' },
       },
       {
+        path: 'data-center',
+        name: 'DataCenter',
+        component: () => import('@/views/data-center/DataCenterView.vue'),
+        meta: { title: '数据中心', icon: 'DataAnalysis' },
+      },
+      {
         path: 'report',
         name: 'Report',
         component: () => import('@/views/report/ReportView.vue'),

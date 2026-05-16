@@ -23,6 +23,9 @@
         <div class="summary-card" :style="{ borderTopColor: card.color }">
           <div class="summary-card__label">{{ card.label }}</div>
           <div class="summary-card__value">{{ card.value }}</div>
+          <div class="summary-card__trend" v-if="card.trend !== null" :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''">
+            {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}% 较上周
+          </div>
         </div>
       </el-col>
     </el-row>
@@ -138,10 +141,10 @@ const lastUpdate = ref('')
 const trendDays = ref(7)
 
 const summaryCards = ref([
-  { label: '总粉丝', value: '0', color: '#409eff' },
-  { label: '总播放量', value: '0', color: '#e6a23c' },
-  { label: '总点赞', value: '0', color: '#67c23a' },
-  { label: '总互动', value: '0', color: '#f56c6c' },
+  { label: '总粉丝', value: '0', trend: null as number | null, color: '#409eff' },
+  { label: '总播放量', value: '0', trend: null as number | null, color: '#e6a23c' },
+  { label: '总点赞', value: '0', trend: null as number | null, color: '#67c23a' },
+  { label: '总互动', value: '0', trend: null as number | null, color: '#f56c6c' },
 ])
 
 interface AccountRow {
@@ -172,36 +175,39 @@ function formatNum(num: number): string {
 async function refreshAll() {
   loading.value = true
   try {
-    // 1. Load overview for summary cards
-    const overviewRes = await analyticsApi.getOverview()
-    const ov = (overviewRes as any).data || overviewRes
+    // 1. Load overview + comparison in parallel
+    const [overviewRes, compRes] = await Promise.all([
+      analyticsApi.getOverview(),
+      analyticsApi.getComparison().catch(() => null),
+    ])
+    const ov = overviewRes.data
+
+    const comp = compRes?.data
+    const wowChange = comp?.weekOverWeek?.change
     summaryCards.value = [
-      { label: '总粉丝', value: formatNum(ov.accounts?.totalFollowers || 0), color: '#409eff' },
-      { label: '总播放量', value: formatNum(ov.engagement?.totalViews || 0), color: '#e6a23c' },
-      { label: '总点赞', value: formatNum(ov.engagement?.totalLikes || 0), color: '#67c23a' },
-      { label: '总互动', value: formatNum((ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0)), color: '#f56c6c' },
+      { label: '总粉丝', value: formatNum(ov.accounts?.totalFollowers || 0), trend: wowChange?.followers ?? null, color: '#409eff' },
+      { label: '总播放量', value: formatNum(ov.engagement?.totalViews || 0), trend: wowChange?.views ?? null, color: '#e6a23c' },
+      { label: '总点赞', value: formatNum(ov.engagement?.totalLikes || 0), trend: wowChange?.likes ?? null, color: '#67c23a' },
+      { label: '总互动', value: formatNum((ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0)), trend: null, color: '#f56c6c' },
     ]
 
     // 2. Load accounts for table
     const accRes = await accountsApi.getList({ pageSize: 100, page: 1 } as any)
-    const accData = (accRes as any).data
+    const accData = accRes.data
     const accs = accData?.accounts || accData?.list || []
 
-    // 3. Load daily stats via report API
+    // 3. Load daily stats via report API — aggregate all daily stats per account
     let dailyMap: Record<string, any> = {}
     try {
       const reportRes = await analyticsApi.getReport()
-      const reportData = (reportRes as any).data || reportRes
-      const rptAccs = reportData?.accounts || []
+      const rptAccs = reportRes.data?.accounts || []
       for (const a of rptAccs) {
-        const stats = a.dailyStats?.[0]
-        if (stats) {
-          dailyMap[a.id] = {
-            views: stats.views || 0,
-            likes: stats.likes || 0,
-            comments: stats.comments || 0,
-            shares: stats.shares || 0,
-          }
+        const allStats = a.dailyStats || []
+        dailyMap[a.id] = {
+          views: allStats.reduce((sum: number, s: any) => sum + (s.views || 0), 0),
+          likes: allStats.reduce((sum: number, s: any) => sum + (s.likes || 0), 0),
+          comments: allStats.reduce((sum: number, s: any) => sum + (s.comments || 0), 0),
+          shares: allStats.reduce((sum: number, s: any) => sum + (s.shares || 0), 0),
         }
       }
     } catch { /* daily stats might be empty */ }
@@ -241,7 +247,7 @@ async function refreshAll() {
 async function loadFollowerTrend() {
   try {
     const res = await analyticsApi.getFollowerTrend({ days: trendDays.value })
-    followerTrendData.value = ((res as any).data || res || []).map((d: any) => d.value || 0)
+    followerTrendData.value = (res.data || []).map((d: any) => d.value || 0)
   } catch { followerTrendData.value = [] }
 }
 
@@ -317,7 +323,11 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
   box-shadow: 0 2px 8px rgba(0,0,0,.06);
   &__label { font-size: 13px; color: #909399; margin-bottom: 8px; }
   &__value { font-size: 26px; font-weight: 700; color: #303133; }
+  &__trend { font-size: 12px; margin-top: 8px; font-weight: 500; }
 }
+
+.trend--up { color: #67c23a; }
+.trend--down { color: #f56c6c; }
 
 .account-cell {
   display: flex; align-items: center; gap: 10px;

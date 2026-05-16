@@ -1,4 +1,4 @@
-import { get } from './request'
+import { get, post } from './request'
 import service from './request'
 import type { AnalyticsOverview, TrendData, PlatformStats, PublishEffect } from '@/types'
 
@@ -71,5 +71,9 @@ export const analyticsApi = {
       total: number
       period: string
     }>('/analytics/views-ranking', params as Record<string, unknown>)
+  },
+
+  collectStats() {
+    return post<{ message: string; accounts: number; dailyStatsGenerated: number; postStatsGenerated: number }>('/analytics/collect')
   },
 }
