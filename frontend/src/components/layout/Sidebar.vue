@@ -20,6 +20,27 @@
       </router-link>
     </nav>
 
+    <!-- Account Switcher -->
+    <div class="sidebar__accounts" v-if="!isCollapsed && accountGroups.length > 0">
+      <div class="sidebar__section-title">我的账号</div>
+      <div v-for="group in accountGroups" :key="group.platform" class="sidebar__acc-group">
+        <div class="sidebar__platform-name">{{ PLATFORM_CN[group.platform] || group.platform }}</div>
+        <div
+          v-for="acc in group.accounts"
+          :key="acc.id"
+          class="sidebar__acc-item"
+          :class="{ 'sidebar__acc-item--active': activeAccountId === acc.id }"
+          @click="selectAccount(acc.id)"
+        >
+          <el-avatar :size="22" :src="acc.avatar" class="sidebar__acc-avatar">
+            {{ acc.nickname?.charAt(0) }}
+          </el-avatar>
+          <span class="sidebar__acc-name">{{ acc.nickname }}</span>
+          <span class="sidebar__acc-followers">{{ formatNum(acc.followers) }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- Bottom -->
     <div class="sidebar__bottom">
       <div class="sidebar__status" :class="{ 'sidebar__status--ok': backendOk }">
@@ -36,12 +57,50 @@
 <script setup lang="ts">
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { accountsApi } from '@/api/accounts'
 
 const route = useRoute()
 const router = useRouter()
 const isCollapsed = ref(false)
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
+const activeAccountId = ref('')
+
+const PLATFORM_CN: Record<string, string> = {
+  DOUYIN: '抖音', KUAISHOU: '快手', XIAOHONGSHU: '小红书', BILIBILI: 'B站',
+  WECHAT_VIDEO: '视频号', WEIBO: '微博', TIKTOK: 'TikTok',
+}
+
+interface AccountGroup { platform: string; accounts: any[] }
+const accountGroups = ref<AccountGroup[]>([])
+
+function formatNum(num: number): string {
+  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
+  return num?.toLocaleString() || '0'
+}
+
+function selectAccount(id: string) {
+  activeAccountId.value = id
+  router.push(`/accounts/${id}`)
+}
+
+async function loadAccounts() {
+  try {
+    const res = await accountsApi.getList({ pageSize: 100, page: 1 } as any)
+    const accs = (res as any).data?.accounts || []
+    const byPlatform: Record<string, any[]> = {}
+    for (const a of accs) {
+      const p = a.platform
+      if (!byPlatform[p]) byPlatform[p] = []
+      byPlatform[p].push(a)
+    }
+    accountGroups.value = Object.entries(byPlatform).map(([platform, accounts]) => ({
+      platform, accounts,
+    }))
+    // Highlight current account if viewing detail
+    if (route.params.id) activeAccountId.value = route.params.id as string
+  } catch { /* silent */ }
+}
 
 onMounted(async () => {
   try {
@@ -52,6 +111,7 @@ onMounted(async () => {
     backendVersion.value = json.data?.version || '0.1.0'
     backendOk.value = json.data?.status === 'ok'
   } catch { backendVersion.value = '离线'; backendOk.value = false }
+  loadAccounts()
 })
 
 const activeMenu = computed(() => route.path)
@@ -64,7 +124,7 @@ const menuRoutes = computed(() => {
 const iconMap: Record<string, string> = {
   Odometer: '⌘', User: '👤', EditPen: '✎', Promotion: '⇧',
   DataAnalysis: '↗', Document: '▤', UserFilled: '◉', Connection: '◎',
-  Aim: '◎', MagicStick: '✦',
+  Aim: '◎', MagicStick: '✦', Calendar: '📅', ChatDotSquare: '💬',
 }
 
 function getIcon(name: any): string {
@@ -92,64 +152,84 @@ function toggleCollapse() { isCollapsed.value = !isCollapsed.value }
     height: 56px; display: flex; align-items: center; gap: 10px;
     padding: 0 18px; cursor: pointer;
     &-icon {
-      width: 30px; height: 30px; border-radius: $radius-sm;
-      background: $color-blue; color: #fff;
+      width: 30px; height: 30px; border-radius: 6px;
+      background: #409eff; color: #fff;
       display: flex; align-items: center; justify-content: center;
       font-weight: 700; font-size: 14px; flex-shrink: 0;
     }
-    &-text { font-size: 16px; font-weight: 600; color: $color-text-primary; white-space: nowrap; letter-spacing: -0.3px; }
+    &-text { font-size: 16px; font-weight: 600; color: #fff; white-space: nowrap; }
   }
 
   &__menu {
-    flex: 1; overflow-y: auto; padding: 8px 10px;
+    overflow-y: auto; padding: 8px 10px;
     display: flex; flex-direction: column; gap: 2px;
+    flex-shrink: 0;
   }
 
   &__item {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: $radius-md;
-    color: $color-text-secondary; text-decoration: none;
+    padding: 10px 12px; border-radius: 8px;
+    color: rgba(255, 255, 255, 0.65); text-decoration: none;
     font-size: 14px; font-weight: 450;
-    transition: all 0.2s $ease-out;
+    transition: all 0.2s ease;
     white-space: nowrap;
 
-    &:hover {
-      background: rgba(255, 255, 255, 0.06);
-      color: $color-text-primary;
-    }
-
+    &:hover { background: rgba(255, 255, 255, 0.08); color: #fff; }
     &--active {
-      background: rgba(10, 132, 255, 0.12);
-      color: $color-blue;
-      font-weight: 540;
-      &:hover { background: rgba(10, 132, 255, 0.18); }
+      background: rgba(64, 158, 255, 0.15); color: #409eff; font-weight: 540;
+      &:hover { background: rgba(64, 158, 255, 0.22); }
     }
-
-    &-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; line-height: 1; }
+    &-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
     &-label { overflow: hidden; text-overflow: ellipsis; }
   }
 
+  &__accounts {
+    flex: 1; overflow-y: auto; padding: 8px 12px;
+    border-top: 1px solid rgba(255,255,255,0.08); margin-top: 4px;
+  }
+  &__section-title {
+    font-size: 11px; color: rgba(255,255,255,0.35); text-transform: uppercase;
+    padding: 8px 0 6px; letter-spacing: 0.5px;
+  }
+  &__acc-group { margin-bottom: 6px; }
+  &__platform-name {
+    font-size: 10px; color: rgba(255,255,255,0.3); padding: 2px 0; text-transform: uppercase;
+  }
+  &__acc-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border-radius: 6px; cursor: pointer;
+    transition: background 0.15s;
+    &:hover { background: rgba(255,255,255,0.06); }
+    &--active { background: rgba(64,158,255,0.1); }
+  }
+  &__acc-avatar { flex-shrink: 0; }
+  &__acc-name {
+    flex: 1; font-size: 13px; color: rgba(255,255,255,0.75);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  &__acc-followers {
+    font-size: 11px; color: rgba(255,255,255,0.35); flex-shrink: 0;
+  }
+
   &__bottom {
-    padding: 12px 10px; border-top: 1px solid $color-separator;
+    padding: 12px 10px; border-top: 1px solid rgba(255,255,255,0.08);
     display: flex; align-items: center; justify-content: space-between;
   }
-
   &__status {
     display: flex; align-items: center; gap: 6px;
-    padding: 6px 10px; border-radius: $radius-full;
+    padding: 6px 10px; border-radius: 20px;
     background: rgba(255, 69, 58, 0.1);
     &--ok { background: rgba(48, 209, 88, 0.1); }
-    &-dot { width: 6px; height: 6px; border-radius: 50%; background: $color-red; }
-    &--ok &-dot { background: $color-green; }
-    &-text { font-size: 11px; color: $color-text-tertiary; font-family: $font-mono; }
+    &-dot { width: 6px; height: 6px; border-radius: 50%; background: #ff453a; }
+    &--ok &-dot { background: #30d158; }
+    &-text { font-size: 11px; color: rgba(255,255,255,0.45); }
   }
-
   &__toggle {
-    width: 32px; height: 32px; border-radius: $radius-sm;
+    width: 32px; height: 32px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer; color: $color-text-tertiary;
-    transition: all 0.2s $ease-out;
-    &:hover { background: rgba(255, 255, 255, 0.06); color: $color-text-primary; }
+    cursor: pointer; color: rgba(255,255,255,0.45);
+    transition: all 0.2s;
+    &:hover { background: rgba(255,255,255,0.08); color: #fff; }
     &-icon { font-size: 20px; font-weight: 300; }
   }
 }
