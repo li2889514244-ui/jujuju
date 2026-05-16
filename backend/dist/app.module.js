@@ -11,8 +11,8 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const throttler_1 = require("@nestjs/throttler");
 const core_1 = require("@nestjs/core");
-const redis_module_1 = require("./redis/redis.module");
 const prisma_module_1 = require("./prisma/prisma.module");
+const redis_module_1 = require("./redis/redis.module");
 const auth_module_1 = require("./modules/auth/auth.module");
 const users_module_1 = require("./modules/users/users.module");
 const teams_module_1 = require("./modules/teams/teams.module");
@@ -31,6 +31,8 @@ const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
 const jwt_config_1 = require("./config/jwt.config");
 const redis_config_1 = require("./config/redis.config");
 const database_config_1 = require("./config/database.config");
+const scan_bind_module_1 = require("./modules/scan-bind/scan-bind.module");
+const calendar_module_1 = require("./modules/calendar/calendar.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -40,15 +42,28 @@ exports.AppModule = AppModule = __decorate([
             config_1.ConfigModule.forRoot({
                 isGlobal: true,
                 envFilePath: '.env',
-                load: [jwt_config_1.default, redis_config_1.default, database_config_1.default],
+                load: [jwt_config_1.default, redis_config_1.default, database_config_1.default
+      ],
             }),
             throttler_1.ThrottlerModule.forRoot([
-                { name: 'short', ttl: 1000, limit: 10 },
-                { name: 'medium', ttl: 10000, limit: 50 },
-                { name: 'long', ttl: 60000, limit: 100 },
+                {
+                    name: 'short',
+                    ttl: 1000,
+                    limit: 10,
+                },
+                {
+                    name: 'medium',
+                    ttl: 10000,
+                    limit: 50,
+                },
+                {
+                    name: 'long',
+                    ttl: 60000,
+                    limit: 100,
+                },
             ]),
-            redis_module_1.RedisModule,
             prisma_module_1.PrismaModule,
+            redis_module_1.RedisModule,
             auth_module_1.AuthModule,
             users_module_1.UsersModule,
             teams_module_1.TeamsModule,
@@ -63,10 +78,18 @@ exports.AppModule = AppModule = __decorate([
             scheduler_module_1.SchedulerModule,
             content_review_module_1.ContentReviewModule,
             notifications_module_1.NotificationsModule,
+            scan_bind_module_1.ScanBindModule,
+            calendar_module_1.CalendarModule,
         ],
         providers: [
-            { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },
-            { provide: core_1.APP_GUARD, useClass: throttler_1.ThrottlerGuard },
+            {
+                provide: core_1.APP_GUARD,
+                useClass: jwt_auth_guard_1.JwtAuthGuard,
+            },
+            {
+                provide: core_1.APP_GUARD,
+                useClass: throttler_1.ThrottlerGuard,
+            },
         ],
     })
 ], AppModule);

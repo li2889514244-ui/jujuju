@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateAccountDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const prisma_enums_1 = require("../../../common/prisma-enums");
+const client_1 = require("@prisma/client"); const prisma_enums_1 = require("../../../common/prisma-enums");
 class CreateAccountDto {
 }
 exports.CreateAccountDto = CreateAccountDto;

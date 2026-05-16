@@ -1,4 +1,4 @@
-import { Role } from '../../../common/prisma-enums';
+import { Role } from '@prisma/client';
 export declare class InviteMemberDto {
     email: string;
     role: Role;

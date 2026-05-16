@@ -5,11 +5,11 @@ export declare class NotificationsController {
     findAll(userId: string, page?: number, limit?: number, unreadOnly?: string): Promise<{
         notifications: {
             id: string;
-            type: string;
+            type: import(".prisma/client").$Enums.NotificationType;
             title: string;
             content: string | null;
             read: boolean;
-            metadata: string | null;
+            metadata: import(".prisma/client").Prisma.JsonValue | null;
             createdAt: Date;
             userId: string;
         }[];

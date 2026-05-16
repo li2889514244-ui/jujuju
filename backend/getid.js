@@ -1,0 +1,1 @@
+var p=new(require("@prisma/client").PrismaClient)();p.account.findFirst({select:{id:true,nickname:true,platform:true}}).then(function(a){console.log("ID:"+a.id+" NAME:"+a.nickname+" PLAT:"+a.platform);p.$disconnect()}).catch(function(e){console.log("ERR:"+e.message)})
