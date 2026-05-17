@@ -122,16 +122,21 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         if (cached) return cached;
         const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true, followers: true, status: true } });
         const accountIds = accounts.map(a => a.id);
-        const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
+        const [totalPosts, publishedPosts, failedPosts, statsAgg, dailyAgg] = await Promise.all([
             this.prisma.post.count({ where: { accountId: { in: accountIds } } }),
             this.prisma.post.count({ where: { accountId: { in: accountIds }, status: 'PUBLISHED' } }),
             this.prisma.post.count({ where: { accountId: { in: accountIds }, status: 'FAILED' } }),
+            this.prisma.postStats.aggregate({ where: { post: { accountId: { in: accountIds } } }, _sum: { views: true, likes: true, comments: true, shares: true, saves: true } }),
+            this.prisma.dailyStats.aggregate({ where: { accountId: { in: accountIds } }, _sum: { views: true, likes: true, comments: true, shares: true } }),
         ]);
-        const statsAgg = await this.prisma.postStats.aggregate({ where: { post: { accountId: { in: accountIds } } }, _sum: { views: true, likes: true, comments: true, shares: true, saves: true } });
         const platformCounts = {};
         accounts.forEach(a => { platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1; });
         const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
-        var result = { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews: statsAgg._sum.views || 0, totalLikes: statsAgg._sum.likes || 0, totalComments: statsAgg._sum.comments || 0, totalShares: statsAgg._sum.shares || 0, totalSaves: statsAgg._sum.saves || 0 } };
+        const totalViews = (statsAgg._sum.views || 0) + (dailyAgg._sum.views || 0);
+        const totalLikes = (statsAgg._sum.likes || 0) + (dailyAgg._sum.likes || 0);
+        const totalComments = (statsAgg._sum.comments || 0) + (dailyAgg._sum.comments || 0);
+        const totalShares = (statsAgg._sum.shares || 0) + (dailyAgg._sum.shares || 0);
+        var result = { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews, totalLikes, totalComments, totalShares, totalSaves: statsAgg._sum.saves || 0 } };
         await cacheSet(cacheKey, result, 300);
         return result;
     }
@@ -142,18 +147,20 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         for (const platform of platforms) {
             const ids = accounts.filter(a => a.platform === platform).map(a => a.id);
             const totalFollowers = accounts.filter(a => a.platform === platform).reduce((s, a) => s + a.followers, 0);
-            const [postCount, statsAgg] = await Promise.all([
+            const [postCount, statsAgg, dailyAgg] = await Promise.all([
                 this.prisma.post.count({ where: { accountId: { in: ids }, status: 'PUBLISHED' } }),
                 this.prisma.postStats.aggregate({ where: { post: { accountId: { in: ids } } }, _sum: { views: true, likes: true, comments: true, shares: true } }),
+                this.prisma.dailyStats.aggregate({ where: { accountId: { in: ids } }, _sum: { views: true, likes: true, comments: true, shares: true } }),
             ]);
-            const totalViews = statsAgg._sum.views || 0;
-            const totalEngagement = (statsAgg._sum.likes || 0) + (statsAgg._sum.comments || 0) + (statsAgg._sum.shares || 0);
+            const totalViews = (statsAgg._sum.views || 0) + (dailyAgg._sum.views || 0);
+            const totalLikes = (statsAgg._sum.likes || 0) + (dailyAgg._sum.likes || 0);
+            const totalEngagement = totalLikes + (statsAgg._sum.comments || 0) + (dailyAgg._sum.comments || 0) + (statsAgg._sum.shares || 0) + (dailyAgg._sum.shares || 0);
             const engagementRate = totalViews > 0 ? Math.round((totalEngagement / totalViews) * 10000) / 100 : 0;
             result.push({
                 platform,
                 accounts: ids.length,
                 followers: totalFollowers,
-                likes: statsAgg._sum.likes || 0,
+                likes: totalLikes,
                 publishes: postCount,
                 engagementRate,
             });
@@ -298,7 +305,8 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const baseFollowers = 500 + platformIdx * 300 + ((account.id.charCodeAt(0) || 0) % 100) * 20;
             const dailyGrowthMean = 3 + platformIdx * 2;
             const baseViews = 200 + platformIdx * 150 + ((account.id.charCodeAt(1) || 0) % 100) * 8;
-            await this.prisma.dailyStats.deleteMany({ where: { accountId: account.id } });
+            const existingCount = await this.prisma.dailyStats.count({ where: { accountId: account.id } });
+            if (existingCount === 0) {
             const dailyStatsData = [];
             for (let d = 90; d >= 0; d--) {
                 const date = new Date(now);
@@ -321,6 +329,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             }
             await this.prisma.dailyStats.createMany({ data: dailyStatsData });
             dailyGenerated += dailyStatsData.length;
+            } // end if existingCount === 0
             for (const post of account.posts) {
                 if (post.stats)
                     continue;
@@ -345,19 +354,24 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         };
     }
     async getAccountAnalytics(accountId) {
-        const statsAgg = await this.prisma.postStats.aggregate({
-            where: { post: { accountId } },
-            _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
-        });
+        const [statsAgg, dailyAgg] = await Promise.all([
+            this.prisma.postStats.aggregate({
+                where: { post: { accountId } },
+                _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
+            }),
+            this.prisma.dailyStats.aggregate({
+                where: { accountId },
+                _sum: { views: true, likes: true, comments: true, shares: true },
+            }),
+        ]);
         const totalPosts = await this.prisma.post.count({
             where: { accountId, status: { in: ['PUBLISHED', 'PUBLISHING'] } },
         });
-        const sum = statsAgg._sum;
-        const totalViews = sum.views || 0;
-        const totalLikes = sum.likes || 0;
-        const totalComments = sum.comments || 0;
-        const totalShares = sum.shares || 0;
-        const totalSaves = sum.saves || 0;
+        const totalViews = (statsAgg._sum.views || 0) + (dailyAgg._sum.views || 0);
+        const totalLikes = (statsAgg._sum.likes || 0) + (dailyAgg._sum.likes || 0);
+        const totalComments = (statsAgg._sum.comments || 0) + (dailyAgg._sum.comments || 0);
+        const totalShares = (statsAgg._sum.shares || 0) + (dailyAgg._sum.shares || 0);
+        const totalSaves = statsAgg._sum.saves || 0;
         const avgEngagementRate = totalViews > 0
             ? Math.round(((totalLikes + totalComments + totalShares) / totalViews) * 10000) / 100
             : 0;
