@@ -24,42 +24,54 @@ PLATFORMS = {
 
 # ── 浏览器检测 ──────────────────────────────────────────────
 def _find_browser():
-    """始终使用独立 Chromium，不碰用户个人 Chrome/Edge，避免弹窗冲突"""
-    import subprocess, urllib.request, zipfile
-
+    """检测可用浏览器，返回 (executable_path, channel) 或 (None, channel_name)"""
     CHROMIUM_DIR = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MatrixFlow' / 'chromium'
     CHROMIUM_EXE = CHROMIUM_DIR / 'chrome.exe'
 
+    # 1. Our custom Chromium
     if CHROMIUM_EXE.exists():
-        return str(CHROMIUM_EXE)
+        print(f'[Browser] 使用独立 Chromium: {CHROMIUM_EXE}')
+        return (str(CHROMIUM_EXE), None)
 
-    # 自动下载独立 Chromium（不碰用户浏览器）
-    print('[Browser] 下载独立 Chromium（不影响你的 Chrome）...')
-    CHROMIUM_DIR.mkdir(parents=True, exist_ok=True)
-    url = 'https://storage.googleapis.com/chromium-browser-snapshots/Win/1434191/chrome-win.zip'
-    zip_path = CHROMIUM_DIR / 'chrome-win.zip'
-    try:
-        urllib.request.urlretrieve(url, zip_path)
-        with zipfile.ZipFile(zip_path, 'r') as z:
-            z.extractall(CHROMIUM_DIR)
-        os.remove(zip_path)
-        extracted = CHROMIUM_DIR / 'chrome-win' / 'chrome.exe'
-        if extracted.exists():
-            os.rename(extracted, CHROMIUM_EXE)
-            for item in list((CHROMIUM_DIR / 'chrome-win').iterdir()):
-                try: item.rename(CHROMIUM_DIR / item.name)
-                except: pass
-            try: (CHROMIUM_DIR / 'chrome-win').rmdir()
-            except: pass
-        print('[Browser] Chromium 下载完成')
-        return str(CHROMIUM_EXE)
-    except Exception as e:
-        print(f'[Browser] 下载失败: {e}')
-        print('[Browser] 请手动下载 Chromium 放到: ' + str(CHROMIUM_DIR))
-        return None
+    # 2. System Chrome
+    for p in [
+        os.environ.get('PROGRAMFILES', 'C:\\Program Files') + '\\Google\\Chrome\\Application\\chrome.exe',
+        os.environ.get('ProgramFiles(x86)', 'C:\\Program Files (x86)') + '\\Google\\Chrome\\Application\\chrome.exe',
+        os.environ.get('LOCALAPPDATA', '') + '\\Google\\Chrome\\Application\\chrome.exe',
+    ]:
+        if os.path.exists(p):
+            print(f'[Browser] 使用系统 Chrome: {p}')
+            return (p, None)
 
-_BROWSER_PATH = _find_browser()
-print(f'[Browser] 使用: {_BROWSER_PATH}')
+    # 3. System Edge
+    for p in [
+        os.environ.get('PROGRAMFILES', 'C:\\Program Files') + '\\Microsoft\\Edge\\Application\\msedge.exe',
+        os.environ.get('ProgramFiles(x86)', 'C:\\Program Files (x86)') + '\\Microsoft\\Edge\\Application\\msedge.exe',
+    ]:
+        if os.path.exists(p):
+            print(f'[Browser] 使用系统 Edge: {p}')
+            return (p, None)
+
+    # 4. Fallback: let Playwright find its own channel
+    print('[Browser] 未检测到本地浏览器，尝试 Playwright channel...')
+    return (None, 'chrome')
+
+
+_BROWSER_PATH, _BROWSER_CHANNEL = _find_browser()
+print(f'[Browser] path={_BROWSER_PATH} channel={_BROWSER_CHANNEL}')
+
+
+def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
+    """Return kwargs for chromium.launch based on detected browser"""
+    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN']
+    if extra_args:
+        args.extend(extra_args)
+    opts = {'headless': headless, 'args': args}
+    if _BROWSER_PATH:
+        opts['executable_path'] = _BROWSER_PATH
+    elif _BROWSER_CHANNEL:
+        opts['channel'] = _BROWSER_CHANNEL
+    return opts
 
 # ── HTML UI ──────────────────────────────────────────────────
 UI_HTML = r'''<!DOCTYPE html>
@@ -498,6 +510,19 @@ _METRIC_PATTERNS = {
 }
 
 
+def _sanitize_text(s: str) -> str:
+    """Remove garbled characters from scraped text (double-encoding cleanup)"""
+    if not s: return ''
+    try:
+        # Try to fix common double-encoding: latin-1 bytes interpreted as UTF-8
+        fixed = s.encode('latin-1', errors='replace').decode('utf-8', errors='replace')
+        if fixed.count('�') < s.count('�'):
+            return fixed
+    except: pass
+    # Replace any remaining replacement chars with empty
+    return s.replace('�', '').strip()
+
+
 def _parse_metric_num(s: str) -> int:
     s = s.strip().replace(',', '').replace(' ', '')
     if s.endswith(('万', 'w', 'W')):
@@ -586,7 +611,7 @@ async def _scrape_dashboard(page) -> dict:
             }
             return result;
         }''')
-        nick = info.get('nickname')
+        nick = _sanitize_text(info.get('nickname') or '')
         if nick and nick not in _NAV_NAMES:
             metrics['_nickname'] = nick
         if info.get('avatar'):
@@ -702,12 +727,7 @@ async def _scrape_all(accounts: list) -> list:
 
     results = []
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(
-            headless=True,
-            executable_path=_BROWSER_PATH,
-            args=['--disable-blink-features=AutomationControlled',
-                  '--no-sandbox'],
-        )
+        browser = await pw.chromium.launch(**_launch_browser_opts(headless=True))
         for acc in accounts:
             aid = (acc.get('id') or '').strip()
             platform = (acc.get('platform') or '').strip().upper()
@@ -946,11 +966,7 @@ def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
             try:
                 from playwright.async_api import async_playwright
                 async with async_playwright() as pw:
-                    browser = await pw.chromium.launch(
-                        headless=False,
-                        executable_path=_BROWSER_PATH,
-                        args=['--disable-blink-features=AutomationControlled','--lang=zh-CN','--start-maximized']
-                    )
+                    browser = await pw.chromium.launch(**_launch_browser_opts(headless=False, extra_args=['--start-maximized']))
                     context = await browser.new_context(
                         viewport={'width':1280,'height':800},
                         user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -1007,14 +1023,14 @@ def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
                     import re, requests
                     page_text = await page.evaluate('() => document.body.innerText')
                     real_id = ''
-                    nickname = info['name']
+                    nickname = _sanitize_text(info['name'])
                     m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
                     if m: real_id = m.group(1).strip()
                     # Find nickname (line before 视频号ID)
                     lines = page_text.split('\n')
                     for i, line in enumerate(lines):
                         if real_id and real_id in line and i > 0:
-                            candidate = lines[i-1].strip()
+                            candidate = _sanitize_text(lines[i-1].strip())
                             if candidate and len(candidate) < 30:
                                 nickname = candidate
                             break

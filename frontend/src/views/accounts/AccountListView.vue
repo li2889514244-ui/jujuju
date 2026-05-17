@@ -120,12 +120,27 @@
     <el-dialog v-model="showGroupDialog" title="新建分组" width="400px">
       <el-form>
         <el-form-item label="分组名称">
-          <el-input v-model="newGroupName" placeholder="请输入分组名称" />
+          <el-input v-model="newGroupName" placeholder="请输入分组名称" @keyup.enter="handleCreateGroup" />
         </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="showGroupDialog = false">取消</el-button>
         <el-button type="primary" @click="handleCreateGroup">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- Move Dialog -->
+    <el-dialog v-model="showMoveDialog" title="移动到分组" width="400px">
+      <el-form>
+        <el-form-item label="目标分组">
+          <el-select v-model="moveTargetGroup" placeholder="选择分组" style="width:100%">
+            <el-option v-for="g in accountStore.groups" :key="g.id" :label="g.name" :value="g.id" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showMoveDialog = false">取消</el-button>
+        <el-button type="primary" @click="handleConfirmMove">确定移动</el-button>
       </template>
     </el-dialog>
 
@@ -203,6 +218,8 @@ const filter = reactive({
 const selectedIds = ref<string[]>([])
 const showGroupDialog = ref(false)
 const newGroupName = ref('')
+const showMoveDialog = ref(false)
+const moveTargetGroup = ref('')
 const showAddDialog = ref(false)
 const showManualDialog = ref(false)
 const companionOnline = ref(false)
@@ -323,8 +340,22 @@ async function handleBatchDelete() {
 }
 
 async function handleBatchMove() {
-  // Show group selection dialog in production
-  ElMessage.info('请选择目标分组')
+  if (!selectedIds.value.length) { ElMessage.warning('请先选择账号'); return }
+  moveTargetGroup.value = ''
+  showMoveDialog.value = true
+}
+
+async function handleConfirmMove() {
+  if (!moveTargetGroup.value) { ElMessage.warning('请选择目标分组'); return }
+  try {
+    await accountsApi.moveToGroup(selectedIds.value, moveTargetGroup.value)
+    showMoveDialog.value = false
+    selectedIds.value = []
+    await accountStore.fetchAccounts()
+    ElMessage.success('移动成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e?.message || '移动失败')
+  }
 }
 
 async function handleCreateGroup() {
@@ -332,11 +363,15 @@ async function handleCreateGroup() {
     ElMessage.warning('请输入分组名称')
     return
   }
-  await accountsApi.createGroup(newGroupName.value)
-  showGroupDialog.value = false
-  newGroupName.value = ''
-  accountStore.fetchGroups()
-  ElMessage.success('创建成功')
+  try {
+    await accountsApi.createGroup(newGroupName.value.trim())
+    showGroupDialog.value = false
+    newGroupName.value = ''
+    await accountStore.fetchGroups()
+    ElMessage.success('创建成功')
+  } catch (e: any) {
+    ElMessage.error(e?.response?.data?.message || e?.message || '创建失败')
+  }
 }
 
 function exportCSV() {

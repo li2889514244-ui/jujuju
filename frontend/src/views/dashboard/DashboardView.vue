@@ -17,9 +17,19 @@
       </div>
     </div>
 
-    <!-- 汇总卡片 -->
+    <!-- 分组切换 -->
+    <div class="dashboard__group-tabs" v-if="accountGroups.length > 0">
+      <el-radio-group v-model="selectedGroup" size="small" @change="onGroupChange">
+        <el-radio-button value="all">全部 ({{ accountRows.length }})</el-radio-button>
+        <el-radio-button v-for="g in accountGroups" :key="g.name" :value="g.name">
+          {{ g.name || '未分组' }} ({{ g.accounts.length }})
+        </el-radio-button>
+      </el-radio-group>
+    </div>
+
+    <!-- 汇总卡片 — 跟随分组筛选 -->
     <el-row :gutter="16" class="dashboard__summary">
-      <el-col :xs="12" :sm="6" v-for="card in summaryCards" :key="card.label">
+      <el-col :xs="12" :sm="6" v-for="card in groupSummaryCards" :key="card.label">
         <div class="summary-card" :style="{ borderTopColor: card.color }">
           <div class="summary-card__label">{{ card.label }}</div>
           <div class="summary-card__value">{{ card.value }}</div>
@@ -37,7 +47,7 @@
           <el-button type="primary" @click="$router.push('/accounts')">添加平台账号</el-button>
         </el-empty>
       </div>
-      <div v-for="group in accountGroups" :key="group.name" class="group-card">
+      <div v-for="group in displayGroups" :key="group.name" class="group-card">
         <div class="group-card__header">
           <div class="group-card__title">
             <span class="group-card__name">{{ group.name || '未分组' }}</span>
@@ -138,6 +148,7 @@ const summaryCards = ref([
   { label: '总点赞', value: '0', trend: null as number | null, color: '#67c23a' },
   { label: '总互动', value: '0', trend: null as number | null, color: '#f56c6c' },
 ])
+const selectedGroup = ref('all')
 
 interface AccountRow {
   id: string
@@ -158,6 +169,31 @@ const accountRows = ref<AccountRow[]>([])
 const accountGroups = ref<{ name: string; accounts: AccountRow[]; totalFollowers: number; totalViews: number; totalLikes: number }[]>([])
 const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
 const followerTrendData = ref<number[]>([])
+
+const displayGroups = computed(() => {
+  if (selectedGroup.value === 'all') return accountGroups.value
+  return accountGroups.value.filter(g => g.name === selectedGroup.value)
+})
+const filteredRows = computed(() => {
+  if (selectedGroup.value === 'all') return accountRows.value
+  return accountRows.value.filter(r => (r as any).groupName === selectedGroup.value)
+})
+const groupSummaryCards = computed(() => {
+  const rows = filteredRows.value
+  const totalFollowers = rows.reduce((s, r) => s + r.followers, 0)
+  const totalViews = rows.reduce((s, r) => s + r.views, 0)
+  const totalLikes = rows.reduce((s, r) => s + r.likes, 0)
+  const totalInteract = rows.reduce((s, r) => s + r.comments + r.shares, 0)
+  return [
+    { label: '总粉丝', value: formatNum(totalFollowers), trend: null as number | null, color: '#409eff' },
+    { label: '总播放量', value: formatNum(totalViews), trend: null as number | null, color: '#e6a23c' },
+    { label: '总点赞', value: formatNum(totalLikes), trend: null as number | null, color: '#67c23a' },
+    { label: '总互动', value: formatNum(totalInteract), trend: null as number | null, color: '#f56c6c' },
+  ]
+})
+function onGroupChange() {
+  // groupSummaryCards is reactive, no-op needed
+}
 
 function formatNum(num: number): string {
   if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'

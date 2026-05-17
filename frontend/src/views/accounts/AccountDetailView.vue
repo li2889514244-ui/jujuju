@@ -32,8 +32,6 @@
           </el-descriptions>
 
           <div class="account-detail__actions">
-            <el-button type="primary" @click="handleCheckCookie">检测Cookie</el-button>
-            <el-button type="warning" @click="handleRefreshCookie">刷新Cookie</el-button>
             <el-button type="danger" @click="handleDelete">删除账号</el-button>
           </div>
         </el-card>
