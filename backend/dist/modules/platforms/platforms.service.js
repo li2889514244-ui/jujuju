@@ -266,6 +266,42 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             take,
         };
     }
+    async reportPostStats(userId, accountId, posts) {
+        const account = await this.prisma.account.findFirst({
+            where: { id: accountId, userId: userId }
+        });
+        if (!account) throw new common_1.NotFoundException('Account not found');
+        let created = 0;
+        let updated = 0;
+        for (const p of posts) {
+            if (!p.title || !p.views) continue;
+            try {
+                // Upsert post by title + accountId
+                const existing = await this.prisma.post.findFirst({
+                    where: { accountId, title: p.title }
+                });
+                let postId = existing?.id;
+                if (!postId) {
+                    const newPost = await this.prisma.post.create({
+                        data: { accountId, title: p.title, status: 'PUBLISHED', platformUrl: '' }
+                    });
+                    postId = newPost.id;
+                    created++;
+                }
+                // Upsert post stats
+                await this.prisma.postStats.upsert({
+                    where: { postId },
+                    create: { postId, views: p.views || 0, likes: p.likes || 0, comments: p.comments || 0, shares: p.shares || 0, saves: 0 },
+                    update: { views: p.views || 0, likes: p.likes || 0, comments: p.comments || 0, shares: p.shares || 0 },
+                });
+                updated++;
+            } catch (e) {
+                this.logger.warn('PostStats upsert failed: ' + e.message);
+            }
+        }
+        this.logger.log('reportPostStats: ' + created + ' created, ' + updated + ' updated');
+        return { created, updated };
+    }
 };
 exports.PlatformsService = PlatformsService;
 exports.PlatformsService = PlatformsService = PlatformsService_1 = __decorate([

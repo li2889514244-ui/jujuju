@@ -2,13 +2,17 @@
 披星云桌面伴侣 v2.4 — 带 UI 界面，一键扫码 + 自动数据采集
 用法: python companion_app.py
 """
-import asyncio, json, os, re, threading, time, uuid, base64
+import asyncio, json, os, re, sys, threading, time, uuid, base64
 from pathlib import Path
 from queue import Queue, Empty
 from flask import Flask, request, jsonify, Response, make_response
 
 app = Flask(__name__)
-BASE_DIR = Path(__file__).parent.resolve()
+# Use EXE directory or script directory for persistent config
+if getattr(sys, 'frozen', False):
+    BASE_DIR = Path(sys.executable).parent.resolve()
+else:
+    BASE_DIR = Path(__file__).parent.resolve()
 
 # ── 平台配置 ──────────────────────────────────────────────────
 PLATFORMS = {
@@ -17,6 +21,45 @@ PLATFORMS = {
     'kuaishou': {'name':'快手','url':'https://cp.kuaishou.com/','key':'KUAISHOU'},
     'tencent':  {'name':'视频号','url':'https://channels.weixin.qq.com/','key':'WECHAT_VIDEO'},
 }
+
+# ── 浏览器检测 ──────────────────────────────────────────────
+def _find_browser():
+    """始终使用独立 Chromium，不碰用户个人 Chrome/Edge，避免弹窗冲突"""
+    import subprocess, urllib.request, zipfile
+
+    CHROMIUM_DIR = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MatrixFlow' / 'chromium'
+    CHROMIUM_EXE = CHROMIUM_DIR / 'chrome.exe'
+
+    if CHROMIUM_EXE.exists():
+        return str(CHROMIUM_EXE)
+
+    # 自动下载独立 Chromium（不碰用户浏览器）
+    print('[Browser] 下载独立 Chromium（不影响你的 Chrome）...')
+    CHROMIUM_DIR.mkdir(parents=True, exist_ok=True)
+    url = 'https://storage.googleapis.com/chromium-browser-snapshots/Win/1434191/chrome-win.zip'
+    zip_path = CHROMIUM_DIR / 'chrome-win.zip'
+    try:
+        urllib.request.urlretrieve(url, zip_path)
+        with zipfile.ZipFile(zip_path, 'r') as z:
+            z.extractall(CHROMIUM_DIR)
+        os.remove(zip_path)
+        extracted = CHROMIUM_DIR / 'chrome-win' / 'chrome.exe'
+        if extracted.exists():
+            os.rename(extracted, CHROMIUM_EXE)
+            for item in list((CHROMIUM_DIR / 'chrome-win').iterdir()):
+                try: item.rename(CHROMIUM_DIR / item.name)
+                except: pass
+            try: (CHROMIUM_DIR / 'chrome-win').rmdir()
+            except: pass
+        print('[Browser] Chromium 下载完成')
+        return str(CHROMIUM_EXE)
+    except Exception as e:
+        print(f'[Browser] 下载失败: {e}')
+        print('[Browser] 请手动下载 Chromium 放到: ' + str(CHROMIUM_DIR))
+        return None
+
+_BROWSER_PATH = _find_browser()
+print(f'[Browser] 使用: {_BROWSER_PATH}')
 
 # ── HTML UI ──────────────────────────────────────────────────
 UI_HTML = r'''<!DOCTYPE html>
@@ -57,9 +100,20 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
 .step{display:flex;align-items:center;gap:8px;padding:8px 0;color:#666;font-size:13px}
 .step .num{width:24px;height:24px;border-radius:50%;background:#667eea;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
 </style></head><body>
-<div class="header"><div class="dot"></div><h1>披星云桌面伴侣</h1><span style="opacity:.7;font-size:13px" v-if="siteConnected">已连接网站</span></div>
+<div class="header"><div class="dot"></div><h1>披星云桌面伴侣</h1><span style="opacity:.7;font-size:13px" v-if="configured">已连接</span></div>
 
-<div class="main">
+<!-- Login panel -->
+<div class="login-panel" v-if="!configured" style="max-width:480px;margin:24px auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08)">
+  <h2 style="margin-bottom:20px;color:#333">登录披星云</h2>
+  <div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:4px">邮箱</label><input v-model="loginEmail" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px" placeholder="输入邮箱"></div>
+  <div style="margin-bottom:8px"><label style="display:block;font-size:13px;color:#666;margin-bottom:4px">密码</label><input v-model="loginPass" type="password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px" placeholder="输入密码" @keyup.enter="doLogin"></div>
+  <div style="margin-bottom:20px"><label style="font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" v-model="rememberPwd" style="width:16px;height:16px"> 记住密码（自动登录）</label></div>
+  <div v-if="loginError" style="color:#f44336;font-size:13px;margin-bottom:12px">{{loginError}}</div>
+  <button class="btn" style="width:100%;padding:12px;font-size:15px" @click="doLogin" :disabled="loginLoading">{{loginLoading?'登录中...':'登录'}}</button>
+  <div v-if="loginHint" style="text-align:center;margin-top:12px;color:#999;font-size:12px">{{loginHint}}</div>
+</div>
+
+<div class="main" v-if="configured">
   <div class="card">
     <h2>选择平台</h2>
     <div class="platforms">
@@ -69,7 +123,7 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
     </div>
   </div>
   <div class="card">
-    <h2>{{ selectedPlatform ? selectedPlatform.name + ' - 扫码登录' : '请从 MatrixFlow 网站发起绑定' }}</h2>
+    <h2>{{ selectedPlatform ? selectedPlatform.name + ' - 扫码登录' : (configured ? '选择平台开始扫码绑定' : '请先登录') }}</h2>
     <div class="scan-area">
       <template v-if="status==='idle'">
         <div style="color:#999;font-size:15px;line-height:1.8">
@@ -89,10 +143,19 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
   </div>
 </div>
 
-<div class="status-bar">
-  <div class="ind" :class="siteConnected?'on':'off'"></div>
-  <span>{{ siteConnected ? '已连接到 MatrixFlow 网站' : '等待网站连接... (在 MatrixFlow 网页中点击"添加账号")' }}</span>
-  <span style="margin-left:auto;color:#999;font-size:12px">v2.4</span>
+<div class="status-bar" v-if="configured" style="flex-direction:column;align-items:stretch;gap:8px">
+  <div style="display:flex;align-items:center;gap:12px">
+    <div class="ind" :class="siteConnected?'on':'off'"></div>
+    <span>{{ siteConnected ? '已连接到网站' : '等待网站连接...' }}</span>
+    <span style="margin-left:auto;color:#999;font-size:12px">v2.5</span>
+  </div>
+  <div v-if="cookieAlerts.length" style="display:flex;flex-direction:column;gap:4px">
+    <div v-for="a in cookieAlerts" :key="a.platform" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:6px;font-size:12px" :style="{background:a.expired?'#fff3f3':'#fff8e6'}">
+      <span :style="{color:a.expired?'#f44336':'#e6a23c'}">{{a.expired?'⚠':'⚡'}}</span>
+      <span>{{a.name}} Cookie {{a.expired?'已过期('+a.hours+'h)':'即将过期('+a.hours+'h)'}} — 需重新扫码</span>
+    </div>
+  </div>
+  <div v-if="cookieStatus && !cookieAlerts.length" style="font-size:12px;color:#67c23a">所有平台 Cookie 正常 (最新 {{cookieFreshness}} 前)</div>
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -100,15 +163,52 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
 const {createApp}=Vue
 createApp({data(){return{
   platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'}],
-  selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:''
+  selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
+  configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
+  cookieStatus:null,cookieAlerts:[],cookieFreshness:''
 }},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
 methods:{
-  selectPlatform(id){
+  async loadCookieStatus(){
+    try{const r=await fetch('/api/cookie-status');const j=await r.json();
+      this.cookieStatus=j.by_platform;
+      this.cookieAlerts=[...j.expired.map(e=>({...e,expired:true})),...j.warnings.map(w=>({...w,expired:false}))];
+      if(!this.cookieAlerts.length&&j.by_platform){
+        const minH=Math.min(...Object.values(j.by_platform).filter(h=>h<900));
+        this.cookieFreshness=minH<1?Math.round(minH*60)+'分钟':Math.round(minH)+'小时';
+      }
+    }catch(e){}
+  },
+  async checkConfig(){
+    try{const r=await fetch('/api/config');const j=await r.json();this.configured=j.configured}catch(e){this.configured=false}
+  },
+  async doLogin(){
+    if(!this.loginEmail||!this.loginPass){this.loginError='请输入邮箱和密码';return}
+    this.loginLoading=true;this.loginError=''
+    try{
+      const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:this.loginEmail,password:this.loginPass})})
+      const j=await r.json()
+      if(j.error){this.loginError=j.error}
+      else{this.configured=true;this.loginEmail='';this.loginPass=''}
+    }catch(e){this.loginError='登录失败: '+e.message}
+    this.loginLoading=false
+  },
+  async selectPlatform(id){
     if(this.status==='loading'||this.status==='browser'||this.status==='uploading')return
     this.selected=id;this.errorMsg=''
-    const token=this.tokenFromUrl||this.getParam('token')
-    const apiUrl=this.apiFromUrl||this.getParam('api')||'https://ddddkiii.com/api/v1'
-    if(!token){this.errorMsg='请先从 MatrixFlow 网页的"添加账号"发起绑定（需要登录）';this.status='error';return}
+    // Try URL params first (website-initiated), then companion's saved token
+    let token=this.tokenFromUrl||this.getParam('token')
+    let apiUrl=this.apiFromUrl||this.getParam('api')||'https://ddddkiii.com/api/v1'
+    if(!token){
+      try{
+        const r=await fetch('/api/config');const j=await r.json()
+        if(j.token_set){
+          // Get the actual token from server-side session
+          const tr=await fetch('/api/get-token');const tj=await tr.json()
+          token=tj.token;apiUrl=j.api_url
+        }
+      }catch(e){}
+    }
+    if(!token){this.errorMsg='请先登录披星云账号再扫码绑定';this.status='error';return}
     this.startScan(token,apiUrl)
   },
   getParam(k){return new URLSearchParams(location.search).get(k)},
@@ -140,11 +240,14 @@ cancelScan(){
 }
 },
 mounted(){
+  this.checkConfig()
+  this.loadCookieStatus()
   this.platformFromUrl=this.getParam('platform')
   this.tokenFromUrl=this.getParam('token')
   this.apiFromUrl=this.getParam('api')
   if(this.platformFromUrl&&this.tokenFromUrl){this.selected=this.platformFromUrl}
   setInterval(async()=>{try{const r=await fetch('/health');if(r.ok)this.siteConnected=true}catch{this.siteConnected=false}},3000)
+  setInterval(()=>{if(this.configured)this.loadCookieStatus()},60000) // refresh cookie status every minute
 }}).mount('body')
 </script></body></html>'''
 
@@ -158,10 +261,21 @@ CONFIG_FILE = BASE_DIR / 'companion_config.json'
 def _load_config() -> dict:
     if CONFIG_FILE.exists():
         try:
-            return json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
+            cfg = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
+            return cfg
         except Exception:
             pass
-    return {'api_url': '', 'token': ''}
+    # For EXE: try to copy bundled config on first run
+    if getattr(sys, 'frozen', False):
+        try:
+            bundled = Path(sys._MEIPASS) / 'companion_config.json'
+            if bundled.exists():
+                cfg = json.loads(bundled.read_text(encoding='utf-8'))
+                if cfg.get('token'):
+                    _save_config(cfg)
+                    return cfg
+        except: pass
+    return {'api_url': 'https://ddddkiii.com/api/v1', 'token': ''}
 
 
 def _save_config(cfg: dict):
@@ -172,17 +286,45 @@ def _save_config(cfg: dict):
 _CONFIG_CACHE = _load_config()
 
 PLATFORM_DASHBOARDS = {
-    'DOUYIN':       ('https://creator.douyin.com',       '.douyin.com'),
-    'KUAISHOU':     ('https://cp.kuaishou.com',          '.kuaishou.com'),
-    'XIAOHONGSHU':  ('https://creator.xiaohongshu.com',  '.xiaohongshu.com'),
-    'BILIBILI':     ('https://member.bilibili.com',      '.bilibili.com'),
-    'WEIBO':        ('https://weibo.com',                '.weibo.com'),
-    'WECHAT_VIDEO': ('https://channels.weixin.qq.com',   '.weixin.qq.com'),
+    'DOUYIN':       ('https://creator.douyin.com',       '.douyin.com',       'https://creator.douyin.com/creator-micro/data/content', 'https://creator.douyin.com/creator-micro/content/manage'),
+    'KUAISHOU':     ('https://cp.kuaishou.com',          '.kuaishou.com',     'https://cp.kuaishou.com/article/manage',               'https://cp.kuaishou.com/article/publish/list'),
+    'XIAOHONGSHU':  ('https://creator.xiaohongshu.com',  '.xiaohongshu.com',  'https://creator.xiaohongshu.com/note-manage',          'https://creator.xiaohongshu.com/note-manage/notes'),
+    'BILIBILI':     ('https://member.bilibili.com',      '.bilibili.com',     'https://member.bilibili.com/platform/upload/video',   'https://member.bilibili.com/platform/content'),
+    'WEIBO':        ('https://weibo.com',                '.weibo.com',        None,                                                     None),
+    'WECHAT_VIDEO': ('https://channels.weixin.qq.com',   '.weixin.qq.com',    'https://channels.weixin.qq.com/platform/data-center', 'https://channels.weixin.qq.com/platform/post/list'),
 }
 
 _collector_running = False
 _collector_last_run = None
 _collector_last_error = None
+
+# Cookie freshness tracking
+_COOKIE_AGE_WARN_HOURS = 23  # warn when > 23 hours
+_COOKIE_AGE_EXPIRED_HOURS = 48  # consider expired > 48 hours
+
+
+def _record_scan_time(platform_key: str):
+    """Record last successful scan time for a platform"""
+    cfg = _load_config()
+    scans = cfg.get('last_scan_times', {})
+    scans[platform_key] = time.time()
+    cfg['last_scan_times'] = scans
+    _save_config(cfg)
+    global _CONFIG_CACHE
+    _CONFIG_CACHE = cfg
+
+
+def _get_cookie_status() -> dict:
+    """Returns dict of platform -> hours since last scan"""
+    cfg = _load_config()
+    scans = cfg.get('last_scan_times', {})
+    now = time.time()
+    result = {}
+    for platform_key in PLATFORMS:
+        last = scans.get(platform_key, 0)
+        hours = (now - last) / 3600 if last else 999
+        result[platform_key] = round(hours, 1)
+    return result
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -194,6 +336,69 @@ active_sessions = {}  # session_id -> queue
 # ══════════════════════════════════════════════════════════════════
 # Config endpoints (data collector)
 # ══════════════════════════════════════════════════════════════════
+
+@app.route('/api/login', methods=['POST'])
+def handle_login():
+    import requests as req
+    data = request.get_json() or {}
+    email = data.get('email', '')
+    password = data.get('password', '')
+    remember = data.get('remember', False)
+    if not email or not password:
+        return jsonify({'error': '邮箱和密码不能为空'})
+    cfg = _load_config()
+    api_url = cfg.get('api_url', 'https://ddddkiii.com/api/v1')
+    try:
+        r = req.post(f'{api_url}/auth/login', json={'email': email, 'password': password}, timeout=15)
+        if r.status_code == 200 or r.status_code == 201:
+            body = r.json()
+            inner = body.get('data') or body
+            token = inner.get('accessToken') or inner.get('access_token') or ''
+            if token:
+                cfg['token'] = token
+                cfg['api_url'] = api_url
+                if remember:
+                    cfg['saved_email'] = email
+                    cfg['saved_password'] = password
+                _save_config(cfg)
+                _CONFIG_CACHE.update(cfg)
+                return jsonify({'status': 'ok', 'message': '登录成功'})
+        msg = '邮箱或密码错误'
+        try:
+            body = r.json()
+            msg = body.get('message') or msg
+        except: pass
+        return jsonify({'error': msg})
+    except Exception as e:
+        return jsonify({'error': f'无法连接服务器: {str(e)[:80]}'})
+
+@app.route('/api/get-token')
+def get_token():
+    cfg = _load_config()
+    return jsonify({'token': cfg.get('token', ''), 'api_url': cfg.get('api_url', '')})
+
+@app.route('/api/auto-login', methods=['POST'])
+def auto_login():
+    import requests as req
+    cfg = _load_config()
+    email = cfg.get('saved_email', '')
+    password = cfg.get('saved_password', '')
+    if not email or not password:
+        return jsonify({'configured': bool(cfg.get('token'))})
+    api_url = cfg.get('api_url', 'https://ddddkiii.com/api/v1')
+    try:
+        r = req.post(f'{api_url}/auth/login', json={'email': email, 'password': password}, timeout=15)
+        if r.status_code in (200, 201):
+            body = r.json()
+            inner = body.get('data') or body
+            token = inner.get('accessToken') or inner.get('access_token') or ''
+            if token:
+                cfg['token'] = token
+                _save_config(cfg)
+                _CONFIG_CACHE.update(cfg)
+                return jsonify({'configured': True, 'message': '自动登录成功'})
+    except: pass
+    return jsonify({'configured': bool(cfg.get('token'))})
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def handle_config():
@@ -207,20 +412,44 @@ def handle_config():
         _save_config(cfg)
         _CONFIG_CACHE = cfg
         return jsonify({'status': 'ok'})
-    safe = {k: v for k, v in _CONFIG_CACHE.items() if k != 'token'}
+    safe = {k: v for k, v in _CONFIG_CACHE.items() if k not in ('token', 'saved_password')}
     if _CONFIG_CACHE.get('token'):
         safe['token_set'] = True
+    if _CONFIG_CACHE.get('saved_email'):
+        safe['saved_email'] = _CONFIG_CACHE['saved_email']
+    safe['configured'] = bool(_CONFIG_CACHE.get('token'))
     return jsonify(safe)
 
 
 @app.route('/api/data-collection/status')
 def data_collection_status():
+    cookie_status = _get_cookie_status()
     return jsonify({
         'running': _collector_running,
         'configured': bool(_CONFIG_CACHE.get('api_url')
                            and _CONFIG_CACHE.get('token')),
         'last_run': _collector_last_run,
         'last_error': _collector_last_error,
+        'cookies_age_hours': cookie_status,
+    })
+
+
+@app.route('/api/cookie-status')
+def api_cookie_status():
+    """Return cookie freshness per platform, + warn/expired flags"""
+    status = _get_cookie_status()
+    warnings = []
+    expired = []
+    for platform_key, hours in status.items():
+        if hours >= _COOKIE_AGE_EXPIRED_HOURS:
+            expired.append({'platform': platform_key, 'name': PLATFORMS[platform_key]['name'], 'hours': hours})
+        elif hours >= _COOKIE_AGE_WARN_HOURS:
+            warnings.append({'platform': platform_key, 'name': PLATFORMS[platform_key]['name'], 'hours': hours})
+    return jsonify({
+        'by_platform': status,
+        'warnings': warnings,
+        'expired': expired,
+        'needs_rescan': len(warnings) + len(expired) > 0,
     })
 
 
@@ -240,6 +469,8 @@ _METRIC_PATTERNS = {
         # 抖音/douyin specific: profile section "粉丝\n159" or "粉丝：159"
         re.compile(r'(?:^|\n)粉丝\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
         re.compile(r'粉丝数?\s*[：:]\s*([\d,.]+[万wW]?)'),
+        # 视频号: 关注者4764
+        re.compile(r'关注者\s*(\d[\d,.]*)'),
     ],
     'following': [
         # Use MULTILINE to anchor to line start, avoid matching nav/sidebar "关注"
@@ -255,6 +486,8 @@ _METRIC_PATTERNS = {
         # 可参考播放量 / 播放量 — must be at line start to avoid matching recommendations
         re.compile(r'(?:^|\n)(?:可)?参考播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
         re.compile(r'(?:^|\n)播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
+        # 视频号: 新增播放\n4
+        re.compile(r'新增播放\s*(\d[\d,.]*)'),
     ],
     'comments': [
         re.compile(r'评论\s*[：:]\s*([\d,.]+[万wW]?)'),
@@ -364,6 +597,106 @@ async def _scrape_dashboard(page) -> dict:
     return metrics
 
 
+async def _scrape_data_center(page, platform: str) -> dict:
+    """Extract analytics from data center page (URL-based navigation, no click needed)"""
+    text = await page.evaluate('() => document.body.innerText')
+    result = {}
+
+    # Try to find yesterday's data section first (most reliable)
+    yd_match = re.search(r'昨日数据([\s\S]*?)(?:近7天|近30天|$)', text[:8000])
+    search_text = yd_match.group(1) if yd_match else text[:6000]
+
+    for pat in _METRIC_PATTERNS.get('views', []):
+        m = pat.search(search_text)
+        if m:
+            val = _parse_metric_num(m.group(1))
+            if 0 < val < 100_000_000:
+                result['views'] = val
+                break
+
+    for pat in _METRIC_PATTERNS.get('followers', []):
+        m = pat.search(search_text)
+        if m:
+            result['followers'] = _parse_metric_num(m.group(1))
+            break
+
+    # Also check for tabular data (table-based layout)
+    try:
+        table_rows = await page.evaluate('''() => {
+            const rows = [];
+            document.querySelectorAll('table tr, [class*="row"], [class*="item"]').forEach(el => {
+                const cells = el.querySelectorAll('td, th, [class*="cell"]');
+                if (cells.length >= 2) {
+                    const label = (cells[0].innerText || '').trim();
+                    const value = (cells[1].innerText || '').trim();
+                    rows.push([label, value]);
+                }
+            });
+            return rows;
+        }''')
+        for label, value in table_rows:
+            for key, patterns in _METRIC_PATTERNS.items():
+                for pat in patterns:
+                    if pat.search(label):
+                        if key not in result:
+                            result[key] = _parse_metric_num(value)
+                        break
+    except:
+        pass
+
+    return result
+
+
+async def _scrape_video_list(page, platform: str) -> list:
+    """Extract per-video stats from video list page"""
+    video_data = await page.evaluate('''() => {
+        const videos = [];
+        // Try common selectors for video/post list items
+        const items = document.querySelectorAll(
+            '[class*="post-item"], [class*="video-item"], [class*="list-item"], ' +
+            'tr[class*="row"], [class*="card"], [class*="work-item"], ' +
+            'table tbody tr, [class*="article-item"], [class*="content-item"]'
+        );
+        items.forEach(el => {
+            const text = (el.innerText || '').trim();
+            if (text.length > 20 && text.length < 2000) {
+                // Extract numbers from text
+                const numbers = text.match(/[\\d,.]+[万wW]?/g) || [];
+                const title = text.split('\\n')[0]?.trim()?.substring(0, 60) || '';
+                videos.push({
+                    title: title,
+                    text: text.substring(0, 300),
+                    numbers: numbers.slice(0, 6)
+                });
+            }
+        });
+        // Limit to 20 items
+        return videos.slice(0, 20);
+    }''')
+
+    result = []
+    for v in video_data:
+        nums = [_parse_metric_num(n) for n in v['numbers']]
+        nums_sorted = sorted([n for n in nums if n > 0], reverse=True)
+        if len(nums_sorted) < 2:
+            continue
+        stat = {
+            'title': v['title'],
+            'views': nums_sorted[0] if len(nums_sorted) > 0 else 0,
+            'likes': nums_sorted[1] if len(nums_sorted) > 1 else 0,
+            'comments': nums_sorted[2] if len(nums_sorted) > 2 else 0,
+            'shares': nums_sorted[3] if len(nums_sorted) > 3 else 0,
+        }
+        # Filter out navbar items and obviously wrong data
+        skip_words = ['管理', '设置', '登录', '退出', '首页', '数据中心', '内容', '互动', '平台', '运营', '变现', '服务']
+        if any(w in stat['title'] for w in skip_words):
+            continue
+        if stat['views'] > 0:
+            result.append(stat)
+
+    return result[:10]
+
+
 async def _scrape_all(accounts: list) -> list:
     from playwright.async_api import async_playwright
 
@@ -371,6 +704,7 @@ async def _scrape_all(accounts: list) -> list:
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(
             headless=True,
+            executable_path=_BROWSER_PATH,
             args=['--disable-blink-features=AutomationControlled',
                   '--no-sandbox'],
         )
@@ -385,7 +719,7 @@ async def _scrape_all(accounts: list) -> list:
             if not entry:
                 continue
 
-            url, domain = entry
+            url, domain, data_center_url, video_list_url = entry if len(entry) == 4 else (entry[0], entry[1], None, None)
 
             cookie_list = []
             for pair in cookies_str.split('; '):
@@ -413,16 +747,39 @@ async def _scrape_all(accounts: list) -> list:
 
             page = await ctx.new_page()
             metrics = {}
+            video_stats = []
             try:
-                await page.goto(url, wait_until='domcontentloaded',
-                                timeout=30000)
+                # 1. Scrape dashboard (account-level metrics)
+                await page.goto(url, wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(8000)
                 metrics = await _scrape_dashboard(page)
+
+                # 2. Scrape data center (detailed analytics via URL navigation)
+                if data_center_url:
+                    try:
+                        await page.goto(data_center_url, wait_until='domcontentloaded', timeout=30000)
+                        await page.wait_for_timeout(6000)
+                        dc_metrics = await _scrape_data_center(page, platform)
+                        for k, v in dc_metrics.items():
+                            if v is not None and (k not in metrics or metrics[k] == 0):
+                                metrics[k] = v
+                    except Exception as e:
+                        print(f'[DC] data-center error {platform}/{aid}: {e}')
+
+                # 3. Scrape video list (per-video stats via URL navigation)
+                if video_list_url:
+                    try:
+                        await page.goto(video_list_url, wait_until='domcontentloaded', timeout=30000)
+                        await page.wait_for_timeout(8000)
+                        video_stats = await _scrape_video_list(page, platform)
+                    except Exception as e:
+                        print(f'[DC] video-list error {platform}/{aid}: {e}')
+
             except Exception as e:
                 print(f'[DC] scrape error {platform}/{aid}: {e}')
 
             await ctx.close()
-            results.append({'accountId': aid, 'metrics': metrics})
+            results.append({'accountId': aid, 'metrics': metrics, 'videoStats': video_stats})
 
         await browser.close()
     return results
@@ -445,9 +802,9 @@ def _run_collection_once():
 
         import requests
 
-        print(f'[DC] Fetching accounts from {api_url}/platforms/accounts')
+        print(f'[DC] Fetching accounts from {api_url}/accounts')
         resp = requests.get(
-            f'{api_url}/platforms/accounts',
+            f'{api_url}/accounts',
             headers={'Authorization': f'Bearer {token}'},
             timeout=30,
         )
@@ -514,6 +871,24 @@ def _run_collection_once():
                 except Exception as e:
                     print(f'[DC] Report error {item["accountId"]}: {e}')
 
+        # Report per-video stats
+        video_reported = 0
+        for item in scraped:
+            vstats = item.get('videoStats') or []
+            if not vstats:
+                continue
+            try:
+                r = requests.post(
+                    f'{api_url}/platforms/report-post-stats',
+                    json={'accountId': item['accountId'], 'posts': vstats},
+                    headers={'Authorization': f'Bearer {token}'},
+                    timeout=30,
+                )
+                if r.status_code < 400:
+                    video_reported += len(vstats)
+            except Exception as e:
+                print(f'[DC] Video report error {item["accountId"]}: {e}')
+
         # Sync nicknames and avatars extracted from dashboard
         for item in scraped:
             m = item.get('metrics', {})
@@ -573,6 +948,7 @@ def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
                 async with async_playwright() as pw:
                     browser = await pw.chromium.launch(
                         headless=False,
+                        executable_path=_BROWSER_PATH,
                         args=['--disable-blink-features=AutomationControlled','--lang=zh-CN','--start-maximized']
                     )
                     context = await browser.new_context(
@@ -627,22 +1003,101 @@ def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
                         await browser.close()
                         return
 
-                    import requests
-                    resp = requests.post(
+                    # Scrape real video号 ID and nickname from the logged-in page
+                    import re, requests
+                    page_text = await page.evaluate('() => document.body.innerText')
+                    real_id = ''
+                    nickname = info['name']
+                    m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
+                    if m: real_id = m.group(1).strip()
+                    # Find nickname (line before 视频号ID)
+                    lines = page_text.split('\n')
+                    for i, line in enumerate(lines):
+                        if real_id and real_id in line and i > 0:
+                            candidate = lines[i-1].strip()
+                            if candidate and len(candidate) < 30:
+                                nickname = candidate
+                            break
+
+                    platform_uid = real_id if real_id else f"vid_{int(time.time())}"
+
+                    # Check if account already exists
+                    check_resp = requests.get(
                         f"{api_url.rstrip('/')}/accounts",
-                        json={
-                            'platform': info['key'],
-                            'platformUserId': f"scan_{int(time.time())}",
-                            'nickname': info['name'],
-                            'cookies': cookie_str,
-                        },
-                        headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
-                        timeout=30,
+                        headers={'Authorization': f'Bearer {token}'},
+                        timeout=15,
                     )
+                    existing_id = None
+                    try:
+                        for acc in (check_resp.json().get('data',{}).get('accounts',[]) or []):
+                            if acc.get('platformUserId') == platform_uid or acc.get('nickname') == nickname:
+                                existing_id = acc.get('id')
+                                break
+                    except: pass
+
+                    if existing_id:
+                        # Update existing account
+                        resp = requests.put(
+                            f"{api_url.rstrip('/')}/accounts/{existing_id}",
+                            json={'nickname': nickname, 'cookies': cookie_str},
+                            headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
+                            timeout=30,
+                        )
+                    else:
+                        # Create new account
+                        resp = requests.post(
+                            f"{api_url.rstrip('/')}/accounts",
+                            json={
+                                'platform': info['key'],
+                                'platformUserId': platform_uid,
+                                'nickname': nickname,
+                                'cookies': cookie_str,
+                            },
+                            headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
+                            timeout=30,
+                        )
                     data = resp.json()
+                    account_id = (data.get('data') or {}).get('id') or existing_id
+                    if not account_id:
+                        # Try to find by platformUserId
+                        check2 = requests.get(f"{api_url.rstrip('/')}/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=15)
+                        for acc in (check2.json().get('data',{}).get('accounts',[]) or []):
+                            if acc.get('platformUserId') == platform_uid:
+                                account_id = acc.get('id'); break
+
+                    # Immediately scrape metrics while session is alive
+                    metrics = {}
+                    if account_id and 'login' not in page.url.lower():
+                        try:
+                            # Parse followers from page
+                            m = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
+                            if m: metrics['followers'] = int(m.group(1).replace(',',''))
+
+                            # Parse yesterday's data
+                            yd_start = page_text.find('昨日数据')
+                            if yd_start > 0:
+                                yd = page_text[yd_start:yd_start+500]
+                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增','likes'),('新增评论','comments')]:
+                                    m = re.search(rf'{label}\s*(\d[\d,.]*)', yd)
+                                    if m: metrics[key] = int(m.group(1).replace(',',''))
+
+                            if metrics:
+                                rpt = requests.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
+                                    json={'accountId': account_id, 'metrics': metrics},
+                                    headers={'Authorization': f'Bearer {token}'}, timeout=30)
+                                if use_sse:
+                                    f_count = metrics.get('followers', '?')
+                                    v_count = metrics.get('views', '?')
+                                    queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count}'}))
+                        except Exception as e:
+                            if use_sse:
+                                queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
+
+                    if data.get('code') == 0:
+                        _record_scan_time(info['platform'])
                     if use_sse:
                         if data.get('code') == 0:
-                            queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies)}}))
+                            queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies),'account_id':account_id}}))
                         else:
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
 
@@ -771,8 +1226,42 @@ def scan_bind_start():
 # ══════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
     print('=' * 50)
-    print('  披星云桌面伴侣 v2.4')
-    print('  http://localhost:5409')
-    print(f'  平台: {" | ".join(p["name"] for p in PLATFORMS.values())}')
+    print('  披星云桌面伴侣 v3.0')
     print('=' * 50)
-    app.run(host='127.0.0.1', port=5409, debug=False)
+
+    import threading, sys, os
+
+    def start_flask():
+        app.run(host='127.0.0.1', port=5409, debug=False)
+
+    flask_thread = threading.Thread(target=start_flask, daemon=True)
+    flask_thread.start()
+
+    # Use native window via pywebview (no browser needed)
+    try:
+        import webview
+        import time
+        time.sleep(2)  # Wait for Flask to be ready
+
+        # Create native window
+        webview.create_window(
+            title='披星云桌面伴侣 v3.0',
+            url='http://localhost:5409',
+            width=1024,
+            height=720,
+            min_size=(800, 600),
+            resizable=True,
+            text_select=True,
+        )
+        webview.start()
+    except ImportError:
+        # Fallback: open browser
+        import webbrowser
+        webbrowser.open('http://localhost:5409')
+        print('pywebview not installed, using browser fallback')
+        # Keep the main thread alive
+        try:
+            while True:
+                import time; time.sleep(1)
+        except KeyboardInterrupt:
+            pass
