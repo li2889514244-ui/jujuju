@@ -70,30 +70,12 @@
           </template>
         </el-table-column>
         <el-table-column prop="groupName" label="分组" width="110" />
-        <el-table-column label="状态" width="80" align="center">
+        <el-table-column label="状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
               {{ row.hasCookies ? '在线' : '待授权' }}
             </el-tag>
           </template>
-        </el-table-column>
-        <el-table-column prop="followers" label="粉丝" width="90" sortable="custom" align="right">
-          <template #default="{ row }">{{ formatNumber(row.followers) }}</template>
-        </el-table-column>
-        <el-table-column prop="dailyViews" label="播放量" width="100" sortable="custom" align="right">
-          <template #default="{ row }">{{ formatNumber(row.dailyViews) }}</template>
-        </el-table-column>
-        <el-table-column prop="dailyLikes" label="点赞" width="90" sortable="custom" align="right">
-          <template #default="{ row }">{{ formatNumber(row.dailyLikes) }}</template>
-        </el-table-column>
-        <el-table-column prop="dailyComments" label="评论" width="80" sortable="custom" align="right">
-          <template #default="{ row }">{{ formatNumber(row.dailyComments) }}</template>
-        </el-table-column>
-        <el-table-column prop="postCount" label="内容" width="70" sortable="custom" align="right">
-          <template #default="{ row }">{{ row.postCount || 0 }}</template>
-        </el-table-column>
-        <el-table-column prop="lastActiveAt" label="最近活跃" width="140">
-          <template #default="{ row }">{{ formatTime(row.lastActiveAt) }}</template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
           <template #default="{ row }">
@@ -199,7 +181,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAccountStore } from '@/store/account'
 import { useUserStore } from '@/store/user'
 import { accountsApi } from '@/api/accounts'
-import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
@@ -224,7 +205,6 @@ const showAddDialog = ref(false)
 const showManualDialog = ref(false)
 const companionOnline = ref(false)
 const loading = ref(false)
-const dailyStatsMap = ref<Record<string, any>>({})
 const bindablePlatforms = [
   { id: 'douyin', name: '抖音', icon: '🎵', type: 'primary' as const },
   { id: 'xiaohongshu', name: '小红书', icon: '📕', type: 'danger' as const },
@@ -375,9 +355,9 @@ async function handleCreateGroup() {
 }
 
 function exportCSV() {
-  const headers = ['账号', '平台', '分组', '粉丝', '播放量', '点赞', '评论', '内容数', '状态']
+  const headers = ['账号', '平台', '分组', '状态']
   const rows = enhancedAccounts.value.map((r: any) => [
-    r.nickname, r.platform, r.groupName || '-', r.followers, r.dailyViews, r.dailyLikes, r.dailyComments, r.postCount, r.hasCookies ? '在线' : '待授权'
+    r.nickname, r.platform, r.groupName || '-', r.hasCookies ? '在线' : '待授权'
   ])
   const csv = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
