@@ -117,7 +117,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return this.prisma.postStats.findMany({ where, include: { post: { select: { id: true, title: true, status: true, platformUrl: true, account: { select: { id: true, platform: true, nickname: true } } } } }, orderBy: { collectedAt: 'desc' } });
     }
     async getOverview(userId) {
-        var cacheKey = 'cache:analytics:overview:' + userId;
+        var cacheKey = 'cache:analytics:overview:v2:' + userId;
         var cached = await cacheGet(cacheKey);
         if (cached) return cached;
         const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true, followers: true, status: true } });
