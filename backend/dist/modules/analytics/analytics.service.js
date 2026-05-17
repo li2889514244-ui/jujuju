@@ -132,12 +132,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const platformCounts = {};
         accounts.forEach(a => { platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1; });
         const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
-        require('fs').appendFileSync('/tmp/getOverview.log', JSON.stringify({ ts: new Date().toISOString(), userId: userId, accountIds: accountIds, postStats_sum: statsAgg._sum, dailyStats_sum: dailyAgg._sum }) + '\n');
         const totalViews = (statsAgg._sum.views || 0) + (dailyAgg._sum.views || 0);
         const totalLikes = (statsAgg._sum.likes || 0) + (dailyAgg._sum.likes || 0);
         const totalComments = (statsAgg._sum.comments || 0) + (dailyAgg._sum.comments || 0);
         const totalShares = (statsAgg._sum.shares || 0) + (dailyAgg._sum.shares || 0);
-        require('fs').appendFileSync('/tmp/getOverview.log', JSON.stringify({ result: { totalViews: totalViews, totalLikes: totalLikes, totalComments: totalComments, totalShares: totalShares } }) + '\n');
         var result = { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews, totalLikes, totalComments, totalShares, totalSaves: statsAgg._sum.saves || 0 } };
         await cacheSet(cacheKey, result, 300);
         return result;
