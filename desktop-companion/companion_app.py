@@ -232,8 +232,8 @@ methods:{
     this.evtSource.onmessage=e=>{
       try{const d=JSON.parse(e.data)
         if(d.type==='session'){this.sessionId=d.data}
-        else if(d.type==='qr_code'){this.status='scan';this.qrUrl=d.data}
-        else if(d.type==='browser'){this.status='browser';this.progress=50}
+        else if(d.type==='qr_code'){if(this.status!=='browser'){this.status='scan';this.qrUrl=d.data}}
+        else if(d.type==='browser'){this.status='browser';this.progress=50;clearInterval(this.timer)}
         else if(d.type==='status'){if(d.data.includes('上传'))this.status='uploading'}
         else if(d.type==='success'){this.status='done';this.progress=100;clearInterval(this.timer);this.evtSource.close()}
         else if(d.type==='error'){this.status='error';this.errorMsg=d.data;clearInterval(this.timer);this.evtSource.close()}
