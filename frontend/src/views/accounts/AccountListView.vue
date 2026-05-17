@@ -237,45 +237,11 @@ async function openCompanionScan(platform: string) {
   }
 }
 
-const enhancedAccounts = computed(() => {
-  return accountStore.accounts.map((a: any) => {
-    const daily = dailyStatsMap.value[a.id] || {}
-    return {
-      ...a,
-      dailyViews: daily.views || 0,
-      dailyLikes: daily.likes || 0,
-      dailyComments: daily.comments || 0,
-      dailyShares: daily.shares || 0,
-      postCount: a._count?.posts || 0,
-    }
-  })
-})
-
-async function fetchDailyStats() {
-  try {
-    const res = await analyticsApi.getReport()
-    const data = (res as any).data || res
-    const accs = data?.accounts || []
-    const map: Record<string, any> = {}
-    for (const a of accs) {
-      const stats = a.dailyStats?.[0]
-      if (stats) {
-        map[a.id] = {
-          views: stats.views || 0,
-          likes: stats.likes || 0,
-          comments: stats.comments || 0,
-          shares: stats.shares || 0,
-        }
-      }
-    }
-    dailyStatsMap.value = map
-  } catch { /* silent */ }
-}
+const enhancedAccounts = computed(() => accountStore.accounts)
 
 onMounted(() => {
   accountStore.fetchAccounts()
   accountStore.fetchGroups()
-  fetchDailyStats()
   checkCompanion()
   setInterval(checkCompanion, 5000)
 })
@@ -283,7 +249,6 @@ onMounted(() => {
 async function handleSearch() {
   accountStore.setFilter(filter)
   await accountStore.fetchAccounts()
-  await fetchDailyStats()
 }
 
 function handleReset() {
