@@ -43,7 +43,7 @@ export const accountsApi = {
   },
 
   moveToGroup(accountIds: string[], groupId: string) {
-    return post('/accounts/move-group', { accountIds, groupId })
+    return post('/accounts/bulk-move', { ids: accountIds, groupId })
   },
 
   getAccountPosts(id: string, params?: { page?: number; pageSize?: number; sortBy?: string; sortOrder?: 'asc' | 'desc' }) {
