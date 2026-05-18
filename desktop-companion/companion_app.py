@@ -227,27 +227,34 @@ methods:{
   startScan(token,apiUrl){
     this.status='loading';this.progress=0
     this.timer=setInterval(()=>{if(this.progress<90)this.progress+=1},400)
-    const url=`/api/scan-bind/start?platform=${this.selected}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(apiUrl)}`
-    this.evtSource=new EventSource(url)
-    this.evtSource.onmessage=e=>{
-      try{const d=JSON.parse(e.data)
-        if(d.type==='session'){this.sessionId=d.data}
-        else if(d.type==='qr_code'){if(this.status!=='browser'){this.status='scan';this.qrUrl=d.data}}
-        else if(d.type==='browser'){this.status='browser';this.progress=50;clearInterval(this.timer)}
-        else if(d.type==='status'){if(d.data.includes('上传'))this.status='uploading'}
-        else if(d.type==='success'){this.status='done';this.progress=100;clearInterval(this.timer);this.evtSource.close()}
-        else if(d.type==='error'){this.status='error';this.errorMsg=d.data;clearInterval(this.timer);this.evtSource.close()}
-      }catch(ex){}
-    }
-    this.evtSource.onerror=()=>{if(this.status!=='done'){this.status='error';this.errorMsg='连接中断，请重试';clearInterval(this.timer)}}
+    // Use trigger endpoint (no SSE) — more reliable
+    const url=`/api/scan-bind/trigger?platform=${this.selected}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(apiUrl)}`
+    fetch(url).then(r=>r.json()).then(j=>{
+      if(j.code===0){
+        this.sessionId=j.session_id
+        this.status='browser'
+        this.progress=50
+        clearInterval(this.timer)
+      }else{
+        this.status='error'
+        this.errorMsg=j.msg||'启动失败'
+        clearInterval(this.timer)
+      }
+    }).catch(e=>{
+      this.status='error'
+      this.errorMsg='通信失败: '+e.message
+      clearInterval(this.timer)
+    })
   },
   reset(){this.evtSource?.close();clearInterval(this.timer);this.status='idle';this.qrUrl='';this.errorMsg='';this.selected='';this.progress=0},
 confirmLogin(){
+  console.log('[UI] confirmLogin called, sessionId='+this.sessionId)
   if(!this.sessionId){this.errorMsg='会话丢失，请重试';this.status='error';return}
   this.status='uploading'
   fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})}).then(r=>r.json()).then(j=>{
+    console.log('[UI] confirm-login response:',JSON.stringify(j))
     if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg}
-  }).catch(e=>{this.status='error';this.errorMsg='通信失败: '+e.message})
+  }).catch(e=>{console.log('[UI] confirm-login error:',e.message);this.status='error';this.errorMsg='通信失败: '+e.message})
 },
 cancelScan(){
   if(this.sessionId){fetch('/api/cancel-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})})}
@@ -996,6 +1003,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         try:
                             msg = ctrl_queue.get_nowait()
                             if msg == 'EXTRACT_COOKIES':
+                                print('[Worker] Received EXTRACT_COOKIES, extracting...')
                                 break
                             if msg == 'CANCEL':
                                 if use_sse:
@@ -1156,9 +1164,12 @@ def health():
 @app.route('/api/confirm-login', methods=['POST'])
 def confirm_login():
     sid = request.json.get('session_id', '') if request.is_json else request.args.get('session_id', '')
+    print(f'[ConfirmLogin] sid={sid} in_sessions={sid in active_sessions} total_sessions={len(active_sessions)}')
     if sid in active_sessions:
         active_sessions[sid].put('EXTRACT_COOKIES')
+        print(f'[ConfirmLogin] EXTRACT_COOKIES sent to ctrl_queue')
         return jsonify({'code':0,'msg':'ok'})
+    print(f'[ConfirmLogin] SESSION NOT FOUND! active_keys={list(active_sessions.keys())}')
     return jsonify({'code':404,'msg':'session not found'}), 404
 
 
@@ -1214,6 +1225,7 @@ def scan_bind_start():
     queue = Queue()       # SSE events: worker → UI
     ctrl_queue = Queue()  # control messages: UI → worker
     active_sessions[session_id] = ctrl_queue  # confirm_login puts to ctrl_queue
+    print(f'[ScanBind] session={session_id} platform={platform}', flush=True)
 
     worker = _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=True)
 
