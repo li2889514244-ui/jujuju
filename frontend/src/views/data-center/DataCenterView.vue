@@ -20,7 +20,9 @@
           <el-button type="primary" @click="refreshAll" :loading="loading">查询</el-button>
         </el-form-item>
         <el-form-item>
-          <el-button @click="handleCollect" :loading="collecting" type="success">手动采集真实数据</el-button>
+          <el-tooltip content="伴侣打开后每30分钟自动采集，点查询刷新即可" placement="bottom">
+        <el-button @click="refreshAll" :loading="loading" type="success">刷新数据</el-button>
+      </el-tooltip>
         </el-form-item>
       </el-form>
     </el-card>

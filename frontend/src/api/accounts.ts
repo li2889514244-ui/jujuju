@@ -30,6 +30,10 @@ export const accountsApi = {
     return post<AccountGroup>('/account-groups', { name })
   },
 
+  deleteGroup(id: string) {
+    return del(`/account-groups/${id}`)
+  },
+
   checkCookie(id: string) {
     return post<{ status: string; expiresAt: string }>(`/accounts/${id}/check-cookie`)
   },
