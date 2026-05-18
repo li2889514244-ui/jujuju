@@ -159,12 +159,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
         if (!account) {
             throw new common_1.NotFoundException('账号不存在');
         }
-        if (userId && account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('无权查看此账号');
-            }
-        }
+        // Data is shared across all users
         return this.sanitizeAccount(account);
     }
     async update(id, dto, userId) {
@@ -172,12 +167,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
         if (!account) {
             throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('无权修改此账号');
-            }
-        }
+        // Shared data: allow modification by any authenticated user
         const updateData = { ...dto };
         if (dto.cookies) {
             updateData.cookies = this.encryptCookie(dto.cookies);
@@ -201,12 +191,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
         if (!account) {
             throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('无权删除此账号');
-            }
-        }
+        // Shared data: allow by any authenticated user
         await this.prisma.account.delete({ where: { id } });
         this.logger.log(`账号已删除: ${id}`);
         return { success: true };
@@ -216,12 +201,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
         if (!account) {
             throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('无权查看此账号Cookie');
-            }
-        }
+        // Shared data: allow by any authenticated user
         if (!account.cookies) {
             return { cookies: null };
         }

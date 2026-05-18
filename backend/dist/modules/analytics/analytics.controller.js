@@ -86,8 +86,8 @@ let AnalyticsController = class AnalyticsController {
         if (['OWNER', 'ADMIN'].includes(userRole))
             return;
         const account = await this.prisma.account.findUnique({ where: { id: accountId }, select: { userId: true } });
-        if (!account || account.userId !== userId)
-            throw new common_1.ForbiddenException('无权查看此账号的数据统计');
+        if (!account)
+            throw new common_1.ForbiddenException('账号不存在');
     }
 };
 exports.AnalyticsController = AnalyticsController;
