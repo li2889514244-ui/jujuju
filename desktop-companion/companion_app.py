@@ -514,6 +514,7 @@ _METRIC_PATTERNS = {
         # 获赞 might be on its own line: "获赞\n132" or "获赞：132"
         re.compile(r'(?:^|\n)获赞\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
         re.compile(r'点赞\s*[：:]\s*([\d,.]+[万wW]?)'),
+        re.compile(r"新增\s*([\d,.]+[万wW]?)"),
         re.compile(r'总获赞\s*[：:]?\s*([\d,.]+[万wW]?)'),
     ],
     'views': [
@@ -1158,6 +1159,16 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         else:
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
 
+                    try:
+                        fp = await context.new_page()
+                        await fp.goto("https://channels.weixin.qq.com/platform/statistic/follower", wait_until="domcontentloaded", timeout=20000, referer="https://channels.weixin.qq.com/platform")
+                        await fp.wait_for_timeout(5000)
+                        ftxt = await fp.evaluate("() => document.body.innerText")
+                        with open(Path(tempfile.gettempdir()) / "pixingyun_follower.txt", "w", encoding="utf-8") as f:
+                            f.write(ftxt[:5000])
+                        await fp.close()
+                    except:
+                        pass
                     await browser.close()
                     if session_id:
                         scan_status[session_id] = 'done'
