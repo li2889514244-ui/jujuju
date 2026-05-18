@@ -872,7 +872,7 @@ def _run_collection_once():
         # Decrypt encrypted cookies via individual account endpoint
         for acc in accounts:
             c = acc.get('cookies') or ''
-            if c and '=' not in c[:200] and c.count(':') >= 2:
+            if True:
                 aid = acc.get('id')
                 try:
                     r = requests.get(
@@ -999,7 +999,9 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         queue.put(json.dumps({'type':'browser','data':'浏览器已打开'}))
 
                     await page.goto(info['url'], wait_until='domcontentloaded', timeout=30000)
-                    await page.wait_for_timeout(5000)
+                    await page.wait_for_timeout(8000)
+                    await page.wait_for_load_state("networkidle")
+                    await page.wait_for_timeout(3000)
 
                     if use_sse:
                         try:
@@ -1026,14 +1028,18 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             pass
                     else:
                         if use_sse:
-                            queue.put(json.dumps({'type':'error','data':'操作超时（5分钟），请重试'}))
+                            queue.put(json.dumps({"type":"error","data":"操作超时（5分钟），请重试"}))
                         await browser.close()
                         return
-
                     if use_sse:
                         queue.put(json.dumps({'type':'status','data':'正在提取 Cookie...'}))
 
                     cookies = await context.cookies()
+                    page_text = await page.evaluate('() => document.body.innerText')
+                    try:
+                        with open('C:/Users/EDY/AppData/Local/Temp/pixingyun_page.txt', 'w', encoding='utf-8') as f:
+                            f.write(page_text[:5000])
+                    except: pass
                     cookie_str = '; '.join(f"{c['name']}={c['value']}" for c in cookies)
 
                     if not cookie_str:
@@ -1051,37 +1057,22 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             f.write(page_text[:3000])
                     except: pass
                     real_id = ''
-                    # Try multiple methods to get nickname
+                    real_id = ''
                     nickname = None
-                    try:  # Method 1: page title
-                        title = await page.title()
-                        if title and 1 < len(title) < 30 and '微信' not in title:
-                            nickname = _sanitize_text(title)
-                    except: pass
-                    if not nickname:  # Method 2: specific DOM selectors
-                        try:
-                            el = await page.evaluate('''() => {
-                                for (const sel of ['[class*="nickname"]', '[class*="profile-name"]', '[class*="account-name"]',
-                                    '[class*="name"]:not(nav):not(header)', 'h1', 'h2', 'h3',
-                                    '[class*="title"]', '[class*="username"]']) {
-                                    const e = document.querySelector(sel);
-                                    if (e) { const t = e.innerText.trim(); if (t.length > 1 && t.length < 30) return t; }
-                                }
-                                return null;
-                            }''')
-                            if el and 1 < len(el) < 30:
-                                nickname = _sanitize_text(el)
-                        except: pass
-                    if not nickname:  # Method 3: first 20 text lines (less filtering)
-                        for line in page_text.split('\n')[:20]:
-                            line = _sanitize_text(line.strip())
-                            if line and 1 < len(line) < 30 and not any(w in line for w in ['登录','扫码','二维码','管理','数据','首页','运营']):
-                                nickname = line; break
-                    if not nickname:  # Fallback: use platformUserId
-                        m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
-                        if m:
-                            real_id = m.group(1).strip()
-                            nickname = real_id  # Use the video号 ID as identifier
+                    m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
+                    if m:
+                        real_id = m.group(1).strip()
+                    lines = page_text.split('\n')
+                    for i, line in enumerate(lines):
+                        if '视频号ID' in line and i >= 2:
+                            for j in range(i-1, max(i-4, -1), -1):
+                                c = _sanitize_text(lines[j].strip())
+                                if c and len(c) > 1 and len(c) < 30 and not c.isdigit() and c not in ('视频号','视频号助手','微信'):
+                                    nickname = c
+                                    break
+                            break
+                    if not nickname and real_id:
+                        nickname = real_id
                     if not nickname:
                         nickname = _sanitize_text(info['name'])
 
@@ -1137,15 +1128,15 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         try:
                             # Parse followers from page
                             m = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
-                            if m: metrics['followers'] = int(m.group(1).replace(',',''))
+                            if m: metrics['followers'] = _parse_metric_num(m.group(1))
 
                             # Parse yesterday's data
                             yd_start = page_text.find('昨日数据')
                             if yd_start > 0:
                                 yd = page_text[yd_start:yd_start+500]
-                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增','likes'),('新增评论','comments')]:
-                                    m = re.search(rf'{label}\s*(\d[\d,.]*)', yd)
-                                    if m: metrics[key] = int(m.group(1).replace(',',''))
+                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
+                                    m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
+                                    if m: metrics[key] = _parse_metric_num(m.group(1))
 
                             if metrics:
                                 rpt = requests.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
