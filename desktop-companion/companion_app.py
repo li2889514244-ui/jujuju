@@ -251,9 +251,20 @@ confirmLogin(){
   console.log('[UI] confirmLogin called, sessionId='+this.sessionId)
   if(!this.sessionId){this.errorMsg='会话丢失，请重试';this.status='error';return}
   this.status='uploading'
-  fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})}).then(r=>r.json()).then(j=>{
+  const sid=this.sessionId
+  fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sid})}).then(r=>r.json()).then(j=>{
     console.log('[UI] confirm-login response:',JSON.stringify(j))
-    if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg}
+    if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg;return}
+    // Poll for completion
+    let attempts=0
+    const poll=setInterval(()=>{
+      fetch('/api/scan-bind/poll/'+sid).then(r=>r.json()).then(s=>{
+        attempts++
+        if(s.status==='done'){this.status='done';this.progress=100;clearInterval(poll)}
+        else if(s.status==='error'){this.status='error';this.errorMsg='上传失败，请重试';clearInterval(poll)}
+        else if(attempts>30){this.status='done';this.progress=100;clearInterval(poll)}
+      }).catch(()=>{if(attempts>30){this.status='done';this.progress=100;clearInterval(poll)}})
+    },1000)
   }).catch(e=>{console.log('[UI] confirm-login error:',e.message);this.status='error';this.errorMsg='通信失败: '+e.message})
 },
 cancelScan(){
@@ -353,6 +364,7 @@ def _get_cookie_status() -> dict:
 # Scan-bind session store
 # ══════════════════════════════════════════════════════════════════
 active_sessions = {}  # session_id -> queue
+scan_status = {}  # session_id -> status (browser/uploading/done/error)
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -970,7 +982,7 @@ threading.Thread(target=_data_collector_loop, daemon=True).start()
 # Shared Playwright login worker (scan-bind)
 # ══════════════════════════════════════════════════════════════════
 
-def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=False):
+def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=False, session_id=None):
     def login_worker():
         async def _run():
             try:
@@ -1034,17 +1046,28 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     import re, requests
                     page_text = await page.evaluate('() => document.body.innerText')
                     real_id = ''
-                    nickname = _sanitize_text(info['name'])
+                    # Try multiple methods to get nickname
+                    nickname = None
+                    try:  # Method 1: page title
+                        title = await page.title()
+                        if title and 1 < len(title) < 30:
+                            nickname = _sanitize_text(title)
+                    except: pass
+                    if not nickname:  # Method 2: DOM selectors
+                        try:
+                            el = await page.evaluate('() => { const s = document.querySelector(\'[class*="nickname"], [class*="profile-name"], [class*="account-name"], h1, h2\'); return s ? s.innerText.trim() : null; }')
+                            if el and 1 < len(el) < 30:
+                                nickname = _sanitize_text(el)
+                        except: pass
+                    if not nickname:  # Method 3: first valid text line
+                        for line in page_text.split('\n')[:15]:
+                            line = _sanitize_text(line.strip())
+                            if line and 1 < len(line) < 30 and not any(w in line for w in ['登录','扫码','二维码','微信','平台','管理','数据','首页','运营','视频号']):
+                                nickname = line; break
+                    if not nickname:  # Fallback
+                        nickname = _sanitize_text(info['name'])
                     m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
                     if m: real_id = m.group(1).strip()
-                    # Find nickname (line before 视频号ID)
-                    lines = page_text.split('\n')
-                    for i, line in enumerate(lines):
-                        if real_id and real_id in line and i > 0:
-                            candidate = _sanitize_text(lines[i-1].strip())
-                            if candidate and len(candidate) < 30:
-                                nickname = candidate
-                            break
 
                     platform_uid = real_id if real_id else f"vid_{int(time.time())}"
 
@@ -1129,6 +1152,9 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
 
                     await browser.close()
+                    if session_id:
+                        scan_status[session_id] = 'done'
+                        if session_id in active_sessions: del active_sessions[session_id]
             except Exception as e:
                 import traceback, tempfile
                 err_full = traceback.format_exc()
@@ -1136,6 +1162,9 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     with open(Path(tempfile.gettempdir()) / 'pixingyun_error.log', 'w', encoding='utf-8') as f:
                         f.write(err_full)
                 except: pass
+                if session_id:
+                    scan_status[session_id] = 'error'
+                    if session_id in active_sessions: del active_sessions[session_id]
                 if use_sse:
                     queue.put(json.dumps({'type':'error','data':f'浏览器异常: {str(e)[:200]}'}))
 
@@ -1173,6 +1202,12 @@ def confirm_login():
     return jsonify({'code':404,'msg':'session not found'}), 404
 
 
+@app.route('/api/scan-bind/poll/<session_id>')
+def scan_bind_poll(session_id):
+    st = scan_status.get(session_id, 'not_found')
+    return jsonify({'status': st})
+
+
 @app.route('/api/cancel-scan', methods=['POST'])
 def cancel_scan():
     sid = request.json.get('session_id', '') if request.is_json else request.args.get('session_id', '')
@@ -1198,8 +1233,9 @@ def scan_bind_trigger():
     session_id = uuid.uuid4().hex[:12]
     queue = Queue()
     active_sessions[session_id] = queue
+    scan_status[session_id] = 'browser'
 
-    worker = _make_login_worker(platform, info, queue, queue, api_url, token, use_sse=False)
+    worker = _make_login_worker(platform, info, queue, queue, api_url, token, use_sse=False, session_id=session_id)
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
@@ -1225,9 +1261,10 @@ def scan_bind_start():
     queue = Queue()       # SSE events: worker → UI
     ctrl_queue = Queue()  # control messages: UI → worker
     active_sessions[session_id] = ctrl_queue  # confirm_login puts to ctrl_queue
+    scan_status[session_id] = 'browser'
     print(f'[ScanBind] session={session_id} platform={platform}', flush=True)
 
-    worker = _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=True)
+    worker = _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=True, session_id=session_id)
 
     def sse_stream():
         yield f"data: {json.dumps({'type':'session','data':session_id})}\n\n"
