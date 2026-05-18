@@ -1193,10 +1193,11 @@ def health():
 @app.route('/api/confirm-login', methods=['POST'])
 def confirm_login():
     sid = request.json.get('session_id', '') if request.is_json else request.args.get('session_id', '')
-    print(f'[ConfirmLogin] sid={sid} in_sessions={sid in active_sessions} total_sessions={len(active_sessions)}')
+    print(f'[ConfirmLogin] sid={sid} in_sessions={sid in active_sessions} total_sessions={len(active_sessions)}', flush=True)
     if sid in active_sessions:
         active_sessions[sid].put('EXTRACT_COOKIES')
-        print(f'[ConfirmLogin] EXTRACT_COOKIES sent to ctrl_queue')
+        scan_status[sid] = 'uploading'
+        print(f'[ConfirmLogin] EXTRACT_COOKIES sent to ctrl_queue, status=uploading', flush=True)
         return jsonify({'code':0,'msg':'ok'})
     print(f'[ConfirmLogin] SESSION NOT FOUND! active_keys={list(active_sessions.keys())}')
     return jsonify({'code':404,'msg':'session not found'}), 404
