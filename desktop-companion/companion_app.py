@@ -1045,29 +1045,45 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     # Scrape real video号 ID and nickname from the logged-in page
                     import re, requests
                     page_text = await page.evaluate('() => document.body.innerText')
+                    # Save page text for debugging
+                    try:
+                        with open(Path(tempfile.gettempdir()) / 'pixingyun_page.txt', 'w', encoding='utf-8') as f:
+                            f.write(page_text[:3000])
+                    except: pass
                     real_id = ''
                     # Try multiple methods to get nickname
                     nickname = None
                     try:  # Method 1: page title
                         title = await page.title()
-                        if title and 1 < len(title) < 30:
+                        if title and 1 < len(title) < 30 and '微信' not in title:
                             nickname = _sanitize_text(title)
                     except: pass
-                    if not nickname:  # Method 2: DOM selectors
+                    if not nickname:  # Method 2: specific DOM selectors
                         try:
-                            el = await page.evaluate('() => { const s = document.querySelector(\'[class*="nickname"], [class*="profile-name"], [class*="account-name"], h1, h2\'); return s ? s.innerText.trim() : null; }')
+                            el = await page.evaluate('''() => {
+                                for (const sel of ['[class*="nickname"]', '[class*="profile-name"]', '[class*="account-name"]',
+                                    '[class*="name"]:not(nav):not(header)', 'h1', 'h2', 'h3',
+                                    '[class*="title"]', '[class*="username"]']) {
+                                    const e = document.querySelector(sel);
+                                    if (e) { const t = e.innerText.trim(); if (t.length > 1 && t.length < 30) return t; }
+                                }
+                                return null;
+                            }''')
                             if el and 1 < len(el) < 30:
                                 nickname = _sanitize_text(el)
                         except: pass
-                    if not nickname:  # Method 3: first valid text line
-                        for line in page_text.split('\n')[:15]:
+                    if not nickname:  # Method 3: first 20 text lines (less filtering)
+                        for line in page_text.split('\n')[:20]:
                             line = _sanitize_text(line.strip())
-                            if line and 1 < len(line) < 30 and not any(w in line for w in ['登录','扫码','二维码','微信','平台','管理','数据','首页','运营','视频号']):
+                            if line and 1 < len(line) < 30 and not any(w in line for w in ['登录','扫码','二维码','管理','数据','首页','运营']):
                                 nickname = line; break
-                    if not nickname:  # Fallback
+                    if not nickname:  # Fallback: use platformUserId
+                        m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
+                        if m:
+                            real_id = m.group(1).strip()
+                            nickname = real_id  # Use the video号 ID as identifier
+                    if not nickname:
                         nickname = _sanitize_text(info['name'])
-                    m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
-                    if m: real_id = m.group(1).strip()
 
                     platform_uid = real_id if real_id else f"vid_{int(time.time())}"
 
