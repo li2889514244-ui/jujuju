@@ -95,10 +95,8 @@ let AccountsService = AccountsService_1 = class AccountsService {
         return this.sanitizeAccount(account);
     }
     async findAll(params) {
-        const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params;
+        const { teamId, groupId, platform, skip = 0, take = 20 } = params;
         const where = {};
-        if (userId)
-            where.userId = userId;
         if (teamId)
             where.teamId = teamId;
         if (groupId)

@@ -68,13 +68,13 @@ let AccountGroupsController = class AccountGroupsController {
     }
     async findAll(userId) {
         return this.prisma.accountGroup.findMany({
-            where: { userId },
+            where: {},
             include: { _count: { select: { accounts: true } } },
             orderBy: { sortOrder: 'asc' },
         });
     }
     async update(id, dto, userId) {
-        const group = await this.prisma.accountGroup.findFirst({ where: { id, userId } });
+        const group = await this.prisma.accountGroup.findFirst({ where: { id } });
         if (!group) {
             return { success: false, message: '分组不存在或无权操作' };
         }
@@ -86,14 +86,14 @@ let AccountGroupsController = class AccountGroupsController {
     }
     async remove(id, userId) {
         await this.prisma.account.updateMany({
-            where: { groupId: id, userId },
+            where: { groupId: id },
             data: { groupId: null },
         });
-        return this.prisma.accountGroup.deleteMany({ where: { id, userId } });
+        return this.prisma.accountGroup.deleteMany({ where: { id } });
     }
     async setAccounts(groupId, body, userId) {
         await this.prisma.account.updateMany({
-            where: { id: { in: body.accountIds }, userId },
+            where: { id: { in: body.accountIds } },
             data: { groupId },
         });
         return { success: true, count: body.accountIds.length };

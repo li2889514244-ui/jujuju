@@ -117,10 +117,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return this.prisma.postStats.findMany({ where, include: { post: { select: { id: true, title: true, status: true, platformUrl: true, account: { select: { id: true, platform: true, nickname: true } } } } }, orderBy: { collectedAt: 'desc' } });
     }
     async getOverview(userId) {
-        var cacheKey = 'cache:analytics:overview:v2:' + userId;
-        var cached = await cacheGet(cacheKey);
-        if (cached) return cached;
-        const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true, followers: true, status: true } });
+        const accounts = await this.prisma.account.findMany({ select: { id: true, platform: true, followers: true, status: true } });
         const accountIds = accounts.map(a => a.id);
         const [totalPosts, publishedPosts, failedPosts, statsAgg, dailyAgg] = await Promise.all([
             this.prisma.post.count({ where: { accountId: { in: accountIds } } }),
@@ -137,11 +134,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const totalComments = (statsAgg._sum.comments || 0) + (dailyAgg._sum.comments || 0);
         const totalShares = (statsAgg._sum.shares || 0) + (dailyAgg._sum.shares || 0);
         var result = { accounts: { total: accounts.length, active: accounts.filter(a => a.status === 'ACTIVE').length, byPlatform: platformCounts, totalFollowers }, posts: { total: totalPosts, published: publishedPosts, failed: failedPosts }, engagement: { totalViews, totalLikes, totalComments, totalShares, totalSaves: statsAgg._sum.saves || 0 } };
-        await cacheSet(cacheKey, result, 300);
         return result;
     }
     async getPlatformComparison(userId) {
-        const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true, platform: true, followers: true } });
+        const accounts = await this.prisma.account.findMany({ select: { id: true, platform: true, followers: true } });
         const platforms = [...new Set(accounts.map(a => a.platform))];
         const result = [];
         for (const platform of platforms) {
@@ -171,7 +167,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const { startDate, endDate, platform } = params;
         const end = endDate || new Date();
         const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
-        const accounts = await this.prisma.account.findMany({ where: { userId, ...(platform ? { platform: platform } : {}) }, select: { id: true, platform: true, nickname: true, followers: true } });
+        const accounts = await this.prisma.account.findMany({ where: { ...(platform ? { platform: platform } : {}) }, select: { id: true, platform: true, nickname: true, followers: true } });
         const accountIds = accounts.map(a => a.id);
         const dailyStats = await this.prisma.dailyStats.findMany({ where: { accountId: { in: accountIds }, date: { gte: start, lte: end } }, orderBy: { date: 'asc' }, include: { account: { select: { nickname: true, platform: true } } } });
         const topPosts = await this.prisma.post.findMany({ where: { accountId: { in: accountIds }, status: 'PUBLISHED', createdAt: { gte: start, lte: end } }, include: { stats: true, account: { select: { nickname: true, platform: true } } }, orderBy: { stats: { views: 'desc' } }, take: 10 });
@@ -179,7 +175,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return { period: { start, end }, overview, accounts: accounts.map(a => ({ ...a, dailyStats: dailyStats.filter(d => d.accountId === a.id) })), topPosts: topPosts.map(p => ({ id: p.id, title: p.title, platform: p.account.platform, account: p.account.nickname, views: p.stats?.views || 0, likes: p.stats?.likes || 0, comments: p.stats?.comments || 0, shares: p.stats?.shares || 0, publishedAt: p.updatedAt })), dailyTrend: dailyStats };
     }
     async getComparison(userId) {
-        const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         const now = new Date();
         const thisWeekStart = this.getWeekStart(now);
@@ -199,7 +195,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getViewsRanking(userId, params) {
         const { limit = 50, period = 'all', platform } = params;
-        const accounts = await this.prisma.account.findMany({ where: { userId, ...(platform ? { platform: platform } : {}) }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ where: { ...(platform ? { platform: platform } : {}) }, select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         let dateFilter = {};
         const now = new Date();
@@ -211,7 +207,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return { ranking: posts.map((p, i) => ({ rank: i + 1, postId: p.id, title: p.title, platform: p.account.platform, accountName: p.account.nickname, accountAvatar: p.account.avatar, views: p.stats?.views || 0, likes: p.stats?.likes || 0, comments: p.stats?.comments || 0, shares: p.stats?.shares || 0, publishedAt: p.updatedAt })), total: posts.length, period };
     }
     async getFollowerTrend(userId, days = 7, platform) {
-        const accounts = await this.prisma.account.findMany({ where: { userId, ...(platform ? { platform: platform } : {}) }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ where: { ...(platform ? { platform: platform } : {}) }, select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         const stats = await this.prisma.dailyStats.findMany({ where: { accountId: { in: accountIds }, date: { gte: startDate } }, orderBy: { date: 'asc' }, select: { date: true, followers: true } });
@@ -225,7 +221,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return Object.values(byDate);
     }
     async getLikesTrend(userId, days = 7, platform) {
-        const accounts = await this.prisma.account.findMany({ where: { userId, ...(platform ? { platform: platform } : {}) }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ where: { ...(platform ? { platform: platform } : {}) }, select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         const stats = await this.prisma.dailyStats.findMany({ where: { accountId: { in: accountIds }, date: { gte: startDate } }, orderBy: { date: 'asc' }, select: { date: true, likes: true } });
@@ -239,7 +235,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return Object.values(byDate);
     }
     async getPublishEffect(userId, days, contentId) {
-        const accounts = await this.prisma.account.findMany({ where: { userId }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         const where = { accountId: { in: accountIds } };
         if (contentId)
@@ -250,7 +246,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         return posts.map(p => ({ id: p.id, title: p.title, platform: p.account.platform, accountName: p.account.nickname, status: p.status, views: p.stats?.views || 0, likes: p.stats?.likes || 0, comments: p.stats?.comments || 0, shares: p.stats?.shares || 0, publishedAt: p.publishAt || p.createdAt }));
     }
     async getEngagementRate(userId, days = 7, platform) {
-        const accounts = await this.prisma.account.findMany({ where: { userId, ...(platform ? { platform: platform } : {}) }, select: { id: true } });
+        const accounts = await this.prisma.account.findMany({ where: { ...(platform ? { platform: platform } : {}) }, select: { id: true } });
         const accountIds = accounts.map(a => a.id);
         const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
         const stats = await this.prisma.dailyStats.findMany({ where: { accountId: { in: accountIds }, date: { gte: startDate } }, orderBy: { date: 'asc' }, select: { date: true, views: true, likes: true, comments: true, shares: true } });
@@ -291,7 +287,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async collectStats(userId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId },
+            where: {},
             include: { posts: { where: { status: { in: ['PUBLISHED', 'PUBLISHING'] } }, include: { stats: true } } },
         });
         if (accounts.length === 0)
