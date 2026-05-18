@@ -1144,7 +1144,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                 queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
 
                     if data.get('code') == 0:
-                        _record_scan_time(info['platform'])
+                        _record_scan_time(platform)
                     if use_sse:
                         if data.get('code') == 0:
                             queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies),'account_id':account_id}}))
