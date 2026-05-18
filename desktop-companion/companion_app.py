@@ -963,7 +963,7 @@ threading.Thread(target=_data_collector_loop, daemon=True).start()
 # Shared Playwright login worker (scan-bind)
 # ══════════════════════════════════════════════════════════════════
 
-def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
+def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=False):
     def login_worker():
         async def _run():
             try:
@@ -994,7 +994,7 @@ def _make_login_worker(platform, info, queue, api_url, token, use_sse=False):
                     for i in range(600):
                         await page.wait_for_timeout(500)
                         try:
-                            msg = queue.get_nowait()
+                            msg = ctrl_queue.get_nowait()
                             if msg == 'EXTRACT_COOKIES':
                                 break
                             if msg == 'CANCEL':
@@ -1182,7 +1182,7 @@ def scan_bind_trigger():
     queue = Queue()
     active_sessions[session_id] = queue
 
-    worker = _make_login_worker(platform, info, queue, api_url, token, use_sse=False)
+    worker = _make_login_worker(platform, info, queue, queue, api_url, token, use_sse=False)
     t = threading.Thread(target=worker, daemon=True)
     t.start()
 
@@ -1205,10 +1205,11 @@ def scan_bind_start():
 
     info = PLATFORMS[platform]
     session_id = uuid.uuid4().hex[:12]
-    queue = Queue()
-    active_sessions[session_id] = queue
+    queue = Queue()       # SSE events: worker → UI
+    ctrl_queue = Queue()  # control messages: UI → worker
+    active_sessions[session_id] = ctrl_queue  # confirm_login puts to ctrl_queue
 
-    worker = _make_login_worker(platform, info, queue, api_url, token, use_sse=True)
+    worker = _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=True)
 
     def sse_stream():
         yield f"data: {json.dumps({'type':'session','data':session_id})}\n\n"
