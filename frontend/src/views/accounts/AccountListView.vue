@@ -35,6 +35,9 @@
       <el-button @click="showGroupDialog = true">
         <el-icon><FolderAdd /></el-icon>新建分组
       </el-button>
+      <el-button @click="showGroupManage = true">
+        <el-icon><Setting /></el-icon>管理分组
+      </el-button>
       <el-button :disabled="!selectedIds.length" @click="handleBatchMove">
         <el-icon><FolderOpened /></el-icon>批量移动
       </el-button>
@@ -126,6 +129,26 @@
       </template>
     </el-dialog>
 
+    <!-- Group Management Dialog -->
+    <el-dialog v-model="showGroupManage" title="管理分组" width="400px">
+      <el-table :data="accountStore.groups" stripe size="small">
+        <el-table-column prop="name" label="分组名称" />
+        <el-table-column prop="_count.accounts" label="账号数" width="80" />
+        <el-table-column label="操作" width="80">
+          <template #default="{ row }">
+            <el-popconfirm title="确定删除此分组？" @confirm="handleDeleteGroup(row.id)">
+              <template #reference>
+                <el-button text type="danger" size="small">删除</el-button>
+              </template>
+            </el-popconfirm>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="showGroupManage = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- Add Account Guide Dialog -->
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
       <div style="text-align:center;padding:20px">
@@ -201,6 +224,7 @@ const showGroupDialog = ref(false)
 const newGroupName = ref('')
 const showMoveDialog = ref(false)
 const moveTargetGroup = ref('')
+const showGroupManage = ref(false)
 const showAddDialog = ref(false)
 const showManualDialog = ref(false)
 const companionOnline = ref(false)
@@ -329,6 +353,16 @@ function exportCSV() {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a'); a.href = url; a.download = `账号列表_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
   URL.revokeObjectURL(url)
+}
+
+async function handleDeleteGroup(id: string) {
+  try {
+    await accountsApi.deleteGroup(id)
+    await accountStore.fetchGroups()
+    ElMessage.success('分组已删除')
+  } catch (e: any) {
+    ElMessage.error(e?.message || '删除失败')
+  }
 }
 
 function handleBindSuccess() {
