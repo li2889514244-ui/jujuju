@@ -175,11 +175,11 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 shares: metrics.shares || 0
             },
             update: {
-                followers: metrics.followers || 0,
-                views: metrics.views || 0,
-                likes: metrics.likes || 0,
-                comments: metrics.comments || 0,
-                shares: metrics.shares || 0
+                ...(metrics.followers != null ? { followers: metrics.followers } : {}),
+                ...(metrics.views != null ? { views: metrics.views } : {}),
+                ...(metrics.likes != null ? { likes: metrics.likes } : {}),
+                ...(metrics.comments != null ? { comments: metrics.comments } : {}),
+                ...(metrics.shares != null ? { shares: metrics.shares } : {})
             }
         });
 

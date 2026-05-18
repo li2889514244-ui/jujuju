@@ -522,7 +522,7 @@ _METRIC_PATTERNS = {
         re.compile(r'(?:^|\n)(?:可)?参考播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
         re.compile(r'(?:^|\n)播放量\s*(?:\n\s*)?([\d,.]+[万wW]?)', re.MULTILINE),
         # 视频号: 新增播放\n4
-        re.compile(r'新增播放\s*(\d[\d,.]*)'),
+        re.compile(r'新增播放\s*([\d,.]+[万wW]?)'),
     ],
     'comments': [
         re.compile(r'评论\s*[：:]\s*([\d,.]+[万wW]?)'),
