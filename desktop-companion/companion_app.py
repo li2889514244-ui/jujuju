@@ -63,11 +63,7 @@ print(f'[Browser] path={_BROWSER_PATH} channel={_BROWSER_CHANNEL}')
 
 def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
     """Return kwargs for chromium.launch based on detected browser"""
-    import tempfile
-    user_data = Path(tempfile.gettempdir()) / 'pixingyun-chrome-profile'
-    user_data.mkdir(parents=True, exist_ok=True)
-    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN',
-            f'--user-data-dir={user_data}']
+    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN']
     if extra_args:
         args.extend(extra_args)
     opts = {'headless': headless, 'args': args}
