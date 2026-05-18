@@ -1169,6 +1169,73 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         await fp.close()
                     except:
                         pass
+                    try:
+                        vp = await context.new_page()
+                        await vp.goto("https://channels.weixin.qq.com/platform/post/list", wait_until="domcontentloaded", timeout=20000, referer="https://channels.weixin.qq.com/platform")
+                        await vp.wait_for_timeout(5000)
+                        await vp.wait_for_load_state("networkidle")
+                        vtxt = await vp.evaluate("() => document.body.innerText")
+                        with open(Path(tempfile.gettempdir()) / "pixingyun_videos.txt", "w", encoding="utf-8") as f:
+                            f.write(vtxt[:8000])
+                        
+                    except:
+                        pass
+                    # ---- Video list scrape ----
+                    try:
+                        vp = await context.new_page()
+                        await vp.goto('https://channels.weixin.qq.com/platform/post/list', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
+                        await vp.wait_for_timeout(5000)
+                        await vp.wait_for_load_state('networkidle')
+                        vtxt = await vp.evaluate('() => document.body.innerText')
+                        with open(Path(tempfile.gettempdir()) / 'pixingyun_videos.txt', 'w', encoding='utf-8') as f:
+                            f.write(vtxt[:8000])
+                        # Extract posts
+                        posts = []
+                        for line in vtxt.splitlines():
+                            line = line.strip()
+                            if line and 3 < len(line) < 60 and not any(w in line for w in ['视频号','管理','数据','首页','运营','发布','设置','通知']):
+                                nums = re.findall(r'([\d,.]+[万wW]?)', line)
+                                if len(nums) >= 2:
+                                    posts.append({'title': line, 'views': _parse_metric_num(nums[0]), 'likes': _parse_metric_num(nums[1]) if len(nums) > 1 else 0})
+                        if posts and account_id:
+                            try:
+                                r = requests.post(f'{api_url}/platforms/report-post-stats', json={'accountId': account_id, 'posts': posts[:20]}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
+                            except:
+                                pass
+                        await vp.close()
+                    except:
+                        pass
+                    # ---- Follower + Video scrape ----
+                    try:
+                        fp = await context.new_page()
+                        await fp.goto('https://channels.weixin.qq.com/platform/statistic/follower', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
+                        await fp.wait_for_timeout(5000)
+                        ftxt = await fp.evaluate('() => document.body.innerText')
+                        Path(tempfile.gettempdir()).joinpath('pixingyun_follower.txt').write_text(ftxt[:5000], encoding='utf-8')
+                        await fp.close()
+                    except:
+                        pass
+                    try:
+                        vp = await context.new_page()
+                        await vp.goto('https://channels.weixin.qq.com/platform/post/list', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
+                        await vp.wait_for_timeout(5000)
+                        vtxt = await vp.evaluate('() => document.body.innerText')
+                        Path(tempfile.gettempdir()).joinpath('pixingyun_videos.txt').write_text(vtxt[:8000], encoding='utf-8')
+                        posts = []
+                        for line in vtxt.splitlines():
+                            line = line.strip()
+                            if line and 3 < len(line) < 60 and not any(w in line for w in ['视频号','管理','数据','首页','运营','发布','设置','通知']):
+                                nums = re.findall(r'([\d,.]+[万wW]?)', line)
+                                if len(nums) >= 2:
+                                    posts.append({'title': line, 'views': _parse_metric_num(nums[0]), 'likes': _parse_metric_num(nums[1]) if len(nums) > 1 else 0})
+                        if posts and account_id:
+                            try:
+                                requests.post(f'{api_url}/platforms/report-post-stats', json={'accountId': account_id, 'posts': posts[:20]}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
+                            except:
+                                pass
+                        await vp.close()
+                    except:
+                        pass
                     await browser.close()
                     if session_id:
                         scan_status[session_id] = 'done'
