@@ -63,7 +63,11 @@ print(f'[Browser] path={_BROWSER_PATH} channel={_BROWSER_CHANNEL}')
 
 def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
     """Return kwargs for chromium.launch based on detected browser"""
-    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN']
+    import tempfile
+    user_data = Path(tempfile.gettempdir()) / 'pixingyun-chrome-profile'
+    user_data.mkdir(parents=True, exist_ok=True)
+    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN',
+            f'--user-data-dir={user_data}']
     if extra_args:
         args.extend(extra_args)
     opts = {'headless': headless, 'args': args}
@@ -1122,6 +1126,12 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
 
                     await browser.close()
             except Exception as e:
+                import traceback, tempfile
+                err_full = traceback.format_exc()
+                try:
+                    with open(Path(tempfile.gettempdir()) / 'pixingyun_error.log', 'w', encoding='utf-8') as f:
+                        f.write(err_full)
+                except: pass
                 if use_sse:
                     queue.put(json.dumps({'type':'error','data':f'浏览器异常: {str(e)[:200]}'}))
 
