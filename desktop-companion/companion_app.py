@@ -243,8 +243,11 @@ methods:{
   },
   reset(){this.evtSource?.close();clearInterval(this.timer);this.status='idle';this.qrUrl='';this.errorMsg='';this.selected='';this.progress=0},
 confirmLogin(){
-  if(!this.sessionId)return
-  fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})})
+  if(!this.sessionId){this.errorMsg='会话丢失，请重试';this.status='error';return}
+  this.status='uploading'
+  fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})}).then(r=>r.json()).then(j=>{
+    if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg}
+  }).catch(e=>{this.status='error';this.errorMsg='通信失败: '+e.message})
 },
 cancelScan(){
   if(this.sessionId){fetch('/api/cancel-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})})}
