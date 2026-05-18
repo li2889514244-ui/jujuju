@@ -562,7 +562,7 @@ async def _scrape_dashboard(page) -> dict:
 
     # Only search the first 2000 chars (profile section) for followers/following/likes
     # to avoid matching nav items and recommendation cards further down
-    profile_section = text[:2000] if len(text) > 2000 else text
+    profile_section = text[:8000] if len(text) > 8000 else text
     for key in ['followers', 'following', 'likes', 'comments', 'shares']:
         for pat in _METRIC_PATTERNS.get(key, []):
             m = pat.search(profile_section)
