@@ -191,7 +191,13 @@ let AccountsService = AccountsService_1 = class AccountsService {
         if (!account) {
             throw new common_1.NotFoundException('账号不存在');
         }
-        // Shared data: allow by any authenticated user
+        // Cascade delete related records
+        await this.prisma.dailyStats.deleteMany({ where: { accountId: id } });
+        const posts = await this.prisma.post.findMany({ where: { accountId: id }, select: { id: true } });
+        if (posts.length > 0) {
+            await this.prisma.postStats.deleteMany({ where: { postId: { in: posts.map(p => p.id) } } });
+            await this.prisma.post.deleteMany({ where: { accountId: id } });
+        }
         await this.prisma.account.delete({ where: { id } });
         this.logger.log(`账号已删除: ${id}`);
         return { success: true };
@@ -222,17 +228,21 @@ exports.AccountsService = AccountsService = AccountsService_1 = __decorate([
 ], AccountsService);
 
 
-/** Bulk delete accounts owned by user */
+/** Bulk delete accounts (shared data) */
 AccountsService.prototype.bulkDelete = async function(ids, userId) {
-    return this.prisma.account.deleteMany({
-        where: { id: { in: ids }, userId: userId }
-    });
+    await this.prisma.dailyStats.deleteMany({ where: { accountId: { in: ids } } });
+    const posts = await this.prisma.post.findMany({ where: { accountId: { in: ids } }, select: { id: true } });
+    if (posts.length > 0) {
+        await this.prisma.postStats.deleteMany({ where: { postId: { in: posts.map(p => p.id) } } });
+        await this.prisma.post.deleteMany({ where: { accountId: { in: ids } } });
+    }
+    return this.prisma.account.deleteMany({ where: { id: { in: ids } } });
 };
 
-/** Bulk move accounts to a group */
+/** Bulk move accounts to a group (shared data) */
 AccountsService.prototype.bulkMove = async function(ids, groupId, userId) {
     return this.prisma.account.updateMany({
-        where: { id: { in: ids }, userId: userId },
+        where: { id: { in: ids } },
         data: { groupId: groupId }
     });
 };
