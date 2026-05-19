@@ -7,7 +7,13 @@
         <span class="subtitle">管理已授权的第三方平台账号</span>
       </div>
       <div class="header-actions">
-        <el-button @click="refreshAllTokens" :loading="refreshing">
+        <el-tooltip v-if="!hasOAuthAccounts" content="视频号通过扫码登录，无需刷新Token" placement="bottom">
+          <el-button disabled>
+            <el-icon><Refresh /></el-icon>
+            刷新Token
+          </el-button>
+        </el-tooltip>
+        <el-button v-else @click="refreshAllTokens" :loading="refreshing">
           <el-icon><Refresh /></el-icon>
           刷新Token
         </el-button>
@@ -93,7 +99,8 @@
 
       <el-table-column label="Token状态" width="140">
         <template #default="{ row }">
-          <el-tag :type="getTokenStatusType(row.tokenStatus)" size="small">
+          <el-tag v-if="isCookiePlatform(row.platform)" type="info" size="small">扫码登录</el-tag>
+          <el-tag v-else :type="getTokenStatusType(row.tokenStatus)" size="small">
             {{ getTokenStatusText(row.tokenStatus) }}
           </el-tag>
         </template>
@@ -119,6 +126,7 @@
             采集数据
           </el-button>
           <el-button
+            v-if="!isCookiePlatform(row.platform)"
             size="small"
             type="warning"
             @click="refreshToken(row)"
@@ -181,6 +189,13 @@ import type { Platform } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
 
+// ==================== 常量 ====================
+// Platforms that use cookies (QR scan) instead of OAuth tokens
+const COOKIE_ONLY_PLATFORMS = new Set(['WECHAT_VIDEO'])
+function isCookiePlatform(platform: string): boolean {
+  return COOKIE_ONLY_PLATFORMS.has(platform)
+}
+
 // ==================== 状态 ====================
 const loading = ref(false)
 const refreshing = ref(false)
@@ -199,6 +214,10 @@ const pageSize = 20
 const total = ref(0)
 
 // ==================== 计算属性 ====================
+const hasOAuthAccounts = computed(() =>
+  accounts.value.some((a) => !isCookiePlatform(a.platform)),
+)
+
 const filteredAccounts = computed(() => {
   let list = accounts.value
   if (searchKeyword.value) {
@@ -354,10 +373,20 @@ async function refreshToken(account: AuthorizedAccountWithState) {
 }
 
 async function refreshAllTokens() {
+  if (!hasOAuthAccounts.value) {
+    ElMessage.info('当前均为视频号扫码绑定，无需刷新Token')
+    return
+  }
   refreshing.value = true
   try {
     const { data } = await platformsApi.refreshExpiringTokens()
-    ElMessage.success(`Token刷新完成: 成功 ${data?.refreshed || 0}，失败 ${data?.failed || 0}`)
+    const rf = data?.refreshed || 0
+    const fa = data?.failed || 0
+    if (rf === 0 && fa === 0) {
+      ElMessage.info('没有需要刷新的Token')
+    } else {
+      ElMessage.success(`Token刷新完成: 成功 ${rf}，失败 ${fa}`)
+    }
     loadAccounts()
   } catch {
     ElMessage.error('批量刷新Token失败')
