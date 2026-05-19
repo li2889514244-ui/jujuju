@@ -745,6 +745,53 @@ async def _scrape_video_list(page, platform: str) -> list:
     return result[:10]
 
 
+async def _scrape_account_pages(context, platform: str) -> dict:
+    """Scan once, grab all pages in a single authenticated session.
+    Navigates dashboard → data center → video list.
+    Returns {'metrics': {...}, 'video_stats': [...]}"""
+    entry = PLATFORM_DASHBOARDS.get(platform)
+    if not entry:
+        return {'metrics': {}, 'video_stats': []}
+
+    url, domain, data_center_url, video_list_url = entry if len(entry) == 4 else (entry[0], entry[1], None, None)
+
+    page = await context.new_page()
+    metrics = {}
+    video_stats = []
+
+    try:
+        # 1. Dashboard
+        await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+        await page.wait_for_timeout(8000)
+        metrics = await _scrape_dashboard(page)
+
+        # 2. Data center
+        if data_center_url:
+            try:
+                await page.goto(data_center_url, wait_until='domcontentloaded', timeout=30000)
+                await page.wait_for_timeout(6000)
+                dc = await _scrape_data_center(page, platform)
+                for k, v in dc.items():
+                    if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
+                        metrics[k] = v
+            except Exception as e:
+                print(f'[DC] data-center error {platform}: {e}')
+
+        # 3. Video list
+        if video_list_url:
+            try:
+                await page.goto(video_list_url, wait_until='domcontentloaded', timeout=30000)
+                await page.wait_for_timeout(8000)
+                video_stats = await _scrape_video_list(page, platform)
+            except Exception as e:
+                print(f'[DC] video-list error {platform}: {e}')
+
+    finally:
+        await page.close()
+
+    return {'metrics': metrics, 'video_stats': video_stats}
+
+
 async def _scrape_all(accounts: list) -> list:
     from playwright.async_api import async_playwright
 
@@ -762,7 +809,7 @@ async def _scrape_all(accounts: list) -> list:
             if not entry:
                 continue
 
-            url, domain, data_center_url, video_list_url = entry if len(entry) == 4 else (entry[0], entry[1], None, None)
+            domain = entry[1]
 
             cookie_list = []
             for pair in cookies_str.split('; '):
@@ -788,41 +835,14 @@ async def _scrape_all(accounts: list) -> list:
                 except Exception:
                     pass
 
-            page = await ctx.new_page()
-            metrics = {}
-            video_stats = []
             try:
-                # 1. Scrape dashboard (account-level metrics)
-                await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-                await page.wait_for_timeout(8000)
-                metrics = await _scrape_dashboard(page)
-
-                # 2. Scrape data center (detailed analytics via URL navigation)
-                if data_center_url:
-                    try:
-                        await page.goto(data_center_url, wait_until='domcontentloaded', timeout=30000)
-                        await page.wait_for_timeout(6000)
-                        dc_metrics = await _scrape_data_center(page, platform)
-                        for k, v in dc_metrics.items():
-                            if v is not None and (k not in metrics or metrics[k] == 0):
-                                metrics[k] = v
-                    except Exception as e:
-                        print(f'[DC] data-center error {platform}/{aid}: {e}')
-
-                # 3. Scrape video list (per-video stats via URL navigation)
-                if video_list_url:
-                    try:
-                        await page.goto(video_list_url, wait_until='domcontentloaded', timeout=30000)
-                        await page.wait_for_timeout(8000)
-                        video_stats = await _scrape_video_list(page, platform)
-                    except Exception as e:
-                        print(f'[DC] video-list error {platform}/{aid}: {e}')
-
+                result = await _scrape_account_pages(ctx, platform)
             except Exception as e:
                 print(f'[DC] scrape error {platform}/{aid}: {e}')
+                result = {'metrics': {}, 'video_stats': []}
 
             await ctx.close()
-            results.append({'accountId': aid, 'metrics': metrics, 'videoStats': video_stats})
+            results.append({'accountId': aid, 'metrics': result['metrics'], 'videoStats': result['video_stats']})
 
         await browser.close()
     return results
@@ -1139,14 +1159,38 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                     m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
                                     if m: metrics[key] = _parse_metric_num(m.group(1))
 
+                            # Deep scrape all pages in one pass
+                            extra = {}
+                            try:
+                                extra = await _scrape_account_pages(context, platform)
+                            except Exception:
+                                pass
+
+                            for k, v in extra.get('metrics', {}).items():
+                                if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
+                                    metrics[k] = v
+
                             if metrics:
                                 rpt = requests.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
                                     json={'accountId': account_id, 'metrics': metrics},
                                     headers={'Authorization': f'Bearer {token}'}, timeout=30)
-                                if use_sse:
-                                    f_count = metrics.get('followers', '?')
-                                    v_count = metrics.get('views', '?')
-                                    queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count}'}))
+
+                            vstats = extra.get('video_stats') or []
+                            if vstats and account_id:
+                                try:
+                                    requests.post(
+                                        f'{api_url}/platforms/report-post-stats',
+                                        json={'accountId': account_id, 'posts': vstats},
+                                        headers={'Authorization': f'Bearer {token}'}, timeout=30,
+                                    )
+                                except Exception:
+                                    pass
+
+                            if use_sse:
+                                f_count = metrics.get('followers', '?')
+                                v_count = metrics.get('views', '?')
+                                p_count = len(vstats)
+                                queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count} 视频{p_count}条'}))
                         except Exception as e:
                             if use_sse:
                                 queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
@@ -1158,84 +1202,6 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies),'account_id':account_id}}))
                         else:
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
-
-                    try:
-                        fp = await context.new_page()
-                        await fp.goto("https://channels.weixin.qq.com/platform/statistic/follower", wait_until="domcontentloaded", timeout=20000, referer="https://channels.weixin.qq.com/platform")
-                        await fp.wait_for_timeout(5000)
-                        ftxt = await fp.evaluate("() => document.body.innerText")
-                        with open(Path(tempfile.gettempdir()) / "pixingyun_follower.txt", "w", encoding="utf-8") as f:
-                            f.write(ftxt[:5000])
-                        await fp.close()
-                    except:
-                        pass
-                    try:
-                        vp = await context.new_page()
-                        await vp.goto("https://channels.weixin.qq.com/platform/post/list", wait_until="domcontentloaded", timeout=20000, referer="https://channels.weixin.qq.com/platform")
-                        await vp.wait_for_timeout(5000)
-                        await vp.wait_for_load_state("networkidle")
-                        vtxt = await vp.evaluate("() => document.body.innerText")
-                        with open(Path(tempfile.gettempdir()) / "pixingyun_videos.txt", "w", encoding="utf-8") as f:
-                            f.write(vtxt[:8000])
-                        
-                    except:
-                        pass
-                    # ---- Video list scrape ----
-                    try:
-                        vp = await context.new_page()
-                        await vp.goto('https://channels.weixin.qq.com/platform/post/list', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
-                        await vp.wait_for_timeout(5000)
-                        await vp.wait_for_load_state('networkidle')
-                        vtxt = await vp.evaluate('() => document.body.innerText')
-                        with open(Path(tempfile.gettempdir()) / 'pixingyun_videos.txt', 'w', encoding='utf-8') as f:
-                            f.write(vtxt[:8000])
-                        # Extract posts
-                        posts = []
-                        for line in vtxt.splitlines():
-                            line = line.strip()
-                            if line and 3 < len(line) < 60 and not any(w in line for w in ['视频号','管理','数据','首页','运营','发布','设置','通知']):
-                                nums = re.findall(r'([\d,.]+[万wW]?)', line)
-                                if len(nums) >= 2:
-                                    posts.append({'title': line, 'views': _parse_metric_num(nums[0]), 'likes': _parse_metric_num(nums[1]) if len(nums) > 1 else 0})
-                        if posts and account_id:
-                            try:
-                                r = requests.post(f'{api_url}/platforms/report-post-stats', json={'accountId': account_id, 'posts': posts[:20]}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
-                            except:
-                                pass
-                        await vp.close()
-                    except:
-                        pass
-                    # ---- Follower + Video scrape ----
-                    try:
-                        fp = await context.new_page()
-                        await fp.goto('https://channels.weixin.qq.com/platform/statistic/follower', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
-                        await fp.wait_for_timeout(5000)
-                        ftxt = await fp.evaluate('() => document.body.innerText')
-                        Path(tempfile.gettempdir()).joinpath('pixingyun_follower.txt').write_text(ftxt[:5000], encoding='utf-8')
-                        await fp.close()
-                    except:
-                        pass
-                    try:
-                        vp = await context.new_page()
-                        await vp.goto('https://channels.weixin.qq.com/platform/post/list', wait_until='domcontentloaded', timeout=20000, referer='https://channels.weixin.qq.com/platform')
-                        await vp.wait_for_timeout(5000)
-                        vtxt = await vp.evaluate('() => document.body.innerText')
-                        Path(tempfile.gettempdir()).joinpath('pixingyun_videos.txt').write_text(vtxt[:8000], encoding='utf-8')
-                        posts = []
-                        for line in vtxt.splitlines():
-                            line = line.strip()
-                            if line and 3 < len(line) < 60 and not any(w in line for w in ['视频号','管理','数据','首页','运营','发布','设置','通知']):
-                                nums = re.findall(r'([\d,.]+[万wW]?)', line)
-                                if len(nums) >= 2:
-                                    posts.append({'title': line, 'views': _parse_metric_num(nums[0]), 'likes': _parse_metric_num(nums[1]) if len(nums) > 1 else 0})
-                        if posts and account_id:
-                            try:
-                                requests.post(f'{api_url}/platforms/report-post-stats', json={'accountId': account_id, 'posts': posts[:20]}, headers={'Authorization': f'Bearer {token}'}, timeout=30)
-                            except:
-                                pass
-                        await vp.close()
-                    except:
-                        pass
                     await browser.close()
                     if session_id:
                         scan_status[session_id] = 'done'

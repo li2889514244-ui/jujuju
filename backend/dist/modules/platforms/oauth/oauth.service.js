@@ -221,14 +221,20 @@ let OAuthService = OAuthService_1 = class OAuthService {
     }
     async refreshExpiringTokens() {
         const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-        const accounts = await this.prisma.account.findMany({
-            where: {
-                status: 'ACTIVE',
-                metadata: {
-                    path: ['tokenExpiresAt'],
-                    lte: threeDaysFromNow.toISOString(),
-                },
-            },
+        // Fetch all active accounts, then filter in JS since metadata is a JSON string column (not native Json type)
+        const allAccounts = await this.prisma.account.findMany({
+            where: { status: 'ACTIVE' },
+        });
+        const accounts = allAccounts.filter(acc => {
+            if (!acc.metadata) return false;
+            try {
+                const meta = JSON.parse(acc.metadata);
+                if (!meta.tokenExpiresAt) return false;
+                return new Date(meta.tokenExpiresAt) <= threeDaysFromNow;
+            }
+            catch {
+                return false;
+            }
         });
         let refreshed = 0;
         let failed = 0;
