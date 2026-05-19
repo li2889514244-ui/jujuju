@@ -215,9 +215,37 @@ let AccountsService = AccountsService_1 = class AccountsService {
     }
     sanitizeAccount(account) {
         const { cookies, ...rest } = account;
+        // Compute tokenStatus from OAuth token or cookie freshness
+        const metadata = account.metadata;
+        const tokenExpiresAt = metadata?.tokenExpiresAt;
+        let tokenStatus = 'unknown';
+        if (tokenExpiresAt) {
+            const expiresAt = new Date(tokenExpiresAt).getTime();
+            if (Date.now() >= expiresAt) {
+                tokenStatus = 'expired';
+            } else if (Date.now() >= expiresAt - 3 * 24 * 60 * 60 * 1000) {
+                tokenStatus = 'expiring_soon';
+            } else {
+                tokenStatus = 'valid';
+            }
+        }
+        if (account.platform === 'WECHAT_VIDEO' && !tokenExpiresAt) {
+            const lastActive = account.lastActiveAt || account.updatedAt;
+            const hoursSince = lastActive ? (Date.now() - new Date(lastActive).getTime()) / 3600000 : null;
+            if (hoursSince === null) {
+                tokenStatus = cookies ? 'expiring_soon' : 'expired';
+            } else if (hoursSince <= 24) {
+                tokenStatus = 'valid';
+            } else if (hoursSince <= 48) {
+                tokenStatus = 'expiring_soon';
+            } else {
+                tokenStatus = 'expired';
+            }
+        }
         return {
             ...rest,
             hasCookies: !!cookies,
+            tokenStatus,
         };
     }
 };

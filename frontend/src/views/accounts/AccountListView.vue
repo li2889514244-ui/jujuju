@@ -73,11 +73,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="groupName" label="分组" width="110" />
-        <el-table-column label="状态" width="90" align="center">
+        <el-table-column label="状态" width="110" align="center">
           <template #default="{ row }">
-            <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
-              {{ row.hasCookies ? '在线' : '待授权' }}
-            </el-tag>
+            <el-tag v-if="row.tokenStatus === 'valid'" type="success" size="small">已连接</el-tag>
+            <el-tag v-else-if="row.tokenStatus === 'expiring_soon'" type="warning" size="small">即将过期</el-tag>
+            <el-tag v-else-if="row.tokenStatus === 'expired'" type="danger" size="small">已失效</el-tag>
+            <el-tag v-else-if="row.hasCookies" type="info" size="small">在线</el-tag>
+            <el-tag v-else type="warning" size="small">待授权</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="140" fixed="right">
@@ -346,7 +348,7 @@ async function handleCreateGroup() {
 function exportCSV() {
   const headers = ['账号', '平台', '分组', '状态']
   const rows = enhancedAccounts.value.map((r: any) => [
-    r.nickname, r.platform, r.groupName || '-', r.hasCookies ? '在线' : '待授权'
+    r.nickname, r.platform, r.groupName || '-', r.tokenStatus === 'valid' ? '已连接' : r.tokenStatus === 'expiring_soon' ? '即将过期' : r.tokenStatus === 'expired' ? '已失效' : r.hasCookies ? '在线' : '待授权'
   ])
   const csv = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })

@@ -83,11 +83,13 @@
           <el-table-column label="点赞" width="80" prop="likes" align="right">
             <template #default="{ row }">{{ formatNum(row.likes) }}</template>
           </el-table-column>
-          <el-table-column label="状态" width="80" align="center">
+          <el-table-column label="状态" width="110" align="center">
             <template #default="{ row }">
-              <el-tag :type="row.hasCookies ? 'success' : 'warning'" size="small">
-                {{ row.hasCookies ? '在线' : '待授权' }}
-              </el-tag>
+              <el-tag v-if="row.tokenStatus === 'valid'" type="success" size="small">已连接</el-tag>
+              <el-tag v-else-if="row.tokenStatus === 'expiring_soon'" type="warning" size="small">即将过期</el-tag>
+              <el-tag v-else-if="row.tokenStatus === 'expired'" type="danger" size="small">已失效</el-tag>
+              <el-tag v-else-if="row.hasCookies" type="info" size="small">在线</el-tag>
+              <el-tag v-else type="warning" size="small">待授权</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="70" align="center">
@@ -163,6 +165,7 @@ interface AccountRow {
   shares: number
   postCount: number
   hasCookies: boolean
+  tokenStatus: string
 }
 
 const accountRows = ref<AccountRow[]>([])
@@ -258,6 +261,7 @@ async function refreshAll() {
         shares: daily.shares,
         postCount: a._count?.posts || 0,
         hasCookies: a.hasCookies,
+        tokenStatus: a.tokenStatus || (a.hasCookies ? 'valid' : 'unknown'),
       }
     })
 
@@ -322,7 +326,7 @@ const platformChartOption = computed(() => ({
 function exportCSV() {
   const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
   const rows = accountRows.value.map(r => [
-    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, r.hasCookies ? '在线' : '待授权'
+    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, r.tokenStatus === 'valid' ? '已连接' : r.tokenStatus === 'expiring_soon' ? '即将过期' : r.tokenStatus === 'expired' ? '已失效' : r.hasCookies ? '在线' : '待授权'
   ])
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
