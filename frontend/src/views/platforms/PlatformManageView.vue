@@ -97,9 +97,12 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="Token状态" width="140">
+      <el-table-column label="状态" width="120">
         <template #default="{ row }">
-          <el-tag v-if="isCookiePlatform(row.platform)" type="info" size="small">扫码登录</el-tag>
+          <el-tag v-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expired'" type="danger" size="small">已失效 - 需扫码</el-tag>
+          <el-tag v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expiring_soon'" type="warning" size="small">即将过期</el-tag>
+          <el-tag v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'valid'" type="success" size="small">已连接</el-tag>
+          <el-tag v-else-if="isCookiePlatform(row.platform)" type="info" size="small">扫码登录</el-tag>
           <el-tag v-else :type="getTokenStatusType(row.tokenStatus)" size="small">
             {{ getTokenStatusText(row.tokenStatus) }}
           </el-tag>

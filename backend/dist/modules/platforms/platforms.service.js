@@ -155,7 +155,8 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             where: { id: accountId },
             data: {
                 followers: metrics.followers || account.followers,
-                following: metrics.following || account.following
+                following: metrics.following || account.following,
+                lastActiveAt: new Date()
             }
         });
 
@@ -207,11 +208,13 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     avatar: true,
                     bio: true,
                     cookies: true,
+                    metadata: true,
                     followers: true,
                     following: true,
                     status: true,
                     lastActiveAt: true,
                     createdAt: true,
+                    updatedAt: true,
                     owner: { select: { id: true, name: true } },
                     team: { select: { id: true, name: true } },
                 },
@@ -233,6 +236,25 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 }
                 else {
                     tokenStatus = 'valid';
+                }
+            }
+            // For cookie-based platforms (no OAuth token), check cookie freshness via lastActiveAt
+            const COOKIE_VALID_HOURS = 24;
+            const COOKIE_EXPIRING_HOURS = 48;
+            const isCookiePlatform = account.platform === 'WECHAT_VIDEO';
+            if (isCookiePlatform && !tokenExpiresAt) {
+                const lastActive = account.lastActiveAt || account.updatedAt;
+                if (!lastActive) {
+                    tokenStatus = account.cookies ? 'expiring_soon' : 'expired';
+                } else {
+                    const hoursSince = (Date.now() - new Date(lastActive).getTime()) / 3600000;
+                    if (hoursSince <= COOKIE_VALID_HOURS) {
+                        tokenStatus = 'valid';
+                    } else if (hoursSince <= COOKIE_EXPIRING_HOURS) {
+                        tokenStatus = 'expiring_soon';
+                    } else {
+                        tokenStatus = 'expired';
+                    }
                 }
             }
             // Decrypt cookies for data collector

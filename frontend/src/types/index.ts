@@ -52,6 +52,7 @@ export interface Account {
   groupId: string
   groupName: string
   cookieStatus: 'valid' | 'expired' | 'unknown'
+  tokenStatus: 'valid' | 'expiring_soon' | 'expired' | 'unknown'
   lastActiveAt: string
   followers: number
   likes: number
