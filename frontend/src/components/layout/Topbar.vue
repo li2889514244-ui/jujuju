@@ -245,7 +245,7 @@ function handleUserCommand(command: string) {
 <style lang="scss" scoped>
 .topbar {
   height: 52px;
-  @include glass;
+  background: var(--el-bg-color);
   border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
