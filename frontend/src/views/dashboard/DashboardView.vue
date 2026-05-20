@@ -164,7 +164,7 @@ function exportCSV() {
       width: 40px; height: 3px;
       background: var(--el-color-primary);
       border-radius: 2px;
-      margin-top: $space-lg;
+      margin-top: $space-sm;
     }
   }
 
@@ -184,7 +184,6 @@ function exportCSV() {
     align-items: center;
     gap: $space-sm;
     padding-left: $space-2xl;
-    border-left: 1px solid var(--el-border-color-light);
   }
 
   // === Groups ===
@@ -196,7 +195,7 @@ function exportCSV() {
   // === Charts ===
   &__charts {
     display: grid;
-    grid-template-columns: 2fr 1fr;
+    grid-template-columns: 1fr 1fr;
     gap: $space-lg;
   }
 
@@ -299,7 +298,7 @@ function exportCSV() {
 // === Account grid ===
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: $space-lg;
 }
 

@@ -7,17 +7,7 @@
         <span class="subtitle">管理已授权的第三方平台账号</span>
       </div>
       <div class="header-actions">
-        <el-tooltip
-          v-if="!hasOAuthAccounts"
-          content="视频号通过扫码登录，无需刷新Token"
-          placement="bottom"
-        >
-          <el-button disabled>
-            <el-icon><Refresh /></el-icon>
-            刷新Token
-          </el-button>
-        </el-tooltip>
-        <el-button v-else @click="refreshAllTokens" :loading="refreshing">
+        <el-button v-if="hasOAuthAccounts" @click="refreshAllTokens" :loading="refreshing">
           <el-icon><Refresh /></el-icon>
           刷新Token
         </el-button>
@@ -27,7 +17,7 @@
     <!-- 平台概览卡片 -->
     <div class="platform-stats">
       <el-row :gutter="16">
-        <el-col :span="4" v-for="stat in platformStats" :key="stat.platform">
+        <el-col :xs="12" :sm="6" :md="4" :lg="3" v-for="stat in platformStats" :key="stat.platform">
           <el-card shadow="hover" class="stat-card" :class="{ active: stat.count > 0 }">
             <div class="stat-icon">
               <PlatformIcon :platform="stat.platform" :size="32" />

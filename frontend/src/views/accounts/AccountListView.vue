@@ -114,8 +114,17 @@
 
     <div v-if="enhancedAccounts.length === 0 && !loading" class="empty-state">
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#E60012" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#E60012" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#E60012" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
-      <h3>暂无账号</h3>
-      <p>添加你的第一个社交媒体账号</p>
+      <h3>连接你的第一个账号</h3>
+      <p>绑定社交媒体账号，开始矩阵管理与数据分析</p>
+    </div>
+
+    <!-- 批量操作浮动栏 -->
+    <div class="float-bar" v-if="selectedIds.length > 0">
+      <span class="float-bar__count">已选 {{ selectedIds.length }} 个账号</span>
+      <div class="float-bar__actions">
+        <el-button size="small" @click="handleBatchMove"><el-icon><FolderOpened /></el-icon>批量移动</el-button>
+        <el-button size="small" type="danger" @click="handleBatchDelete"><el-icon><Delete /></el-icon>批量删除</el-button>
+      </div>
     </div>
 
     <div class="account-list__pagination" v-if="accountStore.total > accountStore.filter.pageSize">
@@ -584,6 +593,20 @@ function handleBindSuccess() {
   p { margin: 4px 0; font-size: $text-caption; color: var(--el-text-color-secondary); }
 }
 .download-btn { margin-bottom: $space-md; }
+
+// === Float bar ===
+.float-bar {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: $space-lg;
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color);
+  border-radius: $radius-lg;
+  box-shadow: var(--el-box-shadow-dark);
+  padding: $space-sm $space-lg;
+  z-index: 100;
+  &__count { font-size: $text-body; font-weight: 600; color: var(--el-text-color-primary); }
+  &__actions { display: flex; gap: $space-sm; }
+}
 
 // === Empty state ===
 .empty-state {
