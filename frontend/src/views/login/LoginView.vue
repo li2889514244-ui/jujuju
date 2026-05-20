@@ -241,7 +241,7 @@ async function handleRegister() {
 
   &__subtitle {
     color: #6e6e73;
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 400;
   }
 
@@ -274,7 +274,7 @@ async function handleRegister() {
   &__btn {
     width: 100%;
     height: 44px;
-    font-size: 16px;
+    font-size: $text-title;
     font-weight: 600;
     letter-spacing: -0.01em;
   }

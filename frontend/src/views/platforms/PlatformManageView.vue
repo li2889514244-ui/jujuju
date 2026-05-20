@@ -435,12 +435,12 @@ onMounted(async () => {
   .header-left {
     h2 {
       margin: 0 0 4px 0;
-      font-size: 22px;
+      font-size: $text-headline;
       font-weight: 600;
       color: #1a1a1a;
     }
     .subtitle {
-      font-size: 14px;
+      font-size: $text-body;
       color: #8c8c8c;
     }
   }
@@ -475,12 +475,12 @@ onMounted(async () => {
 
     .stat-info {
       .stat-name {
-        font-size: 14px;
+        font-size: $text-body;
         font-weight: 500;
         color: #f5f5f7;
       }
       .stat-count {
-        font-size: 12px;
+        font-size: $text-caption;
         color: #6e6e73;
         margin-top: 4px;
       }
@@ -511,7 +511,7 @@ onMounted(async () => {
       color: #f5f5f7;
     }
     .uid {
-      font-size: 12px;
+      font-size: $text-caption;
       color: #6e6e73;
     }
   }
@@ -560,7 +560,7 @@ onMounted(async () => {
     }
 
     .platform-name {
-      font-size: 14px;
+      font-size: $text-body;
       font-weight: 500;
       color: #f5f5f7;
     }

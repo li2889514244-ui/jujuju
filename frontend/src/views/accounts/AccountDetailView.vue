@@ -290,12 +290,12 @@ function formatNum(n: any): string {
 .analytics-mini-card {
   text-align: center;
   &__label {
-    font-size: 12px;
+    font-size: $text-caption;
     color: #6e6e73;
     margin-bottom: 6px;
   }
   &__value {
-    font-size: 20px;
+    font-size: $text-headline;
     font-weight: 600;
     color: #f5f5f7;
   }

@@ -127,7 +127,7 @@ defineExpose({ clearFiles })
 
   &__text {
     color: #98989d;
-    font-size: 14px;
+    font-size: $text-body;
 
     em {
       color: $primary-color;
@@ -137,7 +137,7 @@ defineExpose({ clearFiles })
 
   &__tip {
     color: #6e6e73;
-    font-size: 12px;
+    font-size: $text-caption;
     margin-top: 8px;
   }
 }

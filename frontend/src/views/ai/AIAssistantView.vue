@@ -799,13 +799,13 @@ function copyContent() {
 
 .header-info h2 {
   margin: 0 0 4px;
-  font-size: 22px;
+  font-size: $text-headline;
 }
 
 .subtitle {
   color: #6e6e73;
   margin: 0;
-  font-size: 14px;
+  font-size: $text-body;
 }
 
 .ai-assistant__tabs {
@@ -833,7 +833,7 @@ function copyContent() {
 
 .result-text {
   line-height: 1.8;
-  font-size: 14px;
+  font-size: $text-body;
   color: #f5f5f7;
 }
 
@@ -871,7 +871,7 @@ function copyContent() {
 }
 
 .slot-rank {
-  font-size: 12px;
+  font-size: $text-caption;
   color: #6e6e73;
 }
 
@@ -886,12 +886,12 @@ function copyContent() {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: $text-caption;
   color: #30d158;
 }
 
 .slot-reason {
-  font-size: 12px;
+  font-size: $text-caption;
   color: #6e6e73;
   margin-top: 8px;
 }
@@ -942,7 +942,7 @@ function copyContent() {
   align-items: flex-start;
   gap: 8px;
   color: #98989d;
-  font-size: 14px;
+  font-size: $text-body;
 }
 
 .recommendations-list {

@@ -451,7 +451,7 @@ onMounted(() => {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   &__title {
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 600;
     color: #f5f5f7;
     margin-bottom: 12px;
@@ -471,12 +471,12 @@ onMounted(() => {
     color: #98989d;
   }
   &__value {
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 500;
     color: #f5f5f7;
   }
   &__change {
-    font-size: 12px;
+    font-size: $text-caption;
     font-weight: 500;
     min-width: 50px;
     text-align: right;
@@ -495,14 +495,14 @@ onMounted(() => {
   width: 100%;
 }
 .ranking-title {
-  font-size: 14px;
+  font-size: $text-body;
   color: #f5f5f7;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ranking-meta {
-  font-size: 12px;
+  font-size: $text-caption;
   color: #6e6e73;
   margin-top: 2px;
 }
@@ -513,7 +513,7 @@ onMounted(() => {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: $text-caption;
   font-weight: bold;
   color: #fff;
 }

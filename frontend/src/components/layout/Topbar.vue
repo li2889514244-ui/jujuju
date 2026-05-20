@@ -281,7 +281,7 @@ function handleUserCommand(command: string) {
     gap: 6px;
     cursor: pointer;
     color: var(--el-text-color-secondary);
-    font-size: 14px;
+    font-size: $text-body;
     padding: 6px 12px;
     border-radius: 6px;
     transition: background 0.2s;
@@ -310,7 +310,7 @@ function handleUserCommand(command: string) {
     cursor: pointer;
   }
   &__username {
-    font-size: 14px;
+    font-size: $text-body;
     color: var(--el-text-color-primary);
   }
 }
@@ -334,7 +334,7 @@ function handleUserCommand(command: string) {
     text-align: center;
     color: var(--el-text-color-secondary);
     padding: 40px 0;
-    font-size: 14px;
+    font-size: $text-body;
   }
 }
 
@@ -372,7 +372,7 @@ function handleUserCommand(command: string) {
     white-space: nowrap;
   }
   &__time {
-    font-size: 12px;
+    font-size: $text-caption;
     color: var(--el-text-color-secondary);
     margin-top: 4px;
   }

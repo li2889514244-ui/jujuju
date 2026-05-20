@@ -207,7 +207,7 @@
           <el-icon v-if="r.status === 'success'"><CircleCheckFilled /></el-icon>
           <el-icon v-else-if="r.status === 'failed'"><CircleCloseFilled /></el-icon>
           <span>{{ r.nickname }}</span>
-          <span v-if="r.error" style="color: #ff453a; font-size: 12px">{{ r.error }}</span>
+          <span v-if="r.error" style="color: #ff453a; font-size: 13px">{{ r.error }}</span>
         </div>
       </el-card>
     </div>
@@ -395,7 +395,7 @@ onMounted(() => {
     gap: 8px;
   }
   &__followers {
-    font-size: 12px;
+    font-size: 13px;
     color: #6e6e73;
     margin-left: 4px;
   }

@@ -162,7 +162,7 @@ function toggleCollapse() {
       flex-shrink: 0;
     }
     &-text {
-      font-size: 16px;
+      font-size: $text-title;
       font-weight: 600;
       color: var(--el-text-color-primary);
       white-space: nowrap;
@@ -186,7 +186,7 @@ function toggleCollapse() {
     border-radius: 6px;
     color: var(--el-text-color-secondary);
     text-decoration: none;
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 450;
     transition: all 0.2s ease;
     white-space: nowrap;
@@ -223,7 +223,7 @@ function toggleCollapse() {
     margin-top: 4px;
   }
   &__section-title {
-    font-size: 11px;
+    font-size: $text-micro;
     color: var(--el-text-color-placeholder);
     text-transform: uppercase;
     padding: 8px 0 6px;
@@ -233,7 +233,7 @@ function toggleCollapse() {
     margin-bottom: 6px;
   }
   &__platform-name {
-    font-size: 10px;
+    font-size: $text-micro;
     color: var(--el-text-color-placeholder);
     padding: 2px 0;
     text-transform: uppercase;
@@ -258,14 +258,14 @@ function toggleCollapse() {
   }
   &__acc-name {
     flex: 1;
-    font-size: 13px;
+    font-size: $text-caption;
     color: var(--el-text-color-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   &__acc-followers {
-    font-size: 11px;
+    font-size: $text-micro;
     color: var(--el-text-color-placeholder);
     flex-shrink: 0;
   }
@@ -298,7 +298,7 @@ function toggleCollapse() {
       background: #30d158;
     }
     &-text {
-      font-size: 11px;
+      font-size: $text-micro;
       color: var(--el-text-color-placeholder);
     }
   }
@@ -334,7 +334,7 @@ function toggleCollapse() {
       color: var(--el-text-color-primary);
     }
     &-icon {
-      font-size: 20px;
+      font-size: $text-headline;
       font-weight: 300;
     }
   }

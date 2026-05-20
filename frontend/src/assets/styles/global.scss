@@ -12,8 +12,11 @@ html, body, #app {
   overflow: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 { line-height: 1.2; font-weight: 600; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
 a { text-decoration: none; color: var(--el-color-primary); }
+p { line-height: 1.5; }
+small, .text-caption { font-size: $text-caption; color: var(--el-text-color-placeholder); }
+.text-micro { font-size: $text-micro; text-transform: uppercase; letter-spacing: 0.05em; }
 
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
