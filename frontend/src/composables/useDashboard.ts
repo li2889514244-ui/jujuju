@@ -55,12 +55,19 @@ export function useDashboard() {
       const comp = compRes?.data
       const wowChange = comp?.weekOverWeek?.change
 
-      const accRes = await accountsApi.getList({ pageSize: 100, page: 1 })
+      const [accRes, groupsRes] = await Promise.all([
+        accountsApi.getList({ pageSize: 100, page: 1 }),
+        accountsApi.getGroups().catch(() => ({ data: [] as Array<{ id: string; name: string }> })),
+      ])
       const accData = accRes.data as {
         accounts?: Array<Record<string, unknown>>
         list?: Array<Record<string, unknown>>
       }
       const accs = accData?.accounts || accData?.list || []
+      const groups: Record<string, string> = {}
+      for (const g of (groupsRes.data as Array<{ id: string; name: string }>) || []) {
+        if (g.id) groups[g.id] = g.name
+      }
 
       let dailyMap: DailyStatsMap = {}
       try {
@@ -99,7 +106,10 @@ export function useDashboard() {
           nickname: (a.nickname as string) || '未命名',
           avatar: (a.avatar as string) || '',
           platform: a.platform as string,
-          groupName: (a.group as { name?: string })?.name || '',
+          groupName:
+            (a.group as { name?: string })?.name ||
+            groups[a.groupId as string] ||
+            '',
           followers: (a.followers as number) || 0,
           views: daily.views,
           likes: daily.likes,
