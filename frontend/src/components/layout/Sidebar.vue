@@ -43,11 +43,13 @@
           <Moon v-else />
         </el-icon>
       </div>
-      <div class="sidebar__toggle" @click="toggleCollapse">
-        <el-icon :size="16" class="sidebar__toggle-icon">
-          <component :is="isCollapsed ? Expand : Fold" />
-        </el-icon>
-      </div>
+      <el-tooltip :content="isCollapsed ? '展开' : '收起'" placement="right">
+        <div class="sidebar__toggle" @click="toggleCollapse">
+          <el-icon :size="16" class="sidebar__toggle-icon">
+            <component :is="isCollapsed ? Expand : Fold" />
+          </el-icon>
+        </div>
+      </el-tooltip>
     </div>
   </div>
 </template>

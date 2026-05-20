@@ -12,11 +12,11 @@
             end-placeholder="结束日期"
             value-format="YYYY-MM-DD"
             :shortcuts="dateShortcuts"
-            style="width: 280px"
+            class="report-date-picker"
           />
         </el-form-item>
         <el-form-item label="平台">
-          <el-select v-model="platform" placeholder="全部平台" clearable style="width: 140px">
+          <el-select v-model="platform" placeholder="全部平台" clearable class="report-platform-select">
             <el-option label="全部" value="" />
             <el-option
               v-for="(label, key) in PLATFORM_LABELS"
@@ -297,4 +297,6 @@ async function exportExcel() {
     margin-bottom: 20px;
   }
 }
+.report-date-picker { width: 280px; }
+.report-platform-select { width: 140px; }
 </style>
