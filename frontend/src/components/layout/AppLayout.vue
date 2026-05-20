@@ -59,9 +59,6 @@ function onPageEnter() {
     overflow-y: auto;
     overflow-x: hidden;
     padding: $space-2xl $space-3xl;
-    max-width: var(--content-max-width, 1200px);
-    margin: 0 auto;
-    width: 100%;
     &::-webkit-scrollbar {
       width: 4px;
     }

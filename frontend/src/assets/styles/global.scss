@@ -86,13 +86,12 @@ a { text-decoration: none; color: var(--el-color-primary); }
 .spring-scale:hover { transform: scale(1.02); }
 .spring-scale:active { transform: scale(0.97); }
 
-@media (max-width: 1024px) {
-  .app-layout__content { padding: 24px 20px; }
-  .dashboard__kpi { grid-template-columns: 1fr 1fr; }
-  .dashboard__charts { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+  .app-layout__content { padding: 20px 16px; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
-@media (max-width: 640px) {
+@media (max-width: 480px) {
   .account-grid { grid-template-columns: 1fr !important; }
   .dashboard__hero-kpi .hero-kpi__value { font-size: 48px; }
+  .dashboard__charts { grid-template-columns: 1fr; }
 }
