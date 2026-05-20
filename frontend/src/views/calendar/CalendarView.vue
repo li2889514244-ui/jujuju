@@ -1,7 +1,7 @@
 <template>
   <div class="calendar-page">
     <div class="calendar-page__header">
-      <h2>日程管理</h2>
+      <h2>内容日历</h2>
       <div class="calendar-page__controls">
         <el-radio-group v-model="viewMode" size="small">
           <el-radio-button value="month">月</el-radio-button>
@@ -326,7 +326,7 @@ function deleteEvent() {
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: minmax(100px, auto);
+  grid-auto-rows: minmax(80px, auto);
 }
 .cal-day {
   padding: 4px;
@@ -410,7 +410,7 @@ function deleteEvent() {
   }
   &__col {
     padding: 6px 4px;
-    min-height: 200px;
+    min-height: 100px;
     border-right: 1px solid var(--el-border-color-light);
     &:last-child {
       border-right: none;
