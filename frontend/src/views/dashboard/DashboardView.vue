@@ -27,7 +27,7 @@
     </div>
 
     <!-- 分组切换（有分组时才显示） -->
-    <div class="dashboard__groups" v-if="accountGroups.length > 1">
+    <div class="dashboard__groups" v-if="accountGroups.length > 0">
       <el-select
         v-model="selectedGroup"
         size="small"

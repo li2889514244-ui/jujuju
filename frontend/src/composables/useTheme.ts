@@ -4,7 +4,13 @@ const THEME_KEY = 'matrixflow-theme'
 const isLight = ref(false)
 
 function apply() {
-  document.documentElement.classList.toggle('light', isLight.value)
+  if (isLight.value) {
+    document.documentElement.classList.remove('dark')
+    document.documentElement.classList.add('light')
+  } else {
+    document.documentElement.classList.add('dark')
+    document.documentElement.classList.remove('light')
+  }
 }
 
 export function useTheme() {

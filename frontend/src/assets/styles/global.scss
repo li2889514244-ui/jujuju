@@ -1,8 +1,8 @@
 // 披星云 — Apple Design System（浅色 + 深色双模）
 // Element Plus CSS 变量覆盖 + 全局样式
 
-// === App 级主题色（浅/深双模）===
-:root {
+// === App 级主题色 — 深色（html.dark 优先级 > EP :root）===
+html.dark {
   --app-bg-primary: #000000;
   --app-bg-secondary: #0d0d0d;
   --app-bg-elevated: #1c1c1e;
@@ -29,8 +29,39 @@
   --app-overlay-active: rgba(255, 255, 255, 0.12);
   --section-gap: 64px;
   --content-max-width: 1200px;
+
+  --el-color-primary: #0a84ff;
+  --el-color-primary-light-3: #3399ff;
+  --el-color-primary-light-5: #66b3ff;
+  --el-color-primary-light-7: #99ccff;
+  --el-color-primary-light-9: #cce6ff;
+  --el-color-primary-dark-2: #0870d9;
+  --el-color-success: #30d158;
+  --el-color-warning: #ff9f0a;
+  --el-color-danger: #ff453a;
+  --el-color-info: #64d2ff;
+  --el-bg-color: var(--app-bg-primary);
+  --el-bg-color-overlay: var(--app-bg-elevated);
+  --el-bg-color-page: var(--app-bg-secondary);
+  --el-border-color: var(--app-border);
+  --el-border-color-light: var(--app-separator);
+  --el-border-color-lighter: rgba(255, 255, 255, 0.04);
+  --el-border-color-extra-light: rgba(255, 255, 255, 0.03);
+  --el-text-color-primary: var(--app-text-primary);
+  --el-text-color-regular: #d2d2d7;
+  --el-text-color-secondary: var(--app-text-secondary);
+  --el-text-color-placeholder: #636366;
+  --el-text-color-disabled: #48484a;
+  --el-fill-color: var(--app-fill-color);
+  --el-fill-color-light: var(--app-fill-color-light);
+  --el-fill-color-blank: var(--app-bg-primary);
+  --el-border-radius-base: 10px;
+  --el-border-radius-small: 6px;
+  --el-border-radius-round: 9999px;
+  --el-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 }
 
+// === 浅色覆盖 ===
 html.light {
   --app-bg-primary: #f2f2f7;
   --app-bg-secondary: #ffffff;
@@ -58,47 +89,7 @@ html.light {
   --app-overlay-active: rgba(0, 0, 0, 0.1);
   --section-gap: 64px;
   --content-max-width: 1200px;
-}
 
-// === EP CSS 变量（深色默认，浅色覆写）===
-:root {
-  --el-color-primary: #0a84ff;
-  --el-color-primary-light-3: #3399ff;
-  --el-color-primary-light-5: #66b3ff;
-  --el-color-primary-light-7: #99ccff;
-  --el-color-primary-light-9: #cce6ff;
-  --el-color-primary-dark-2: #0870d9;
-  --el-color-success: #30d158;
-  --el-color-warning: #ff9f0a;
-  --el-color-danger: #ff453a;
-  --el-color-info: #64d2ff;
-
-  --el-bg-color: var(--app-bg-primary);
-  --el-bg-color-overlay: var(--app-bg-elevated);
-  --el-bg-color-page: var(--app-bg-secondary);
-  --el-border-color: var(--app-border);
-  --el-border-color-light: var(--app-separator);
-  --el-border-color-lighter: rgba(255, 255, 255, 0.04);
-  --el-border-color-extra-light: rgba(255, 255, 255, 0.03);
-
-  --el-text-color-primary: var(--app-text-primary);
-  --el-text-color-regular: #d2d2d7;
-  --el-text-color-secondary: var(--app-text-secondary);
-  --el-text-color-placeholder: #636366;
-  --el-text-color-disabled: #48484a;
-
-  --el-fill-color: var(--app-fill-color);
-  --el-fill-color-light: var(--app-fill-color-light);
-  --el-fill-color-blank: var(--app-bg-primary);
-
-  --el-border-radius-base: 10px;
-  --el-border-radius-small: 6px;
-  --el-border-radius-round: 9999px;
-
-  --el-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-}
-
-html.light {
   --el-bg-color: var(--app-bg-primary);
   --el-bg-color-overlay: var(--app-bg-elevated);
   --el-bg-color-page: var(--app-bg-secondary);
