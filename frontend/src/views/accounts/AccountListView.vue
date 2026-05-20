@@ -79,12 +79,12 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#0a84ff"
+          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#E60012"
             ><CircleCheckFilled
           /></el-icon>
           <span v-else class="account-card__check-empty" />
         </div>
-        <el-avatar :size="48" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
+        <el-avatar :size="48" :src="acc.avatar" :style="{ background: acc.avatar ? '' : getPlatformColor(acc.platform), color: '#fff' }">{{ acc.nickname?.charAt(0) }}</el-avatar>
         <div class="account-card__info">
           <span class="account-card__name">{{ acc.nickname }}</span>
           <PlatformBadge :platform="acc.platform" size="sm" />
@@ -276,6 +276,7 @@ import GlassCard from '@/components/common/GlassCard.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 import { formatCompactNum, tokenStatusLabel } from '@/utils/format'
+import { getPlatformColor } from '@/composables/usePlatform'
 
 const accountStore = useAccountStore()
 const userStore = useUserStore()
@@ -521,8 +522,8 @@ function handleBindSuccess() {
   }
 
   &--selected {
-    border-color: #0a84ff;
-    background: rgba(#0a84ff, 0.06);
+    border-color: #E60012;
+    background: rgba(#E60012, 0.06);
   }
 
   &__check {

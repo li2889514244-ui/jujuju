@@ -208,7 +208,7 @@ async function handleRegister() {
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(#0a84ff, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(#E60012, 0.06) 0%, transparent 60%),
       radial-gradient(ellipse 40% 30% at 80% 100%, rgba(#bf5af2, 0.04) 0%, transparent 60%);
     pointer-events: none;
   }

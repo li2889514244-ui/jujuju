@@ -866,7 +866,7 @@ function copyContent() {
 }
 
 .time-slot.is-best {
-  border-color: #0a84ff;
+  border-color: #E60012;
   background: #ecf5ff;
 }
 

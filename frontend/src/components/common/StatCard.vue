@@ -57,7 +57,7 @@ const props = withDefaults(
   {
     trend: null,
     trendLabel: '较上周',
-    accentColor: '#0a84ff',
+    accentColor: '#E60012',
     animated: true,
     delay: 0,
     size: 'md',

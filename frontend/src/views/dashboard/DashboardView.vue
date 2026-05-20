@@ -267,7 +267,7 @@ function exportCSV() {
   }
   &__link {
     font-size: $text-caption;
-    color: #0a84ff;
+    color: #E60012;
     text-decoration: none;
     font-weight: 500;
     margin-left: auto;
@@ -306,8 +306,8 @@ function exportCSV() {
   cursor: pointer;
 
   &:hover {
-    border-color: #0a84ff;
-    background: rgba(#0a84ff, 0.04);
+    border-color: #E60012;
+    background: rgba(#E60012, 0.04);
   }
 
   &__name {

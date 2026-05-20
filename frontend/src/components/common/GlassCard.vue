@@ -45,12 +45,12 @@ defineEmits<{ click: [e: MouseEvent] }>()
     box-shadow: var(--el-box-shadow);
   }
   &--tinted {
-    background: rgba(#0a84ff, 0.06);
-    border-color: rgba(#0a84ff, 0.15);
+    background: rgba(#E60012, 0.06);
+    border-color: rgba(#E60012, 0.15);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     .glass-card__header {
-      border-bottom-color: rgba(#0a84ff, 0.08);
+      border-bottom-color: rgba(#E60012, 0.08);
     }
   }
 

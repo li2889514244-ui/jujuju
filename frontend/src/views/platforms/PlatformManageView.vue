@@ -466,7 +466,7 @@ onMounted(async () => {
     }
 
     &.active {
-      border-color: #0a84ff;
+      border-color: #E60012;
     }
 
     .stat-icon {
@@ -550,7 +550,7 @@ onMounted(async () => {
     transition: all 0.3s;
 
     &:hover {
-      border-color: #0a84ff;
+      border-color: #E60012;
       background: #f0f7ff;
     }
 
