@@ -130,10 +130,10 @@ function toggleCollapse() {
 .sidebar {
   width: 220px;
   height: 100vh;
-  background: var(--app-bg-glass-heavy);
+  background: var(--el-fill-color);
   backdrop-filter: blur(60px) saturate(200%);
   -webkit-backdrop-filter: blur(60px) saturate(200%);
-  border-right: 1px solid var(--app-border);
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
   transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -165,7 +165,7 @@ function toggleCollapse() {
     &-text {
       font-size: 16px;
       font-weight: 600;
-      color: var(--app-text-primary);
+      color: var(--el-text-color-primary);
       white-space: nowrap;
     }
   }
@@ -185,7 +185,7 @@ function toggleCollapse() {
     gap: 10px;
     padding: 10px 12px;
     border-radius: 6px;
-    color: var(--app-text-secondary);
+    color: var(--el-text-color-secondary);
     text-decoration: none;
     font-size: 14px;
     font-weight: 450;
@@ -193,8 +193,8 @@ function toggleCollapse() {
     white-space: nowrap;
 
     &:hover {
-      background: var(--app-overlay-hover);
-      color: var(--app-text-primary);
+      background: var(--el-fill-color-lighter);
+      color: var(--el-text-color-primary);
     }
     &--active {
       background: rgba(#0a84ff, 0.12);
@@ -220,12 +220,12 @@ function toggleCollapse() {
     flex: 1;
     overflow-y: auto;
     padding: 8px 12px;
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--el-border-color);
     margin-top: 4px;
   }
   &__section-title {
     font-size: 11px;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     text-transform: uppercase;
     padding: 8px 0 6px;
     letter-spacing: 0.5px;
@@ -235,7 +235,7 @@ function toggleCollapse() {
   }
   &__platform-name {
     font-size: 10px;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     padding: 2px 0;
     text-transform: uppercase;
   }
@@ -248,7 +248,7 @@ function toggleCollapse() {
     cursor: pointer;
     transition: background 0.15s;
     &:hover {
-      background: var(--app-overlay-hover);
+      background: var(--el-fill-color-lighter);
     }
     &--active {
       background: rgba(#0a84ff, 0.1);
@@ -260,20 +260,20 @@ function toggleCollapse() {
   &__acc-name {
     flex: 1;
     font-size: 13px;
-    color: var(--app-text-secondary);
+    color: var(--el-text-color-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   &__acc-followers {
     font-size: 11px;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     flex-shrink: 0;
   }
 
   &__bottom {
     padding: 12px 10px;
-    border-top: 1px solid var(--app-border);
+    border-top: 1px solid var(--el-border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -300,7 +300,7 @@ function toggleCollapse() {
     }
     &-text {
       font-size: 11px;
-      color: var(--app-text-tertiary);
+      color: var(--el-text-color-placeholder);
     }
   }
   &__theme-toggle {
@@ -311,12 +311,12 @@ function toggleCollapse() {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     transition: all 0.2s;
     flex-shrink: 0;
     &:hover {
-      background: var(--app-overlay-hover);
-      color: var(--app-text-primary);
+      background: var(--el-fill-color-lighter);
+      color: var(--el-text-color-primary);
     }
   }
   &__toggle {
@@ -327,12 +327,12 @@ function toggleCollapse() {
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     transition: all 0.2s;
     flex-shrink: 0;
     &:hover {
-      background: var(--app-overlay-hover);
-      color: var(--app-text-primary);
+      background: var(--el-fill-color-lighter);
+      color: var(--el-text-color-primary);
     }
     &-icon {
       font-size: 20px;

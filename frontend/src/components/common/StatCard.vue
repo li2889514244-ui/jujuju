@@ -90,7 +90,7 @@ const displayValue = computed(() =>
 
   &__label {
     font-size: $text-caption;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     margin-bottom: $space-xs;
     display: block;
     text-transform: uppercase;
@@ -100,7 +100,7 @@ const displayValue = computed(() =>
   &__value {
     font-size: 28px;
     font-weight: 700;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     letter-spacing: -0.03em;
     line-height: 1.1;
     font-feature-settings: 'tnum';

@@ -249,7 +249,7 @@ async function handleRegister() {
     display: flex;
     gap: 0;
     margin-bottom: 24px;
-    background: var(--app-overlay-hover);
+    background: var(--el-fill-color-lighter);
     border-radius: $radius-md;
     padding: 3px;
     button {
@@ -258,15 +258,15 @@ async function handleRegister() {
       border: none;
       border-radius: $radius-sm;
       background: transparent;
-      color: var(--app-text-tertiary);
+      color: var(--el-text-color-placeholder);
       font-size: $text-body;
       font-weight: 500;
       cursor: pointer;
       transition: all 0.2s ease;
       &.active {
-        background: var(--app-bg-elevated);
-        color: var(--app-text-primary);
-        box-shadow: var(--app-shadow-sm);
+        background: var(--el-bg-color-overlay);
+        color: var(--el-text-color-primary);
+        box-shadow: var(--el-box-shadow-lighter);
       }
     }
   }

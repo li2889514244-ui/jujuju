@@ -504,10 +504,10 @@ function handleBindSuccess() {
   align-items: center;
   gap: $space-sm;
   padding: $space-lg $space-md;
-  background: var(--app-glass-bg);
+  background: var(--el-fill-color-light);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   cursor: pointer;
   transition: all 0.25s $ease-out;
@@ -516,8 +516,8 @@ function handleBindSuccess() {
 
   &:hover {
     transform: translateY(-2px);
-    border-color: var(--app-border-strong);
-    box-shadow: var(--app-shadow-md);
+    border-color: var(--el-border-color);
+    box-shadow: var(--el-box-shadow);
   }
 
   &--selected {
@@ -534,7 +534,7 @@ function handleBindSuccess() {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid var(--app-border);
+    border: 2px solid var(--el-border-color);
     display: block;
   }
 
@@ -549,7 +549,7 @@ function handleBindSuccess() {
   &__name {
     font-size: $text-body;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -564,18 +564,18 @@ function handleBindSuccess() {
   &__stat-value {
     font-size: $text-headline;
     font-weight: 700;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     font-feature-settings: 'tnum';
   }
   &__stat-label {
     font-size: $text-micro;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     text-transform: uppercase;
   }
   &__group {
     font-size: $text-micro;
-    color: var(--app-text-tertiary);
-    background: var(--app-overlay-hover);
+    color: var(--el-text-color-placeholder);
+    background: var(--el-fill-color-lighter);
     padding: 1px 10px;
     border-radius: $radius-full;
   }
@@ -616,12 +616,12 @@ function handleBindSuccess() {
   h3 {
     font-size: $text-headline;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     margin: 0;
   }
   p {
     font-size: $text-body;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     margin: 0;
   }
 }

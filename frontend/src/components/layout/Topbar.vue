@@ -246,7 +246,7 @@ function handleUserCommand(command: string) {
 .topbar {
   height: 52px;
   @include glass;
-  border-bottom: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--el-border-color);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -286,7 +286,7 @@ function handleUserCommand(command: string) {
     border-radius: 6px;
     transition: background 0.2s;
     &:hover {
-      background: var(--app-overlay-hover);
+      background: var(--el-fill-color-lighter);
     }
   }
 
@@ -321,7 +321,7 @@ function handleUserCommand(command: string) {
     justify-content: space-between;
     align-items: center;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--app-separator);
+    border-bottom: 1px solid var(--el-border-color-light);
     font-weight: 600;
     font-size: 15px;
   }
@@ -347,7 +347,7 @@ function handleUserCommand(command: string) {
   cursor: pointer;
   transition: background 0.2s;
   &:hover {
-    background: var(--app-overlay-hover);
+    background: var(--el-fill-color-lighter);
   }
   &--unread {
     background: rgba(10, 132, 255, 0.08);

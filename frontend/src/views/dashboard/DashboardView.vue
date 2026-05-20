@@ -170,7 +170,7 @@ function exportCSV() {
     align-items: center;
     gap: $space-sm;
     padding-left: $space-2xl;
-    border-left: 1px solid var(--app-separator);
+    border-left: 1px solid var(--el-border-color-light);
   }
 
   // === Groups ===
@@ -207,7 +207,7 @@ function exportCSV() {
   &__value {
     font-size: 80px;
     font-weight: 700;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     letter-spacing: -0.04em;
     line-height: 1;
     font-feature-settings: 'tnum';
@@ -215,7 +215,7 @@ function exportCSV() {
   }
   &__label {
     font-size: $text-body;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     text-transform: uppercase;
     letter-spacing: 0.1em;
   }
@@ -230,12 +230,12 @@ function exportCSV() {
   b {
     font-size: $text-headline;
     font-weight: 700;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     font-feature-settings: 'tnum';
   }
   small {
     font-size: $text-micro;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     text-transform: uppercase;
   }
 }
@@ -248,13 +248,13 @@ function exportCSV() {
   &__title {
     font-size: $text-micro;
     font-weight: 600;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
   &__count {
     font-size: $text-caption;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
   }
   &__link {
     font-size: $text-caption;
@@ -288,10 +288,10 @@ function exportCSV() {
   gap: $space-sm;
   padding: $space-md $space-lg;
   border-radius: $radius-md;
-  background: var(--app-glass-bg);
+  background: var(--el-fill-color-light);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--el-border-color);
   text-decoration: none;
   transition: all 0.2s $ease-out;
   cursor: pointer;
@@ -305,7 +305,7 @@ function exportCSV() {
     flex: 1;
     font-size: $text-body;
     font-weight: 600;
-    color: var(--app-text-primary);
+    color: var(--el-text-color-primary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

@@ -1,113 +1,88 @@
-// 披星云 — Apple Design System（浅色 + 深色双模）
-// Element Plus CSS 变量覆盖 + 全局样式
+// 披星云 — Apple Human Interface 色板
+// 暗色 = macOS dark mode / 浅色 = iOS light mode
 
-// === App 级主题色 — 深色（html.dark 优先级 > EP :root）===
+// === 深色模式 (Apple macOS Dark) ===
 html.dark {
-  --app-bg-primary: #000000;
-  --app-bg-secondary: #0d0d0d;
-  --app-bg-elevated: #1c1c1e;
-  --app-bg-glass: rgba(28, 28, 30, 0.85);
-  --app-bg-glass-heavy: rgba(28, 28, 30, 0.9);
-  --app-text-primary: #f5f5f7;
-  --app-text-secondary: #98989d;
-  --app-text-tertiary: #6e6e73;
-  --app-border: rgba(255, 255, 255, 0.08);
-  --app-border-strong: rgba(255, 255, 255, 0.15);
-  --app-separator: rgba(255, 255, 255, 0.06);
-  --app-scrollbar-thumb: rgba(255, 255, 255, 0.1);
-  --app-scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
-  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-  --app-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --app-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
-  --app-glass-bg: rgba(28, 28, 30, 0.75);
-  --app-glass-bg-heavy: rgba(28, 28, 30, 0.9);
-  --app-table-header-bg: rgba(255, 255, 255, 0.03);
-  --app-table-hover-bg: rgba(255, 255, 255, 0.04);
-  --app-fill-color: rgba(255, 255, 255, 0.04);
-  --app-fill-color-light: rgba(255, 255, 255, 0.06);
-  --app-overlay-hover: rgba(255, 255, 255, 0.08);
-  --app-overlay-active: rgba(255, 255, 255, 0.12);
-  --section-gap: 64px;
-  --content-max-width: 1200px;
+  --el-color-primary: #007AFF;
+  --el-color-primary-light-3: #3395FF;
+  --el-color-primary-light-5: #66B0FF;
+  --el-color-primary-light-9: #CCE5FF;
+  --el-color-primary-dark-2: #0062CC;
+  --el-color-success: #34C759;
+  --el-color-warning: #FF9500;
+  --el-color-danger: #FF3B30;
+  --el-color-info: #5AC8FA;
 
-  --el-color-primary: #0a84ff;
-  --el-color-primary-light-3: #3399ff;
-  --el-color-primary-light-5: #66b3ff;
-  --el-color-primary-light-7: #99ccff;
-  --el-color-primary-light-9: #cce6ff;
-  --el-color-primary-dark-2: #0870d9;
-  --el-color-success: #30d158;
-  --el-color-warning: #ff9f0a;
-  --el-color-danger: #ff453a;
-  --el-color-info: #64d2ff;
-  --el-bg-color: var(--app-bg-primary);
-  --el-bg-color-overlay: var(--app-bg-elevated);
-  --el-bg-color-page: var(--app-bg-secondary);
-  --el-border-color: var(--app-border);
-  --el-border-color-light: var(--app-separator);
-  --el-border-color-lighter: rgba(255, 255, 255, 0.04);
-  --el-border-color-extra-light: rgba(255, 255, 255, 0.03);
-  --el-text-color-primary: var(--app-text-primary);
-  --el-text-color-regular: #d2d2d7;
-  --el-text-color-secondary: var(--app-text-secondary);
-  --el-text-color-placeholder: #636366;
-  --el-text-color-disabled: #48484a;
-  --el-fill-color: var(--app-fill-color);
-  --el-fill-color-light: var(--app-fill-color-light);
-  --el-fill-color-blank: var(--app-bg-primary);
+  --el-bg-color: #000000;
+  --el-bg-color-overlay: #1C1C1E;
+  --el-bg-color-page: #000000;
+  --el-border-color: rgba(84,84,88,0.65);
+  --el-border-color-light: rgba(84,84,88,0.4);
+  --el-border-color-lighter: rgba(84,84,88,0.25);
+  --el-border-color-extra-light: rgba(84,84,88,0.15);
+
+  --el-text-color-primary: #FFFFFF;
+  --el-text-color-regular: #EBEBF5;
+  --el-text-color-secondary: rgba(235,235,245,0.6);
+  --el-text-color-placeholder: rgba(235,235,245,0.3);
+  --el-text-color-disabled: rgba(235,235,245,0.18);
+
+  --el-fill-color: rgba(120,120,128,0.2);
+  --el-fill-color-light: rgba(120,120,128,0.12);
+  --el-fill-color-blank: #000000;
+  --el-fill-color-lighter: rgba(120,120,128,0.08);
+  --el-fill-color-extra-light: rgba(120,120,128,0.04);
+
   --el-border-radius-base: 10px;
   --el-border-radius-small: 6px;
   --el-border-radius-round: 9999px;
-  --el-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --el-box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  --el-box-shadow-light: 0 1px 4px rgba(0,0,0,0.4);
+  --el-box-shadow-lighter: 0 1px 2px rgba(0,0,0,0.3);
+  --el-box-shadow-dark: 0 4px 16px rgba(0,0,0,0.8);
+
+  --el-font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', sans-serif;
 }
 
-// === 浅色覆盖 ===
+// === 浅色模式 (Apple iOS Light) ===
 html.light {
-  --app-bg-primary: #f2f2f7;
-  --app-bg-secondary: #ffffff;
-  --app-bg-elevated: #ffffff;
-  --app-bg-glass: rgba(255, 255, 255, 0.85);
-  --app-bg-glass-heavy: rgba(255, 255, 255, 0.92);
-  --app-text-primary: #1d1d1f;
-  --app-text-secondary: #6e6e73;
-  --app-text-tertiary: #86868b;
-  --app-border: rgba(0, 0, 0, 0.08);
-  --app-border-strong: rgba(0, 0, 0, 0.15);
-  --app-separator: rgba(0, 0, 0, 0.06);
-  --app-scrollbar-thumb: rgba(0, 0, 0, 0.15);
-  --app-scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
-  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
-  --app-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.12);
-  --app-shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.15);
-  --app-glass-bg: rgba(255, 255, 255, 0.85);
-  --app-glass-bg-heavy: rgba(255, 255, 255, 0.92);
-  --app-table-header-bg: rgba(0, 0, 0, 0.03);
-  --app-table-hover-bg: rgba(0, 0, 0, 0.04);
-  --app-fill-color: rgba(0, 0, 0, 0.04);
-  --app-fill-color-light: rgba(0, 0, 0, 0.06);
-  --app-overlay-hover: rgba(0, 0, 0, 0.06);
-  --app-overlay-active: rgba(0, 0, 0, 0.1);
-  --section-gap: 64px;
-  --content-max-width: 1200px;
+  --el-color-primary: #007AFF;
+  --el-color-primary-light-3: #3395FF;
+  --el-color-primary-light-5: #66B0FF;
+  --el-color-primary-light-9: #CCE5FF;
+  --el-color-primary-dark-2: #0062CC;
+  --el-color-success: #34C759;
+  --el-color-warning: #FF9500;
+  --el-color-danger: #FF3B30;
+  --el-color-info: #5AC8FA;
 
-  --el-bg-color: var(--app-bg-primary);
-  --el-bg-color-overlay: var(--app-bg-elevated);
-  --el-bg-color-page: var(--app-bg-secondary);
-  --el-border-color: var(--app-border);
-  --el-border-color-light: var(--app-separator);
-  --el-border-color-lighter: rgba(0, 0, 0, 0.04);
-  --el-border-color-extra-light: rgba(0, 0, 0, 0.03);
-  --el-text-color-primary: var(--app-text-primary);
-  --el-text-color-regular: #3a3a3c;
-  --el-text-color-secondary: var(--app-text-secondary);
-  --el-text-color-placeholder: #86868b;
-  --el-text-color-disabled: #aeaeb2;
-  --el-fill-color: var(--app-fill-color);
-  --el-fill-color-light: var(--app-fill-color-light);
-  --el-fill-color-blank: var(--app-bg-primary);
+  --el-bg-color: #FFFFFF;
+  --el-bg-color-overlay: #FFFFFF;
+  --el-bg-color-page: #F2F2F7;
+  --el-border-color: rgba(60,60,67,0.2);
+  --el-border-color-light: rgba(60,60,67,0.12);
+  --el-border-color-lighter: rgba(60,60,67,0.08);
+  --el-border-color-extra-light: rgba(60,60,67,0.04);
+
+  --el-text-color-primary: #000000;
+  --el-text-color-regular: #1C1C1E;
+  --el-text-color-secondary: rgba(60,60,67,0.6);
+  --el-text-color-placeholder: rgba(60,60,67,0.3);
+  --el-text-color-disabled: rgba(60,60,67,0.18);
+
+  --el-fill-color: rgba(120,120,128,0.16);
+  --el-fill-color-light: rgba(120,120,128,0.1);
+  --el-fill-color-lighter: rgba(120,120,128,0.06);
+  --el-fill-color-extra-light: rgba(120,120,128,0.03);
+  --el-fill-color-blank: #FFFFFF;
+
+  --el-box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --el-box-shadow-light: 0 1px 4px rgba(0,0,0,0.04);
+  --el-box-shadow-lighter: 0 1px 2px rgba(0,0,0,0.02);
+  --el-box-shadow-dark: 0 4px 16px rgba(0,0,0,0.12);
 }
 
-// === Global ===
+// === 全局 ===
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #app {
@@ -115,7 +90,7 @@ html, body, #app {
   font-family: var(--el-font-family);
   font-size: 15px;
   line-height: 1.5;
-  background: var(--app-bg-primary);
+  background: var(--el-bg-color-page);
   color: var(--el-text-color-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -124,109 +99,62 @@ html, body, #app {
 
 h1, h2, h3, h4, h5, h6 { line-height: 1.2; font-weight: 600; }
 
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background:
-    radial-gradient(ellipse 80% 30% at 20% 0%, rgba(10, 132, 255, 0.04) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 100%, rgba(191, 90, 242, 0.03) 0%, transparent 60%);
-}
-
 a { text-decoration: none; color: var(--el-color-primary); }
 
-// === Scrollbar ===
+// === 滚动条 ===
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--app-scrollbar-thumb); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: var(--app-scrollbar-thumb-hover); }
+::-webkit-scrollbar-thumb { background: var(--el-fill-color); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--el-fill-color-light); }
 
-::selection { background: rgba(10, 132, 255, 0.3); color: #fff; }
+::selection { background: rgba(0, 122, 255, 0.3); color: #fff; }
+:focus-visible { outline: 2px solid #007AFF; outline-offset: 2px; border-radius: 2px; }
 
-:focus-visible { outline: 2px solid #0a84ff; outline-offset: 2px; border-radius: 2px; }
-
-// === Element Plus 组件微调 ===
-.el-button--primary {
-  border-radius: 9999px;
-  font-weight: 590;
-  letter-spacing: -0.01em;
-}
-
-.el-card {
-  border-radius: 16px;
-  box-shadow: var(--app-shadow-md);
-  border: 1px solid var(--el-border-color);
-}
-
+// === EP 组件 ===
+.el-button--primary { border-radius: 9999px; font-weight: 600; letter-spacing: -0.01em; }
+.el-card { border-radius: 16px; border: 1px solid var(--el-border-color); }
 .el-dialog {
-  border-radius: 20px;
-  border: 1px solid var(--el-border-color);
-  box-shadow: var(--app-shadow-lg);
+  border-radius: 20px; border: 1px solid var(--el-border-color);
   .el-dialog__header { padding: 24px 24px 0; }
   .el-dialog__body { padding: 24px; }
   .el-dialog__footer { padding: 0 24px 24px; }
 }
-
-// Dialog transitions
-.dialog-fade-enter-active { transition: all 0.3s $ease-spring; }
-.dialog-fade-leave-active { transition: all 0.2s ease-in; }
-.dialog-fade-enter-from { opacity: 0; transform: scale(0.96) translateY(8px); }
-.dialog-fade-leave-to { opacity: 0; transform: scale(0.98); }
-
-.el-input__wrapper {
-  border-radius: 10px;
-  transition: all 0.2s;
-}
-
+.el-input__wrapper { border-radius: 10px; transition: all 0.2s; }
 .el-tag { border-radius: 9999px; }
-
 .el-table {
-  --el-table-header-bg-color: var(--app-table-header-bg);
-  --el-table-row-hover-bg-color: var(--app-table-hover-bg);
+  --el-table-header-bg-color: var(--el-fill-color-extra-light);
+  --el-table-row-hover-bg-color: var(--el-fill-color-lighter);
 }
 
-// === Router transitions ===
+// === 路由过渡 ===
 .fade-enter-active, .fade-leave-active { transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
 .slide-up-enter-from { opacity: 0; transform: translateY(12px); }
 .slide-up-leave-to { opacity: 0; transform: translateY(-8px); }
 
-// === Staggered entrance animations ===
+// === 交错入场 ===
 .stagger-item {
   opacity: 0; transform: translateY(16px);
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
   &.stagger-visible { opacity: 1; transform: translateY(0); }
 }
 
-// === Spring interactions ===
+// === 弹性交互 ===
 .spring-scale {
   transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   &:hover { transform: scale(1.02); }
   &:active { transform: scale(0.97); }
 }
 
-// === Responsive ===
+// === 响应式 ===
 @media (max-width: 1024px) {
-  .app-layout__content {
-    padding: 24px 20px;
-  }
-  .dashboard__kpi {
-    grid-template-columns: 1fr 1fr;
-  }
-  .dashboard__charts {
-    grid-template-columns: 1fr;
-  }
-  .account-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
+  .app-layout__content { padding: 24px 20px; }
+  .dashboard__kpi { grid-template-columns: 1fr 1fr; }
+  .dashboard__charts { grid-template-columns: 1fr; }
+  .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
-
 @media (max-width: 640px) {
-  .account-grid {
-    grid-template-columns: 1fr !important;
-  }
-  .dashboard__hero-kpi .hero-kpi__value {
-    font-size: 48px;
-  }
+  .account-grid { grid-template-columns: 1fr !important; }
+  .dashboard__hero-kpi .hero-kpi__value { font-size: 48px; }
 }
