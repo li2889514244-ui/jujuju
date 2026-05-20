@@ -180,7 +180,7 @@ const trendChartOption = computed(() => ({
   }],
   graphic: trendData.value.length === 0 ? [{
     type: 'text', left: 'center', top: 'center',
-    style: { text: '暂无数据', fontSize: 16, fill: '#909399' },
+    style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
   }] : undefined,
 }))
 
@@ -305,20 +305,20 @@ onMounted(() => {
 
 .overview-card {
   text-align: center;
-  &__label { font-size: 13px; color: #909399; margin-bottom: 8px; }
-  &__value { font-size: 24px; font-weight: 600; color: #303133; }
+  &__label { font-size: 13px; color: #6e6e73; margin-bottom: 8px; }
+  &__value { font-size: 24px; font-weight: 600; color: #f5f5f7; }
   &__change { font-size: 12px; margin-top: 6px; font-weight: 500; }
 }
 
-.trend--up { color: #67c23a; }
-.trend--down { color: #f56c6c; }
+.trend--up { color: #30d158; }
+.trend--down { color: #ff453a; }
 
 .chart-header {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
 }
 
-.ranking-title { font-size: 13px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
-.ranking-meta { font-size: 11px; color: #909399; margin-top: 2px; }
+.ranking-title { font-size: 13px; color: #f5f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
+.ranking-meta { font-size: 11px; color: #6e6e73; margin-top: 2px; }
 
 .rank-badge {
   display: inline-flex; align-items: center; justify-content: center;
@@ -326,6 +326,6 @@ onMounted(() => {
   font-size: 11px; font-weight: bold; color: #fff;
 }
 .rank-1 { background: #f5a623; }
-.rank-2 { background: #909399; }
+.rank-2 { background: #6e6e73; }
 .rank-3 { background: #b87333; }
 </style>

@@ -5,7 +5,7 @@
       <Topbar />
       <div class="app-layout__content">
         <router-view v-slot="{ Component }">
-          <transition name="slide-up" mode="out-in">
+          <transition name="slide-up" mode="out-in" @after-enter="onPageEnter">
             <component :is="Component" />
           </transition>
         </router-view>
@@ -17,6 +17,19 @@
 <script setup lang="ts">
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
+
+function onPageEnter() {
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.stagger-item').forEach((el, i) => {
+      const htmlEl = el as HTMLElement
+      htmlEl.style.transitionDelay = `${i * 50}ms`
+      htmlEl.classList.add('stagger-visible')
+      setTimeout(() => {
+        htmlEl.style.transitionDelay = '0ms'
+      }, 600 + i * 50)
+    })
+  })
+}
 </script>
 
 <style lang="scss" scoped>
@@ -24,7 +37,7 @@ import Topbar from './Topbar.vue'
 
 .app-layout {
   display: flex; width: 100%; height: 100vh; overflow: hidden;
-  background: $color-bg-primary;
+  background: var(--app-bg-primary);
 
   &__main {
     flex: 1; display: flex; flex-direction: column;

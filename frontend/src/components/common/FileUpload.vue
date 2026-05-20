@@ -115,12 +115,12 @@ defineExpose({ clearFiles })
   }
 
   &__icon {
-    color: #c0c4cc;
+    color: #48484a;
     margin-bottom: 12px;
   }
 
   &__text {
-    color: #606266;
+    color: #98989d;
     font-size: 14px;
 
     em {
@@ -130,7 +130,7 @@ defineExpose({ clearFiles })
   }
 
   &__tip {
-    color: #909399;
+    color: #6e6e73;
     font-size: 12px;
     margin-top: 8px;
   }

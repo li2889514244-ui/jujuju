@@ -4,7 +4,7 @@
     <el-card shadow="hover" class="ai-assistant__header">
       <div class="header-content">
         <div class="header-info">
-          <h2>🤖 AI 智能助手</h2>
+          <h2><el-icon :size="22"><MagicStick /></el-icon> AI 智能助手</h2>
           <p class="subtitle">基于AI的内容创作、发布优化、趋势预测与风险检测</p>
         </div>
         <el-tag :type="providerStatus === 'mock' ? 'warning' : 'success'" size="large">
@@ -16,7 +16,8 @@
     <!-- Main Tabs -->
     <el-tabs v-model="activeTab" type="border-card" class="ai-assistant__tabs">
       <!-- ===== Content Generation ===== -->
-      <el-tab-pane label="✍️ 智能创作" name="content">
+      <el-tab-pane name="content">
+        <template #label><el-icon :size="16"><EditPen /></el-icon> 智能创作</template>
         <el-row :gutter="20">
           <el-col :xs="24" :lg="10">
             <el-card shadow="hover">
@@ -115,7 +116,7 @@
           </el-col>
           <el-col :xs="24" :lg="16">
             <el-card v-if="publishResult" shadow="hover">
-              <template #header>📊 发布时间建议</template>
+              <template #header><el-icon :size="16"><TrendCharts /></el-icon> 发布时间建议</template>
               <el-row :gutter="16" class="time-slots">
                 <el-col v-for="(slot, idx) in publishResult.bestSlots" :key="idx" :span="8">
                   <div class="time-slot" :class="{ 'is-best': idx === 0 }">
@@ -131,11 +132,11 @@
               </el-row>
               <el-divider />
               <div class="publish-info">
-                <h4>📅 推荐发布频率</h4>
+                <h4><el-icon :size="14"><Calendar /></el-icon> 推荐发布频率</h4>
                 <p>{{ publishResult.frequency.description }}</p>
               </div>
               <div v-if="publishResult.tips.length" class="publish-tips">
-                <h4>💡 优化建议</h4>
+                <h4><el-icon :size="14"><Sunny /></el-icon> 优化建议</h4>
                 <ul>
                   <li v-for="(tip, i) in publishResult.tips" :key="i">{{ tip }}</li>
                 </ul>
@@ -149,7 +150,8 @@
       </el-tab-pane>
 
       <!-- ===== Trend Prediction ===== -->
-      <el-tab-pane label="📈 趋势预测" name="trend">
+      <el-tab-pane name="trend">
+        <template #label><el-icon :size="16"><TrendCharts /></el-icon> 趋势预测</template>
         <el-row :gutter="20">
           <el-col :xs="24" :lg="8">
             <el-card shadow="hover">
@@ -204,14 +206,14 @@
                 </el-col>
               </el-row>
               <el-card shadow="hover" style="margin-top: 16px">
-                <template #header>🔍 趋势洞察</template>
+                <template #header><el-icon :size="16"><Search /></el-icon> 趋势洞察</template>
                 <div class="insights-list">
                   <div v-for="(insight, i) in trendResult.insights" :key="i" class="insight-item">
                     <el-icon><InfoFilled /></el-icon> {{ insight }}
                   </div>
                 </div>
                 <el-divider v-if="trendResult.recommendations.length" />
-                <h4 v-if="trendResult.recommendations.length">💡 建议</h4>
+                <h4 v-if="trendResult.recommendations.length"><el-icon :size="14"><Sunny /></el-icon> 建议</h4>
                 <ul class="recommendations-list">
                   <li v-for="(rec, i) in trendResult.recommendations" :key="i">{{ rec }}</li>
                 </ul>
@@ -225,7 +227,8 @@
       </el-tab-pane>
 
       <!-- ===== Anomaly Detection ===== -->
-      <el-tab-pane label="🔍 异常检测" name="anomaly">
+      <el-tab-pane name="anomaly">
+        <template #label><el-icon :size="16"><Search /></el-icon> 异常检测</template>
         <el-row :gutter="20">
           <el-col :xs="24" :lg="8">
             <el-card shadow="hover">
@@ -264,7 +267,7 @@
               <el-row :gutter="16">
                 <el-col :span="12">
                   <el-card shadow="hover">
-                    <template #header>⚠️ 异常点 ({{ anomalyResult.anomalies.length }})</template>
+                    <template #header><el-icon :size="16"><WarningFilled /></el-icon> 异常点 ({{ anomalyResult.anomalies.length }})</template>
                     <div v-if="anomalyResult.anomalies.length === 0" class="empty-text">未检测到异常</div>
                     <div v-for="(a, i) in anomalyResult.anomalies" :key="i" class="anomaly-item">
                       <el-tag :type="a.type === 'spike' ? 'danger' : 'warning'" size="small">
@@ -276,7 +279,7 @@
                 </el-col>
                 <el-col :span="12">
                   <el-card shadow="hover">
-                    <template #header>📊 统计信息</template>
+                    <template #header><el-icon :size="16"><TrendCharts /></el-icon> 统计信息</template>
                     <el-descriptions :column="1" border size="small">
                       <el-descriptions-item label="均值">{{ anomalyResult.statistics.mean.toFixed(2) }}</el-descriptions-item>
                       <el-descriptions-item label="标准差">{{ anomalyResult.statistics.stdDev.toFixed(2) }}</el-descriptions-item>
@@ -288,7 +291,7 @@
                 </el-col>
               </el-row>
               <el-card v-if="anomalyResult.recommendations.length" shadow="hover" style="margin-top: 16px">
-                <template #header>💡 建议</template>
+                <template #header><el-icon :size="16"><Sunny /></el-icon> 建议</template>
                 <ul>
                   <li v-for="(rec, i) in anomalyResult.recommendations" :key="i">{{ rec }}</li>
                 </ul>
@@ -302,7 +305,8 @@
       </el-tab-pane>
 
       <!-- ===== Content Review ===== -->
-      <el-tab-pane label="🛡️ 内容审核" name="review">
+      <el-tab-pane name="review">
+        <template #label><el-icon :size="16"><CircleCheck /></el-icon> 内容审核</template>
         <el-row :gutter="20">
           <el-col :xs="24" :lg="10">
             <el-card shadow="hover">
@@ -349,7 +353,7 @@
               </el-card>
 
               <el-card v-if="reviewResult.issues.length" shadow="hover" style="margin-top: 16px">
-                <template #header>⚠️ 问题清单 ({{ reviewResult.issues.length }})</template>
+                <template #header><el-icon :size="16"><WarningFilled /></el-icon> 问题清单 ({{ reviewResult.issues.length }})</template>
                 <div v-for="(issue, i) in reviewResult.issues" :key="i" class="review-issue">
                   <el-tag :type="issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info'" size="small">
                     {{ issue.severity === 'high' ? '高' : issue.severity === 'medium' ? '中' : '低' }}
@@ -359,13 +363,13 @@
               </el-card>
 
               <el-card shadow="hover" style="margin-top: 16px">
-                <template #header>😊 情感分析</template>
+                <template #header>情感分析</template>
                 <el-row :gutter="16">
                   <el-col :span="8">
                     <div class="sentiment-item">
                       <div class="sentiment-label">情感倾向</div>
                       <div class="sentiment-value" :class="reviewResult.sentiment.label === 'positive' ? 'text-success' : reviewResult.sentiment.label === 'negative' ? 'text-danger' : ''">
-                        {{ reviewResult.sentiment.label === 'positive' ? '😊 正面' : reviewResult.sentiment.label === 'negative' ? '😟 负面' : '😐 中性' }}
+                        {{ reviewResult.sentiment.label === 'positive' ? '正面' : reviewResult.sentiment.label === 'negative' ? '负面' : '中性' }}
                       </div>
                     </div>
                   </el-col>
@@ -385,7 +389,7 @@
               </el-card>
 
               <el-card v-if="reviewResult.suggestions.length" shadow="hover" style="margin-top: 16px">
-                <template #header>💡 修改建议</template>
+                <template #header><el-icon :size="16"><Sunny /></el-icon> 修改建议</template>
                 <ul>
                   <li v-for="(s, i) in reviewResult.suggestions" :key="i">{{ s }}</li>
                 </ul>
@@ -407,6 +411,7 @@ import { ElMessage } from 'element-plus'
 import {
   MagicStick, CopyDocument, Loading, Timer, TrendCharts,
   Warning, CircleCheck, InfoFilled, CircleCheckFilled, CircleCloseFilled,
+  EditPen, Sunny, Search, WarningFilled, Calendar,
 } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
 import {
@@ -613,7 +618,7 @@ function copyContent() {
 }
 
 .subtitle {
-  color: #909399;
+  color: #6e6e73;
   margin: 0;
   font-size: 14px;
 }
@@ -638,23 +643,23 @@ function copyContent() {
   align-items: center;
   justify-content: center;
   padding: 60px;
-  color: #909399;
+  color: #6e6e73;
 }
 
 .result-text {
   line-height: 1.8;
   font-size: 14px;
-  color: #303133;
+  color: #f5f5f7;
 }
 
 .result-keywords {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid rgba(255,255,255,0.08);
 }
 
 .result-keywords .label {
-  color: #909399;
+  color: #6e6e73;
   margin-right: 8px;
 }
 
@@ -670,19 +675,19 @@ function copyContent() {
 .time-slot {
   text-align: center;
   padding: 16px;
-  border: 1px solid #ebeef5;
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 8px;
   transition: all 0.3s;
 }
 
 .time-slot.is-best {
-  border-color: #409eff;
+  border-color: #0a84ff;
   background: #ecf5ff;
 }
 
 .slot-rank {
   font-size: 12px;
-  color: #909399;
+  color: #6e6e73;
 }
 
 .slot-time {
@@ -697,12 +702,12 @@ function copyContent() {
   justify-content: center;
   gap: 8px;
   font-size: 12px;
-  color: #67c23a;
+  color: #30d158;
 }
 
 .slot-reason {
   font-size: 12px;
-  color: #909399;
+  color: #6e6e73;
   margin-top: 8px;
 }
 
@@ -713,7 +718,7 @@ function copyContent() {
 
 .publish-tips ul {
   padding-left: 20px;
-  color: #606266;
+  color: #98989d;
 }
 
 /* Stats */
@@ -722,7 +727,7 @@ function copyContent() {
 }
 
 .stat-label {
-  color: #909399;
+  color: #6e6e73;
   font-size: 13px;
   margin-bottom: 8px;
 }
@@ -733,11 +738,11 @@ function copyContent() {
 }
 
 .text-success {
-  color: #67c23a;
+  color: #30d158;
 }
 
 .text-danger {
-  color: #f56c6c;
+  color: #ff453a;
 }
 
 /* Insights */
@@ -751,13 +756,13 @@ function copyContent() {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: #606266;
+  color: #98989d;
   font-size: 14px;
 }
 
 .recommendations-list {
   padding-left: 20px;
-  color: #606266;
+  color: #98989d;
 }
 
 .recommendations-list li {
@@ -778,7 +783,7 @@ function copyContent() {
 }
 
 .empty-text {
-  color: #909399;
+  color: #6e6e73;
   text-align: center;
   padding: 20px;
 }
@@ -800,7 +805,7 @@ function copyContent() {
 }
 
 .review-summary {
-  color: #606266;
+  color: #98989d;
   margin: 0;
 }
 
@@ -822,7 +827,7 @@ function copyContent() {
 }
 
 .sentiment-label {
-  color: #909399;
+  color: #6e6e73;
   font-size: 13px;
   margin-bottom: 8px;
 }

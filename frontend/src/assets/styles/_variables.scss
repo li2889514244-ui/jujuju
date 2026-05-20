@@ -67,15 +67,15 @@ $xiaohongshu-color: #ff2442;
 $bilibili-color: #fb7299;
 $weibo-color: #ff8200;
 
-// === 毛玻璃 ===
+// === 毛玻璃（跟随主题色）===
 @mixin glass {
-  background: rgba(28, 28, 30, 0.75);
+  background: var(--app-glass-bg, rgba(28, 28, 30, 0.75));
   backdrop-filter: blur(40px) saturate(180%);
   -webkit-backdrop-filter: blur(40px) saturate(180%);
 }
 
 @mixin glass-heavy {
-  background: rgba(28, 28, 30, 0.9);
+  background: var(--app-glass-bg-heavy, rgba(28, 28, 30, 0.9));
   backdrop-filter: blur(60px) saturate(200%);
   -webkit-backdrop-filter: blur(60px) saturate(200%);
 }

@@ -11,6 +11,7 @@
 import { computed } from 'vue'
 import { PLATFORM_LABELS } from '@/types'
 import { toFrontend } from '@/utils/platform'
+import { getPlatformColor, getPlatformChar } from '@/composables/usePlatform'
 
 const props = withDefaults(
   defineProps<{
@@ -21,30 +22,10 @@ const props = withDefaults(
   { showLabel: false, size: 'default' }
 )
 
-const normalizedPlatform = computed(() => toFrontend(props.platform) as any)
+const normalizedPlatform = computed(() => toFrontend(props.platform) as string)
 
-const platformColors: Record<string, string> = {
-  douyin: '#000000',
-  kuaishou: '#ff4906',
-  xiaohongshu: '#ff2442',
-  video_account: '#07c160',
-  bilibili: '#fb7299',
-  weibo: '#ff8200',
-  tiktok: '#010101',
-}
-
-const platformChars: Record<string, string> = {
-  douyin: '抖',
-  kuaishou: '快',
-  xiaohongshu: '红',
-  video_account: '视',
-  bilibili: 'B',
-  weibo: '微',
-  tiktok: 'T',
-}
-
-const platformColor = computed(() => platformColors[normalizedPlatform.value] || '#909399')
-const platformChar = computed(() => platformChars[normalizedPlatform.value] || '?')
+const platformColor = computed(() => getPlatformColor(normalizedPlatform.value))
+const platformChar = computed(() => getPlatformChar(normalizedPlatform.value))
 const platformLabel = computed(() => (PLATFORM_LABELS as Record<string, string>)[normalizedPlatform.value] || props.platform)
 
 const iconSize = computed(() => {
@@ -79,7 +60,7 @@ const charStyle = computed(() => ({
 
   &__label {
     font-size: 14px;
-    color: #303133;
+    color: #f5f5f7;
   }
 }
 </style>

@@ -28,17 +28,19 @@
     </div>
 
     <!-- 汇总卡片 — 跟随分组筛选 -->
-    <el-row :gutter="16" class="dashboard__summary">
-      <el-col :xs="12" :sm="6" v-for="card in groupSummaryCards" :key="card.label">
-        <div class="summary-card" :style="{ borderTopColor: card.color }">
-          <div class="summary-card__label">{{ card.label }}</div>
-          <div class="summary-card__value">{{ card.value }}</div>
-          <div class="summary-card__trend" v-if="card.trend !== null" :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''">
-            {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}% 较上周
-          </div>
-        </div>
-      </el-col>
-    </el-row>
+    <div class="dashboard__summary">
+      <StatCard
+        v-for="(card, i) in groupSummaryCards"
+        :key="card.label"
+        :label="card.label"
+        :value="card.rawValue"
+        :formatter="formatNum"
+        :trend="card.trend"
+        :accent-color="card.color"
+        :delay="i * 80"
+        class="stagger-item"
+      />
+    </div>
 
     <!-- 账号分组展示 -->
     <div class="dashboard__groups">
@@ -68,7 +70,7 @@
                   <span class="account-cell__name">{{ row.nickname }}</span>
                   <span class="account-cell__platform">
                     <PlatformIcon :platform="row.platform" />
-                    {{ PLATFORM_CN[row.platform] || row.platform }}
+                    {{ getPlatformLabel(row.platform) }}
                   </span>
                 </div>
               </div>
@@ -102,28 +104,23 @@
     </div>
 
     <!-- 粉丝趋势图 -->
-    <el-row :gutter="16" class="dashboard__charts" v-if="accountRows.length > 0">
-      <el-col :xs="24" :lg="16">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="dashboard__chart-header">
-              <span>粉丝增长趋势</span>
-              <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
-                <el-radio-button :value="7">近7天</el-radio-button>
-                <el-radio-button :value="30">近30天</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <DataChart :option="followerChartOption" :height="300" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="8">
-        <el-card shadow="hover">
-          <template #header>平台分布</template>
-          <DataChart :option="platformChartOption" :height="300" />
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="dashboard__charts" v-if="accountRows.length > 0">
+      <GlassCard class="stagger-item dashboard__chart-card">
+        <template #header>
+          <div class="dashboard__chart-header">
+            <span>粉丝增长趋势</span>
+            <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
+              <el-radio-button :value="7">近7天</el-radio-button>
+              <el-radio-button :value="30">近30天</el-radio-button>
+            </el-radio-group>
+          </div>
+        </template>
+        <DataChart :option="followerChartOption" :height="300" />
+      </GlassCard>
+      <GlassCard title="平台分布" class="stagger-item dashboard__chart-card">
+        <DataChart :option="platformChartOption" :height="300" />
+      </GlassCard>
+    </div>
   </div>
 </template>
 
@@ -133,22 +130,29 @@ import dayjs from 'dayjs'
 import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import StatCard from '@/components/common/StatCard.vue'
+import GlassCard from '@/components/common/GlassCard.vue'
 import { analyticsApi } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
-
-const PLATFORM_COLORS: Record<string, string> = { DOUYIN: '#000', KUAISHOU: '#ff4906', XIAOHONGSHU: '#ff2442', BILIBILI: '#fb7299', WECHAT_VIDEO: '#07c160', WEIBO: '#ff8200', TIKTOK: '#010101' }
-const PLATFORM_CN: Record<string, string> = { DOUYIN: '抖音', KUAISHOU: '快手', XIAOHONGSHU: '小红书', BILIBILI: 'B站', WECHAT_VIDEO: '视频号', WEIBO: '微博', TIKTOK: 'TikTok' }
+import { getPlatformColor, getPlatformLabel } from '@/composables/usePlatform'
 
 const period = ref('week')
 const loading = ref(false)
 const lastUpdate = ref('')
 const trendDays = ref(7)
 
-const summaryCards = ref([
-  { label: '总粉丝', value: '0', trend: null as number | null, color: '#409eff' },
-  { label: '总播放量', value: '0', trend: null as number | null, color: '#e6a23c' },
-  { label: '总点赞', value: '0', trend: null as number | null, color: '#67c23a' },
-  { label: '总互动', value: '0', trend: null as number | null, color: '#f56c6c' },
+interface SummaryCardData {
+  label: string
+  rawValue: number
+  trend: number | null
+  color: string
+}
+
+const summaryCards = ref<SummaryCardData[]>([
+  { label: '总粉丝', rawValue: 0, trend: null, color: '#0a84ff' },
+  { label: '总播放量', rawValue: 0, trend: null, color: '#ff9f0a' },
+  { label: '总点赞', rawValue: 0, trend: null, color: '#30d158' },
+  { label: '总互动', rawValue: 0, trend: null, color: '#ff453a' },
 ])
 const selectedGroup = ref('all')
 
@@ -181,17 +185,17 @@ const filteredRows = computed(() => {
   if (selectedGroup.value === 'all') return accountRows.value
   return accountRows.value.filter(r => (r as any).groupName === selectedGroup.value)
 })
-const groupSummaryCards = computed(() => {
+const groupSummaryCards = computed<SummaryCardData[]>(() => {
   const rows = filteredRows.value
   const totalFollowers = rows.reduce((s, r) => s + r.followers, 0)
   const totalViews = rows.reduce((s, r) => s + r.views, 0)
   const totalLikes = rows.reduce((s, r) => s + r.likes, 0)
   const totalInteract = rows.reduce((s, r) => s + r.comments + r.shares, 0)
   return [
-    { label: '总粉丝', value: formatNum(totalFollowers), trend: null as number | null, color: '#409eff' },
-    { label: '总播放量', value: formatNum(totalViews), trend: null as number | null, color: '#e6a23c' },
-    { label: '总点赞', value: formatNum(totalLikes), trend: null as number | null, color: '#67c23a' },
-    { label: '总互动', value: formatNum(totalInteract), trend: null as number | null, color: '#f56c6c' },
+    { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#0a84ff' },
+    { label: '总播放量', rawValue: totalViews, trend: null, color: '#ff9f0a' },
+    { label: '总点赞', rawValue: totalLikes, trend: null, color: '#30d158' },
+    { label: '总互动', rawValue: totalInteract, trend: null, color: '#ff453a' },
   ]
 })
 function onGroupChange() {
@@ -218,10 +222,10 @@ async function refreshAll() {
     const comp = compRes?.data
     const wowChange = comp?.weekOverWeek?.change
     summaryCards.value = [
-      { label: '总粉丝', value: formatNum(ov.accounts?.totalFollowers || 0), trend: wowChange?.followers ?? null, color: '#409eff' },
-      { label: '总播放量', value: formatNum(ov.engagement?.totalViews || 0), trend: wowChange?.views ?? null, color: '#e6a23c' },
-      { label: '总点赞', value: formatNum(ov.engagement?.totalLikes || 0), trend: wowChange?.likes ?? null, color: '#67c23a' },
-      { label: '总互动', value: formatNum((ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0)), trend: null, color: '#f56c6c' },
+      { label: '总粉丝', rawValue: ov.accounts?.totalFollowers || 0, trend: wowChange?.followers ?? null, color: '#0a84ff' },
+      { label: '总播放量', rawValue: ov.engagement?.totalViews || 0, trend: wowChange?.views ?? null, color: '#ff9f0a' },
+      { label: '总点赞', rawValue: ov.engagement?.totalLikes || 0, trend: wowChange?.likes ?? null, color: '#30d158' },
+      { label: '总互动', rawValue: (ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0), trend: null, color: '#ff453a' },
     ]
 
     // 2. Load accounts for table
@@ -285,8 +289,8 @@ async function refreshAll() {
       .filter(([, count]) => (count as number) > 0)
       .map(([key, count]) => ({
         value: count as number,
-        name: PLATFORM_CN[key] || key,
-        itemStyle: { color: PLATFORM_COLORS[key] || '#999' },
+        name: getPlatformLabel(key),
+        itemStyle: { color: getPlatformColor(key) },
       }))
 
     lastUpdate.value = dayjs().format('HH:mm:ss')
@@ -342,52 +346,60 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 .dashboard {
   &__header {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
   &__title {
-    h2 { margin: 0 0 4px 0; font-size: 20px; font-weight: 600; }
+    h2 { margin: 0 0 4px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
   }
-  &__update { font-size: 12px; color: #909399; }
+  &__update { font-size: 13px; color: #6e6e73; }
   &__controls { display: flex; align-items: center; gap: 12px; }
 
-  &__summary { margin-bottom: 20px; }
+  &__summary {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  &__chart-card { flex: 1; min-width: 0; }
+
+  &__charts {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  &__chart-header { display: flex; justify-content: space-between; align-items: center; }
 
   &__table-card { margin-bottom: 20px; }
   &__table-header { display: flex; align-items: baseline; gap: 12px; }
   &__table-hint { font-size: 12px; color: #a7a7a7; }
-
-  &__charts { margin-bottom: 20px; }
-  &__chart-header { display: flex; justify-content: space-between; align-items: center; }
 }
-
-.summary-card {
-  background: #fff; border-radius: 8px; padding: 20px;
-  border-top: 3px solid #409eff;
-  box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  &__label { font-size: 13px; color: #909399; margin-bottom: 8px; }
-  &__value { font-size: 26px; font-weight: 700; color: #303133; }
-  &__trend { font-size: 12px; margin-top: 8px; font-weight: 500; }
-}
-
-.trend--up { color: #67c23a; }
-.trend--down { color: #f56c6c; }
 
 .account-cell {
   display: flex; align-items: center; gap: 10px;
   &__info { display: flex; flex-direction: column; }
   &__name { font-size: 14px; font-weight: 500; }
-  &__platform { font-size: 12px; color: #909399; display: flex; align-items: center; gap: 4px; }
+  &__platform { font-size: 12px; color: #6e6e73; display: flex; align-items: center; gap: 4px; }
 }
 
 .dashboard__groups { display: flex; flex-direction: column; gap: 16px; }
 .dashboard__empty { padding: 40px 0; }
 .group-card {
-  background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.06); overflow: hidden;
-  &__header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #ebeef5; background: #fafafa; }
+  @include glass;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: $radius-lg;
+  overflow: hidden;
+  &__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    background: transparent;
+  }
   &__title { display: flex; align-items: center; gap: 10px; }
-  &__name { font-size: 15px; font-weight: 600; color: #303133; }
-  &__stats { display: flex; gap: 20px; font-size: 13px; color: #606266;
-    b { color: #303133; margin-left: 4px; }
+  &__name { font-size: 15px; font-weight: 600; color: #f5f5f7; }
+  &__stats { display: flex; gap: 20px; font-size: 13px; color: #98989d;
+    b { color: #f5f5f7; margin-left: 4px; }
   }
 }
 </style>

@@ -7,6 +7,7 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    AnimatedNumber: typeof import('./components/common/AnimatedNumber.vue')['default']
     AppLayout: typeof import('./components/layout/AppLayout.vue')['default']
     DataChart: typeof import('./components/common/DataChart.vue')['default']
     ElAlert: typeof import('element-plus/es')['ElAlert']
@@ -62,13 +63,16 @@ declare module 'vue' {
     ElTooltip: typeof import('element-plus/es')['ElTooltip']
     ElUpload: typeof import('element-plus/es')['ElUpload']
     FileUpload: typeof import('./components/common/FileUpload.vue')['default']
+    GlassCard: typeof import('./components/common/GlassCard.vue')['default']
     ManualAddDialog: typeof import('./components/account/ManualAddDialog.vue')['default']
     MiniTrend: typeof import('./components/common/MiniTrend.vue')['default']
+    PlatformBadge: typeof import('./components/common/PlatformBadge.vue')['default']
     PlatformIcon: typeof import('./components/common/PlatformIcon.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScanBindDialog: typeof import('./components/account/ScanBindDialog.vue')['default']
     Sidebar: typeof import('./components/layout/Sidebar.vue')['default']
+    StatCard: typeof import('./components/common/StatCard.vue')['default']
     StatusBadge: typeof import('./components/common/StatusBadge.vue')['default']
     Topbar: typeof import('./components/layout/Topbar.vue')['default']
   }

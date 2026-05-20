@@ -459,7 +459,7 @@ onMounted(async () => {
     }
 
     &.active {
-      border-color: #409eff;
+      border-color: #0a84ff;
     }
 
     .stat-icon {
@@ -470,11 +470,11 @@ onMounted(async () => {
       .stat-name {
         font-size: 14px;
         font-weight: 500;
-        color: #303133;
+        color: #f5f5f7;
       }
       .stat-count {
         font-size: 12px;
-        color: #909399;
+        color: #6e6e73;
         margin-top: 4px;
       }
     }
@@ -501,23 +501,23 @@ onMounted(async () => {
   .account-info {
     .nickname {
       font-weight: 500;
-      color: #303133;
+      color: #f5f5f7;
     }
     .uid {
       font-size: 12px;
-      color: #909399;
+      color: #6e6e73;
     }
   }
 }
 
 .metric {
   font-weight: 500;
-  color: #303133;
+  color: #f5f5f7;
 }
 
 .time-text {
   font-size: 13px;
-  color: #909399;
+  color: #6e6e73;
 }
 
 .pagination-wrapper {
@@ -543,19 +543,19 @@ onMounted(async () => {
     transition: all 0.3s;
 
     &:hover {
-      border-color: #409eff;
+      border-color: #0a84ff;
       background: #f0f7ff;
     }
 
     &.authorized {
-      border-color: #67c23a;
+      border-color: #30d158;
       background: #f0f9eb;
     }
 
     .platform-name {
       font-size: 14px;
       font-weight: 500;
-      color: #303133;
+      color: #f5f5f7;
     }
   }
 }

@@ -158,7 +158,7 @@
 
         <!-- 已检测到桌面伴侣 -->
         <div v-if="companionOnline" style="background:#f0f9eb;border:1px solid #b3e19d;border-radius:8px;padding:16px;margin-bottom:16px">
-          <p style="color:#67c23a;font-weight:600;margin-bottom:8px">已检测到桌面伴侣运行中</p>
+          <p style="color:#30d158;font-weight:600;margin-bottom:8px">已检测到桌面伴侣运行中</p>
           <p style="color:#666;font-size:13px;margin-bottom:12px">选择平台后，桌面伴侣会自动弹出浏览器窗口</p>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
             <el-button v-for="p in bindablePlatforms" :key="p.id" :type="p.type" size="small"
@@ -185,7 +185,7 @@
           </div>
         </template>
 
-        <p style="color:#909399;font-size:13px">
+        <p style="color:#6e6e73;font-size:13px">
           桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。
         </p>
       </div>

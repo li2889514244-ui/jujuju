@@ -125,11 +125,11 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
 const editingEvent = ref<CalEvent | null>(null)
-const form = ref({ title: '', allDay: false, color: '#409eff', description: '' })
+const form = ref({ title: '', allDay: false, color: '#0a84ff', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
-const predefineColors = ['#409eff', '#67c23a', '#e6a23c', '#f56c6c', '#909399', '#8b5cf6', '#06b6d4', '#f59e0b']
+const predefineColors = ['#0a84ff', '#30d158', '#ff9f0a', '#ff453a', '#6e6e73', '#8b5cf6', '#06b6d4', '#f59e0b']
 
 const periodLabel = computed(() => {
   if (viewMode.value === 'month') return currentDate.value.format('YYYY年 M月')
@@ -171,7 +171,7 @@ function nextPeriod() { currentDate.value = currentDate.value.add(1, viewMode.va
 
 function openAddDialog() {
   editingEvent.value = null
-  form.value = { title: '', allDay: false, color: '#409eff', description: '' }
+  form.value = { title: '', allDay: false, color: '#0a84ff', description: '' }
   formDate.value = new Date()
   formTime.value = null
   dialogVisible.value = true
@@ -220,38 +220,56 @@ function deleteEvent() {
 <style lang="scss" scoped>
 .calendar-page {
   &__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-    h2 { margin: 0; font-size: 20px; }
+    h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
   }
   &__controls { display: flex; align-items: center; gap: 12px; }
 }
 
-.cal-month { background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-.cal-weekdays { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid #ebeef5; text-align: center; padding: 10px 0; font-size: 13px; color: #909399; font-weight: 500; background: #fafafa; }
+.cal-month {
+  @include glass;
+  border: 1px solid var(--app-border);
+  border-radius: $radius-lg;
+  overflow: hidden;
+}
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--app-border);
+  text-align: center; padding: 10px 0;
+  font-size: 13px; color: var(--app-text-tertiary); font-weight: 500;
+  background: transparent;
+}
 .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(100px, auto); }
-.cal-day { padding: 4px; border-right: 1px solid #f0f0f0; border-bottom: 1px solid #f0f0f0; min-height: 100px;
+.cal-day {
+  padding: 4px;
+  border-right: 1px solid var(--app-separator);
+  border-bottom: 1px solid var(--app-separator);
+  min-height: 100px;
   &:nth-child(7n) { border-right: none; }
-  &--other { background: #fafafa; color: #c0c4cc; }
-  &--today { background: #ecf5ff; .cal-day__num { color: #409eff; font-weight: 700; } }
-  &__num { padding: 2px 6px; font-size: 13px; color: #606266; }
+  &--other { background: var(--app-bg-secondary); color: var(--app-text-tertiary); }
+  &--today { background: rgba(#0a84ff, 0.06); .cal-day__num { color: #0a84ff; font-weight: 700; } }
+  &__num { padding: 2px 6px; font-size: 13px; color: var(--app-text-secondary); }
   &__items { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
 }
 
 .cal-event { padding: 2px 6px; border-radius: 3px; font-size: 11px; cursor: pointer; border-left: 3px solid; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  &__time { font-size: 10px; color: #909399; margin-right: 2px; }
+  &__time { font-size: 10px; color: var(--app-text-tertiary); margin-right: 2px; }
   &__title { }
   &--week { margin-bottom: 2px; }
 }
 
-.cal-week { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,.06);
-  &__header { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid #ebeef5; }
-  &__col-header { text-align: center; padding: 8px 0; font-size: 13px; color: #606266;
-    &.is-today { color: #409eff; font-weight: 600; }
+.cal-week {
+  @include glass;
+  border: 1px solid var(--app-border);
+  border-radius: $radius-lg;
+  &__header { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--app-border); }
+  &__col-header { text-align: center; padding: 8px 0; font-size: 13px; color: var(--app-text-secondary);
+    &.is-today { color: #0a84ff; font-weight: 600; }
   }
   &__date { font-size: 20px; font-weight: 500; }
   &__body { display: grid; grid-template-columns: repeat(7, 1fr); }
-  &__col { padding: 6px 4px; min-height: 200px; border-right: 1px solid #f0f0f0;
+  &__col { padding: 6px 4px; min-height: 200px; border-right: 1px solid var(--app-separator);
     &:last-child { border-right: none; }
-    &.is-today { background: #ecf5ff; }
+    &.is-today { background: rgba(#0a84ff, 0.06); }
   }
 }
 </style>
