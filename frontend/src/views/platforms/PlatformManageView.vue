@@ -423,7 +423,7 @@ onMounted(async () => {
 
 <style scoped lang="scss">
 .platform-manage {
-  padding: 20px;
+  padding: $space-lg;
 }
 
 .page-header {
@@ -543,7 +543,7 @@ onMounted(async () => {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 20px;
+    padding: $space-lg;
     border: 1px solid #e4e7ed;
     border-radius: 8px;
     cursor: pointer;

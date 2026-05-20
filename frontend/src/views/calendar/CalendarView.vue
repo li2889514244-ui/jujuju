@@ -317,7 +317,7 @@ function deleteEvent() {
   grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--el-border-color);
   text-align: center;
-  padding: 10px 0;
+  padding: $space-sm 0;
   font-size: 13px;
   color: var(--el-text-color-placeholder);
   font-weight: 500;

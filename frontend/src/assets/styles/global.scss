@@ -49,7 +49,7 @@ small, .text-caption { font-size: $text-caption; color: var(--el-text-color-plac
 .spring-scale:active { transform: scale(0.97); }
 
 @media (max-width: 768px) {
-  .app-layout__content { padding: 20px 16px; }
+  .app-layout__content { padding: $space-lg 16px; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
 @media (max-width: 480px) {

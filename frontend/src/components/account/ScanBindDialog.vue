@@ -289,7 +289,7 @@ function disconnectSSE() {
     flex-direction: column;
     align-items: center;
     gap: 8px;
-    padding: 20px 12px;
+    padding: $space-lg 12px;
     border: 1px solid #e4e7ed;
     border-radius: 8px;
     cursor: pointer;
