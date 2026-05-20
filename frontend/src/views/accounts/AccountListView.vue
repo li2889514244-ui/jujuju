@@ -4,19 +4,39 @@
     <GlassCard class="account-list__filter">
       <el-form :inline="true" :model="filter">
         <el-form-item label="平台">
-          <el-select v-model="accountStore.filter.platform" placeholder="全部平台" clearable style="width: 140px">
+          <el-select
+            v-model="accountStore.filter.platform"
+            placeholder="全部平台"
+            clearable
+            style="width: 140px"
+          >
             <el-option label="全部" value="" />
-            <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+            <el-option
+              v-for="(label, key) in PLATFORM_LABELS"
+              :key="key"
+              :label="label"
+              :value="key"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="分组">
-          <el-select v-model="accountStore.filter.group" placeholder="全部分组" clearable style="width: 140px">
+          <el-select
+            v-model="accountStore.filter.group"
+            placeholder="全部分组"
+            clearable
+            style="width: 140px"
+          >
             <el-option label="全部" value="" />
             <el-option v-for="g in accountStore.groups" :key="g.id" :label="g.name" :value="g.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="搜索">
-          <el-input v-model="accountStore.filter.keyword" placeholder="搜索账号名称" clearable style="width: 200px" />
+          <el-input
+            v-model="accountStore.filter.keyword"
+            placeholder="搜索账号名称"
+            clearable
+            style="width: 200px"
+          />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
@@ -59,7 +79,9 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#0a84ff"><CircleCheckFilled /></el-icon>
+          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#0a84ff"
+            ><CircleCheckFilled
+          /></el-icon>
           <span v-else class="account-card__check-empty" />
         </div>
         <el-avatar :size="48" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
@@ -76,8 +98,16 @@
           {{ tokenStatusLabel(acc) }}
         </span>
         <div class="account-card__actions">
-          <el-button text type="primary" size="small" @click.stop="$router.push(`/accounts/${acc.id}`)">详情</el-button>
-          <el-button text type="danger" size="small" @click.stop="handleDelete(acc.id)">删除</el-button>
+          <el-button
+            text
+            type="primary"
+            size="small"
+            @click.stop="$router.push(`/accounts/${acc.id}`)"
+            >详情</el-button
+          >
+          <el-button text type="danger" size="small" @click.stop="handleDelete(acc.id)"
+            >删除</el-button
+          >
         </div>
       </div>
     </div>
@@ -104,7 +134,11 @@
     <el-dialog v-model="showGroupDialog" title="新建分组" width="400px">
       <el-form>
         <el-form-item label="分组名称">
-          <el-input v-model="newGroupName" placeholder="请输入分组名称" @keyup.enter="handleCreateGroup" />
+          <el-input
+            v-model="newGroupName"
+            placeholder="请输入分组名称"
+            @keyup.enter="handleCreateGroup"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -117,7 +151,7 @@
     <el-dialog v-model="showMoveDialog" title="移动到分组" width="400px">
       <el-form>
         <el-form-item label="目标分组">
-          <el-select v-model="moveTargetGroup" placeholder="选择分组" style="width:100%">
+          <el-select v-model="moveTargetGroup" placeholder="选择分组" style="width: 100%">
             <el-option v-for="g in accountStore.groups" :key="g.id" :label="g.name" :value="g.id" />
           </el-select>
         </el-form-item>
@@ -150,16 +184,34 @@
 
     <!-- Add Account Guide Dialog -->
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
-      <div style="text-align:center;padding:20px">
-        <p style="font-size:16px;margin-bottom:16px">请使用 <strong>披星云桌面伴侣</strong> 绑定账号</p>
+      <div style="text-align: center; padding: 20px">
+        <p style="font-size: 16px; margin-bottom: 16px">
+          请使用 <strong>披星云桌面伴侣</strong> 绑定账号
+        </p>
 
         <!-- 已检测到桌面伴侣 -->
-        <div v-if="companionOnline" style="background:#f0f9eb;border:1px solid #b3e19d;border-radius:8px;padding:16px;margin-bottom:16px">
-          <p style="color:#30d158;font-weight:600;margin-bottom:8px">已检测到桌面伴侣运行中</p>
-          <p style="color:#666;font-size:13px;margin-bottom:12px">选择平台后，桌面伴侣会自动弹出浏览器窗口</p>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
-            <el-button v-for="p in bindablePlatforms" :key="p.id" :type="p.type" size="small"
-              @click="openCompanionScan(p.id)">
+        <div
+          v-if="companionOnline"
+          style="
+            background: #f0f9eb;
+            border: 1px solid #b3e19d;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+          "
+        >
+          <p style="color: #30d158; font-weight: 600; margin-bottom: 8px">已检测到桌面伴侣运行中</p>
+          <p style="color: #666; font-size: 13px; margin-bottom: 12px">
+            选择平台后，桌面伴侣会自动弹出浏览器窗口
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center">
+            <el-button
+              v-for="p in bindablePlatforms"
+              :key="p.id"
+              :type="p.type"
+              size="small"
+              @click="openCompanionScan(p.id)"
+            >
               {{ p.icon }} {{ p.name }}
             </el-button>
           </div>
@@ -167,28 +219,43 @@
 
         <!-- 未检测到桌面伴侣 -->
         <template v-else>
-          <el-button type="primary" size="large" style="margin-bottom:16px" tag="a"
+          <el-button
+            type="primary"
+            size="large"
+            style="margin-bottom: 16px"
+            tag="a"
             href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
-            target="_blank">
+            target="_blank"
+          >
             <el-icon><Download /></el-icon>
             下载桌面伴侣
           </el-button>
-          <div style="background:#f5f7fa;border-radius:8px;padding:16px;text-align:left;margin-bottom:16px">
-            <p style="margin:4px 0">1. 下载并解压桌面伴侣</p>
-            <p style="margin:4px 0">2. 双击 install.bat 一键安装</p>
-            <p style="margin:4px 0">3. 双击 start.bat 启动，自动打开界面</p>
-            <p style="margin:4px 0">4. 回到本页选择平台，扫码登录</p>
-            <p style="margin:4px 0">5. Cookie 自动上传，刷新即可见</p>
+          <div
+            style="
+              background: #f5f7fa;
+              border-radius: 8px;
+              padding: 16px;
+              text-align: left;
+              margin-bottom: 16px;
+            "
+          >
+            <p style="margin: 4px 0">1. 下载并解压桌面伴侣</p>
+            <p style="margin: 4px 0">2. 双击 install.bat 一键安装</p>
+            <p style="margin: 4px 0">3. 双击 start.bat 启动，自动打开界面</p>
+            <p style="margin: 4px 0">4. 回到本页选择平台，扫码登录</p>
+            <p style="margin: 4px 0">5. Cookie 自动上传，刷新即可见</p>
           </div>
         </template>
 
-        <p style="color:#6e6e73;font-size:13px">
+        <p style="color: #6e6e73; font-size: 13px">
           桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。
         </p>
       </div>
       <template #footer>
         <el-button @click="showAddDialog = false">关闭</el-button>
-        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false">手动输入 Cookie</el-button>
+        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false"
+          >手动输入 Cookie</el-button
+        >
       </template>
     </el-dialog>
     <!-- Manual Add Dialog -->
@@ -232,9 +299,13 @@ const bindablePlatforms = [
 
 function checkCompanion() {
   fetch('http://localhost:5409/health')
-    .then(r => r.json())
-    .then(d => { if (d.status === 'ok') companionOnline.value = true })
-    .catch(() => { companionOnline.value = false })
+    .then((r) => r.json())
+    .then((d) => {
+      if (d.status === 'ok') companionOnline.value = true
+    })
+    .catch(() => {
+      companionOnline.value = false
+    })
 }
 
 async function openCompanionScan(platform: string) {
@@ -281,8 +352,11 @@ function handleReset() {
 
 function toggleSelect(id: string) {
   const idx = selectedIds.value.indexOf(id)
-  if (idx >= 0) { selectedIds.value.splice(idx, 1) }
-  else { selectedIds.value.push(id) }
+  if (idx >= 0) {
+    selectedIds.value.splice(idx, 1)
+  } else {
+    selectedIds.value.push(id)
+  }
 }
 
 async function handleDelete(id: string) {
@@ -292,10 +366,10 @@ async function handleDelete(id: string) {
 }
 
 async function handleBatchDelete() {
-  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个账号？`, '提示', { type: 'warning' })
-  const results = await Promise.allSettled(
-    selectedIds.value.map((id) => accountsApi.delete(id))
-  )
+  await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 个账号？`, '提示', {
+    type: 'warning',
+  })
+  const results = await Promise.allSettled(selectedIds.value.map((id) => accountsApi.delete(id)))
   const successCount = results.filter((r) => r.status === 'fulfilled').length
   const failCount = results.filter((r) => r.status === 'rejected').length
   if (failCount === 0) {
@@ -307,13 +381,19 @@ async function handleBatchDelete() {
 }
 
 async function handleBatchMove() {
-  if (!selectedIds.value.length) { ElMessage.warning('请先选择账号'); return }
+  if (!selectedIds.value.length) {
+    ElMessage.warning('请先选择账号')
+    return
+  }
   moveTargetGroup.value = ''
   showMoveDialog.value = true
 }
 
 async function handleConfirmMove() {
-  if (!moveTargetGroup.value) { ElMessage.warning('请选择目标分组'); return }
+  if (!moveTargetGroup.value) {
+    ElMessage.warning('请选择目标分组')
+    return
+  }
   try {
     await accountsApi.moveToGroup(selectedIds.value, moveTargetGroup.value)
     showMoveDialog.value = false
@@ -344,12 +424,26 @@ async function handleCreateGroup() {
 function exportCSV() {
   const headers = ['账号', '平台', '分组', '状态']
   const rows = enhancedAccounts.value.map((r: any) => [
-    r.nickname, r.platform, r.groupName || '-', r.tokenStatus === 'valid' ? '已连接' : r.tokenStatus === 'expiring_soon' ? '即将过期' : r.tokenStatus === 'expired' ? '已失效' : r.hasCookies ? '在线' : '待授权'
+    r.nickname,
+    r.platform,
+    r.groupName || '-',
+    r.tokenStatus === 'valid'
+      ? '已连接'
+      : r.tokenStatus === 'expiring_soon'
+        ? '即将过期'
+        : r.tokenStatus === 'expired'
+          ? '已失效'
+          : r.hasCookies
+            ? '在线'
+            : '待授权',
   ])
   const csv = [headers.join(','), ...rows.map((r: any) => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = `账号列表_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `账号列表_${dayjs().format('YYYY-MM-DD')}.csv`
+  a.click()
   URL.revokeObjectURL(url)
 }
 
@@ -367,12 +461,13 @@ function handleBindSuccess() {
   ElMessage.success('账号绑定成功')
   accountStore.fetchAccounts()
 }
-
 </script>
 
 <style lang="scss" scoped>
 .account-list {
-  display: flex; flex-direction: column; gap: $section-gap;
+  display: flex;
+  flex-direction: column;
+  gap: $section-gap;
 
   &__filter {
     :deep(.el-form--inline .el-form-item) {
@@ -381,12 +476,17 @@ function handleBindSuccess() {
   }
 
   &__actions {
-    display: flex; gap: $space-sm; flex-wrap: wrap;
-    .ml-auto { margin-left: auto; }
+    display: flex;
+    gap: $space-sm;
+    flex-wrap: wrap;
+    .ml-auto {
+      margin-left: auto;
+    }
   }
 
   &__pagination {
-    display: flex; justify-content: center;
+    display: flex;
+    justify-content: center;
     padding-top: $space-lg;
   }
 }
@@ -399,7 +499,10 @@ function handleBindSuccess() {
 }
 
 .account-card {
-  display: flex; flex-direction: column; align-items: center; gap: $space-sm;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-sm;
   padding: $space-lg $space-md;
   background: var(--app-glass-bg);
   backdrop-filter: blur(20px) saturate(180%);
@@ -423,45 +526,103 @@ function handleBindSuccess() {
   }
 
   &__check {
-    position: absolute; top: $space-sm; right: $space-sm;
+    position: absolute;
+    top: $space-sm;
+    right: $space-sm;
   }
   &__check-empty {
-    width: 20px; height: 20px; border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
     border: 2px solid var(--app-border);
     display: block;
   }
 
   &__info {
-    display: flex; flex-direction: column; align-items: center; gap: 2px;
-    min-width: 0; width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 0;
+    width: 100%;
   }
   &__name {
-    font-size: $text-body; font-weight: 600; color: var(--app-text-primary);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: $text-body;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     max-width: 100%;
   }
   &__stats {
-    display: flex; flex-direction: column; align-items: center; gap: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
   }
-  &__stat-value { font-size: $text-headline; font-weight: 700; color: var(--app-text-primary); font-feature-settings: 'tnum'; }
-  &__stat-label { font-size: $text-micro; color: var(--app-text-tertiary); text-transform: uppercase; }
-  &__group { font-size: $text-micro; color: var(--app-text-tertiary); background: var(--app-overlay-hover); padding: 1px 10px; border-radius: $radius-full; }
+  &__stat-value {
+    font-size: $text-headline;
+    font-weight: 700;
+    color: var(--app-text-primary);
+    font-feature-settings: 'tnum';
+  }
+  &__stat-label {
+    font-size: $text-micro;
+    color: var(--app-text-tertiary);
+    text-transform: uppercase;
+  }
+  &__group {
+    font-size: $text-micro;
+    color: var(--app-text-tertiary);
+    background: var(--app-overlay-hover);
+    padding: 1px 10px;
+    border-radius: $radius-full;
+  }
   &__status {
-    font-size: $text-micro; font-weight: 500; padding: 2px 10px; border-radius: $radius-full;
-    &.status--valid { background: rgba(#30d158, 0.1); color: #30d158; }
-    &.status--expiring_soon { background: rgba(#ff9f0a, 0.1); color: #ff9f0a; }
-    &.status--expired, &.status--unknown { background: rgba(#ff453a, 0.1); color: #ff453a; }
+    font-size: $text-micro;
+    font-weight: 500;
+    padding: 2px 10px;
+    border-radius: $radius-full;
+    &.status--valid {
+      background: rgba(#30d158, 0.1);
+      color: #30d158;
+    }
+    &.status--expiring_soon {
+      background: rgba(#ff9f0a, 0.1);
+      color: #ff9f0a;
+    }
+    &.status--expired,
+    &.status--unknown {
+      background: rgba(#ff453a, 0.1);
+      color: #ff453a;
+    }
   }
   &__actions {
-    display: flex; gap: $space-xs; margin-top: 2px;
+    display: flex;
+    gap: $space-xs;
+    margin-top: 2px;
   }
 }
 
 // === Empty state ===
 .empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: $space-md;
-  padding: $space-4xl 0; text-align: center;
-  h3 { font-size: $text-headline; font-weight: 600; color: var(--app-text-primary); margin: 0; }
-  p { font-size: $text-body; color: var(--app-text-tertiary); margin: 0; }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: $space-md;
+  padding: $space-4xl 0;
+  text-align: center;
+  h3 {
+    font-size: $text-headline;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    margin: 0;
+  }
+  p {
+    font-size: $text-body;
+    color: var(--app-text-tertiary);
+    margin: 0;
+  }
 }
 </style>

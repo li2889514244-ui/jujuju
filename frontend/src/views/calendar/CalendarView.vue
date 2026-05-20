@@ -8,9 +8,13 @@
           <el-radio-button value="week">周</el-radio-button>
         </el-radio-group>
         <el-button-group>
-          <el-button size="small" @click="prevPeriod"><el-icon><ArrowLeft /></el-icon></el-button>
+          <el-button size="small" @click="prevPeriod"
+            ><el-icon><ArrowLeft /></el-icon
+          ></el-button>
           <el-button size="small" disabled>{{ periodLabel }}</el-button>
-          <el-button size="small" @click="nextPeriod"><el-icon><ArrowRight /></el-icon></el-button>
+          <el-button size="small" @click="nextPeriod"
+            ><el-icon><ArrowRight /></el-icon
+          ></el-button>
         </el-button-group>
         <el-button size="small" type="primary" @click="openAddDialog">添加日程</el-button>
       </div>
@@ -23,15 +27,18 @@
       </div>
       <div class="cal-grid">
         <div
-          v-for="(day, i) in monthCells" :key="i"
+          v-for="(day, i) in monthCells"
+          :key="i"
           class="cal-day"
           :class="{ 'cal-day--other': !day.isCurrentMonth, 'cal-day--today': day.isToday }"
         >
           <div class="cal-day__num">{{ day.dayNum }}</div>
           <div class="cal-day__items">
             <div
-              v-for="evt in day.events" :key="evt.id"
-              class="cal-event" :style="{ background: evt.color + '22', borderLeftColor: evt.color }"
+              v-for="evt in day.events"
+              :key="evt.id"
+              class="cal-event"
+              :style="{ background: evt.color + '22', borderLeftColor: evt.color }"
               @click="openEditDialog(evt)"
             >
               {{ evt.title }}
@@ -44,19 +51,33 @@
     <!-- Week View -->
     <div v-else class="cal-week">
       <div class="cal-week__header">
-        <div v-for="d in weekDaysWithDate" :key="d.dateKey" class="cal-week__col-header" :class="{ 'is-today': d.isToday }">
+        <div
+          v-for="d in weekDaysWithDate"
+          :key="d.dateKey"
+          class="cal-week__col-header"
+          :class="{ 'is-today': d.isToday }"
+        >
           <div>{{ d.dayName }}</div>
           <div class="cal-week__date">{{ d.dateStr }}</div>
         </div>
       </div>
       <div class="cal-week__body">
-        <div v-for="d in weekDaysWithDate" :key="d.dateKey" class="cal-week__col" :class="{ 'is-today': d.isToday }">
+        <div
+          v-for="d in weekDaysWithDate"
+          :key="d.dateKey"
+          class="cal-week__col"
+          :class="{ 'is-today': d.isToday }"
+        >
           <div
-            v-for="evt in d.events" :key="evt.id"
-            class="cal-event cal-event--week" :style="{ background: evt.color + '22', borderLeftColor: evt.color }"
+            v-for="evt in d.events"
+            :key="evt.id"
+            class="cal-event cal-event--week"
+            :style="{ background: evt.color + '22', borderLeftColor: evt.color }"
             @click="openEditDialog(evt)"
           >
-            <span class="cal-event__time" v-if="!evt.allDay">{{ evt.startTime?.slice(11, 16) }}</span>
+            <span class="cal-event__time" v-if="!evt.allDay">{{
+              evt.startTime?.slice(11, 16)
+            }}</span>
             <span class="cal-event__title">{{ evt.title }}</span>
           </div>
         </div>
@@ -64,16 +85,33 @@
     </div>
 
     <!-- Add/Edit Dialog -->
-    <el-dialog v-model="dialogVisible" :title="editingEvent ? '编辑日程' : '添加日程'" width="480px">
+    <el-dialog
+      v-model="dialogVisible"
+      :title="editingEvent ? '编辑日程' : '添加日程'"
+      width="480px"
+    >
       <el-form :model="form" label-width="80px">
         <el-form-item label="标题">
           <el-input v-model="form.title" placeholder="日程标题" />
         </el-form-item>
         <el-form-item label="日期">
-          <el-date-picker v-model="formDate" type="date" placeholder="选择日期" style="width:100%" />
+          <el-date-picker
+            v-model="formDate"
+            type="date"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="时间" v-if="!form.allDay">
-          <el-time-picker v-model="formTime" is-range range-separator="至" start-placeholder="开始" end-placeholder="结束" style="width:100%" format="HH:mm" />
+          <el-time-picker
+            v-model="formTime"
+            is-range
+            range-separator="至"
+            start-placeholder="开始"
+            end-placeholder="结束"
+            style="width: 100%"
+            format="HH:mm"
+          />
         </el-form-item>
         <el-form-item label="全天">
           <el-switch v-model="form.allDay" />
@@ -112,7 +150,11 @@ interface CalEvent {
 const STORAGE_KEY = 'matrixflow_calendar_events'
 
 function loadEvents(): CalEvent[] {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') } catch { return [] }
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+  } catch {
+    return []
+  }
 }
 function saveEvents(events: CalEvent[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
@@ -129,7 +171,16 @@ const form = ref({ title: '', allDay: false, color: '#0a84ff', description: '' }
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
-const predefineColors = ['#0a84ff', '#30d158', '#ff9f0a', '#ff453a', '#6e6e73', '#8b5cf6', '#06b6d4', '#f59e0b']
+const predefineColors = [
+  '#0a84ff',
+  '#30d158',
+  '#ff9f0a',
+  '#ff453a',
+  '#6e6e73',
+  '#8b5cf6',
+  '#06b6d4',
+  '#f59e0b',
+]
 
 const periodLabel = computed(() => {
   if (viewMode.value === 'month') return currentDate.value.format('YYYY年 M月')
@@ -147,7 +198,7 @@ const monthCells = computed(() => {
       isCurrentMonth: d.month() === currentDate.value.month(),
       isToday: dateKey === today,
       dateKey,
-      events: events.value.filter(e => dayjs(e.startTime).format('YYYY-MM-DD') === dateKey),
+      events: events.value.filter((e) => dayjs(e.startTime).format('YYYY-MM-DD') === dateKey),
     }
   })
 })
@@ -159,15 +210,21 @@ const weekDaysWithDate = computed(() => {
     const d = start.add(i, 'day')
     const dateKey = d.format('YYYY-MM-DD')
     return {
-      dayName: weekDays[i], dateStr: d.format('M/D'),
-      isToday: dateKey === today, dateKey,
-      events: events.value.filter(e => dayjs(e.startTime).format('YYYY-MM-DD') === dateKey),
+      dayName: weekDays[i],
+      dateStr: d.format('M/D'),
+      isToday: dateKey === today,
+      dateKey,
+      events: events.value.filter((e) => dayjs(e.startTime).format('YYYY-MM-DD') === dateKey),
     }
   })
 })
 
-function prevPeriod() { currentDate.value = currentDate.value.subtract(1, viewMode.value) }
-function nextPeriod() { currentDate.value = currentDate.value.add(1, viewMode.value) }
+function prevPeriod() {
+  currentDate.value = currentDate.value.subtract(1, viewMode.value)
+}
+function nextPeriod() {
+  currentDate.value = currentDate.value.add(1, viewMode.value)
+}
 
 function openAddDialog() {
   editingEvent.value = null
@@ -179,7 +236,12 @@ function openAddDialog() {
 
 function openEditDialog(evt: CalEvent) {
   editingEvent.value = evt
-  form.value = { title: evt.title, allDay: evt.allDay, color: evt.color, description: evt.description }
+  form.value = {
+    title: evt.title,
+    allDay: evt.allDay,
+    color: evt.color,
+    description: evt.description,
+  }
   formDate.value = new Date(evt.startTime)
   if (!evt.allDay) formTime.value = [new Date(evt.startTime), new Date(evt.endTime)]
   else formTime.value = null
@@ -191,18 +253,24 @@ function saveEvent() {
   const dateStr = dayjs(formDate.value).format('YYYY-MM-DD')
   const startTime = form.value.allDay
     ? dateStr + 'T00:00:00'
-    : dateStr + 'T' + (formTime.value?.[0] ? dayjs(formTime.value[0]).format('HH:mm:ss') : '00:00:00')
+    : dateStr +
+      'T' +
+      (formTime.value?.[0] ? dayjs(formTime.value[0]).format('HH:mm:ss') : '00:00:00')
   const endTime = form.value.allDay
     ? dateStr + 'T23:59:59'
-    : dateStr + 'T' + (formTime.value?.[1] ? dayjs(formTime.value[1]).format('HH:mm:ss') : '23:59:59')
+    : dateStr +
+      'T' +
+      (formTime.value?.[1] ? dayjs(formTime.value[1]).format('HH:mm:ss') : '23:59:59')
 
   if (editingEvent.value) {
-    const idx = events.value.findIndex(e => e.id === editingEvent.value!.id)
+    const idx = events.value.findIndex((e) => e.id === editingEvent.value!.id)
     if (idx >= 0) events.value[idx] = { ...editingEvent.value, ...form.value, startTime, endTime }
   } else {
     events.value.push({
       id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      ...form.value, startTime, endTime,
+      ...form.value,
+      startTime,
+      endTime,
     })
   }
   saveEvents(events.value)
@@ -211,7 +279,7 @@ function saveEvent() {
 
 function deleteEvent() {
   if (!editingEvent.value) return
-  events.value = events.value.filter(e => e.id !== editingEvent.value!.id)
+  events.value = events.value.filter((e) => e.id !== editingEvent.value!.id)
   saveEvents(events.value)
   dialogVisible.value = false
 }
@@ -219,10 +287,23 @@ function deleteEvent() {
 
 <style lang="scss" scoped>
 .calendar-page {
-  &__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;
-    h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    h2 {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
   }
-  &__controls { display: flex; align-items: center; gap: 12px; }
+  &__controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
 }
 
 .cal-month {
@@ -232,44 +313,111 @@ function deleteEvent() {
   overflow: hidden;
 }
 .cal-weekdays {
-  display: grid; grid-template-columns: repeat(7, 1fr);
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
   border-bottom: 1px solid var(--app-border);
-  text-align: center; padding: 10px 0;
-  font-size: 13px; color: var(--app-text-tertiary); font-weight: 500;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 13px;
+  color: var(--app-text-tertiary);
+  font-weight: 500;
   background: transparent;
 }
-.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(100px, auto); }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  grid-auto-rows: minmax(100px, auto);
+}
 .cal-day {
   padding: 4px;
   border-right: 1px solid var(--app-separator);
   border-bottom: 1px solid var(--app-separator);
   min-height: 100px;
-  &:nth-child(7n) { border-right: none; }
-  &--other { background: var(--app-bg-secondary); color: var(--app-text-tertiary); }
-  &--today { background: rgba(#0a84ff, 0.06); .cal-day__num { color: #0a84ff; font-weight: 700; } }
-  &__num { padding: 2px 6px; font-size: 13px; color: var(--app-text-secondary); }
-  &__items { display: flex; flex-direction: column; gap: 1px; margin-top: 2px; }
+  &:nth-child(7n) {
+    border-right: none;
+  }
+  &--other {
+    background: var(--app-bg-secondary);
+    color: var(--app-text-tertiary);
+  }
+  &--today {
+    background: rgba(#0a84ff, 0.06);
+    .cal-day__num {
+      color: #0a84ff;
+      font-weight: 700;
+    }
+  }
+  &__num {
+    padding: 2px 6px;
+    font-size: 13px;
+    color: var(--app-text-secondary);
+  }
+  &__items {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    margin-top: 2px;
+  }
 }
 
-.cal-event { padding: 2px 6px; border-radius: 3px; font-size: 11px; cursor: pointer; border-left: 3px solid; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-  &__time { font-size: 10px; color: var(--app-text-tertiary); margin-right: 2px; }
-  &__title { }
-  &--week { margin-bottom: 2px; }
+.cal-event {
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  cursor: pointer;
+  border-left: 3px solid;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  &__time {
+    font-size: 10px;
+    color: var(--app-text-tertiary);
+    margin-right: 2px;
+  }
+  &__title {
+  }
+  &--week {
+    margin-bottom: 2px;
+  }
 }
 
 .cal-week {
   @include glass;
   border: 1px solid var(--app-border);
   border-radius: $radius-lg;
-  &__header { display: grid; grid-template-columns: repeat(7, 1fr); border-bottom: 1px solid var(--app-border); }
-  &__col-header { text-align: center; padding: 8px 0; font-size: 13px; color: var(--app-text-secondary);
-    &.is-today { color: #0a84ff; font-weight: 600; }
+  &__header {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    border-bottom: 1px solid var(--app-border);
   }
-  &__date { font-size: 20px; font-weight: 500; }
-  &__body { display: grid; grid-template-columns: repeat(7, 1fr); }
-  &__col { padding: 6px 4px; min-height: 200px; border-right: 1px solid var(--app-separator);
-    &:last-child { border-right: none; }
-    &.is-today { background: rgba(#0a84ff, 0.06); }
+  &__col-header {
+    text-align: center;
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--app-text-secondary);
+    &.is-today {
+      color: #0a84ff;
+      font-weight: 600;
+    }
+  }
+  &__date {
+    font-size: 20px;
+    font-weight: 500;
+  }
+  &__body {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+  }
+  &__col {
+    padding: 6px 4px;
+    min-height: 200px;
+    border-right: 1px solid var(--app-separator);
+    &:last-child {
+      border-right: none;
+    }
+    &.is-today {
+      background: rgba(#0a84ff, 0.06);
+    }
   }
 }
 </style>

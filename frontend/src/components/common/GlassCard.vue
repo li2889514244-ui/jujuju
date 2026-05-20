@@ -4,7 +4,7 @@
     :class="[
       `glass-card--${variant}`,
       `glass-card--${padding}`,
-      { 'glass-card--hover': hoverable, 'glass-card--interactive': interactive }
+      { 'glass-card--hover': hoverable, 'glass-card--interactive': interactive },
     ]"
     @click="interactive ? $emit('click', $event) : undefined"
   >
@@ -37,19 +37,32 @@ defineEmits<{ click: [e: MouseEvent] }>()
   border: 1px solid var(--app-border);
   transition: all 0.35s $ease-spring;
 
-  &--default { @include glass; }
-  &--elevated { @include glass-heavy; box-shadow: var(--app-shadow-md); }
+  &--default {
+    @include glass;
+  }
+  &--elevated {
+    @include glass-heavy;
+    box-shadow: var(--app-shadow-md);
+  }
   &--tinted {
     background: rgba(#0a84ff, 0.06);
     border-color: rgba(#0a84ff, 0.15);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    .glass-card__header { border-bottom-color: rgba(#0a84ff, 0.08); }
+    .glass-card__header {
+      border-bottom-color: rgba(#0a84ff, 0.08);
+    }
   }
 
-  &--sm { padding: 14px; }
-  &--md { padding: 20px; }
-  &--lg { padding: 28px; }
+  &--sm {
+    padding: 14px;
+  }
+  &--md {
+    padding: 20px;
+  }
+  &--lg {
+    padding: 28px;
+  }
 
   &--hover:hover {
     transform: translateY(-2px);
@@ -59,7 +72,9 @@ defineEmits<{ click: [e: MouseEvent] }>()
 
   &--interactive {
     cursor: pointer;
-    &:active { transform: scale(0.98); }
+    &:active {
+      transform: scale(0.98);
+    }
   }
 
   &__header {

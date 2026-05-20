@@ -1,5 +1,9 @@
 <template>
-  <GlassCard :padding="size === 'lg' ? 'lg' : 'md'" class="stat-card" :class="{ 'stat-card--lg': size === 'lg' }">
+  <GlassCard
+    :padding="size === 'lg' ? 'lg' : 'md'"
+    class="stat-card"
+    :class="{ 'stat-card--lg': size === 'lg' }"
+  >
     <div class="stat-card__accent" :style="{ background: accentColor }" />
     <div class="stat-card__content">
       <span class="stat-card__label">{{ label }}</span>
@@ -38,27 +42,30 @@ import { CaretTop, CaretBottom, Minus } from '@element-plus/icons-vue'
 import GlassCard from './GlassCard.vue'
 import AnimatedNumber from './AnimatedNumber.vue'
 
-const props = withDefaults(defineProps<{
-  label: string
-  value: number
-  formatter?: (n: number) => string
-  trend?: number | null
-  trendLabel?: string
-  accentColor?: string
-  animated?: boolean
-  delay?: number
-  size?: 'md' | 'lg'
-}>(), {
-  trend: null,
-  trendLabel: '较上周',
-  accentColor: '#0a84ff',
-  animated: true,
-  delay: 0,
-  size: 'md',
-})
+const props = withDefaults(
+  defineProps<{
+    label: string
+    value: number
+    formatter?: (n: number) => string
+    trend?: number | null
+    trendLabel?: string
+    accentColor?: string
+    animated?: boolean
+    delay?: number
+    size?: 'md' | 'lg'
+  }>(),
+  {
+    trend: null,
+    trendLabel: '较上周',
+    accentColor: '#0a84ff',
+    animated: true,
+    delay: 0,
+    size: 'md',
+  },
+)
 
 const displayValue = computed(() =>
-  props.formatter ? props.formatter(props.value) : props.value.toLocaleString()
+  props.formatter ? props.formatter(props.value) : props.value.toLocaleString(),
 )
 </script>
 
@@ -69,13 +76,16 @@ const displayValue = computed(() =>
 
   &__accent {
     position: absolute;
-    top: 0; left: 0; right: 0;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 3px;
     border-radius: $radius-lg $radius-lg 0 0;
   }
 
   &__content {
-    position: relative; z-index: 1;
+    position: relative;
+    z-index: 1;
   }
 
   &__label {

@@ -1,5 +1,9 @@
 <template>
-  <span class="platform-badge" :class="`platform-badge--${size}`" :style="{ '--p-color': platformColor }">
+  <span
+    class="platform-badge"
+    :class="`platform-badge--${size}`"
+    :style="{ '--p-color': platformColor }"
+  >
     <span class="platform-badge__dot" />
     <span class="platform-badge__label">{{ platformLabel }}</span>
   </span>
@@ -9,10 +13,13 @@
 import { computed } from 'vue'
 import { getPlatformColor, getPlatformLabel } from '@/composables/usePlatform'
 
-const props = withDefaults(defineProps<{
-  platform: string
-  size?: 'sm' | 'md'
-}>(), { size: 'sm' })
+const props = withDefaults(
+  defineProps<{
+    platform: string
+    size?: 'sm' | 'md'
+  }>(),
+  { size: 'sm' },
+)
 
 const platformColor = computed(() => getPlatformColor(props.platform))
 const platformLabel = computed(() => getPlatformLabel(props.platform))
@@ -29,7 +36,8 @@ const platformLabel = computed(() => getPlatformLabel(props.platform))
   font-weight: 500;
 
   &__dot {
-    width: 6px; height: 6px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background: var(--p-color);
     flex-shrink: 0;
@@ -42,7 +50,9 @@ const platformLabel = computed(() => getPlatformLabel(props.platform))
 
   &--md {
     padding: 4px 12px;
-    .platform-badge__label { font-size: 13px; }
+    .platform-badge__label {
+      font-size: 13px;
+    }
   }
 }
 </style>

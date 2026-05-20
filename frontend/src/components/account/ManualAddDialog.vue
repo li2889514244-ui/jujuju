@@ -9,12 +9,7 @@
     <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="平台" prop="platform">
         <el-select v-model="form.platform" placeholder="选择平台" style="width: 100%">
-          <el-option
-            v-for="p in platforms"
-            :key="p.value"
-            :label="p.label"
-            :value="p.value"
-          />
+          <el-option v-for="p in platforms" :key="p.value" :label="p.label" :value="p.value" />
         </el-select>
       </el-form-item>
 
@@ -50,7 +45,7 @@ import { accountsApi } from '@/api/accounts'
 defineProps<{ visible: boolean }>()
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'success': []
+  success: []
 }>()
 
 const platforms = [

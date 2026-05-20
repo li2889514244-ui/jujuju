@@ -12,7 +12,9 @@
       <el-col :xs="24" :lg="8">
         <el-card shadow="hover">
           <div class="account-detail__profile">
-            <el-avatar :size="80" :src="account.avatar">{{ account.nickname?.charAt(0) }}</el-avatar>
+            <el-avatar :size="80" :src="account.avatar">{{
+              account.nickname?.charAt(0)
+            }}</el-avatar>
             <h3>{{ account.nickname }}</h3>
             <div class="account-detail__platform">
               <PlatformIcon :platform="account.platform" show-label />
@@ -24,11 +26,21 @@
 
           <el-descriptions :column="1" border>
             <el-descriptions-item label="账号ID">{{ account.accountId }}</el-descriptions-item>
-            <el-descriptions-item label="分组">{{ account.groupName || '未分组' }}</el-descriptions-item>
-            <el-descriptions-item label="粉丝数">{{ account.followers?.toLocaleString() }}</el-descriptions-item>
-            <el-descriptions-item label="获赞数">{{ account.likes?.toLocaleString() }}</el-descriptions-item>
-            <el-descriptions-item label="最近活跃">{{ formatTime(account.lastActiveAt) }}</el-descriptions-item>
-            <el-descriptions-item label="创建时间">{{ formatTime(account.createdAt) }}</el-descriptions-item>
+            <el-descriptions-item label="分组">{{
+              account.groupName || '未分组'
+            }}</el-descriptions-item>
+            <el-descriptions-item label="粉丝数">{{
+              account.followers?.toLocaleString()
+            }}</el-descriptions-item>
+            <el-descriptions-item label="获赞数">{{
+              account.likes?.toLocaleString()
+            }}</el-descriptions-item>
+            <el-descriptions-item label="最近活跃">{{
+              formatTime(account.lastActiveAt)
+            }}</el-descriptions-item>
+            <el-descriptions-item label="创建时间">{{
+              formatTime(account.createdAt)
+            }}</el-descriptions-item>
           </el-descriptions>
 
           <div class="account-detail__actions">
@@ -66,7 +78,9 @@
               </template>
             </el-table-column>
             <el-table-column prop="publishAt" label="发布时间" width="140" sortable="custom">
-              <template #default="{ row }">{{ formatTime(row.publishAt || row.createdAt) }}</template>
+              <template #default="{ row }">{{
+                formatTime(row.publishAt || row.createdAt)
+              }}</template>
             </el-table-column>
             <el-table-column prop="views" label="播放量" width="100" sortable="custom">
               <template #default="{ row }">{{ formatNum(row.views) }}</template>
@@ -154,7 +168,9 @@ async function loadAnalytics() {
   try {
     const res = await accountsApi.getAccountAnalytics(accountId)
     analytics.value = res.data
-  } catch { analytics.value = null }
+  } catch {
+    analytics.value = null
+  }
 }
 
 async function loadPosts() {
@@ -169,7 +185,9 @@ async function loadPosts() {
     const data = res.data as any
     posts.value = data.items || data.list || []
     postTotal.value = data.total || 0
-  } catch { posts.value = [] }
+  } catch {
+    posts.value = []
+  }
   postsLoading.value = false
 }
 
@@ -197,8 +215,10 @@ function exportAccountData() {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
-  a.href = url; a.download = `${account.value?.nickname || 'account'}_data.csv`
-  a.click(); URL.revokeObjectURL(url)
+  a.href = url
+  a.download = `${account.value?.nickname || 'account'}_data.csv`
+  a.click()
+  URL.revokeObjectURL(url)
   ElMessage.success('导出成功')
 }
 
@@ -233,31 +253,64 @@ function formatNum(n: any): string {
 
 <style lang="scss" scoped>
 .account-detail {
-  &__title { font-size: 18px; font-weight: 600; }
-  &__content { margin-top: 20px; }
+  &__title {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  &__content {
+    margin-top: 20px;
+  }
   &__profile {
-    text-align: center; padding: 20px 0;
-    h3 { margin: 12px 0 8px; font-size: 18px; }
+    text-align: center;
+    padding: 20px 0;
+    h3 {
+      margin: 12px 0 8px;
+      font-size: 18px;
+    }
   }
-  &__platform { margin: 8px 0; display: flex; justify-content: center; }
+  &__platform {
+    margin: 8px 0;
+    display: flex;
+    justify-content: center;
+  }
   &__actions {
-    margin-top: 20px; display: flex; flex-direction: column; gap: 8px;
-    .el-button { width: 100%; }
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    .el-button {
+      width: 100%;
+    }
   }
-  &__analytics { margin-bottom: 16px; }
+  &__analytics {
+    margin-bottom: 16px;
+  }
 }
 
 .analytics-mini-card {
   text-align: center;
-  &__label { font-size: 12px; color: #6e6e73; margin-bottom: 6px; }
-  &__value { font-size: 20px; font-weight: 600; color: #f5f5f7; }
+  &__label {
+    font-size: 12px;
+    color: #6e6e73;
+    margin-bottom: 6px;
+  }
+  &__value {
+    font-size: 20px;
+    font-weight: 600;
+    color: #f5f5f7;
+  }
 }
 
 .post-header {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .post-pagination {
-  display: flex; justify-content: center; margin-top: 16px;
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 </style>

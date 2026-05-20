@@ -7,7 +7,11 @@
         <span class="subtitle">管理已授权的第三方平台账号</span>
       </div>
       <div class="header-actions">
-        <el-tooltip v-if="!hasOAuthAccounts" content="视频号通过扫码登录，无需刷新Token" placement="bottom">
+        <el-tooltip
+          v-if="!hasOAuthAccounts"
+          content="视频号通过扫码登录，无需刷新Token"
+          placement="bottom"
+        >
           <el-button disabled>
             <el-icon><Refresh /></el-icon>
             刷新Token
@@ -41,12 +45,7 @@
     <div class="filter-bar">
       <el-select v-model="filterPlatform" placeholder="选择平台" clearable @change="loadAccounts">
         <el-option label="全部平台" value="" />
-        <el-option
-          v-for="p in supportedPlatforms"
-          :key="p.key"
-          :label="p.name"
-          :value="p.key"
-        />
+        <el-option v-for="p in supportedPlatforms" :key="p.key" :label="p.name" :value="p.key" />
       </el-select>
       <el-input
         v-model="searchKeyword"
@@ -58,12 +57,7 @@
     </div>
 
     <!-- 已授权账号列表 -->
-    <el-table
-      :data="filteredAccounts"
-      v-loading="loading"
-      stripe
-      style="width: 100%"
-    >
+    <el-table :data="filteredAccounts" v-loading="loading" stripe style="width: 100%">
       <el-table-column label="平台" width="100">
         <template #default="{ row }">
           <div class="platform-cell">
@@ -99,10 +93,27 @@
 
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
-          <el-tag v-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expired'" type="danger" size="small">已失效 - 需扫码</el-tag>
-          <el-tag v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expiring_soon'" type="warning" size="small">即将过期</el-tag>
-          <el-tag v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'valid'" type="success" size="small">已连接</el-tag>
-          <el-tag v-else-if="isCookiePlatform(row.platform)" type="info" size="small">扫码登录</el-tag>
+          <el-tag
+            v-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expired'"
+            type="danger"
+            size="small"
+            >已失效 - 需扫码</el-tag
+          >
+          <el-tag
+            v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expiring_soon'"
+            type="warning"
+            size="small"
+            >即将过期</el-tag
+          >
+          <el-tag
+            v-else-if="isCookiePlatform(row.platform) && row.tokenStatus === 'valid'"
+            type="success"
+            size="small"
+            >已连接</el-tag
+          >
+          <el-tag v-else-if="isCookiePlatform(row.platform)" type="info" size="small"
+            >扫码登录</el-tag
+          >
           <el-tag v-else :type="getTokenStatusType(row.tokenStatus)" size="small">
             {{ getTokenStatusText(row.tokenStatus) }}
           </el-tag>
@@ -173,7 +184,7 @@
           :class="{ authorized: isAuthorized(platform.key) }"
           @click="authorizePlatform(platform)"
         >
-          <PlatformIcon :platform="(platform.key as Platform)" :size="40" />
+          <PlatformIcon :platform="platform.key as Platform" :size="40" />
           <div class="platform-name">{{ platform.name }}</div>
           <el-tag v-if="isAuthorized(platform.key)" type="success" size="small">已授权</el-tag>
           <el-tag v-else type="info" size="small">未授权</el-tag>
@@ -217,18 +228,14 @@ const pageSize = 20
 const total = ref(0)
 
 // ==================== 计算属性 ====================
-const hasOAuthAccounts = computed(() =>
-  accounts.value.some((a) => !isCookiePlatform(a.platform)),
-)
+const hasOAuthAccounts = computed(() => accounts.value.some((a) => !isCookiePlatform(a.platform)))
 
 const filteredAccounts = computed(() => {
   let list = accounts.value
   if (searchKeyword.value) {
     const kw = searchKeyword.value.toLowerCase()
     list = list.filter(
-      (a) =>
-        a.nickname.toLowerCase().includes(kw) ||
-        a.platformUserId.includes(kw),
+      (a) => a.nickname.toLowerCase().includes(kw) || a.platformUserId.includes(kw),
     )
   }
   return list

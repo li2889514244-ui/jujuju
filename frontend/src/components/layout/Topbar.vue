@@ -12,7 +12,11 @@
     <div class="topbar__right">
       <!-- Desktop Download -->
       <el-tooltip content="下载桌面伴侣，扫码绑定平台账号" placement="bottom">
-        <a href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip" target="_blank" class="topbar__download">
+        <a
+          href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+          target="_blank"
+          class="topbar__download"
+        >
           <el-icon :size="20"><Download /></el-icon>
           <span>桌面端</span>
         </a>
@@ -48,20 +52,26 @@
       >
         <template #reference>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="topbar__notification">
-            <el-icon :size="20" class="topbar__icon" role="button" aria-label="通知" tabindex="0"><Bell /></el-icon>
+            <el-icon :size="20" class="topbar__icon" role="button" aria-label="通知" tabindex="0"
+              ><Bell
+            /></el-icon>
           </el-badge>
         </template>
         <div class="notification-panel">
           <div class="notification-panel__header">
             <span>通知</span>
-            <el-button link type="primary" size="small" @click="handleMarkAllRead" :disabled="unreadCount === 0">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              @click="handleMarkAllRead"
+              :disabled="unreadCount === 0"
+            >
               全部已读
             </el-button>
           </div>
           <div class="notification-panel__body" v-loading="notifLoading">
-            <div v-if="notifications.length === 0" class="notification-panel__empty">
-              暂无通知
-            </div>
+            <div v-if="notifications.length === 0" class="notification-panel__empty">暂无通知</div>
             <div
               v-for="item in notifications"
               :key="item.id"
@@ -70,7 +80,9 @@
               @click="handleNotifClick(item)"
             >
               <div class="notification-item__icon">
-                <el-icon :color="getNotifColor(item.type)"><component :is="getNotifIcon(item.type)" /></el-icon>
+                <el-icon :color="getNotifColor(item.type)"
+                  ><component :is="getNotifIcon(item.type)"
+                /></el-icon>
               </div>
               <div class="notification-item__content">
                 <div class="notification-item__title">{{ item.title }}</div>
@@ -142,7 +154,9 @@ async function fetchUnreadCount() {
   try {
     const res = await notificationApi.getUnreadCount()
     unreadCount.value = res.data.unreadCount
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 async function fetchNotifications() {
@@ -151,13 +165,15 @@ async function fetchNotifications() {
     const res = await notificationApi.getAll({ limit: 10 })
     notifications.value = res.data.notifications
     unreadCount.value = res.data.unreadCount
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
   notifLoading.value = false
 }
 
 async function handleMarkAllRead() {
   await notificationApi.markAllAsRead()
-  notifications.value = notifications.value.map(n => ({ ...n, read: true }))
+  notifications.value = notifications.value.map((n) => ({ ...n, read: true }))
   unreadCount.value = 0
 }
 
@@ -231,56 +247,134 @@ function handleUserCommand(command: string) {
   height: 52px;
   @include glass;
   border-bottom: 1px solid var(--app-border);
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px; flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  flex-shrink: 0;
   z-index: 5;
 
-  &__right { display: flex; align-items: center; gap: 20px; }
+  &__right {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
 
   &__download {
-    display: flex; align-items: center; gap: 4px;
-    color: var(--el-color-primary); text-decoration: none;
-    font-size: 13px; padding: 4px 10px; border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--el-color-primary);
+    text-decoration: none;
+    font-size: 13px;
+    padding: 4px 10px;
+    border-radius: 6px;
     transition: background 0.2s;
-    &:hover { background: rgba(10, 132, 255, 0.1); }
+    &:hover {
+      background: rgba(10, 132, 255, 0.1);
+    }
   }
 
   &__team {
-    display: flex; align-items: center; gap: 6px; cursor: pointer;
-    color: var(--el-text-color-secondary); font-size: 14px;
-    padding: 6px 12px; border-radius: 6px; transition: background 0.2s;
-    &:hover { background: var(--app-overlay-hover); }
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--el-text-color-secondary);
+    font-size: 14px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    &:hover {
+      background: var(--app-overlay-hover);
+    }
   }
 
-  &__notification { cursor: pointer; }
+  &__notification {
+    cursor: pointer;
+  }
 
   &__icon {
-    color: var(--el-text-color-secondary); cursor: pointer; transition: color 0.2s;
-    &:hover { color: var(--el-color-primary); }
+    color: var(--el-text-color-secondary);
+    cursor: pointer;
+    transition: color 0.2s;
+    &:hover {
+      color: var(--el-color-primary);
+    }
   }
 
-  &__user { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-  &__username { font-size: 14px; color: var(--el-text-color-primary); }
+  &__user {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  &__username {
+    font-size: 14px;
+    color: var(--el-text-color-primary);
+  }
 }
 
 .notification-panel {
   &__header {
-    display: flex; justify-content: space-between; align-items: center;
-    padding-bottom: 12px; border-bottom: 1px solid var(--app-separator);
-    font-weight: 600; font-size: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--app-separator);
+    font-weight: 600;
+    font-size: 15px;
   }
-  &__body { max-height: 360px; overflow-y: auto; padding-top: 8px; }
-  &__empty { text-align: center; color: var(--el-text-color-secondary); padding: 40px 0; font-size: 14px; }
+  &__body {
+    max-height: 360px;
+    overflow-y: auto;
+    padding-top: 8px;
+  }
+  &__empty {
+    text-align: center;
+    color: var(--el-text-color-secondary);
+    padding: 40px 0;
+    font-size: 14px;
+  }
 }
 
 .notification-item {
-  display: flex; align-items: flex-start; gap: 10px;
-  padding: 10px 4px; border-radius: 6px; cursor: pointer; transition: background 0.2s;
-  &:hover { background: var(--app-overlay-hover); }
-  &--unread { background: rgba(10, 132, 255, 0.08); &:hover { background: rgba(10, 132, 255, 0.14); } }
-  &__icon { padding-top: 2px; font-size: 18px; }
-  &__content { flex: 1; min-width: 0; }
-  &__title { font-size: 13px; color: var(--el-text-color-primary); line-height: 1.4; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  &__time { font-size: 12px; color: var(--el-text-color-secondary); margin-top: 4px; }
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover {
+    background: var(--app-overlay-hover);
+  }
+  &--unread {
+    background: rgba(10, 132, 255, 0.08);
+    &:hover {
+      background: rgba(10, 132, 255, 0.14);
+    }
+  }
+  &__icon {
+    padding-top: 2px;
+    font-size: 18px;
+  }
+  &__content {
+    flex: 1;
+    min-width: 0;
+  }
+  &__title {
+    font-size: 13px;
+    color: var(--el-text-color-primary);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  &__time {
+    font-size: 12px;
+    color: var(--el-text-color-secondary);
+    margin-top: 4px;
+  }
 }
 </style>

@@ -17,7 +17,9 @@ export function useTheme() {
   apply()
 
   watchEffect(() => {
-    try { localStorage.setItem(THEME_KEY, isLight.value ? 'light' : 'dark') } catch {}
+    try {
+      localStorage.setItem(THEME_KEY, isLight.value ? 'light' : 'dark')
+    } catch {}
     apply()
   })
 

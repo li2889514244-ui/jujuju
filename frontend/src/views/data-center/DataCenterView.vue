@@ -11,9 +11,20 @@
           </el-select>
         </el-form-item>
         <el-form-item label="平台">
-          <el-select v-model="platform" placeholder="全部平台" clearable style="width: 140px" @change="refreshAll">
+          <el-select
+            v-model="platform"
+            placeholder="全部平台"
+            clearable
+            style="width: 140px"
+            @change="refreshAll"
+          >
             <el-option label="全部" value="" />
-            <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+            <el-option
+              v-for="(label, key) in PLATFORM_LABELS"
+              :key="key"
+              :label="label"
+              :value="key"
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -21,8 +32,8 @@
         </el-form-item>
         <el-form-item>
           <el-tooltip content="伴侣打开后每30分钟自动采集，点查询刷新即可" placement="bottom">
-        <el-button @click="refreshAll" :loading="loading" type="success">刷新数据</el-button>
-      </el-tooltip>
+            <el-button @click="refreshAll" :loading="loading" type="success">刷新数据</el-button>
+          </el-tooltip>
         </el-form-item>
       </el-form>
     </el-card>
@@ -33,7 +44,11 @@
         <el-card shadow="hover" class="overview-card">
           <div class="overview-card__label">{{ card.label }}</div>
           <div class="overview-card__value">{{ card.value }}</div>
-          <div class="overview-card__change" :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''" v-if="card.trend !== null">
+          <div
+            class="overview-card__change"
+            :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''"
+            v-if="card.trend !== null"
+          >
             {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
           </div>
         </el-card>
@@ -61,7 +76,9 @@
         <el-card shadow="hover">
           <template #header>平台数据明细</template>
           <el-table :data="platformStats" stripe>
-            <template #empty><el-empty description="暂无平台数据，请先添加账号并采集数据" /></template>
+            <template #empty
+              ><el-empty description="暂无平台数据，请先添加账号并采集数据"
+            /></template>
             <el-table-column label="平台" width="90">
               <template #default="{ row }">
                 <PlatformIcon :platform="row.platform" show-label />
@@ -100,7 +117,9 @@
             <template #empty><el-empty description="暂无排行数据" /></template>
             <el-table-column label="#" width="50">
               <template #default="{ row }">
-                <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{ row.rank }}</span>
+                <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{
+                  row.rank
+                }}</span>
               </template>
             </el-table-column>
             <el-table-column label="内容" min-width="160">
@@ -142,7 +161,11 @@ const overviewCards = computed(() => {
   const ov = overview.value
   if (!ov) return []
   const cards = [
-    { label: '总播放量', value: formatNum(ov.engagement?.totalViews || 0), trend: null as number | null },
+    {
+      label: '总播放量',
+      value: formatNum(ov.engagement?.totalViews || 0),
+      trend: null as number | null,
+    },
     { label: '总点赞', value: formatNum(ov.engagement?.totalLikes || 0), trend: null },
     { label: '总评论', value: formatNum(ov.engagement?.totalComments || 0), trend: null },
     { label: '总分享', value: formatNum(ov.engagement?.totalShares || 0), trend: null },
@@ -164,8 +187,13 @@ const overviewCards = computed(() => {
 // Trend
 const trendMetric = ref('views')
 const trendData = ref<any[]>([])
-const dates = computed(() => Array.from({ length: days.value }, (_, i) =>
-  dayjs().subtract(days.value - 1 - i, 'day').format('MM-DD')))
+const dates = computed(() =>
+  Array.from({ length: days.value }, (_, i) =>
+    dayjs()
+      .subtract(days.value - 1 - i, 'day')
+      .format('MM-DD'),
+  ),
+)
 
 const trendChartOption = computed(() => ({
   tooltip: { trigger: 'axis' as const },
@@ -173,15 +201,26 @@ const trendChartOption = computed(() => ({
   grid: { left: 60, right: 20, top: 40, bottom: 30 },
   xAxis: { type: 'category' as const, data: dates.value },
   yAxis: { type: 'value' as const },
-  series: [{
-    name: trendLabel.value, type: 'line' as const, smooth: true,
-    areaStyle: { opacity: 0.2 },
-    data: trendData.value,
-  }],
-  graphic: trendData.value.length === 0 ? [{
-    type: 'text', left: 'center', top: 'center',
-    style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
-  }] : undefined,
+  series: [
+    {
+      name: trendLabel.value,
+      type: 'line' as const,
+      smooth: true,
+      areaStyle: { opacity: 0.2 },
+      data: trendData.value,
+    },
+  ],
+  graphic:
+    trendData.value.length === 0
+      ? [
+          {
+            type: 'text',
+            left: 'center',
+            top: 'center',
+            style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
+          },
+        ]
+      : undefined,
 }))
 
 const trendLabel = computed(() => {
@@ -226,7 +265,7 @@ async function loadTrend() {
       // Actually get views trend - use daily stats aggregation from publish effect
       res = await analyticsApi.getPublishEffect({ days: d })
       const byDate: Record<string, number> = {}
-      for (const item of (res.data || [])) {
+      for (const item of res.data || []) {
         const date = item.date?.slice(0, 10) || dayjs(item.publishedAt).format('YYYY-MM-DD')
         byDate[date] = (byDate[date] || 0) + (item.views || 0)
       }
@@ -239,14 +278,18 @@ async function loadTrend() {
       res = await analyticsApi.getFollowerTrend({ days: d, platform: p })
       trendData.value = (res.data || []).map((x: any) => x.value || 0)
     }
-  } catch { trendData.value = [] }
+  } catch {
+    trendData.value = []
+  }
 }
 
 async function loadPlatformStats() {
   try {
     const res = await analyticsApi.getPlatformStats()
     platformStats.value = (res.data || []) as any[]
-  } catch { platformStats.value = [] }
+  } catch {
+    platformStats.value = []
+  }
 }
 
 async function loadRanking() {
@@ -258,7 +301,9 @@ async function loadRanking() {
       platform: platform.value || undefined,
     })
     viewsRanking.value = r.data?.ranking || []
-  } catch { viewsRanking.value = [] }
+  } catch {
+    viewsRanking.value = []
+  }
   rankingLoading.value = false
 }
 
@@ -266,12 +311,20 @@ async function loadComparison() {
   try {
     const res = await analyticsApi.getComparison()
     comparisonData.value = res.data
-  } catch { comparisonData.value = null }
+  } catch {
+    comparisonData.value = null
+  }
 }
 
 async function refreshAll() {
   loading.value = true
-  await Promise.all([loadOverview(), loadTrend(), loadPlatformStats(), loadRanking(), loadComparison()])
+  await Promise.all([
+    loadOverview(),
+    loadTrend(),
+    loadPlatformStats(),
+    loadRanking(),
+    loadComparison(),
+  ])
   loading.value = false
 }
 
@@ -279,7 +332,9 @@ async function handleCollect() {
   collecting.value = true
   try {
     const res = await analyticsApi.triggerRealDataCollection()
-    ElMessage.success(res?.status === 'started' ? '数据采集已启动，正在从各平台获取真实数据...' : '采集指令已发送')
+    ElMessage.success(
+      res?.status === 'started' ? '数据采集已启动，正在从各平台获取真实数据...' : '采集指令已发送',
+    )
     // 等 10 秒后刷新（给伴侣时间去采集）
     setTimeout(() => refreshAll(), 10000)
   } catch (e: any) {
@@ -299,35 +354,84 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .data-center {
-  &__filter { margin-bottom: 20px; }
-  &__overview { margin-bottom: 20px; }
-  &__chart { margin-bottom: 20px; }
-  &__body { }
+  &__filter {
+    margin-bottom: 20px;
+  }
+  &__overview {
+    margin-bottom: 20px;
+  }
+  &__chart {
+    margin-bottom: 20px;
+  }
+  &__body {
+  }
 }
 
 .overview-card {
   text-align: center;
-  &__label { font-size: 13px; color: #6e6e73; margin-bottom: 8px; }
-  &__value { font-size: 24px; font-weight: 600; color: #f5f5f7; }
-  &__change { font-size: 12px; margin-top: 6px; font-weight: 500; }
+  &__label {
+    font-size: 13px;
+    color: #6e6e73;
+    margin-bottom: 8px;
+  }
+  &__value {
+    font-size: 24px;
+    font-weight: 600;
+    color: #f5f5f7;
+  }
+  &__change {
+    font-size: 12px;
+    margin-top: 6px;
+    font-weight: 500;
+  }
 }
 
-.trend--up { color: #30d158; }
-.trend--down { color: #ff453a; }
+.trend--up {
+  color: #30d158;
+}
+.trend--down {
+  color: #ff453a;
+}
 
 .chart-header {
-  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
 }
 
-.ranking-title { font-size: 13px; color: #f5f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 180px; }
-.ranking-meta { font-size: 11px; color: #6e6e73; margin-top: 2px; }
+.ranking-title {
+  font-size: 13px;
+  color: #f5f5f7;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+.ranking-meta {
+  font-size: 11px;
+  color: #6e6e73;
+  margin-top: 2px;
+}
 
 .rank-badge {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; border-radius: 50%;
-  font-size: 11px; font-weight: bold; color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: bold;
+  color: #fff;
 }
-.rank-1 { background: #f5a623; }
-.rank-2 { background: #6e6e73; }
-.rank-3 { background: #b87333; }
+.rank-1 {
+  background: #f5a623;
+}
+.rank-2 {
+  background: #6e6e73;
+}
+.rank-3 {
+  background: #b87333;
+}
 </style>

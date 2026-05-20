@@ -6,15 +6,18 @@
 import { computed, ref, watch } from 'vue'
 import { useTransition, TransitionPresets } from '@vueuse/core'
 
-const props = withDefaults(defineProps<{
-  value: number
-  format?: (n: number) => string
-  duration?: number
-  delay?: number
-}>(), {
-  duration: 800,
-  delay: 0,
-})
+const props = withDefaults(
+  defineProps<{
+    value: number
+    format?: (n: number) => string
+    duration?: number
+    delay?: number
+  }>(),
+  {
+    duration: 800,
+    delay: 0,
+  },
+)
 
 const target = ref(0)
 const animated = useTransition(target, {
@@ -23,14 +26,20 @@ const animated = useTransition(target, {
   transition: TransitionPresets.easeOutExpo,
 })
 
-watch(() => props.value, (v) => {
-  const ms = props.delay || 0
-  if (ms > 0) {
-    setTimeout(() => { target.value = v }, ms)
-  } else {
-    target.value = v
-  }
-}, { immediate: true })
+watch(
+  () => props.value,
+  (v) => {
+    const ms = props.delay || 0
+    if (ms > 0) {
+      setTimeout(() => {
+        target.value = v
+      }, ms)
+    } else {
+      target.value = v
+    }
+  },
+  { immediate: true },
+)
 
 const displayValue = computed(() => {
   const n = Math.round(animated.value)

@@ -4,11 +4,19 @@
     <el-card shadow="hover" class="ai-assistant__header">
       <div class="header-content">
         <div class="header-info">
-          <h2><el-icon :size="22"><MagicStick /></el-icon> AI 智能助手</h2>
+          <h2>
+            <el-icon :size="22"><MagicStick /></el-icon> AI 智能助手
+          </h2>
           <p class="subtitle">基于AI的内容创作、发布优化、趋势预测与风险检测</p>
         </div>
         <el-tag :type="providerStatus === 'mock' ? 'warning' : 'success'" size="large">
-          {{ providerStatus === 'loading' ? '连接中...' : providerStatus === 'connected' ? 'AI 已连接' : '演示模式 (Mock)' }}
+          {{
+            providerStatus === 'loading'
+              ? '连接中...'
+              : providerStatus === 'connected'
+                ? 'AI 已连接'
+                : '演示模式 (Mock)'
+          }}
         </el-tag>
       </div>
     </el-card>
@@ -17,7 +25,9 @@
     <el-tabs v-model="activeTab" type="border-card" class="ai-assistant__tabs">
       <!-- ===== Content Generation ===== -->
       <el-tab-pane name="content">
-        <template #label><el-icon :size="16"><EditPen /></el-icon> 智能创作</template>
+        <template #label
+          ><el-icon :size="16"><EditPen /></el-icon> 智能创作</template
+        >
         <el-row :gutter="20">
           <el-col :xs="24" :lg="10">
             <el-card shadow="hover">
@@ -36,7 +46,12 @@
                 </el-form-item>
                 <el-form-item label="平台">
                   <el-select v-model="contentForm.platform" clearable style="width: 100%">
-                    <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+                    <el-option
+                      v-for="(label, key) in PLATFORM_LABELS"
+                      :key="key"
+                      :label="label"
+                      :value="key"
+                    />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="风格">
@@ -46,13 +61,22 @@
                   <el-input v-model="contentForm.audience" placeholder="如：年轻用户、宝妈群体" />
                 </el-form-item>
                 <el-form-item label="参考">
-                  <el-input v-model="contentForm.reference" type="textarea" :rows="2" placeholder="可选：粘贴参考内容" />
+                  <el-input
+                    v-model="contentForm.reference"
+                    type="textarea"
+                    :rows="2"
+                    placeholder="可选：粘贴参考内容"
+                  />
                 </el-form-item>
                 <el-form-item v-if="contentForm.type === 'title'" label="数量">
                   <el-input-number v-model="contentForm.count" :min="1" :max="10" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" :loading="contentLoading" @click="handleGenerateContent">
+                  <el-button
+                    type="primary"
+                    :loading="contentLoading"
+                    @click="handleGenerateContent"
+                  >
                     <el-icon><MagicStick /></el-icon> AI 生成
                   </el-button>
                 </el-form-item>
@@ -77,7 +101,12 @@
                 <div class="result-text" v-html="formatContent(contentResult.content)" />
                 <div v-if="contentResult.keywords?.length" class="result-keywords">
                   <span class="label">关键词：</span>
-                  <el-tag v-for="kw in contentResult.keywords" :key="kw" size="small" class="keyword-tag">
+                  <el-tag
+                    v-for="kw in contentResult.keywords"
+                    :key="kw"
+                    size="small"
+                    class="keyword-tag"
+                  >
                     {{ kw }}
                   </el-tag>
                 </div>
@@ -97,7 +126,12 @@
               <el-form :model="publishForm" label-width="80px">
                 <el-form-item label="平台">
                   <el-select v-model="publishForm.platform" style="width: 100%">
-                    <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+                    <el-option
+                      v-for="(label, key) in PLATFORM_LABELS"
+                      :key="key"
+                      :label="label"
+                      :value="key"
+                    />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="类型">
@@ -107,7 +141,11 @@
                   <el-input v-model="publishForm.audience" placeholder="如：年轻用户" />
                 </el-form-item>
                 <el-form-item>
-                  <el-button type="primary" :loading="publishLoading" @click="handlePublishOptimize">
+                  <el-button
+                    type="primary"
+                    :loading="publishLoading"
+                    @click="handlePublishOptimize"
+                  >
                     <el-icon><Timer /></el-icon> 分析最佳时间
                   </el-button>
                 </el-form-item>
@@ -116,7 +154,9 @@
           </el-col>
           <el-col :xs="24" :lg="16">
             <el-card v-if="publishResult" shadow="hover">
-              <template #header><el-icon :size="16"><TrendCharts /></el-icon> 发布时间建议</template>
+              <template #header
+                ><el-icon :size="16"><TrendCharts /></el-icon> 发布时间建议</template
+              >
               <el-row :gutter="16" class="time-slots">
                 <el-col v-for="(slot, idx) in publishResult.bestSlots" :key="idx" :span="8">
                   <div class="time-slot" :class="{ 'is-best': idx === 0 }">
@@ -132,11 +172,15 @@
               </el-row>
               <el-divider />
               <div class="publish-info">
-                <h4><el-icon :size="14"><Calendar /></el-icon> 推荐发布频率</h4>
+                <h4>
+                  <el-icon :size="14"><Calendar /></el-icon> 推荐发布频率
+                </h4>
                 <p>{{ publishResult.frequency.description }}</p>
               </div>
               <div v-if="publishResult.tips.length" class="publish-tips">
-                <h4><el-icon :size="14"><Sunny /></el-icon> 优化建议</h4>
+                <h4>
+                  <el-icon :size="14"><Sunny /></el-icon> 优化建议
+                </h4>
                 <ul>
                   <li v-for="(tip, i) in publishResult.tips" :key="i">{{ tip }}</li>
                 </ul>
@@ -151,7 +195,9 @@
 
       <!-- ===== Trend Prediction ===== -->
       <el-tab-pane name="trend">
-        <template #label><el-icon :size="16"><TrendCharts /></el-icon> 趋势预测</template>
+        <template #label
+          ><el-icon :size="16"><TrendCharts /></el-icon> 趋势预测</template
+        >
         <el-row :gutter="20">
           <el-col :xs="24" :lg="8">
             <el-card shadow="hover">
@@ -167,7 +213,12 @@
                 </el-form-item>
                 <el-form-item label="平台">
                   <el-select v-model="trendForm.platform" clearable style="width: 100%">
-                    <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+                    <el-option
+                      v-for="(label, key) in PLATFORM_LABELS"
+                      :key="key"
+                      :label="label"
+                      :value="key"
+                    />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="预测天数">
@@ -199,21 +250,28 @@
                 <el-col :span="8">
                   <el-card shadow="hover" class="stat-card">
                     <div class="stat-label">日均增长率</div>
-                    <div class="stat-value" :class="trendResult.growthRate >= 0 ? 'text-success' : 'text-danger'">
+                    <div
+                      class="stat-value"
+                      :class="trendResult.growthRate >= 0 ? 'text-success' : 'text-danger'"
+                    >
                       {{ (trendResult.growthRate * 100).toFixed(2) }}%
                     </div>
                   </el-card>
                 </el-col>
               </el-row>
               <el-card shadow="hover" style="margin-top: 16px">
-                <template #header><el-icon :size="16"><Search /></el-icon> 趋势洞察</template>
+                <template #header
+                  ><el-icon :size="16"><Search /></el-icon> 趋势洞察</template
+                >
                 <div class="insights-list">
                   <div v-for="(insight, i) in trendResult.insights" :key="i" class="insight-item">
                     <el-icon><InfoFilled /></el-icon> {{ insight }}
                   </div>
                 </div>
                 <el-divider v-if="trendResult.recommendations.length" />
-                <h4 v-if="trendResult.recommendations.length"><el-icon :size="14"><Sunny /></el-icon> 建议</h4>
+                <h4 v-if="trendResult.recommendations.length">
+                  <el-icon :size="14"><Sunny /></el-icon> 建议
+                </h4>
                 <ul class="recommendations-list">
                   <li v-for="(rec, i) in trendResult.recommendations" :key="i">{{ rec }}</li>
                 </ul>
@@ -228,14 +286,21 @@
 
       <!-- ===== Anomaly Detection ===== -->
       <el-tab-pane name="anomaly">
-        <template #label><el-icon :size="16"><Search /></el-icon> 异常检测</template>
+        <template #label
+          ><el-icon :size="16"><Search /></el-icon> 异常检测</template
+        >
         <el-row :gutter="20">
           <el-col :xs="24" :lg="8">
             <el-card shadow="hover">
               <template #header>检测参数</template>
               <el-form :model="anomalyForm" label-width="80px">
                 <el-form-item label="数据集">
-                  <el-input v-model="anomalyForm.dataset" type="textarea" :rows="4" placeholder="输入JSON数组，如: [100, 120, 95, 500, 110]" />
+                  <el-input
+                    v-model="anomalyForm.dataset"
+                    type="textarea"
+                    :rows="4"
+                    placeholder="输入JSON数组，如: [100, 120, 95, 500, 110]"
+                  />
                 </el-form-item>
                 <el-form-item label="指标">
                   <el-input v-model="anomalyForm.metric" placeholder="如：粉丝数、播放量" />
@@ -259,7 +324,13 @@
             <template v-if="anomalyResult">
               <el-alert
                 :title="anomalyResult.summary"
-                :type="anomalyResult.riskLevel === 'high' ? 'error' : anomalyResult.riskLevel === 'medium' ? 'warning' : 'success'"
+                :type="
+                  anomalyResult.riskLevel === 'high'
+                    ? 'error'
+                    : anomalyResult.riskLevel === 'medium'
+                      ? 'warning'
+                      : 'success'
+                "
                 show-icon
                 :closable="false"
                 style="margin-bottom: 16px"
@@ -267,31 +338,58 @@
               <el-row :gutter="16">
                 <el-col :span="12">
                   <el-card shadow="hover">
-                    <template #header><el-icon :size="16"><WarningFilled /></el-icon> 异常点 ({{ anomalyResult.anomalies.length }})</template>
-                    <div v-if="anomalyResult.anomalies.length === 0" class="empty-text">未检测到异常</div>
+                    <template #header
+                      ><el-icon :size="16"><WarningFilled /></el-icon> 异常点 ({{
+                        anomalyResult.anomalies.length
+                      }})</template
+                    >
+                    <div v-if="anomalyResult.anomalies.length === 0" class="empty-text">
+                      未检测到异常
+                    </div>
                     <div v-for="(a, i) in anomalyResult.anomalies" :key="i" class="anomaly-item">
                       <el-tag :type="a.type === 'spike' ? 'danger' : 'warning'" size="small">
                         {{ a.type === 'spike' ? '突增' : '突降' }}
                       </el-tag>
-                      <span>索引 #{{ a.index }}: {{ a.value }} (z-score: {{ a.zScore.toFixed(2) }})</span>
+                      <span
+                        >索引 #{{ a.index }}: {{ a.value }} (z-score:
+                        {{ a.zScore.toFixed(2) }})</span
+                      >
                     </div>
                   </el-card>
                 </el-col>
                 <el-col :span="12">
                   <el-card shadow="hover">
-                    <template #header><el-icon :size="16"><TrendCharts /></el-icon> 统计信息</template>
+                    <template #header
+                      ><el-icon :size="16"><TrendCharts /></el-icon> 统计信息</template
+                    >
                     <el-descriptions :column="1" border size="small">
-                      <el-descriptions-item label="均值">{{ anomalyResult.statistics.mean.toFixed(2) }}</el-descriptions-item>
-                      <el-descriptions-item label="标准差">{{ anomalyResult.statistics.stdDev.toFixed(2) }}</el-descriptions-item>
-                      <el-descriptions-item label="最小值">{{ anomalyResult.statistics.min }}</el-descriptions-item>
-                      <el-descriptions-item label="最大值">{{ anomalyResult.statistics.max }}</el-descriptions-item>
-                      <el-descriptions-item label="数据点">{{ anomalyResult.statistics.dataPoints }}</el-descriptions-item>
+                      <el-descriptions-item label="均值">{{
+                        anomalyResult.statistics.mean.toFixed(2)
+                      }}</el-descriptions-item>
+                      <el-descriptions-item label="标准差">{{
+                        anomalyResult.statistics.stdDev.toFixed(2)
+                      }}</el-descriptions-item>
+                      <el-descriptions-item label="最小值">{{
+                        anomalyResult.statistics.min
+                      }}</el-descriptions-item>
+                      <el-descriptions-item label="最大值">{{
+                        anomalyResult.statistics.max
+                      }}</el-descriptions-item>
+                      <el-descriptions-item label="数据点">{{
+                        anomalyResult.statistics.dataPoints
+                      }}</el-descriptions-item>
                     </el-descriptions>
                   </el-card>
                 </el-col>
               </el-row>
-              <el-card v-if="anomalyResult.recommendations.length" shadow="hover" style="margin-top: 16px">
-                <template #header><el-icon :size="16"><Sunny /></el-icon> 建议</template>
+              <el-card
+                v-if="anomalyResult.recommendations.length"
+                shadow="hover"
+                style="margin-top: 16px"
+              >
+                <template #header
+                  ><el-icon :size="16"><Sunny /></el-icon> 建议</template
+                >
                 <ul>
                   <li v-for="(rec, i) in anomalyResult.recommendations" :key="i">{{ rec }}</li>
                 </ul>
@@ -306,18 +404,30 @@
 
       <!-- ===== Content Review ===== -->
       <el-tab-pane name="review">
-        <template #label><el-icon :size="16"><CircleCheck /></el-icon> 内容审核</template>
+        <template #label
+          ><el-icon :size="16"><CircleCheck /></el-icon> 内容审核</template
+        >
         <el-row :gutter="20">
           <el-col :xs="24" :lg="10">
             <el-card shadow="hover">
               <template #header>审核参数</template>
               <el-form :model="reviewForm" label-width="80px">
                 <el-form-item label="内容">
-                  <el-input v-model="reviewForm.content" type="textarea" :rows="6" placeholder="粘贴待审核的内容" />
+                  <el-input
+                    v-model="reviewForm.content"
+                    type="textarea"
+                    :rows="6"
+                    placeholder="粘贴待审核的内容"
+                  />
                 </el-form-item>
                 <el-form-item label="平台">
                   <el-select v-model="reviewForm.platform" clearable style="width: 100%">
-                    <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+                    <el-option
+                      v-for="(label, key) in PLATFORM_LABELS"
+                      :key="key"
+                      :label="label"
+                      :value="key"
+                    />
                   </el-select>
                 </el-form-item>
                 <el-form-item label="严格度">
@@ -339,24 +449,58 @@
             <template v-if="reviewResult">
               <el-card shadow="hover" class="review-result-card">
                 <div class="review-status">
-                  <el-icon v-if="reviewResult.passed" :size="48" class="text-success"><CircleCheckFilled /></el-icon>
+                  <el-icon v-if="reviewResult.passed" :size="48" class="text-success"
+                    ><CircleCheckFilled
+                  /></el-icon>
                   <el-icon v-else :size="48" class="text-danger"><CircleCloseFilled /></el-icon>
                   <div>
                     <h3>{{ reviewResult.passed ? '审核通过' : '审核未通过' }}</h3>
-                    <el-tag :type="reviewResult.riskLevel === 'high' ? 'danger' : reviewResult.riskLevel === 'medium' ? 'warning' : 'success'">
-                      风险等级: {{ reviewResult.riskLevel === 'high' ? '高' : reviewResult.riskLevel === 'medium' ? '中' : '低' }}
+                    <el-tag
+                      :type="
+                        reviewResult.riskLevel === 'high'
+                          ? 'danger'
+                          : reviewResult.riskLevel === 'medium'
+                            ? 'warning'
+                            : 'success'
+                      "
+                    >
+                      风险等级:
+                      {{
+                        reviewResult.riskLevel === 'high'
+                          ? '高'
+                          : reviewResult.riskLevel === 'medium'
+                            ? '中'
+                            : '低'
+                      }}
                     </el-tag>
-                    <el-tag type="info" style="margin-left: 8px">风险分: {{ reviewResult.score }}</el-tag>
+                    <el-tag type="info" style="margin-left: 8px"
+                      >风险分: {{ reviewResult.score }}</el-tag
+                    >
                   </div>
                 </div>
                 <p class="review-summary">{{ reviewResult.summary }}</p>
               </el-card>
 
               <el-card v-if="reviewResult.issues.length" shadow="hover" style="margin-top: 16px">
-                <template #header><el-icon :size="16"><WarningFilled /></el-icon> 问题清单 ({{ reviewResult.issues.length }})</template>
+                <template #header
+                  ><el-icon :size="16"><WarningFilled /></el-icon> 问题清单 ({{
+                    reviewResult.issues.length
+                  }})</template
+                >
                 <div v-for="(issue, i) in reviewResult.issues" :key="i" class="review-issue">
-                  <el-tag :type="issue.severity === 'high' ? 'danger' : issue.severity === 'medium' ? 'warning' : 'info'" size="small">
-                    {{ issue.severity === 'high' ? '高' : issue.severity === 'medium' ? '中' : '低' }}
+                  <el-tag
+                    :type="
+                      issue.severity === 'high'
+                        ? 'danger'
+                        : issue.severity === 'medium'
+                          ? 'warning'
+                          : 'info'
+                    "
+                    size="small"
+                  >
+                    {{
+                      issue.severity === 'high' ? '高' : issue.severity === 'medium' ? '中' : '低'
+                    }}
                   </el-tag>
                   <span>{{ issue.message }}</span>
                 </div>
@@ -368,28 +512,53 @@
                   <el-col :span="8">
                     <div class="sentiment-item">
                       <div class="sentiment-label">情感倾向</div>
-                      <div class="sentiment-value" :class="reviewResult.sentiment.label === 'positive' ? 'text-success' : reviewResult.sentiment.label === 'negative' ? 'text-danger' : ''">
-                        {{ reviewResult.sentiment.label === 'positive' ? '正面' : reviewResult.sentiment.label === 'negative' ? '负面' : '中性' }}
+                      <div
+                        class="sentiment-value"
+                        :class="
+                          reviewResult.sentiment.label === 'positive'
+                            ? 'text-success'
+                            : reviewResult.sentiment.label === 'negative'
+                              ? 'text-danger'
+                              : ''
+                        "
+                      >
+                        {{
+                          reviewResult.sentiment.label === 'positive'
+                            ? '正面'
+                            : reviewResult.sentiment.label === 'negative'
+                              ? '负面'
+                              : '中性'
+                        }}
                       </div>
                     </div>
                   </el-col>
                   <el-col :span="8">
                     <div class="sentiment-item">
                       <div class="sentiment-label">情感分数</div>
-                      <div class="sentiment-value">{{ reviewResult.sentiment.score.toFixed(2) }}</div>
+                      <div class="sentiment-value">
+                        {{ reviewResult.sentiment.score.toFixed(2) }}
+                      </div>
                     </div>
                   </el-col>
                   <el-col :span="8">
                     <div class="sentiment-item">
                       <div class="sentiment-label">置信度</div>
-                      <div class="sentiment-value">{{ (reviewResult.sentiment.confidence * 100).toFixed(0) }}%</div>
+                      <div class="sentiment-value">
+                        {{ (reviewResult.sentiment.confidence * 100).toFixed(0) }}%
+                      </div>
                     </div>
                   </el-col>
                 </el-row>
               </el-card>
 
-              <el-card v-if="reviewResult.suggestions.length" shadow="hover" style="margin-top: 16px">
-                <template #header><el-icon :size="16"><Sunny /></el-icon> 修改建议</template>
+              <el-card
+                v-if="reviewResult.suggestions.length"
+                shadow="hover"
+                style="margin-top: 16px"
+              >
+                <template #header
+                  ><el-icon :size="16"><Sunny /></el-icon> 修改建议</template
+                >
                 <ul>
                   <li v-for="(s, i) in reviewResult.suggestions" :key="i">{{ s }}</li>
                 </ul>
@@ -409,9 +578,21 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  MagicStick, CopyDocument, Loading, Timer, TrendCharts,
-  Warning, CircleCheck, InfoFilled, CircleCheckFilled, CircleCloseFilled,
-  EditPen, Sunny, Search, WarningFilled, Calendar,
+  MagicStick,
+  CopyDocument,
+  Loading,
+  Timer,
+  TrendCharts,
+  Warning,
+  CircleCheck,
+  InfoFilled,
+  CircleCheckFilled,
+  CircleCloseFilled,
+  EditPen,
+  Sunny,
+  Search,
+  WarningFilled,
+  Calendar,
 } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
 import {
@@ -433,8 +614,12 @@ const activeTab = ref('content')
 const providerStatus = ref('loading')
 
 onMounted(async () => {
-  try { await getAIProviders(); providerStatus.value = 'connected' }
-  catch { providerStatus.value = 'mock' }
+  try {
+    await getAIProviders()
+    providerStatus.value = 'connected'
+  } catch {
+    providerStatus.value = 'mock'
+  }
 })
 
 // Content Generation
@@ -655,7 +840,7 @@ function copyContent() {
 .result-keywords {
   margin-top: 16px;
   padding-top: 16px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .result-keywords .label {
@@ -675,7 +860,7 @@ function copyContent() {
 .time-slot {
   text-align: center;
   padding: 16px;
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 8px;
   transition: all 0.3s;
 }

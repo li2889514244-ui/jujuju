@@ -11,7 +11,7 @@
         <template #image>
           <el-icon :size="64" color="#48484a"><Monitor /></el-icon>
         </template>
-        <p style="color: #6e6e73; font-size: 14px;">
+        <p style="color: #6e6e73; font-size: 14px">
           浏览器引擎（browser-engine）已从系统中移除，浏览器发布功能不可用。<br />
           如需此功能，请联系管理员。
         </p>

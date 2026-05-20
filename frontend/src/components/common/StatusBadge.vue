@@ -15,7 +15,7 @@ const props = withDefaults(
     size?: 'large' | 'default' | 'small'
     round?: boolean
   }>(),
-  { type: 'publish', effect: 'light', size: 'default', round: false }
+  { type: 'publish', effect: 'light', size: 'default', round: false },
 )
 
 const statusConfig: Record<string, Record<string, { type: string; label: string }>> = {

@@ -30,7 +30,14 @@ export interface LoginResponse {
 }
 
 // ===== Platform =====
-export type Platform = 'douyin' | 'kuaishou' | 'xiaohongshu' | 'video_account' | 'bilibili' | 'weibo' | 'tiktok'
+export type Platform =
+  | 'douyin'
+  | 'kuaishou'
+  | 'xiaohongshu'
+  | 'video_account'
+  | 'bilibili'
+  | 'weibo'
+  | 'tiktok'
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   douyin: '抖音',
@@ -280,10 +287,19 @@ export interface PostWithStats {
 
 // ===== Dashboard =====
 export interface DashboardAccount {
-  id: string; nickname: string; avatar: string; platform: string
-  groupName: string; followers: number; views: number; likes: number
-  comments: number; shares: number; postCount: number
-  hasCookies: boolean; tokenStatus: string
+  id: string
+  nickname: string
+  avatar: string
+  platform: string
+  groupName: string
+  followers: number
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  postCount: number
+  hasCookies: boolean
+  tokenStatus: string
 }
 
 export interface DailyStatsMap {
@@ -293,11 +309,16 @@ export interface DailyStatsMap {
 export interface AccountGroupSummary {
   name: string
   accounts: DashboardAccount[]
-  totalFollowers: number; totalViews: number; totalLikes: number
+  totalFollowers: number
+  totalViews: number
+  totalLikes: number
 }
 
 export interface SummaryCardData {
-  label: string; rawValue: number; trend: number | null; color: string
+  label: string
+  rawValue: number
+  trend: number | null
+  color: string
 }
 
 export interface AccountAnalytics {
