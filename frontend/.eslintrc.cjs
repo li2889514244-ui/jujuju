@@ -26,11 +26,12 @@ module.exports = {
     'vue/no-setup-props-reactivity-loss': 'off',
     '@typescript-eslint/no-explicit-any': 'warn',
     '@typescript-eslint/no-unused-vars': [
-      'warn',
+      'error',
       { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
     ],
     'no-console': 'warn',
-    'no-debugger': 'warn',
+    'no-debugger': 'error',
+    'no-empty': ['error', { allowEmptyCatch: false }],
     'prettier/prettier': [
       'error',
       {

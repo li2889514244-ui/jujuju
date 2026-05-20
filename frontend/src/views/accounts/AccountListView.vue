@@ -382,7 +382,11 @@ function handleBindSuccess() {
 .account-list {
   display: flex; flex-direction: column; gap: $section-gap;
 
-  &__filter { /* GlassCard handles styling */ }
+  &__filter {
+    :deep(.el-form--inline .el-form-item) {
+      margin-right: $space-sm;
+    }
+  }
 
   &__actions {
     display: flex; gap: $space-sm; flex-wrap: wrap;
