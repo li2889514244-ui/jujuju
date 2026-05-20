@@ -82,9 +82,14 @@
 
     <!-- 空状态 -->
     <div class="dashboard__empty" v-if="accountRows.length === 0 && !loading">
-      <el-button type="primary" size="large" @click="$router.push('/accounts')"
-        >添加第一个账号</el-button
-      >
+      <div class="empty-state">
+        <div class="empty-state__icon">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#E60012" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#E60012" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#E60012" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+        </div>
+        <h3 class="empty-state__title">连接你的第一个账号</h3>
+        <p class="empty-state__desc">绑定社交媒体账号，开始矩阵管理与数据分析</p>
+        <el-button type="primary" size="large" @click="$router.push('/accounts')">添加账号</el-button>
+      </div>
     </div>
   </div>
 </template>
@@ -209,6 +214,13 @@ function exportCSV() {
     align-items: center;
     min-height: 60vh;
   }
+}
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center;
+  &__icon { opacity: 0.6; }
+  &__title { font-size: $text-headline; font-weight: 600; color: var(--el-text-color-primary); margin: 0; }
+  &__desc { font-size: $text-body; color: var(--el-text-color-secondary); margin: 0; max-width: 320px; }
 }
 
 // === Hero number ===

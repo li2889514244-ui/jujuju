@@ -28,10 +28,20 @@ small, .text-caption { font-size: $text-caption; color: var(--el-text-color-plac
 
 .el-button--primary { border-radius: 9999px; font-weight: 600; letter-spacing: -0.01em; }
 .el-card { border-radius: 16px; border: 1px solid var(--el-border-color); }
-.el-dialog { border-radius: 20px; border: 1px solid var(--el-border-color); }
-.el-dialog .el-dialog__header { padding: 24px 24px 0; }
-.el-dialog .el-dialog__body { padding: 24px; }
-.el-dialog .el-dialog__footer { padding: 0 24px 24px; }
+.el-dialog {
+  border-radius: 20px; border: 1px solid var(--el-border-color);
+  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+}
+.el-dialog__header {
+  padding: 28px 28px 0;
+  .el-dialog__title { font-size: 18px; font-weight: 600; }
+}
+.el-dialog__headerbtn {
+  top: 28px; right: 28px; width: 32px; height: 32px;
+  .el-dialog__close { color: var(--el-text-color-secondary); }
+}
+.el-dialog__body { padding: 24px 28px; color: var(--el-text-color-regular); }
+.el-dialog__footer { padding: 0 28px 28px; }
 .el-input__wrapper { border-radius: 10px; transition: all 0.2s; }
 .el-tag { border-radius: 9999px; }
 

@@ -113,7 +113,7 @@
     </div>
 
     <div v-if="enhancedAccounts.length === 0 && !loading" class="empty-state">
-      <el-icon :size="48" color="#48484a"><User /></el-icon>
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#E60012" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#E60012" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#E60012" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       <h3>暂无账号</h3>
       <p>添加你的第一个社交媒体账号</p>
     </div>
