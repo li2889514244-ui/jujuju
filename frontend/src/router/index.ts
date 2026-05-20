@@ -70,7 +70,7 @@ const routes: RouteRecordRaw[] = [
         path: 'team',
         name: 'Team',
         component: () => import('@/views/team/TeamView.vue'),
-        meta: { title: '团队管理', icon: 'UserFilled' },
+        meta: { title: '团队管理', icon: 'UserFilled', hidden: true },
       },
       {
         path: 'team/permissions',
@@ -94,7 +94,7 @@ const routes: RouteRecordRaw[] = [
         path: 'calendar',
         name: 'Calendar',
         component: () => import('@/views/calendar/CalendarView.vue'),
-        meta: { title: '内容日历', icon: 'Calendar' },
+        meta: { title: '内容日历', icon: 'Calendar', hidden: true },
       },
       {
         path: 'ai',

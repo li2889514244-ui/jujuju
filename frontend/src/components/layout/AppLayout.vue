@@ -3,13 +3,13 @@
     <Sidebar />
     <div class="app-layout__main">
       <Topbar />
-      <div class="app-layout__content">
+      <main class="app-layout__content" aria-label="主内容区">
         <router-view v-slot="{ Component }">
           <transition name="slide-up" mode="out-in" @after-enter="onPageEnter">
             <component :is="Component" />
           </transition>
         </router-view>
-      </div>
+      </main>
     </div>
   </div>
 </template>
