@@ -27,6 +27,8 @@
   --app-fill-color-light: rgba(255, 255, 255, 0.06);
   --app-overlay-hover: rgba(255, 255, 255, 0.08);
   --app-overlay-active: rgba(255, 255, 255, 0.12);
+  --section-gap: 64px;
+  --content-max-width: 1200px;
 }
 
 html.light {
@@ -54,6 +56,8 @@ html.light {
   --app-fill-color-light: rgba(0, 0, 0, 0.06);
   --app-overlay-hover: rgba(0, 0, 0, 0.06);
   --app-overlay-active: rgba(0, 0, 0, 0.1);
+  --section-gap: 64px;
+  --content-max-width: 1200px;
 }
 
 // === EP CSS 变量（深色默认，浅色覆写）===
@@ -118,11 +122,16 @@ html.light {
 html, body, #app {
   width: 100%; height: 100%;
   font-family: var(--el-font-family);
+  font-size: 15px;
+  line-height: 1.5;
   background: var(--app-bg-primary);
   color: var(--el-text-color-primary);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
+
+h1, h2, h3, h4, h5, h6 { line-height: 1.2; font-weight: 600; }
 
 body::before {
   content: '';
