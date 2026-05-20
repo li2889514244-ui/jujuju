@@ -1,47 +1,35 @@
 <template>
   <div class="dashboard">
-    <!-- Hero: 标题 + 控制 -->
-    <div class="dashboard__hero">
-      <div class="dashboard__hero-left">
-        <h2 class="dashboard__hero-title">账号总览</h2>
-        <span class="dashboard__hero-update">最后更新 {{ lastUpdate }}</span>
+    <!-- Hero KPI: 唯一的视觉焦点 -->
+    <div class="dashboard__hero-kpi" v-if="accountRows.length > 0">
+      <span class="hero-kpi__value">{{ formatNum(groupSummaryCards[0]?.rawValue || 0) }}</span>
+      <span class="hero-kpi__label">总粉丝</span>
+    </div>
+
+    <!-- 次级指标 + 操作（同一行，低调） -->
+    <div class="dashboard__sub-row" v-if="accountRows.length > 0">
+      <div class="dashboard__sub-kpis">
+        <span class="sub-kpi" v-for="card in groupSummaryCards.slice(1)" :key="card.label">
+          <b>{{ formatNum(card.rawValue) }}</b>
+          <small>{{ card.label }}</small>
+        </span>
       </div>
-      <div class="dashboard__hero-controls">
+      <div class="dashboard__sub-actions">
         <el-radio-group v-model="period" size="small" @change="onPeriodChange">
           <el-radio-button value="day">日</el-radio-button>
           <el-radio-button value="week">周</el-radio-button>
-          <el-radio-button value="month">月</el-radio-button>
         </el-radio-group>
-        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0">导出 CSV</el-button>
+        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0">导出</el-button>
         <el-button :icon="Refresh" size="small" circle @click="refreshAll" :loading="loading" />
       </div>
     </div>
 
-    <!-- 分组切换 -->
-    <div class="dashboard__tabs" v-if="accountGroups.length > 0">
-      <el-radio-group v-model="selectedGroup" size="small" @change="onGroupChange">
-        <el-radio-button value="all">全部 ({{ accountRows.length }})</el-radio-button>
-        <el-radio-button v-for="g in accountGroups" :key="g.name" :value="g.name">
-          {{ g.name || '未分组' }} ({{ g.accounts.length }})
-        </el-radio-button>
-      </el-radio-group>
-    </div>
-
-    <!-- KPI bento 网格: 2大 + 2小 -->
-    <div class="dashboard__kpi">
-      <StatCard
-        v-for="(card, i) in groupSummaryCards"
-        :key="card.label"
-        :label="card.label"
-        :value="card.rawValue"
-        :formatter="formatNum"
-        :trend="card.trend"
-        :accent-color="card.color"
-        :size="i < 2 ? 'lg' : 'md'"
-        :delay="i * 80"
-        class="stagger-item"
-        :class="i < 2 ? 'kpi--large' : 'kpi--small'"
-      />
+    <!-- 分组切换（有分组时才显示） -->
+    <div class="dashboard__groups" v-if="accountGroups.length > 1">
+      <el-select v-model="selectedGroup" size="small" @change="onGroupChange" placeholder="全部" style="width: 120px">
+        <el-option label="全部" value="all" />
+        <el-option v-for="g in accountGroups" :key="g.name" :label="g.name" :value="g.name" />
+      </el-select>
     </div>
 
     <!-- 图表区 -->
@@ -49,25 +37,26 @@
       <GlassCard class="stagger-item">
         <template #header>
           <div class="chart-header">
-            <span>粉丝增长趋势</span>
+            <span>增长趋势</span>
             <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
-              <el-radio-button :value="7">近7天</el-radio-button>
-              <el-radio-button :value="30">近30天</el-radio-button>
+              <el-radio-button :value="7">7天</el-radio-button>
+              <el-radio-button :value="30">30天</el-radio-button>
             </el-radio-group>
           </div>
         </template>
-        <DataChart :option="followerChartOption" :height="320" />
+        <DataChart :option="followerChartOption" :height="280" />
       </GlassCard>
       <GlassCard title="平台分布" class="stagger-item">
-        <DataChart :option="platformChartOption" :height="320" />
+        <DataChart :option="platformChartOption" :height="280" />
       </GlassCard>
     </div>
 
     <!-- 账号卡片网格 -->
     <div class="dashboard__accounts" v-if="accountRows.length > 0">
       <div class="section-header">
-        <span class="section-header__title">账号 · {{ accountRows.length }} 个</span>
-        <router-link to="/accounts" class="section-header__link">查看全部 →</router-link>
+        <span class="section-header__title">账号</span>
+        <span class="section-header__count">{{ accountRows.length }}</span>
+        <router-link to="/accounts" class="section-header__link">全部 →</router-link>
       </div>
       <div class="account-grid">
         <router-link
@@ -75,31 +64,17 @@
           :key="acc.id"
           :to="`/accounts/${acc.id}`"
           class="account-card stagger-item"
-          :style="{ animationDelay: `${i * 60}ms` }"
         >
-          <el-avatar :size="44" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
-          <div class="account-card__info">
-            <span class="account-card__name">{{ acc.nickname }}</span>
-            <span class="account-card__platform">
-              <PlatformBadge :platform="acc.platform" size="sm" />
-            </span>
-          </div>
-          <div class="account-card__stat">
-            <span class="account-card__stat-value">{{ formatNum(acc.followers) }}</span>
-            <span class="account-card__stat-label">粉丝</span>
-          </div>
+          <el-avatar :size="36" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
+          <span class="account-card__name">{{ acc.nickname }}</span>
+          <PlatformBadge :platform="acc.platform" size="sm" />
         </router-link>
       </div>
     </div>
 
     <!-- 空状态 -->
     <div class="dashboard__empty" v-if="accountRows.length === 0 && !loading">
-      <div class="empty-state">
-        <el-icon :size="48" color="#48484a"><Monitor /></el-icon>
-        <h3>还没有绑定账号</h3>
-        <p>连接你的社交媒体账号，开始矩阵管理</p>
-        <el-button type="primary" @click="$router.push('/accounts')">添加账号</el-button>
-      </div>
+      <el-button type="primary" size="large" @click="$router.push('/accounts')">添加第一个账号</el-button>
     </div>
   </div>
 </template>
@@ -107,9 +82,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
-import { Refresh, Monitor } from '@element-plus/icons-vue'
+import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
-import StatCard from '@/components/common/StatCard.vue'
 import GlassCard from '@/components/common/GlassCard.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import { analyticsApi } from '@/api/analytics'
@@ -321,23 +295,26 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 .dashboard {
   display: flex; flex-direction: column; gap: $section-gap;
 
-  // === Hero ===
-  &__hero {
-    display: flex; justify-content: space-between; align-items: flex-start;
-    &-left { display: flex; flex-direction: column; gap: $space-xs; }
-    &-title { font-size: $text-hero; font-weight: 700; letter-spacing: -0.03em; margin: 0; color: var(--app-text-primary); }
-    &-update { font-size: $text-caption; color: var(--app-text-tertiary); }
-    &-controls { display: flex; align-items: center; gap: $space-sm; }
+  // === Hero KPI — THE focal point ===
+  &__hero-kpi {
+    display: flex; flex-direction: column; align-items: center; gap: $space-sm;
+    padding: $space-3xl 0 $space-xl;
   }
 
-  // === Group tabs ===
-  &__tabs { margin-top: -#{$space-xl}; }
+  // === Sub KPIs + actions ===
+  &__sub-row {
+    display: flex; justify-content: center; align-items: center; gap: $space-2xl;
+  }
+  &__sub-kpis {
+    display: flex; gap: $space-2xl;
+  }
+  &__sub-actions {
+    display: flex; align-items: center; gap: $space-sm;
+  }
 
-  // === KPI bento grid ===
-  &__kpi {
-    display: grid;
-    grid-template-columns: 2fr 2fr 1fr 1fr;
-    gap: $space-lg;
+  // === Groups ===
+  &__groups {
+    display: flex; justify-content: center;
   }
 
   // === Charts ===
@@ -352,18 +329,41 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
     display: flex; flex-direction: column; gap: $space-lg;
   }
 
-  // === Empty state ===
+  // === Empty ===
   &__empty {
-    padding: $space-4xl 0;
-    display: flex; justify-content: center;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 60vh;
   }
+}
+
+// === Hero number ===
+.hero-kpi {
+  &__value {
+    font-size: 80px; font-weight: 700;
+    color: var(--app-text-primary);
+    letter-spacing: -0.04em; line-height: 1;
+    font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums;
+  }
+  &__label {
+    font-size: $text-body;
+    color: var(--app-text-tertiary);
+    text-transform: uppercase; letter-spacing: 0.1em;
+  }
+}
+
+// === Secondary KPI line ===
+.sub-kpi {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  b { font-size: $text-headline; font-weight: 700; color: var(--app-text-primary); font-feature-settings: 'tnum'; }
+  small { font-size: $text-micro; color: var(--app-text-tertiary); text-transform: uppercase; }
 }
 
 // === Section header ===
 .section-header {
-  display: flex; justify-content: space-between; align-items: baseline;
-  &__title { font-size: $text-headline; font-weight: 600; color: var(--app-text-primary); }
-  &__link { font-size: $text-body; color: #0a84ff; text-decoration: none; font-weight: 500;
+  display: flex; align-items: baseline; gap: $space-sm;
+  &__title { font-size: $text-body; font-weight: 600; color: var(--app-text-primary); text-transform: uppercase; letter-spacing: 0.06em; }
+  &__count { font-size: $text-caption; color: var(--app-text-tertiary); }
+  &__link { font-size: $text-caption; color: #0a84ff; text-decoration: none; font-weight: 500; margin-left: auto;
     &:hover { text-decoration: underline; }
   }
 }
@@ -375,49 +375,31 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 .account-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: $space-md;
+  gap: $space-sm;
 }
 
 .account-card {
   display: flex; align-items: center; gap: $space-sm;
-  padding: $space-lg;
-  border-radius: $radius-lg;
+  padding: $space-md $space-lg;
+  border-radius: $radius-md;
   background: var(--app-glass-bg);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   border: 1px solid var(--app-border);
   text-decoration: none;
-  transition: all 0.35s $ease-spring;
+  transition: all 0.2s $ease-out;
   cursor: pointer;
 
   &:hover {
-    transform: translateY(-2px);
-    border-color: var(--app-border-strong);
-    box-shadow: var(--app-shadow-md);
+    border-color: #0a84ff;
+    background: rgba(#0a84ff, 0.04);
   }
 
-  &__info {
-    flex: 1; min-width: 0;
-    display: flex; flex-direction: column; gap: 2px;
-  }
   &__name {
+    flex: 1;
     font-size: $text-body; font-weight: 590; color: var(--app-text-primary);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    min-width: 0;
   }
-  &__platform { display: flex; align-items: center; }
-  &__stat {
-    display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
-    flex-shrink: 0;
-  }
-  &__stat-value { font-size: $text-title; font-weight: 700; color: var(--app-text-primary); }
-  &__stat-label { font-size: $text-micro; color: var(--app-text-tertiary); text-transform: uppercase; }
-}
-
-// === Empty state ===
-.empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: $space-md;
-  text-align: center;
-  h3 { font-size: $text-headline; font-weight: 600; color: var(--app-text-primary); margin: 0; }
-  p { font-size: $text-body; color: var(--app-text-tertiary); margin: 0; }
 }
 </style>
