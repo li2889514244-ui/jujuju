@@ -11,7 +11,13 @@
         </div>
       </template>
 
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="content-editor__form">
+      <el-form
+        ref="formRef"
+        :model="form"
+        :rules="rules"
+        label-width="100px"
+        class="content-editor__form"
+      >
         <!-- Video Upload -->
         <el-form-item label="视频文件" prop="videoFile">
           <FileUpload
@@ -76,7 +82,13 @@
               <el-tag
                 v-for="(item, idx) in reviewHighlights"
                 :key="idx"
-                :type="item.severity === 'HIGH' ? 'danger' : item.severity === 'MEDIUM' ? 'warning' : 'info'"
+                :type="
+                  item.severity === 'HIGH'
+                    ? 'danger'
+                    : item.severity === 'MEDIUM'
+                      ? 'warning'
+                      : 'info'
+                "
                 size="small"
                 style="margin: 4px"
               >

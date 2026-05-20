@@ -1,5 +1,11 @@
 <template>
-  <div ref="chartRef" class="data-chart" :style="{ height: height + 'px' }" role="img" aria-label="数据图表"></div>
+  <div
+    ref="chartRef"
+    class="data-chart"
+    :style="{ height: height + 'px' }"
+    role="img"
+    aria-label="数据图表"
+  ></div>
 </template>
 
 <script setup lang="ts">
@@ -36,7 +42,7 @@ const props = withDefaults(
     height?: number
     autoResize?: boolean
   }>(),
-  { height: 400, autoResize: true }
+  { height: 400, autoResize: true },
 )
 
 const chartRef = ref<HTMLElement>()
@@ -62,7 +68,7 @@ watch(
   (newOption) => {
     chartInstance.value?.setOption(newOption, true)
   },
-  { deep: true }
+  { deep: true },
 )
 
 onUnmounted(() => {

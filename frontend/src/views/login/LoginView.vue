@@ -7,100 +7,82 @@
       </div>
 
       <div class="login__switch">
-        <button :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">登录</button>
-        <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">注册</button>
+        <button :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">
+          登录
+        </button>
+        <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">
+          注册
+        </button>
       </div>
       <div v-show="activeTab === 'login'">
-          <el-form
-            ref="loginFormRef"
-            :model="loginForm"
-            :rules="loginRules"
-            label-width="0"
-            size="large"
-            @submit.prevent="handleLogin"
-          >
-            <el-form-item prop="email">
-              <el-input
-                v-model="loginForm.email"
-                placeholder="邮箱"
-                :prefix-icon="Message"
-              />
-            </el-form-item>
-            <el-form-item prop="password">
-              <el-input
-                v-model="loginForm.password"
-                type="password"
-                placeholder="密码"
-                :prefix-icon="Lock"
-                show-password
-                @keyup.enter="handleLogin"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                type="primary"
-                :loading="loading"
-                class="login__btn"
-                @click="handleLogin"
-              >
-                登录
-              </el-button>
-            </el-form-item>
-          </el-form>
+        <el-form
+          ref="loginFormRef"
+          :model="loginForm"
+          :rules="loginRules"
+          label-width="0"
+          size="large"
+          @submit.prevent="handleLogin"
+        >
+          <el-form-item prop="email">
+            <el-input v-model="loginForm.email" placeholder="邮箱" :prefix-icon="Message" />
+          </el-form-item>
+          <el-form-item prop="password">
+            <el-input
+              v-model="loginForm.password"
+              type="password"
+              placeholder="密码"
+              :prefix-icon="Lock"
+              show-password
+              @keyup.enter="handleLogin"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="loading" class="login__btn" @click="handleLogin">
+              登录
+            </el-button>
+          </el-form-item>
+        </el-form>
       </div>
       <div v-show="activeTab === 'register'">
-          <el-form
-            ref="registerFormRef"
-            :model="registerForm"
-            :rules="registerRules"
-            label-width="0"
-            size="large"
-            @submit.prevent="handleRegister"
-          >
-            <el-form-item prop="name">
-              <el-input
-                v-model="registerForm.name"
-                placeholder="用户名 / 昵称"
-                :prefix-icon="User"
-              />
-            </el-form-item>
-            <el-form-item prop="email">
-              <el-input
-                v-model="registerForm.email"
-                placeholder="邮箱"
-                :prefix-icon="Message"
-              />
-            </el-form-item>
-            <el-form-item prop="password">
-              <el-input
-                v-model="registerForm.password"
-                type="password"
-                placeholder="密码"
-                :prefix-icon="Lock"
-                show-password
-              />
-            </el-form-item>
-            <el-form-item prop="confirmPassword">
-              <el-input
-                v-model="registerForm.confirmPassword"
-                type="password"
-                placeholder="确认密码"
-                :prefix-icon="Lock"
-                show-password
-                @keyup.enter="handleRegister"
-              />
-            </el-form-item>
-            <el-form-item>
-              <el-button
-                type="primary"
-                :loading="loading"
-                class="login__btn"
-                @click="handleRegister"
-              >
-                注册
-              </el-button>
-            </el-form-item>
-          </el-form>
+        <el-form
+          ref="registerFormRef"
+          :model="registerForm"
+          :rules="registerRules"
+          label-width="0"
+          size="large"
+          @submit.prevent="handleRegister"
+        >
+          <el-form-item prop="name">
+            <el-input v-model="registerForm.name" placeholder="用户名 / 昵称" :prefix-icon="User" />
+          </el-form-item>
+          <el-form-item prop="email">
+            <el-input v-model="registerForm.email" placeholder="邮箱" :prefix-icon="Message" />
+          </el-form-item>
+          <el-form-item prop="password">
+            <el-input
+              v-model="registerForm.password"
+              type="password"
+              placeholder="密码"
+              :prefix-icon="Lock"
+              show-password
+            />
+          </el-form-item>
+          <el-form-item prop="confirmPassword">
+            <el-input
+              v-model="registerForm.confirmPassword"
+              type="password"
+              placeholder="确认密码"
+              :prefix-icon="Lock"
+              show-password
+              @keyup.enter="handleRegister"
+            />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="loading" class="login__btn" @click="handleRegister">
+              注册
+            </el-button>
+          </el-form-item>
+        </el-form>
       </div>
     </div>
   </div>
@@ -142,7 +124,11 @@ const loginRules: FormRules = {
   ],
 }
 
-const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
+const validateConfirmPassword = (
+  _rule: unknown,
+  value: string,
+  callback: (error?: Error) => void,
+) => {
   if (value !== registerForm.password) {
     callback(new Error('两次密码不一致'))
   } else {
@@ -219,7 +205,8 @@ async function handleRegister() {
 
   &::before {
     content: '';
-    position: fixed; inset: 0;
+    position: fixed;
+    inset: 0;
     background:
       radial-gradient(ellipse 60% 40% at 50% 0%, rgba(#0a84ff, 0.06) 0%, transparent 60%),
       radial-gradient(ellipse 40% 30% at 80% 100%, rgba(#bf5af2, 0.04) 0%, transparent 60%);
@@ -259,17 +246,22 @@ async function handleRegister() {
   }
 
   &__switch {
-    display: flex; gap: 0;
+    display: flex;
+    gap: 0;
     margin-bottom: 24px;
     background: var(--app-overlay-hover);
     border-radius: $radius-md;
     padding: 3px;
     button {
-      flex: 1; padding: 8px 0;
-      border: none; border-radius: $radius-sm;
+      flex: 1;
+      padding: 8px 0;
+      border: none;
+      border-radius: $radius-sm;
       background: transparent;
       color: var(--app-text-tertiary);
-      font-size: $text-body; font-weight: 500; cursor: pointer;
+      font-size: $text-body;
+      font-weight: 500;
+      cursor: pointer;
       transition: all 0.2s ease;
       &.active {
         background: var(--app-bg-elevated);

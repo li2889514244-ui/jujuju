@@ -40,7 +40,9 @@
         </div>
       </div>
 
-      <p class="scan-bind__hint">本地 Chrome 窗口已打开，请用「{{ selectedPlatformLabel }}」App 扫描窗口中的二维码</p>
+      <p class="scan-bind__hint">
+        本地 Chrome 窗口已打开，请用「{{ selectedPlatformLabel }}」App 扫描窗口中的二维码
+      </p>
 
       <div class="scan-bind__actions">
         <el-button @click="handleCancel">取消</el-button>
@@ -87,7 +89,7 @@ import { useUserStore } from '@/store/user'
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{
   'update:visible': [value: boolean]
-  'success': []
+  success: []
 }>()
 
 const userStore = useUserStore()
@@ -117,17 +119,20 @@ let eventSource: EventSource | null = null
 let scanTimeout: ReturnType<typeof setTimeout> | null = null
 
 const selectedPlatformLabel = computed(() => {
-  return platforms.find(p => p.value === selectedPlatform.value)?.label || ''
+  return platforms.find((p) => p.value === selectedPlatform.value)?.label || ''
 })
 
-watch(() => props.visible, (val) => {
-  if (val) {
-    step.value = 'select'
-    resetState()
-  } else {
-    disconnectSSE()
-  }
-})
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) {
+      step.value = 'select'
+      resetState()
+    } else {
+      disconnectSSE()
+    }
+  },
+)
 
 onUnmounted(() => {
   disconnectSSE()

@@ -67,5 +67,5 @@ export const useUserStore = defineStore(
       paths: ['token', 'refreshToken', 'userInfo'],
       storage: sessionStorage,
     },
-  }
+  },
 )

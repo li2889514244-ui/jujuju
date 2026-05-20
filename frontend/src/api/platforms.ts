@@ -68,7 +68,12 @@ export const platformsApi = {
   },
 
   /** 获取已授权平台账号列表 */
-  getAuthorizedAccounts(params?: { platform?: string; teamId?: string; skip?: number; take?: number }) {
+  getAuthorizedAccounts(params?: {
+    platform?: string
+    teamId?: string
+    skip?: number
+    take?: number
+  }) {
     return get<{ accounts: AuthorizedAccount[]; total: number; skip: number; take: number }>(
       '/platforms/accounts',
       params as Record<string, unknown>,

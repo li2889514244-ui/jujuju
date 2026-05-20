@@ -18,7 +18,7 @@ export function useBatchSelection<T extends { id: string }>() {
   }
 
   function selectAll(items: T[]) {
-    selectedIds.value = new Set(items.map(i => i.id))
+    selectedIds.value = new Set(items.map((i) => i.id))
   }
 
   function clearSelection() {

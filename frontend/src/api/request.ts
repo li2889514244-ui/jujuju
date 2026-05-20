@@ -1,4 +1,9 @@
-import axios, { type AxiosInstance, type AxiosRequestConfig, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
+import axios, {
+  type AxiosInstance,
+  type AxiosRequestConfig,
+  type AxiosResponse,
+  type InternalAxiosRequestConfig,
+} from 'axios'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import type { ApiResponse } from '@/types'
@@ -18,7 +23,7 @@ service.interceptors.request.use(
     }
     return config
   },
-  (error) => Promise.reject(error)
+  (error) => Promise.reject(error),
 )
 
 // Response interceptor
@@ -67,7 +72,9 @@ service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
     if (res.code !== 0 && res.code !== 200) {
-      if (!response.config.url?.includes('/notifications')) { ElMessage.error(res.message || '请求失败') }
+      if (!response.config.url?.includes('/notifications')) {
+        ElMessage.error(res.message || '请求失败')
+      }
       if (res.code === 401) {
         return handleTokenRefresh(response)
       }
@@ -80,25 +87,42 @@ service.interceptors.response.use(
       return handleTokenRefresh(error.response)
     }
     const isNotif = error.config?.url?.includes('/notifications')
-    if (!isNotif) { ElMessage.error(error.response?.data?.message || error.message || '网络错误') }
+    if (!isNotif) {
+      ElMessage.error(error.response?.data?.message || error.message || '网络错误')
+    }
     return Promise.reject(error)
-  }
+  },
 )
 
 // Helper methods - return ApiResponse<T> directly (unwrapped from AxiosResponse)
-export function get<T = unknown>(url: string, params?: Record<string, unknown>, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+export function get<T = unknown>(
+  url: string,
+  params?: Record<string, unknown>,
+  config?: AxiosRequestConfig,
+): Promise<ApiResponse<T>> {
   return service.get<ApiResponse<T>>(url, { params, ...config }).then((res) => res.data)
 }
 
-export function post<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+export function post<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<ApiResponse<T>> {
   return service.post<ApiResponse<T>>(url, data, config).then((res) => res.data)
 }
 
-export function put<T = unknown>(url: string, data?: unknown, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+export function put<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<ApiResponse<T>> {
   return service.put<ApiResponse<T>>(url, data, config).then((res) => res.data)
 }
 
-export function del<T = unknown>(url: string, config?: AxiosRequestConfig): Promise<ApiResponse<T>> {
+export function del<T = unknown>(
+  url: string,
+  config?: AxiosRequestConfig,
+): Promise<ApiResponse<T>> {
   return service.delete<ApiResponse<T>>(url, config).then((res) => res.data)
 }
 

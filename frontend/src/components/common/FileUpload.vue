@@ -38,7 +38,13 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import type { UploadFile, UploadFiles, UploadInstance, UploadRawFile, UploadUserFile } from 'element-plus'
+import type {
+  UploadFile,
+  UploadFiles,
+  UploadInstance,
+  UploadRawFile,
+  UploadUserFile,
+} from 'element-plus'
 
 const props = withDefaults(
   defineProps<{
@@ -60,7 +66,7 @@ const props = withDefaults(
     autoUpload: true,
     drag: false,
     showFileList: true,
-  }
+  },
 )
 
 const emit = defineEmits<{

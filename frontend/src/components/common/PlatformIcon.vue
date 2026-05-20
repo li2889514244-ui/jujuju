@@ -19,14 +19,16 @@ const props = withDefaults(
     showLabel?: boolean
     size?: 'small' | 'default' | 'large' | number
   }>(),
-  { showLabel: false, size: 'default' }
+  { showLabel: false, size: 'default' },
 )
 
 const normalizedPlatform = computed(() => toFrontend(props.platform) as string)
 
 const platformColor = computed(() => getPlatformColor(normalizedPlatform.value))
 const platformChar = computed(() => getPlatformChar(normalizedPlatform.value))
-const platformLabel = computed(() => (PLATFORM_LABELS as Record<string, string>)[normalizedPlatform.value] || props.platform)
+const platformLabel = computed(
+  () => (PLATFORM_LABELS as Record<string, string>)[normalizedPlatform.value] || props.platform,
+)
 
 const iconSize = computed(() => {
   if (typeof props.size === 'number') return `${props.size}px`

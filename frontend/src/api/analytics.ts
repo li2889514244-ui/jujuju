@@ -53,7 +53,11 @@ export const analyticsApi = {
     }>('/analytics/comparison')
   },
 
-  getViewsRanking(params?: { limit?: number; period?: 'week' | 'month' | 'all'; platform?: string }) {
+  getViewsRanking(params?: {
+    limit?: number
+    period?: 'week' | 'month' | 'all'
+    platform?: string
+  }) {
     return get<{
       ranking: Array<{
         rank: number
@@ -76,7 +80,9 @@ export const analyticsApi = {
   // 触发桌面伴侣采集真实数据（伴侣在本地 localhost:5409 运行）
   async triggerRealDataCollection() {
     try {
-      const resp = await fetch('http://localhost:5409/api/data-collection/trigger', { method: 'POST' })
+      const resp = await fetch('http://localhost:5409/api/data-collection/trigger', {
+        method: 'POST',
+      })
       const json = await resp.json()
       return json
     } catch {

@@ -18,7 +18,12 @@
         <el-form-item label="平台">
           <el-select v-model="platform" placeholder="全部平台" clearable style="width: 140px">
             <el-option label="全部" value="" />
-            <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+            <el-option
+              v-for="(label, key) in PLATFORM_LABELS"
+              :key="key"
+              :label="label"
+              :value="key"
+            />
           </el-select>
         </el-form-item>
         <el-form-item>
@@ -79,13 +84,19 @@
     </el-card>
 
     <!-- Cross-Platform Comparison -->
-    <el-card shadow="hover" v-if="reportData && crossPlatformItems.length > 0" class="report__section">
+    <el-card
+      shadow="hover"
+      v-if="reportData && crossPlatformItems.length > 0"
+      class="report__section"
+    >
       <template #header>
         <span>跨平台内容对比</span>
-        <span style="font-size:12px;color:#6e6e73;margin-left:8px">同一内容在不同平台的表现</span>
+        <span style="font-size: 12px; color: #6e6e73; margin-left: 8px"
+          >同一内容在不同平台的表现</span
+        >
       </template>
-      <div v-for="(group, gi) in crossPlatformItems" :key="gi" style="margin-bottom:16px">
-        <div style="font-weight:600;margin-bottom:8px;color:#f5f5f7">{{ group.title }}</div>
+      <div v-for="(group, gi) in crossPlatformItems" :key="gi" style="margin-bottom: 16px">
+        <div style="font-weight: 600; margin-bottom: 8px; color: #f5f5f7">{{ group.title }}</div>
         <el-table :data="group.items" stripe size="small">
           <el-table-column label="平台" width="100">
             <template #default="{ row }">
@@ -186,7 +197,12 @@ const trendChart = computed(() => {
     xAxis: { type: 'category' as const, data: dates },
     yAxis: { type: 'value' as const },
     series: [
-      { name: '粉丝', type: 'line' as const, smooth: true, data: dates.map((d) => byDate[d]?.followers || 0) },
+      {
+        name: '粉丝',
+        type: 'line' as const,
+        smooth: true,
+        data: dates.map((d) => byDate[d]?.followers || 0),
+      },
       { name: '播放', type: 'bar' as const, data: dates.map((d) => byDate[d]?.views || 0) },
       { name: '点赞', type: 'bar' as const, data: dates.map((d) => byDate[d]?.likes || 0) },
     ],
@@ -219,8 +235,13 @@ async function exportExcel() {
     const postRows = [
       ['标题', '平台', '账号', '播放', '点赞', '评论', '分享'],
       ...reportData.value.topPosts.map((p: any) => [
-        p.title, PLATFORM_LABELS[p.platform] || p.platform, p.account,
-        p.views, p.likes, p.comments, p.shares,
+        p.title,
+        PLATFORM_LABELS[p.platform] || p.platform,
+        p.account,
+        p.views,
+        p.likes,
+        p.comments,
+        p.shares,
       ]),
     ]
     const ws2 = XLSX.utils.aoa_to_sheet(postRows)
@@ -234,7 +255,11 @@ async function exportExcel() {
           dayjs(d.date).format('YYYY-MM-DD'),
           d.account?.nickname || '',
           d.account?.platform || '',
-          d.followers, d.views, d.likes, d.comments, d.shares,
+          d.followers,
+          d.views,
+          d.likes,
+          d.comments,
+          d.shares,
         ]),
       ]
       const ws3 = XLSX.utils.aoa_to_sheet(trendRows)
@@ -242,7 +267,9 @@ async function exportExcel() {
     }
 
     const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-    const blob = new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const blob = new Blob([buf], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url

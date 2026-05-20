@@ -24,9 +24,12 @@ function onPageEnter() {
       const htmlEl = el as HTMLElement
       htmlEl.style.transitionDelay = `${i * 50}ms`
       htmlEl.classList.add('stagger-visible')
-      setTimeout(() => {
-        htmlEl.style.transitionDelay = '0ms'
-      }, 600 + i * 50)
+      setTimeout(
+        () => {
+          htmlEl.style.transitionDelay = '0ms'
+        },
+        600 + i * 50,
+      )
     })
   })
 }
@@ -36,21 +39,32 @@ function onPageEnter() {
 @import '@/assets/styles/variables';
 
 .app-layout {
-  display: flex; width: 100%; height: 100vh; overflow: hidden;
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
   background: var(--app-bg-primary);
 
   &__main {
-    flex: 1; display: flex; flex-direction: column;
-    overflow: hidden; position: relative; z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
   }
 
   &__content {
-    flex: 1; overflow-y: auto; overflow-x: hidden;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: $space-2xl $space-3xl;
     max-width: var(--content-max-width, 1200px);
     margin: 0 auto;
     width: 100%;
-    &::-webkit-scrollbar { width: 4px; }
+    &::-webkit-scrollbar {
+      width: 4px;
+    }
   }
 }
 </style>

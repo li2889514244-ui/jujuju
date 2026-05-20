@@ -19,14 +19,22 @@
           <el-radio-button value="day">日</el-radio-button>
           <el-radio-button value="week">周</el-radio-button>
         </el-radio-group>
-        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0">导出</el-button>
+        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0"
+          >导出</el-button
+        >
         <el-button :icon="Refresh" size="small" circle @click="refreshAll" :loading="loading" />
       </div>
     </div>
 
     <!-- 分组切换（有分组时才显示） -->
     <div class="dashboard__groups" v-if="accountGroups.length > 1">
-      <el-select v-model="selectedGroup" size="small" @change="onGroupChange" placeholder="全部" style="width: 120px">
+      <el-select
+        v-model="selectedGroup"
+        size="small"
+        @change="onGroupChange"
+        placeholder="全部"
+        style="width: 120px"
+      >
         <el-option label="全部" value="all" />
         <el-option v-for="g in accountGroups" :key="g.name" :label="g.name" :value="g.name" />
       </el-select>
@@ -74,7 +82,9 @@
 
     <!-- 空状态 -->
     <div class="dashboard__empty" v-if="accountRows.length === 0 && !loading">
-      <el-button type="primary" size="large" @click="$router.push('/accounts')">添加第一个账号</el-button>
+      <el-button type="primary" size="large" @click="$router.push('/accounts')"
+        >添加第一个账号</el-button
+      >
     </div>
   </div>
 </template>
@@ -89,52 +99,84 @@ import { useDashboard } from '@/composables/useDashboard'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
 
 const {
-  period, loading, trendDays, selectedGroup,
-  accountRows, accountGroups,
-  displayAccounts, groupSummaryCards,
-  refreshAll, loadFollowerTrend, onPeriodChange, onGroupChange,
-  followerChartOption, platformChartOption,
+  period,
+  loading,
+  trendDays,
+  selectedGroup,
+  accountRows,
+  accountGroups,
+  displayAccounts,
+  groupSummaryCards,
+  refreshAll,
+  loadFollowerTrend,
+  onPeriodChange,
+  onGroupChange,
+  followerChartOption,
+  platformChartOption,
 } = useDashboard()
 
 function exportCSV() {
   const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
-  const rows = accountRows.value.map(r => [
-    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, tokenStatusLabel(r)
+  const rows = accountRows.value.map((r) => [
+    r.nickname,
+    r.platform,
+    r.followers,
+    r.views,
+    r.likes,
+    r.comments,
+    r.shares,
+    r.postCount,
+    tokenStatusLabel(r),
   ])
-  const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
+  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url; a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`
+  a.click()
   URL.revokeObjectURL(url)
 }
 </script>
 
 <style lang="scss" scoped>
 .dashboard {
-  display: flex; flex-direction: column; gap: $section-gap;
+  display: flex;
+  flex-direction: column;
+  gap: $section-gap;
 
   // === Hero KPI — THE focal point ===
   &__hero-kpi {
-    display: flex; flex-direction: column; align-items: center; gap: $space-sm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: $space-sm;
     padding: $space-3xl 0 $space-xl;
   }
 
   // === Sub KPIs + actions ===
   &__sub-row {
-    display: flex; justify-content: center; align-items: flex-end; gap: $space-2xl;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    gap: $space-2xl;
   }
   &__sub-kpis {
-    display: flex; gap: $space-3xl;
+    display: flex;
+    gap: $space-3xl;
   }
   &__sub-actions {
-    display: flex; align-items: center; gap: $space-sm;
+    display: flex;
+    align-items: center;
+    gap: $space-sm;
     padding-left: $space-2xl;
     border-left: 1px solid var(--app-separator);
   }
 
   // === Groups ===
   &__groups {
-    display: flex; justify-content: center;
+    display: flex;
+    justify-content: center;
   }
 
   // === Charts ===
@@ -146,12 +188,16 @@ function exportCSV() {
 
   // === Account cards ===
   &__accounts {
-    display: flex; flex-direction: column; gap: $space-lg;
+    display: flex;
+    flex-direction: column;
+    gap: $space-lg;
   }
 
   // === Empty ===
   &__empty {
-    display: flex; justify-content: center; align-items: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
     min-height: 60vh;
   }
 }
@@ -159,37 +205,75 @@ function exportCSV() {
 // === Hero number ===
 .hero-kpi {
   &__value {
-    font-size: 80px; font-weight: 700;
+    font-size: 80px;
+    font-weight: 700;
     color: var(--app-text-primary);
-    letter-spacing: -0.04em; line-height: 1;
-    font-feature-settings: 'tnum'; font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+    font-feature-settings: 'tnum';
+    font-variant-numeric: tabular-nums;
   }
   &__label {
     font-size: $text-body;
     color: var(--app-text-tertiary);
-    text-transform: uppercase; letter-spacing: 0.1em;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
   }
 }
 
 // === Secondary KPI line ===
 .sub-kpi {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  b { font-size: $text-headline; font-weight: 700; color: var(--app-text-primary); font-feature-settings: 'tnum'; }
-  small { font-size: $text-micro; color: var(--app-text-tertiary); text-transform: uppercase; }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  b {
+    font-size: $text-headline;
+    font-weight: 700;
+    color: var(--app-text-primary);
+    font-feature-settings: 'tnum';
+  }
+  small {
+    font-size: $text-micro;
+    color: var(--app-text-tertiary);
+    text-transform: uppercase;
+  }
 }
 
 // === Section header ===
 .section-header {
-  display: flex; align-items: baseline; gap: $space-sm;
-  &__title { font-size: $text-micro; font-weight: 600; color: var(--app-text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
-  &__count { font-size: $text-caption; color: var(--app-text-tertiary); }
-  &__link { font-size: $text-caption; color: #0a84ff; text-decoration: none; font-weight: 500; margin-left: auto;
-    &:hover { text-decoration: underline; }
+  display: flex;
+  align-items: baseline;
+  gap: $space-sm;
+  &__title {
+    font-size: $text-micro;
+    font-weight: 600;
+    color: var(--app-text-tertiary);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  &__count {
+    font-size: $text-caption;
+    color: var(--app-text-tertiary);
+  }
+  &__link {
+    font-size: $text-caption;
+    color: #0a84ff;
+    text-decoration: none;
+    font-weight: 500;
+    margin-left: auto;
+    &:hover {
+      text-decoration: underline;
+    }
   }
 }
 
 // === Chart header ===
-.chart-header { display: flex; justify-content: space-between; align-items: center; }
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
 
 // === Account grid ===
 .account-grid {
@@ -199,7 +283,9 @@ function exportCSV() {
 }
 
 .account-card {
-  display: flex; align-items: center; gap: $space-sm;
+  display: flex;
+  align-items: center;
+  gap: $space-sm;
   padding: $space-md $space-lg;
   border-radius: $radius-md;
   background: var(--app-glass-bg);
@@ -217,8 +303,12 @@ function exportCSV() {
 
   &__name {
     flex: 1;
-    font-size: $text-body; font-weight: 600; color: var(--app-text-primary);
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: $text-body;
+    font-weight: 600;
+    color: var(--app-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     min-width: 0;
   }
 }
