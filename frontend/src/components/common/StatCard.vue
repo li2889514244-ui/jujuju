@@ -1,5 +1,5 @@
 <template>
-  <GlassCard :padding="size === 'lg' ? 'lg' : 'md'" class="stat-card">
+  <GlassCard :padding="size === 'lg' ? 'lg' : 'md'" class="stat-card" :class="{ 'stat-card--lg': size === 'lg' }">
     <div class="stat-card__accent" :style="{ background: accentColor }" />
     <div class="stat-card__content">
       <span class="stat-card__label">{{ label }}</span>
@@ -79,24 +79,34 @@ const displayValue = computed(() =>
   }
 
   &__label {
-    font-size: 13px;
-    color: #6e6e73;
-    margin-bottom: 6px;
+    font-size: $text-caption;
+    color: var(--app-text-tertiary);
+    margin-bottom: $space-xs;
     display: block;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
   }
 
   &__value {
     font-size: 28px;
     font-weight: 700;
-    color: #f5f5f7;
-    letter-spacing: -0.02em;
+    color: var(--app-text-primary);
+    letter-spacing: -0.03em;
     line-height: 1.1;
+    font-feature-settings: 'tnum';
+    font-variant-numeric: tabular-nums;
+  }
+
+  // Stripe-style large KPI mode
+  &--lg &__value {
+    font-size: 48px;
+    font-weight: 700;
   }
 
   &__trend {
-    font-size: 12px;
+    font-size: $text-micro;
     font-weight: 500;
-    margin-top: 8px;
+    margin-top: $space-sm;
     display: inline-flex;
     align-items: center;
     gap: 2px;
@@ -104,7 +114,6 @@ const displayValue = computed(() =>
     border-radius: $radius-full;
     background: rgba(#30d158, 0.1);
     color: #30d158;
-    transition: all 0.25s ease;
 
     &--down {
       background: rgba(#ff453a, 0.1);
@@ -113,7 +122,7 @@ const displayValue = computed(() =>
   }
 
   &__chart {
-    margin-top: 12px;
+    margin-top: $space-sm;
   }
 }
 </style>

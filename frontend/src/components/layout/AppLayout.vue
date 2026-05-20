@@ -46,8 +46,10 @@ function onPageEnter() {
 
   &__content {
     flex: 1; overflow-y: auto; overflow-x: hidden;
-    padding: 28px 32px;
-    // Apple-style content area
+    padding: $space-2xl $space-3xl;
+    max-width: var(--content-max-width, 1200px);
+    margin: 0 auto;
+    width: 100%;
     &::-webkit-scrollbar { width: 4px; }
   }
 }

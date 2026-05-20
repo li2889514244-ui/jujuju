@@ -1,5 +1,5 @@
-// 披星云 — Apple Design System
-// 暗黑为主、克制配色、毛玻璃、流畅动画
+// 披星云 — Stripe Design System
+// 极宽留白、巨大数字、bento网格、无可见边框
 
 // === 基础色 ===
 $color-bg-primary: #000000;
@@ -38,6 +38,17 @@ $sidebar-width: 220px;
 $sidebar-collapsed-width: 68px;
 $topbar-height: 52px;
 
+// === Stripe 间距量表 ===
+$space-xs: 8px;
+$space-sm: 12px;
+$space-md: 16px;
+$space-lg: 24px;
+$space-xl: 32px;
+$space-2xl: 48px;
+$space-3xl: 72px;
+$space-4xl: 96px;
+$section-gap: 64px;
+
 // === 圆角 ===
 $radius-sm: 8px;
 $radius-md: 12px;
@@ -59,6 +70,15 @@ $ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 $font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
   'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
 $font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+
+// === Stripe 排版 scale ===
+$text-display: 56px;    // KPI 数字
+$text-hero: 36px;       // 页面标题
+$text-headline: 24px;   // 区块标题
+$text-title: 18px;      // 卡片标题
+$text-body: 15px;       // 正文
+$text-caption: 13px;    // 辅助文字
+$text-micro: 11px;      // 标签/元数据
 
 // === 平台色 ===
 $douyin-color: #000000;

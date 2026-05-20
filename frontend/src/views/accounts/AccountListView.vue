@@ -1,7 +1,7 @@
 <template>
   <div class="account-list">
     <!-- Filters -->
-    <el-card shadow="hover" class="account-list__filter">
+    <GlassCard class="account-list__filter">
       <el-form :inline="true" :model="filter">
         <el-form-item label="平台">
           <el-select v-model="filter.platform" placeholder="全部平台" clearable style="width: 140px">
@@ -25,7 +25,7 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
-    </el-card>
+    </GlassCard>
 
     <!-- Action Bar -->
     <div class="account-list__actions">
@@ -44,64 +44,61 @@
       <el-button type="danger" :disabled="!selectedIds.length" @click="handleBatchDelete">
         <el-icon><Delete /></el-icon>批量删除
       </el-button>
-      <el-button @click="exportCSV" :disabled="enhancedAccounts.length === 0" style="margin-left:auto">
+      <el-button @click="exportCSV" :disabled="enhancedAccounts.length === 0" class="ml-auto">
         <el-icon><Download /></el-icon>导出 CSV
       </el-button>
     </div>
 
-    <!-- Table -->
-    <el-card shadow="hover">
-      <el-table
-        v-loading="loading"
-        :data="enhancedAccounts"
-        stripe
-        @selection-change="handleSelectionChange"
-        :default-sort="{ prop: 'followers', order: 'descending' }"
+    <!-- Account Card Grid -->
+    <div v-loading="loading" class="account-grid">
+      <div
+        v-for="acc in enhancedAccounts"
+        :key="acc.id"
+        class="account-card"
+        :class="{ 'account-card--selected': selectedIds.includes(acc.id) }"
+        @click="toggleSelect(acc.id)"
       >
-        <el-table-column type="selection" width="50" />
-        <el-table-column label="平台" width="80">
-          <template #default="{ row }">
-            <PlatformIcon :platform="row.platform" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="nickname" label="账号名称" min-width="160" show-overflow-tooltip sortable="custom">
-          <template #default="{ row }">
-            <div class="account-list__name">
-              <el-avatar :size="32" :src="row.avatar">{{ row.nickname?.charAt(0) }}</el-avatar>
-              <span>{{ row.nickname }}</span>
-            </div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="groupName" label="分组" width="110" />
-        <el-table-column label="状态" width="110" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.tokenStatus === 'valid'" type="success" size="small">已连接</el-tag>
-            <el-tag v-else-if="row.tokenStatus === 'expiring_soon'" type="warning" size="small">即将过期</el-tag>
-            <el-tag v-else-if="row.tokenStatus === 'expired'" type="danger" size="small">已失效</el-tag>
-            <el-tag v-else-if="row.hasCookies" type="info" size="small">在线</el-tag>
-            <el-tag v-else type="warning" size="small">待授权</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="140" fixed="right">
-          <template #default="{ row }">
-            <el-button text type="primary" size="small" @click="$router.push(`/accounts/${row.id}`)">详情</el-button>
-            <el-button text type="danger" size="small" @click="handleDelete(row.id)">删除</el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <div class="account-list__pagination">
-        <el-pagination
-          v-model:current-page="filter.page"
-          v-model:page-size="filter.pageSize"
-          :total="accountStore.total"
-          :page-sizes="[20, 50, 100]"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSearch"
-          @current-change="handleSearch"
-        />
+        <div class="account-card__check">
+          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#0a84ff"><CircleCheckFilled /></el-icon>
+          <span v-else class="account-card__check-empty" />
+        </div>
+        <el-avatar :size="48" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
+        <div class="account-card__info">
+          <span class="account-card__name">{{ acc.nickname }}</span>
+          <PlatformBadge :platform="acc.platform" size="sm" />
+        </div>
+        <div class="account-card__stats">
+          <span class="account-card__stat-value">{{ formatNumber(acc.followers || 0) }}</span>
+          <span class="account-card__stat-label">粉丝</span>
+        </div>
+        <span class="account-card__group" v-if="acc.groupName">{{ acc.groupName }}</span>
+        <span class="account-card__status" :class="'status--' + (acc.tokenStatus || 'unknown')">
+          {{ acc.tokenStatus === 'valid' ? '已连接' : acc.tokenStatus === 'expiring_soon' ? '即将过期' : acc.tokenStatus === 'expired' ? '已失效' : acc.hasCookies ? '在线' : '待授权' }}
+        </span>
+        <div class="account-card__actions">
+          <el-button text type="primary" size="small" @click.stop="$router.push(`/accounts/${acc.id}`)">详情</el-button>
+          <el-button text type="danger" size="small" @click.stop="handleDelete(acc.id)">删除</el-button>
+        </div>
       </div>
-    </el-card>
+    </div>
+
+    <div v-if="enhancedAccounts.length === 0 && !loading" class="empty-state">
+      <el-icon :size="48" color="#48484a"><User /></el-icon>
+      <h3>暂无账号</h3>
+      <p>添加你的第一个社交媒体账号</p>
+    </div>
+
+    <div class="account-list__pagination" v-if="accountStore.total > filter.pageSize">
+      <el-pagination
+        v-model:current-page="filter.page"
+        v-model:page-size="filter.pageSize"
+        :total="accountStore.total"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="handleSearch"
+        @current-change="handleSearch"
+      />
+    </div>
 
     <!-- Group Dialog -->
     <el-dialog v-model="showGroupDialog" title="新建分组" width="400px">
@@ -203,11 +200,13 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { CircleCheckFilled, User } from '@element-plus/icons-vue'
 import { useAccountStore } from '@/store/account'
 import { useUserStore } from '@/store/user'
 import { accountsApi } from '@/api/accounts'
 import { PLATFORM_LABELS } from '@/types'
-import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import GlassCard from '@/components/common/GlassCard.vue'
+import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 
 const accountStore = useAccountStore()
@@ -285,8 +284,10 @@ function handleReset() {
   handleSearch()
 }
 
-function handleSelectionChange(rows: { id: string }[]) {
-  selectedIds.value = rows.map((r) => r.id)
+function toggleSelect(id: string) {
+  const idx = selectedIds.value.indexOf(id)
+  if (idx >= 0) { selectedIds.value.splice(idx, 1) }
+  else { selectedIds.value.push(id) }
 }
 
 async function handleDelete(id: string) {
@@ -384,26 +385,92 @@ function formatTime(time: string) {
 
 <style lang="scss" scoped>
 .account-list {
-  &__filter {
-    margin-bottom: 16px;
-  }
+  display: flex; flex-direction: column; gap: $section-gap;
+
+  &__filter { /* GlassCard handles styling */ }
 
   &__actions {
-    margin-bottom: 16px;
-    display: flex;
-    gap: 8px;
-  }
-
-  &__name {
-    display: flex;
-    align-items: center;
-    gap: 8px;
+    display: flex; gap: $space-sm; flex-wrap: wrap;
+    .ml-auto { margin-left: auto; }
   }
 
   &__pagination {
-    margin-top: 16px;
-    display: flex;
-    justify-content: flex-end;
+    display: flex; justify-content: center;
+    padding-top: $space-lg;
   }
+}
+
+// === Account card grid ===
+.account-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $space-md;
+}
+
+.account-card {
+  display: flex; flex-direction: column; align-items: center; gap: $space-sm;
+  padding: $space-lg $space-md;
+  background: var(--app-glass-bg);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid var(--app-border);
+  border-radius: $radius-lg;
+  cursor: pointer;
+  transition: all 0.25s $ease-out;
+  text-align: center;
+  position: relative;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: var(--app-border-strong);
+    box-shadow: var(--app-shadow-md);
+  }
+
+  &--selected {
+    border-color: #0a84ff;
+    background: rgba(#0a84ff, 0.06);
+  }
+
+  &__check {
+    position: absolute; top: $space-sm; right: $space-sm;
+  }
+  &__check-empty {
+    width: 20px; height: 20px; border-radius: 50%;
+    border: 2px solid var(--app-border);
+    display: block;
+  }
+
+  &__info {
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    min-width: 0; width: 100%;
+  }
+  &__name {
+    font-size: $text-body; font-weight: 590; color: var(--app-text-primary);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    max-width: 100%;
+  }
+  &__stats {
+    display: flex; flex-direction: column; align-items: center; gap: 0;
+  }
+  &__stat-value { font-size: $text-headline; font-weight: 700; color: var(--app-text-primary); font-feature-settings: 'tnum'; }
+  &__stat-label { font-size: $text-micro; color: var(--app-text-tertiary); text-transform: uppercase; }
+  &__group { font-size: $text-micro; color: var(--app-text-tertiary); background: var(--app-overlay-hover); padding: 1px 10px; border-radius: $radius-full; }
+  &__status {
+    font-size: $text-micro; font-weight: 500; padding: 2px 10px; border-radius: $radius-full;
+    &.status--valid { background: rgba(#30d158, 0.1); color: #30d158; }
+    &.status--expiring_soon { background: rgba(#ff9f0a, 0.1); color: #ff9f0a; }
+    &.status--expired, &.status--unknown { background: rgba(#ff453a, 0.1); color: #ff453a; }
+  }
+  &__actions {
+    display: flex; gap: $space-xs; margin-top: 2px;
+  }
+}
+
+// === Empty state ===
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: $space-md;
+  padding: $space-4xl 0; text-align: center;
+  h3 { font-size: $text-headline; font-weight: 600; color: var(--app-text-primary); margin: 0; }
+  p { font-size: $text-body; color: var(--app-text-tertiary); margin: 0; }
 }
 </style>
