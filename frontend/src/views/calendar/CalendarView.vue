@@ -308,18 +308,18 @@ function deleteEvent() {
 
 .cal-month {
   @include glass;
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   overflow: hidden;
 }
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-bottom: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--el-border-color);
   text-align: center;
   padding: 10px 0;
   font-size: 13px;
-  color: var(--app-text-tertiary);
+  color: var(--el-text-color-placeholder);
   font-weight: 500;
   background: transparent;
 }
@@ -330,15 +330,15 @@ function deleteEvent() {
 }
 .cal-day {
   padding: 4px;
-  border-right: 1px solid var(--app-separator);
-  border-bottom: 1px solid var(--app-separator);
+  border-right: 1px solid var(--el-border-color-light);
+  border-bottom: 1px solid var(--el-border-color-light);
   min-height: 100px;
   &:nth-child(7n) {
     border-right: none;
   }
   &--other {
-    background: var(--app-bg-secondary);
-    color: var(--app-text-tertiary);
+    background: var(--el-bg-color-page);
+    color: var(--el-text-color-placeholder);
   }
   &--today {
     background: rgba(#0a84ff, 0.06);
@@ -350,7 +350,7 @@ function deleteEvent() {
   &__num {
     padding: 2px 6px;
     font-size: 13px;
-    color: var(--app-text-secondary);
+    color: var(--el-text-color-secondary);
   }
   &__items {
     display: flex;
@@ -371,7 +371,7 @@ function deleteEvent() {
   text-overflow: ellipsis;
   &__time {
     font-size: 10px;
-    color: var(--app-text-tertiary);
+    color: var(--el-text-color-placeholder);
     margin-right: 2px;
   }
   &__title {
@@ -383,18 +383,18 @@ function deleteEvent() {
 
 .cal-week {
   @include glass;
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   &__header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    border-bottom: 1px solid var(--app-border);
+    border-bottom: 1px solid var(--el-border-color);
   }
   &__col-header {
     text-align: center;
     padding: 8px 0;
     font-size: 13px;
-    color: var(--app-text-secondary);
+    color: var(--el-text-color-secondary);
     &.is-today {
       color: #0a84ff;
       font-weight: 600;
@@ -411,7 +411,7 @@ function deleteEvent() {
   &__col {
     padding: 6px 4px;
     min-height: 200px;
-    border-right: 1px solid var(--app-separator);
+    border-right: 1px solid var(--el-border-color-light);
     &:last-child {
       border-right: none;
     }

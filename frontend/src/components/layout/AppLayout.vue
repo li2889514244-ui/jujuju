@@ -43,7 +43,7 @@ function onPageEnter() {
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  background: var(--app-bg-primary);
+  background: var(--el-bg-color);
 
   &__main {
     flex: 1;

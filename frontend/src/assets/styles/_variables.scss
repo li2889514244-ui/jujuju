@@ -17,15 +17,15 @@ $color-border: rgba(255, 255, 255, 0.08);
 $color-border-active: rgba(255, 255, 255, 0.15);
 $color-separator: rgba(255, 255, 255, 0.06);
 
-// === 系统色 (Apple palette) ===
-$color-blue: #0a84ff;
-$color-green: #30d158;
-$color-orange: #ff9f0a;
-$color-red: #ff453a;
-$color-pink: #ff375f;
-$color-purple: #bf5af2;
-$color-teal: #64d2ff;
-$color-indigo: #5e5ce6;
+// === 系统色 (Apple HIG palette) ===
+$color-blue: #007AFF;
+$color-green: #34C759;
+$color-orange: #FF9500;
+$color-red: #FF3B30;
+$color-pink: #FF2D55;
+$color-purple: #AF52DE;
+$color-teal: #5AC8FA;
+$color-indigo: #5856D6;
 
 $primary-color: $color-blue;
 $success-color: $color-green;

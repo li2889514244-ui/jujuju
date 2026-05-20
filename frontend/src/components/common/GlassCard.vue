@@ -34,7 +34,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
 <style lang="scss" scoped>
 .glass-card {
   border-radius: $radius-lg;
-  border: 1px solid var(--app-border);
+  border: 1px solid var(--el-border-color);
   transition: all 0.35s $ease-spring;
 
   &--default {
@@ -42,7 +42,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
   }
   &--elevated {
     @include glass-heavy;
-    box-shadow: var(--app-shadow-md);
+    box-shadow: var(--el-box-shadow);
   }
   &--tinted {
     background: rgba(#0a84ff, 0.06);
@@ -66,8 +66,8 @@ defineEmits<{ click: [e: MouseEvent] }>()
 
   &--hover:hover {
     transform: translateY(-2px);
-    box-shadow: var(--app-shadow-md);
-    border-color: var(--app-border-strong);
+    box-shadow: var(--el-box-shadow);
+    border-color: var(--el-border-color);
   }
 
   &--interactive {
@@ -80,13 +80,13 @@ defineEmits<{ click: [e: MouseEvent] }>()
   &__header {
     padding-bottom: 12px;
     margin-bottom: 12px;
-    border-bottom: 1px solid var(--app-separator);
+    border-bottom: 1px solid var(--el-border-color-light);
   }
 
   &__title {
     font-size: 14px;
     font-weight: 600;
-    color: var(--app-text-secondary);
+    color: var(--el-text-color-secondary);
     letter-spacing: -0.01em;
   }
 
