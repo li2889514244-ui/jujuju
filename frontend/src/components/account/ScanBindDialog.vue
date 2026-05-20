@@ -266,7 +266,7 @@ function disconnectSSE() {
 <style lang="scss" scoped>
 .scan-bind {
   &__tip {
-    color: #606266;
+    color: #98989d;
     font-size: 14px;
     margin-bottom: 16px;
     text-align: center;
@@ -291,7 +291,7 @@ function disconnectSSE() {
     transition: all 0.2s;
 
     &:hover {
-      border-color: #409eff;
+      border-color: #0a84ff;
       box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
       transform: translateY(-2px);
     }
@@ -311,7 +311,7 @@ function disconnectSSE() {
 
   &__platform-name {
     font-size: 13px;
-    color: #303133;
+    color: #f5f5f7;
   }
 
   &__scanning {
@@ -325,7 +325,7 @@ function disconnectSSE() {
     justify-content: center;
     gap: 8px;
     margin-bottom: 16px;
-    color: #606266;
+    color: #98989d;
     font-size: 14px;
   }
 
@@ -353,12 +353,12 @@ function disconnectSSE() {
     flex-direction: column;
     align-items: center;
     gap: 12px;
-    color: #909399;
+    color: #6e6e73;
     font-size: 13px;
   }
 
   &__hint {
-    color: #909399;
+    color: #6e6e73;
     font-size: 13px;
     margin-bottom: 16px;
   }
@@ -384,12 +384,12 @@ function disconnectSSE() {
   &__account-name {
     font-size: 16px;
     font-weight: 500;
-    color: #303133;
+    color: #f5f5f7;
   }
 
   &__account-platform {
     font-size: 13px;
-    color: #909399;
+    color: #6e6e73;
     margin-top: 2px;
   }
 

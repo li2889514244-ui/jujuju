@@ -21,7 +21,7 @@ function render() {
     chart = echarts.init(chartRef.value)
   }
   const isUp = props.data[props.data.length - 1] >= props.data[0]
-  const lineColor = props.color || (isUp ? '#67c23a' : '#f56c6c')
+  const lineColor = props.color || (isUp ? '#30d158' : '#ff453a')
   chart.setOption({
     grid: { left: 0, right: 0, top: 2, bottom: 2 },
     xAxis: { show: false, type: 'category', data: props.data.map((_, i) => i) },

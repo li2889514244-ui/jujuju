@@ -249,8 +249,8 @@ function formatNum(n: any): string {
 
 .analytics-mini-card {
   text-align: center;
-  &__label { font-size: 12px; color: #909399; margin-bottom: 6px; }
-  &__value { font-size: 20px; font-weight: 600; color: #303133; }
+  &__label { font-size: 12px; color: #6e6e73; margin-bottom: 6px; }
+  &__value { font-size: 20px; font-weight: 600; color: #f5f5f7; }
 }
 
 .post-header {

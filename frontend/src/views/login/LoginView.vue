@@ -213,14 +213,30 @@ async function handleRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #000;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: fixed; inset: 0;
+    background:
+      radial-gradient(ellipse 60% 40% at 50% 0%, rgba(#0a84ff, 0.06) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 100%, rgba(#bf5af2, 0.04) 0%, transparent 60%);
+    pointer-events: none;
+  }
 
   &__container {
     width: 420px;
     padding: 40px;
-    background: #fff;
-    border-radius: 12px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+    position: relative;
+    z-index: 1;
+    background: rgba(28, 28, 30, 0.85);
+    backdrop-filter: blur(60px) saturate(200%);
+    -webkit-backdrop-filter: blur(60px) saturate(200%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: $radius-xl;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
   }
 
   &__header {
@@ -229,21 +245,24 @@ async function handleRegister() {
   }
 
   &__title {
-    font-size: 32px;
+    font-size: 28px;
     font-weight: 700;
-    color: #303133;
-    margin-bottom: 8px;
-    letter-spacing: 2px;
+    color: #f5f5f7;
+    margin-bottom: 6px;
+    letter-spacing: -0.01em;
   }
 
   &__subtitle {
-    color: #909399;
+    color: #6e6e73;
     font-size: 14px;
+    font-weight: 400;
   }
 
   &__tabs {
-    :deep(.el-tabs__nav-wrap::after) {
-      display: none;
+    :deep(.el-tabs__nav-wrap::after) { display: none; }
+    :deep(.el-tabs__item) {
+      color: #98989d;
+      &.is-active { color: #f5f5f7; }
     }
   }
 
@@ -251,7 +270,8 @@ async function handleRegister() {
     width: 100%;
     height: 44px;
     font-size: 16px;
-    letter-spacing: 4px;
+    font-weight: 590;
+    letter-spacing: -0.01em;
   }
 }
 </style>

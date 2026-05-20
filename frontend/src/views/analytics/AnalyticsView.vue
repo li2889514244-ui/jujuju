@@ -165,7 +165,7 @@ const followerChart = computed(() => ({
   yAxis: { type: 'value' as const, name: '粉丝' },
   series: [{ name: '新增粉丝', type: 'line' as const, smooth: true, areaStyle: { opacity: 0.3 },
     data: followerTrend.value.length > 0 ? followerTrend.value : [] }],
-  graphic: followerTrend.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
+  graphic: followerTrend.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' } }] : undefined,
 }))
 
 const engagementChart = computed(() => ({
@@ -175,7 +175,7 @@ const engagementChart = computed(() => ({
   yAxis: { type: 'value' as const, name: '%' },
   series: [{ name: '互动率', type: 'line' as const, smooth: true,
     data: engagementData.value.length > 0 ? engagementData.value : [] }],
-  graphic: engagementData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
+  graphic: engagementData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' } }] : undefined,
 }))
 
 const publishEffectChart = computed(() => ({
@@ -183,7 +183,7 @@ const publishEffectChart = computed(() => ({
   grid: { left: 50, right: 20, top: 40, bottom: 30 },
   xAxis: { type: 'category' as const, data: dates.value },
   yAxis: { type: 'value' as const },
-  graphic: publishData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#909399' } }] : undefined,
+  graphic: publishData.value.length === 0 ? [{ type: 'text', left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' } }] : undefined,
   series: publishData.value.length > 0 ? [
     { name: '播放量', type: 'bar' as const, data: publishData.value.map((d: any) => d.views || 0) },
     { name: '点赞', type: 'bar' as const, data: publishData.value.map((d: any) => d.likes || 0) },
@@ -315,21 +315,21 @@ onMounted(() => {
   &__ranking { margin-top: 20px; }
 }
 .comparison-card {
-  padding: 12px; border: 1px solid #ebeef5; border-radius: 8px;
-  &__title { font-size: 14px; font-weight: 600; color: #303133; margin-bottom: 12px; }
+  padding: 12px; border: 1px solid rgba(255,255,255,0.08); border-radius: 8px;
+  &__title { font-size: 14px; font-weight: 600; color: #f5f5f7; margin-bottom: 12px; }
 }
 .comparison-metric {
   display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #f5f7fa;
   &:last-child { border-bottom: none; }
-  &__label { font-size: 13px; color: #606266; }
-  &__value { font-size: 14px; font-weight: 500; color: #303133; }
+  &__label { font-size: 13px; color: #98989d; }
+  &__value { font-size: 14px; font-weight: 500; color: #f5f5f7; }
   &__change { font-size: 12px; font-weight: 500; min-width: 50px; text-align: right; }
 }
-.change--up { color: #67c23a; }
-.change--down { color: #f56c6c; }
+.change--up { color: #30d158; }
+.change--down { color: #ff453a; }
 .ranking-header { display: flex; align-items: center; justify-content: space-between; width: 100%; }
-.ranking-title { font-size: 14px; color: #303133; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ranking-meta { font-size: 12px; color: #909399; margin-top: 2px; }
+.ranking-title { font-size: 14px; color: #f5f5f7; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking-meta { font-size: 12px; color: #6e6e73; margin-top: 2px; }
 .rank-badge { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; font-size: 12px; font-weight: bold; color: #fff; }
-.rank-1 { background: #f5a623; } .rank-2 { background: #909399; } .rank-3 { background: #b87333; }
+.rank-1 { background: #f5a623; } .rank-2 { background: #6e6e73; } .rank-3 { background: #b87333; }
 </style>

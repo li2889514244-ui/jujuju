@@ -155,17 +155,17 @@ function formatTime(time: string) {
   &__member-name {
     font-size: 14px;
     font-weight: 500;
-    color: #303133;
+    color: #f5f5f7;
   }
 
   &__member-email {
     font-size: 12px;
-    color: #909399;
+    color: #6e6e73;
   }
 
   &__owner-label {
     font-size: 13px;
-    color: #909399;
+    color: #6e6e73;
   }
 }
 </style>

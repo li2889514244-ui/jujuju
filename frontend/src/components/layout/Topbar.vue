@@ -185,13 +185,13 @@ function getNotifColor(type: string) {
   switch (type) {
     case 'PUBLISH_FAILED':
     case 'ACCOUNT_EXPIRED':
-      return '#F56C6C'
+      return '#ff453a'
     case 'PUBLISH_SUCCESS':
-      return '#67C23A'
+      return '#30d158'
     case 'FOLLOWER_ALERT':
-      return '#E6A23C'
+      return '#ff9f0a'
     default:
-      return '#909399'
+      return '#6e6e73'
   }
 }
 
@@ -229,10 +229,8 @@ function handleUserCommand(command: string) {
 <style lang="scss" scoped>
 .topbar {
   height: 52px;
-  background: rgba(28, 28, 30, 0.75);
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  @include glass;
+  border-bottom: 1px solid var(--app-border);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 24px; flex-shrink: 0;
   z-index: 5;
@@ -251,7 +249,7 @@ function handleUserCommand(command: string) {
     display: flex; align-items: center; gap: 6px; cursor: pointer;
     color: var(--el-text-color-secondary); font-size: 14px;
     padding: 6px 12px; border-radius: 6px; transition: background 0.2s;
-    &:hover { background: rgba(255,255,255,0.06); }
+    &:hover { background: var(--app-overlay-hover); }
   }
 
   &__notification { cursor: pointer; }
@@ -268,7 +266,7 @@ function handleUserCommand(command: string) {
 .notification-panel {
   &__header {
     display: flex; justify-content: space-between; align-items: center;
-    padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding-bottom: 12px; border-bottom: 1px solid var(--app-separator);
     font-weight: 600; font-size: 15px;
   }
   &__body { max-height: 360px; overflow-y: auto; padding-top: 8px; }
@@ -278,7 +276,7 @@ function handleUserCommand(command: string) {
 .notification-item {
   display: flex; align-items: flex-start; gap: 10px;
   padding: 10px 4px; border-radius: 6px; cursor: pointer; transition: background 0.2s;
-  &:hover { background: rgba(255,255,255,0.04); }
+  &:hover { background: var(--app-overlay-hover); }
   &--unread { background: rgba(10, 132, 255, 0.08); &:hover { background: rgba(10, 132, 255, 0.14); } }
   &__icon { padding-top: 2px; font-size: 18px; }
   &__content { flex: 1; min-width: 0; }

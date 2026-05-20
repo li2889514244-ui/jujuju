@@ -136,7 +136,7 @@
           <el-icon v-if="r.status === 'success'"><CircleCheckFilled /></el-icon>
           <el-icon v-else-if="r.status === 'failed'"><CircleCloseFilled /></el-icon>
           <span>{{ r.nickname }}</span>
-          <span v-if="r.error" style="color:#f56c6c;font-size:12px">{{ r.error }}</span>
+          <span v-if="r.error" style="color:#ff453a;font-size:12px">{{ r.error }}</span>
         </div>
       </el-card>
     </div>
@@ -274,12 +274,12 @@ onMounted(() => {
 
 .account-list {
   display: flex; flex-direction: column; gap: 8px; padding: 8px 0;
-  &__empty { padding: 16px; text-align: center; color: #909399; }
+  &__empty { padding: 16px; text-align: center; color: #6e6e73; }
 }
 .account-item {
   display: flex; align-items: center; gap: 8px; padding: 4px 0;
   &__info { display: flex; align-items: center; gap: 8px; }
-  &__followers { font-size: 12px; color: #909399; margin-left: 4px; }
+  &__followers { font-size: 12px; color: #6e6e73; margin-left: 4px; }
 }
 
 .review-desc { margin-bottom: 16px; }
@@ -287,7 +287,7 @@ onMounted(() => {
 
 .result-item {
   display: flex; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid #f0f0f0;
-  &.result-success { color: #67c23a; }
-  &.result-failed { color: #f56c6c; }
+  &.result-success { color: #30d158; }
+  &.result-failed { color: #ff453a; }
 }
 </style>
