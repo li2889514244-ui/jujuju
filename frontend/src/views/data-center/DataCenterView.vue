@@ -49,7 +49,7 @@
             :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''"
             v-if="card.trend !== null"
           >
-            {{ card.trend > 0 ? '↑' : '↓' }} {{ Math.abs(card.trend) }}%
+            <el-icon :size="12"><CaretTop v-if="card.trend > 0" /><CaretBottom v-else /></el-icon> {{ Math.abs(card.trend) }}%
           </div>
         </el-card>
       </el-col>
@@ -144,6 +144,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
