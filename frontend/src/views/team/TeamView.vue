@@ -41,7 +41,7 @@
               <el-select
                 :model-value="row.role"
                 size="small"
-                style="width: 100px; margin-right: 8px"
+                class="team__role-select"
                 @change="(val: string) => handleRoleChange(row.id, val)"
               >
                 <el-option label="管理员" value="admin" />
@@ -164,8 +164,9 @@ function formatTime(time: string) {
   }
 
   &__owner-label {
-    font-size: 13px;
-    color: #6e6e73;
+    font-size: $text-caption;
+    color: var(--el-text-color-placeholder);
   }
 }
+.team__role-select { width: 100px; margin-right: $space-sm; }
 </style>
