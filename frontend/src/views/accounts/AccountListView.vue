@@ -4,19 +4,19 @@
     <GlassCard class="account-list__filter">
       <el-form :inline="true" :model="filter">
         <el-form-item label="平台">
-          <el-select v-model="filter.platform" placeholder="全部平台" clearable style="width: 140px">
+          <el-select v-model="accountStore.filter.platform" placeholder="全部平台" clearable style="width: 140px">
             <el-option label="全部" value="" />
             <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
           </el-select>
         </el-form-item>
         <el-form-item label="分组">
-          <el-select v-model="filter.group" placeholder="全部分组" clearable style="width: 140px">
+          <el-select v-model="accountStore.filter.group" placeholder="全部分组" clearable style="width: 140px">
             <el-option label="全部" value="" />
             <el-option v-for="g in accountStore.groups" :key="g.id" :label="g.name" :value="g.id" />
           </el-select>
         </el-form-item>
         <el-form-item label="搜索">
-          <el-input v-model="filter.keyword" placeholder="搜索账号名称" clearable style="width: 200px" />
+          <el-input v-model="accountStore.filter.keyword" placeholder="搜索账号名称" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">
@@ -88,10 +88,10 @@
       <p>添加你的第一个社交媒体账号</p>
     </div>
 
-    <div class="account-list__pagination" v-if="accountStore.total > filter.pageSize">
+    <div class="account-list__pagination" v-if="accountStore.total > accountStore.filter.pageSize">
       <el-pagination
-        v-model:current-page="filter.page"
-        v-model:page-size="filter.pageSize"
+        v-model:current-page="accountStore.filter.page"
+        v-model:page-size="accountStore.filter.pageSize"
         :total="accountStore.total"
         :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next, jumper"
@@ -213,14 +213,6 @@ import { formatCompactNum, tokenStatusLabel } from '@/utils/format'
 const accountStore = useAccountStore()
 const userStore = useUserStore()
 
-const filter = reactive({
-  platform: '',
-  group: '',
-  keyword: '',
-  page: 1,
-  pageSize: 20,
-})
-
 const selectedIds = ref<string[]>([])
 const showGroupDialog = ref(false)
 const newGroupName = ref('')
@@ -280,10 +272,10 @@ async function handleSearch() {
 }
 
 function handleReset() {
-  filter.platform = ''
-  filter.group = ''
-  filter.keyword = ''
-  filter.page = 1
+  accountStore.filter.platform = ''
+  accountStore.filter.group = ''
+  accountStore.filter.keyword = ''
+  accountStore.filter.page = 1
   handleSearch()
 }
 

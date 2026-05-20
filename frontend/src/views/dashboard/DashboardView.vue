@@ -91,18 +91,12 @@ import { analyticsApi } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
 import { getPlatformColor, getPlatformLabel } from '@/composables/usePlatform'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
+import type { DashboardAccount, AccountGroupSummary, SummaryCardData, DailyStatsMap } from '@/types'
 
 const period = ref('week')
 const loading = ref(false)
-const lastUpdate = ref('')
 const trendDays = ref(7)
-
-interface SummaryCardData {
-  label: string
-  rawValue: number
-  trend: number | null
-  color: string
-}
+const selectedGroup = ref('all')
 
 const summaryCards = ref<SummaryCardData[]>([
   { label: '总粉丝', rawValue: 0, trend: null, color: '#0a84ff' },
@@ -110,26 +104,9 @@ const summaryCards = ref<SummaryCardData[]>([
   { label: '总点赞', rawValue: 0, trend: null, color: '#30d158' },
   { label: '总互动', rawValue: 0, trend: null, color: '#ff453a' },
 ])
-const selectedGroup = ref('all')
 
-interface AccountRow {
-  id: string
-  nickname: string
-  avatar: string
-  platform: string
-  groupName: string
-  followers: number
-  views: number
-  likes: number
-  comments: number
-  shares: number
-  postCount: number
-  hasCookies: boolean
-  tokenStatus: string
-}
-
-const accountRows = ref<AccountRow[]>([])
-const accountGroups = ref<{ name: string; accounts: AccountRow[]; totalFollowers: number; totalViews: number; totalLikes: number }[]>([])
+const accountRows = ref<DashboardAccount[]>([])
+const accountGroups = ref<AccountGroupSummary[]>([])
 const platformDistribution = ref<{ value: number; name: string; itemStyle: { color: string } }[]>([])
 const followerTrendData = ref<number[]>([])
 
@@ -141,7 +118,7 @@ const displayGroups = computed(() => {
 })
 const filteredRows = computed(() => {
   if (selectedGroup.value === 'all') return accountRows.value
-  return accountRows.value.filter(r => (r as any).groupName === selectedGroup.value)
+  return accountRows.value.filter(r => r.groupName === selectedGroup.value)
 })
 const groupSummaryCards = computed<SummaryCardData[]>(() => {
   const rows = filteredRows.value
@@ -177,47 +154,47 @@ async function refreshAll() {
       { label: '总互动', rawValue: (ov.engagement?.totalComments || 0) + (ov.engagement?.totalShares || 0), trend: null, color: '#ff453a' },
     ]
 
-    const accRes = await accountsApi.getList({ pageSize: 100, page: 1 } as any)
-    const accData = accRes.data
+    const accRes = await accountsApi.getList({ pageSize: 100, page: 1 })
+    const accData = accRes.data as { accounts?: Array<Record<string, unknown>>; list?: Array<Record<string, unknown>> }
     const accs = accData?.accounts || accData?.list || []
 
-    let dailyMap: Record<string, any> = {}
+    let dailyMap: DailyStatsMap = {}
     try {
       const reportRes = await analyticsApi.getReport()
-      const rptAccs = reportRes.data?.accounts || []
+      const rptAccs = (reportRes.data as { accounts?: Array<{ id: string; dailyStats?: Array<{ views?: number; likes?: number; comments?: number; shares?: number }> }> })?.accounts || []
       for (const a of rptAccs) {
         const allStats = a.dailyStats || []
         dailyMap[a.id] = {
-          views: allStats.reduce((sum: number, s: any) => sum + (s.views || 0), 0),
-          likes: allStats.reduce((sum: number, s: any) => sum + (s.likes || 0), 0),
-          comments: allStats.reduce((sum: number, s: any) => sum + (s.comments || 0), 0),
-          shares: allStats.reduce((sum: number, s: any) => sum + (s.shares || 0), 0),
+          views: allStats.reduce((sum, s) => sum + (s.views || 0), 0),
+          likes: allStats.reduce((sum, s) => sum + (s.likes || 0), 0),
+          comments: allStats.reduce((sum, s) => sum + (s.comments || 0), 0),
+          shares: allStats.reduce((sum, s) => sum + (s.shares || 0), 0),
         }
       }
     } catch { /* daily stats unavailable — showing counts without stats */ }
 
-    accountRows.value = accs.map((a: any) => {
-      const daily = dailyMap[a.id] || { views: 0, likes: 0, comments: 0, shares: 0 }
+    accountRows.value = accs.map((a): DashboardAccount => {
+      const daily = dailyMap[a.id as string] || { views: 0, likes: 0, comments: 0, shares: 0 }
       return {
-        id: a.id,
-        nickname: a.nickname || '未命名',
-        avatar: a.avatar || '',
-        platform: a.platform,
-        groupName: a.group?.name || '',
-        followers: a.followers || 0,
+        id: a.id as string,
+        nickname: (a.nickname as string) || '未命名',
+        avatar: (a.avatar as string) || '',
+        platform: a.platform as string,
+        groupName: (a.group as { name?: string })?.name || '',
+        followers: (a.followers as number) || 0,
         views: daily.views,
         likes: daily.likes,
         comments: daily.comments,
         shares: daily.shares,
-        postCount: a._count?.posts || 0,
-        hasCookies: a.hasCookies,
-        tokenStatus: a.tokenStatus || (a.hasCookies ? 'valid' : 'unknown'),
+        postCount: ((a._count as { posts?: number })?.posts) || 0,
+        hasCookies: a.hasCookies as boolean,
+        tokenStatus: (a.tokenStatus as string) || ((a.hasCookies as boolean) ? 'valid' : 'unknown'),
       }
     })
 
-    const groupMap: Record<string, AccountRow[]> = {}
+    const groupMap: Record<string, DashboardAccount[]> = {}
     for (const row of accountRows.value) {
-      const gName = (row as any).groupName || '未分组'
+      const gName = row.groupName || '未分组'
       if (!groupMap[gName]) groupMap[gName] = []
       groupMap[gName].push(row)
     }

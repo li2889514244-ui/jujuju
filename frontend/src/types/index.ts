@@ -278,6 +278,28 @@ export interface PostWithStats {
   engagementRate: number
 }
 
+// ===== Dashboard =====
+export interface DashboardAccount {
+  id: string; nickname: string; avatar: string; platform: string
+  groupName: string; followers: number; views: number; likes: number
+  comments: number; shares: number; postCount: number
+  hasCookies: boolean; tokenStatus: string
+}
+
+export interface DailyStatsMap {
+  [accountId: string]: { views: number; likes: number; comments: number; shares: number }
+}
+
+export interface AccountGroupSummary {
+  name: string
+  accounts: DashboardAccount[]
+  totalFollowers: number; totalViews: number; totalLikes: number
+}
+
+export interface SummaryCardData {
+  label: string; rawValue: number; trend: number | null; color: string
+}
+
 export interface AccountAnalytics {
   totalViews: number
   totalLikes: number
