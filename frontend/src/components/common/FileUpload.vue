@@ -116,7 +116,7 @@ defineExpose({ clearFiles })
 <style lang="scss" scoped>
 .file-upload {
   &__drag {
-    padding: 40px 20px;
+    padding: $space-2xl 20px;
     text-align: center;
   }
 

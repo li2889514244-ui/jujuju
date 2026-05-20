@@ -55,13 +55,13 @@ defineEmits<{ click: [e: MouseEvent] }>()
   }
 
   &--sm {
-    padding: 14px;
+    padding: $space-sm;
   }
   &--md {
-    padding: 20px;
+    padding: $space-lg;
   }
   &--lg {
-    padding: 28px;
+    padding: $space-xl;
   }
 
   &--hover:hover {

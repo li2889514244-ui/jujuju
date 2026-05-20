@@ -215,7 +215,7 @@ async function handleRegister() {
 
   &__container {
     width: 420px;
-    padding: 40px;
+    padding: $space-2xl;
     position: relative;
     z-index: 1;
     background: rgba(28, 28, 30, 0.85);

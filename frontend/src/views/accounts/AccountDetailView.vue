@@ -262,7 +262,7 @@ function formatNum(n: any): string {
   }
   &__profile {
     text-align: center;
-    padding: 20px 0;
+    padding: $space-lg 0;
     h3 {
       margin: 12px 0 8px;
       font-size: 18px;

@@ -970,7 +970,7 @@ function copyContent() {
 .empty-text {
   color: #6e6e73;
   text-align: center;
-  padding: 20px;
+  padding: $space-lg;
 }
 
 /* Review */

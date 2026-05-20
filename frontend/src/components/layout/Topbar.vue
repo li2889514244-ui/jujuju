@@ -257,7 +257,7 @@ function handleUserCommand(command: string) {
   &__right {
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: $space-lg;
   }
 
   &__download {
@@ -333,7 +333,7 @@ function handleUserCommand(command: string) {
   &__empty {
     text-align: center;
     color: var(--el-text-color-secondary);
-    padding: 40px 0;
+    padding: $space-2xl 0;
     font-size: $text-body;
   }
 }
@@ -341,8 +341,8 @@ function handleUserCommand(command: string) {
 .notification-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  padding: 10px 4px;
+  gap: $space-sm;
+  padding: $space-sm 4px;
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;

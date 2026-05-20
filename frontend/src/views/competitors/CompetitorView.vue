@@ -268,7 +268,7 @@ onMounted(() => {
   &__account {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: $space-sm;
   }
 
   &__account-info {

@@ -184,7 +184,7 @@
 
     <!-- Add Account Guide Dialog -->
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
-      <div style="text-align: center; padding: 20px">
+      <div style="text-align: center; padding: 24px">
         <p style="font-size: 18px; margin-bottom: 16px">
           请使用 <strong>披星云桌面伴侣</strong> 绑定账号
         </p>
@@ -504,7 +504,7 @@ function handleBindSuccess() {
   flex-direction: column;
   align-items: center;
   gap: $space-sm;
-  padding: $space-lg $space-md;
+  padding: 24px $space-md;
   background: var(--el-fill-color-light);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);

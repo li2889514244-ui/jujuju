@@ -148,7 +148,7 @@ function toggleCollapse() {
     height: 56px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: $space-sm;
     padding: 0 18px;
     cursor: pointer;
     &-icon {
@@ -181,8 +181,8 @@ function toggleCollapse() {
   &__item {
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 10px 12px;
+    gap: $space-sm;
+    padding: $space-sm 12px;
     border-radius: 6px;
     color: var(--el-text-color-secondary);
     text-decoration: none;
