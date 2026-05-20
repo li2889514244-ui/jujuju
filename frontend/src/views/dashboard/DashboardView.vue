@@ -73,7 +73,7 @@
           :to="`/accounts/${acc.id}`"
           class="account-card stagger-item"
         >
-          <el-avatar :size="36" :src="acc.avatar">{{ acc.nickname?.charAt(0) }}</el-avatar>
+          <el-avatar :size="36" :src="acc.avatar" :style="{ background: acc.avatar ? '' : platformColor(acc.platform), color: '#fff' }">{{ acc.nickname?.charAt(0) }}</el-avatar>
           <span class="account-card__name">{{ acc.nickname }}</span>
           <PlatformBadge :platform="acc.platform" size="sm" />
         </router-link>
@@ -97,6 +97,7 @@ import GlassCard from '@/components/common/GlassCard.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
+import { getPlatformColor as platformColor } from '@/composables/usePlatform'
 
 const {
   period,
@@ -152,6 +153,14 @@ function exportCSV() {
     align-items: center;
     gap: $space-sm;
     padding: $space-3xl 0 $space-xl;
+    position: relative;
+    &::after {
+      content: '';
+      width: 40px; height: 3px;
+      background: var(--el-color-primary);
+      border-radius: 2px;
+      margin-top: $space-lg;
+    }
   }
 
   // === Sub KPIs + actions ===
