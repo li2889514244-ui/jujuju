@@ -1,21 +1,20 @@
-// 披星云 — Stripe Design System
-// 极宽留白、巨大数字、bento网格、无可见边框
+// 披星云 — 红白设计系统
 
 // === 基础色 ===
-$color-bg-primary: #000000;
-$color-bg-secondary: #0d0d0d;
-$color-bg-tertiary: #1a1a1a;
-$color-bg-elevated: #1c1c1e;
-$color-bg-glass: rgba(28, 28, 30, 0.85);
+$color-bg-primary: #FFFFFF;
+$color-bg-secondary: #F8F8F8;
+$color-bg-tertiary: #FAFAFA;
+$color-bg-elevated: #FFFFFF;
+$color-bg-glass: rgba(255, 255, 255, 0.95);
 
-$color-text-primary: #f5f5f7;
-$color-text-secondary: #98989d;
-$color-text-tertiary: #6e6e73;
-$color-text-placeholder: #48484a;
+$color-text-primary: #1D1D1F;
+$color-text-secondary: #8E8E93;
+$color-text-tertiary: #AEAEB2;
+$color-text-placeholder: #C7C7CC;
 
-$color-border: rgba(255, 255, 255, 0.08);
-$color-border-active: rgba(255, 255, 255, 0.15);
-$color-separator: rgba(255, 255, 255, 0.06);
+$color-border: #E5E5E5;
+$color-border-active: #E60012;
+$color-separator: #F0F0F0;
 
 // === 红白配色系统色 ===
 $color-red: #E60012;
@@ -90,15 +89,15 @@ $xiaohongshu-color: #ff2442;
 $bilibili-color: #fb7299;
 $weibo-color: #ff8200;
 
-// === 毛玻璃（跟随主题色）===
+// === 毛玻璃 ===
 @mixin glass {
-  background: var(--app-glass-bg, rgba(28, 28, 30, 0.75));
-  backdrop-filter: blur(40px) saturate(180%);
-  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
 }
 
 @mixin glass-heavy {
-  background: var(--app-glass-bg-heavy, rgba(28, 28, 30, 0.9));
-  backdrop-filter: blur(60px) saturate(200%);
-  -webkit-backdrop-filter: blur(60px) saturate(200%);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
 }

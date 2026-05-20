@@ -184,78 +184,32 @@
 
     <!-- Add Account Guide Dialog -->
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
-      <div style="text-align: center; padding: 24px">
-        <p style="font-size: 18px; margin-bottom: 16px">
-          请使用 <strong>披星云桌面伴侣</strong> 绑定账号
-        </p>
-
-        <!-- 已检测到桌面伴侣 -->
-        <div
-          v-if="companionOnline"
-          style="
-            background: #f0f9eb;
-            border: 1px solid #b3e19d;
-            border-radius: 8px;
-            padding: 16px;
-            margin-bottom: 16px;
-          "
-        >
-          <p style="color: #30d158; font-weight: 600; margin-bottom: 8px">已检测到桌面伴侣运行中</p>
-          <p style="color: #666; font-size: 13px; margin-bottom: 12px">
-            选择平台后，桌面伴侣会自动弹出浏览器窗口
-          </p>
-          <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center">
-            <el-button
-              v-for="p in bindablePlatforms"
-              :key="p.id"
-              :type="p.type"
-              size="small"
-              @click="openCompanionScan(p.id)"
-            >
-              {{ p.icon }} {{ p.name }}
-            </el-button>
+      <div class="add-dialog">
+        <p class="add-dialog__title">请使用 <strong>披星云桌面伴侣</strong> 绑定账号</p>
+        <div v-if="companionOnline" class="companion-online-box">
+          <p class="companion-online-box__status">已检测到桌面伴侣运行中</p>
+          <p class="companion-online-box__hint">选择平台后，桌面伴侣会自动弹出浏览器窗口</p>
+          <div class="companion-online-box__btns">
+            <el-button v-for="p in bindablePlatforms" :key="p.id" :type="p.type" size="small" @click="openCompanionScan(p.id)">{{ p.icon }} {{ p.name }}</el-button>
           </div>
         </div>
-
-        <!-- 未检测到桌面伴侣 -->
         <template v-else>
-          <el-button
-            type="primary"
-            size="large"
-            style="margin-bottom: 16px"
-            tag="a"
-            href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
-            target="_blank"
-          >
-            <el-icon><Download /></el-icon>
-            下载桌面伴侣
+          <el-button type="primary" size="large" class="download-btn" tag="a" href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip" target="_blank">
+            <el-icon><Download /></el-icon>下载桌面伴侣
           </el-button>
-          <div
-            style="
-              background: #f5f7fa;
-              border-radius: 8px;
-              padding: 16px;
-              text-align: left;
-              margin-bottom: 16px;
-            "
-          >
-            <p style="margin: 4px 0">1. 下载并解压桌面伴侣</p>
-            <p style="margin: 4px 0">2. 双击 install.bat 一键安装</p>
-            <p style="margin: 4px 0">3. 双击 start.bat 启动，自动打开界面</p>
-            <p style="margin: 4px 0">4. 回到本页选择平台，扫码登录</p>
-            <p style="margin: 4px 0">5. Cookie 自动上传，刷新即可见</p>
+          <div class="companion-offline-box">
+            <p>1. 下载并解压桌面伴侣</p>
+            <p>2. 双击 install.bat 一键安装</p>
+            <p>3. 双击 start.bat 启动，自动打开界面</p>
+            <p>4. 回到本页选择平台，扫码登录</p>
+            <p>5. Cookie 自动上传，刷新即可见</p>
           </div>
         </template>
-
-        <p style="color: #6e6e73; font-size: 13px">
-          桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。
-        </p>
+        <p class="text-caption">桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。</p>
       </div>
       <template #footer>
         <el-button @click="showAddDialog = false">关闭</el-button>
-        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false"
-          >手动输入 Cookie</el-button
-        >
+        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false">手动输入 Cookie</el-button>
       </template>
     </el-dialog>
     <!-- Manual Add Dialog -->
@@ -605,6 +559,31 @@ function handleBindSuccess() {
     margin-top: 2px;
   }
 }
+
+// === Add dialog ===
+.add-dialog {
+  text-align: center; padding: $space-lg;
+  .add-dialog__title { font-size: $text-title; margin-bottom: $space-md; }
+}
+.companion-online-box {
+  background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color);
+  border-radius: $radius-sm;
+  padding: $space-md;
+  margin-bottom: $space-md;
+  .companion-online-box__status { color: #34C759; font-weight: 600; margin-bottom: $space-sm; }
+  .companion-online-box__hint { color: var(--el-text-color-secondary); font-size: $text-caption; margin-bottom: $space-sm; }
+  .companion-online-box__btns { display: flex; gap: $space-sm; flex-wrap: wrap; justify-content: center; }
+}
+.companion-offline-box {
+  background: var(--el-fill-color-lighter);
+  border-radius: $radius-sm;
+  padding: $space-md;
+  text-align: left;
+  margin-bottom: $space-md;
+  p { margin: 4px 0; font-size: $text-caption; color: var(--el-text-color-secondary); }
+}
+.download-btn { margin-bottom: $space-md; }
 
 // === Empty state ===
 .empty-state {
