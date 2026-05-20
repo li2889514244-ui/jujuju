@@ -278,11 +278,11 @@ onMounted(() => {
 
   &__account-name {
     font-weight: 500;
-    font-size: 14px;
+    font-size: $text-body;
   }
 
   &__account-id {
-    font-size: 12px;
+    font-size: $text-caption;
     color: #999;
   }
 }

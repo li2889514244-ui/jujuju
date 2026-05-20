@@ -380,7 +380,7 @@ onMounted(() => {
     color: #f5f5f7;
   }
   &__change {
-    font-size: 12px;
+    font-size: $text-caption;
     margin-top: 6px;
     font-weight: 500;
   }

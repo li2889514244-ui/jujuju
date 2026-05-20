@@ -91,7 +91,7 @@
     >
       <template #header>
         <span>跨平台内容对比</span>
-        <span style="font-size: 12px; color: #6e6e73; margin-left: 8px"
+        <span style="font-size: 13px; color: #6e6e73; margin-left: 8px"
           >同一内容在不同平台的表现</span
         >
       </template>

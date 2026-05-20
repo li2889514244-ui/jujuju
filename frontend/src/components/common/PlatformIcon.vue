@@ -55,13 +55,13 @@ const charStyle = computed(() => ({
     justify-content: center;
     border-radius: 6px;
     color: #fff;
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 600;
     flex-shrink: 0;
   }
 
   &__label {
-    font-size: 14px;
+    font-size: $text-body;
     color: #f5f5f7;
   }
 }

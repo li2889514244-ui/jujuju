@@ -84,7 +84,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
   }
 
   &__title {
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 600;
     color: var(--el-text-color-secondary);
     letter-spacing: -0.01em;

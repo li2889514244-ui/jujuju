@@ -185,7 +185,7 @@
     <!-- Add Account Guide Dialog -->
     <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
       <div style="text-align: center; padding: 20px">
-        <p style="font-size: 16px; margin-bottom: 16px">
+        <p style="font-size: 18px; margin-bottom: 16px">
           请使用 <strong>披星云桌面伴侣</strong> 绑定账号
         </p>
 

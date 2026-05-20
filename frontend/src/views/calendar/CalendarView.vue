@@ -294,7 +294,7 @@ function deleteEvent() {
     margin-bottom: 20px;
     h2 {
       margin: 0;
-      font-size: 22px;
+      font-size: $text-headline;
       font-weight: 700;
       letter-spacing: -0.02em;
     }
@@ -370,7 +370,7 @@ function deleteEvent() {
   white-space: nowrap;
   text-overflow: ellipsis;
   &__time {
-    font-size: 10px;
+    font-size: $text-micro;
     color: var(--el-text-color-placeholder);
     margin-right: 2px;
   }
@@ -401,7 +401,7 @@ function deleteEvent() {
     }
   }
   &__date {
-    font-size: 20px;
+    font-size: $text-headline;
     font-weight: 500;
   }
   &__body {

@@ -44,7 +44,7 @@ const platformLabel = computed(() => getPlatformLabel(props.platform))
   }
 
   &__label {
-    font-size: 12px;
+    font-size: $text-caption;
     color: #98989d;
   }
 

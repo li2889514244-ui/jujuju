@@ -272,7 +272,7 @@ function disconnectSSE() {
 .scan-bind {
   &__tip {
     color: #98989d;
-    font-size: 14px;
+    font-size: $text-body;
     margin-bottom: 16px;
     text-align: center;
   }
@@ -331,7 +331,7 @@ function disconnectSSE() {
     gap: 8px;
     margin-bottom: 16px;
     color: #98989d;
-    font-size: 14px;
+    font-size: $text-body;
   }
 
   &__qr-container {
@@ -387,7 +387,7 @@ function disconnectSSE() {
   }
 
   &__account-name {
-    font-size: 16px;
+    font-size: $text-title;
     font-weight: 500;
     color: #f5f5f7;
   }
