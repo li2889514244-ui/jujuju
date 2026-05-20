@@ -6,8 +6,11 @@
         <p class="login__subtitle">矩阵账号管理平台</p>
       </div>
 
-      <el-tabs v-model="activeTab" class="login__tabs">
-        <el-tab-pane label="登录" name="login">
+      <div class="login__switch">
+        <button :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">登录</button>
+        <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">注册</button>
+      </div>
+      <div v-show="activeTab === 'login'">
           <el-form
             ref="loginFormRef"
             :model="loginForm"
@@ -44,9 +47,8 @@
               </el-button>
             </el-form-item>
           </el-form>
-        </el-tab-pane>
-
-        <el-tab-pane label="注册" name="register">
+      </div>
+      <div v-show="activeTab === 'register'">
           <el-form
             ref="registerFormRef"
             :model="registerForm"
@@ -99,8 +101,7 @@
               </el-button>
             </el-form-item>
           </el-form>
-        </el-tab-pane>
-      </el-tabs>
+      </div>
     </div>
   </div>
 </template>
@@ -197,7 +198,6 @@ async function handleRegister() {
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
     loginForm.email = registerForm.email
-    loginForm.password = ''
   } catch {
     // 错误已由响应拦截器统一处理并弹出提示
   } finally {
@@ -258,11 +258,24 @@ async function handleRegister() {
     font-weight: 400;
   }
 
-  &__tabs {
-    :deep(.el-tabs__nav-wrap::after) { display: none; }
-    :deep(.el-tabs__item) {
-      color: #98989d;
-      &.is-active { color: #f5f5f7; }
+  &__switch {
+    display: flex; gap: 0;
+    margin-bottom: 24px;
+    background: var(--app-overlay-hover);
+    border-radius: $radius-md;
+    padding: 3px;
+    button {
+      flex: 1; padding: 8px 0;
+      border: none; border-radius: $radius-sm;
+      background: transparent;
+      color: var(--app-text-tertiary);
+      font-size: $text-body; font-weight: 500; cursor: pointer;
+      transition: all 0.2s ease;
+      &.active {
+        background: var(--app-bg-elevated);
+        color: var(--app-text-primary);
+        box-shadow: var(--app-shadow-sm);
+      }
     }
   }
 
@@ -270,7 +283,7 @@ async function handleRegister() {
     width: 100%;
     height: 44px;
     font-size: 16px;
-    font-weight: 590;
+    font-weight: 600;
     letter-spacing: -0.01em;
   }
 }

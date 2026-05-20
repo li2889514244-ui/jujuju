@@ -68,12 +68,12 @@
           <PlatformBadge :platform="acc.platform" size="sm" />
         </div>
         <div class="account-card__stats">
-          <span class="account-card__stat-value">{{ formatNumber(acc.followers || 0) }}</span>
+          <span class="account-card__stat-value">{{ formatCompactNum(acc.followers || 0) }}</span>
           <span class="account-card__stat-label">粉丝</span>
         </div>
         <span class="account-card__group" v-if="acc.groupName">{{ acc.groupName }}</span>
         <span class="account-card__status" :class="'status--' + (acc.tokenStatus || 'unknown')">
-          {{ acc.tokenStatus === 'valid' ? '已连接' : acc.tokenStatus === 'expiring_soon' ? '即将过期' : acc.tokenStatus === 'expired' ? '已失效' : acc.hasCookies ? '在线' : '待授权' }}
+          {{ tokenStatusLabel(acc) }}
         </span>
         <div class="account-card__actions">
           <el-button text type="primary" size="small" @click.stop="$router.push(`/accounts/${acc.id}`)">详情</el-button>
@@ -208,6 +208,7 @@ import { PLATFORM_LABELS } from '@/types'
 import GlassCard from '@/components/common/GlassCard.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
+import { formatCompactNum, tokenStatusLabel } from '@/utils/format'
 
 const accountStore = useAccountStore()
 const userStore = useUserStore()
@@ -246,10 +247,13 @@ function checkCompanion() {
 
 async function openCompanionScan(platform: string) {
   const token = userStore.token
-  const api = 'https://ddddkiii.com/api/v1'
+  const api = import.meta.env.VITE_API_BASE_URL || '/api/v1'
   try {
-    // 先尝试 JSON trigger 端点（companion v2.3+）
-    const resp = await fetch(`http://localhost:5409/api/scan-bind/trigger?platform=${platform}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(api)}`)
+    const resp = await fetch(`http://localhost:5409/api/scan-bind/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, token, api_url: api }),
+    })
     if (!resp.ok) throw new Error('HTTP ' + resp.status)
     const data = await resp.json()
     if (data.code === 0) {
@@ -268,7 +272,6 @@ onMounted(() => {
   accountStore.fetchAccounts()
   accountStore.fetchGroups()
   checkCompanion()
-  setInterval(checkCompanion, 5000)
 })
 
 async function handleSearch() {
@@ -373,14 +376,6 @@ function handleBindSuccess() {
   accountStore.fetchAccounts()
 }
 
-function formatNumber(num: number) {
-  if (num >= 10000) return (num / 10000).toFixed(1) + 'w'
-  return num?.toLocaleString() || '0'
-}
-
-function formatTime(time: string) {
-  return time ? dayjs(time).format('YYYY-MM-DD HH:mm') : '-'
-}
 </script>
 
 <style lang="scss" scoped>
@@ -445,7 +440,7 @@ function formatTime(time: string) {
     min-width: 0; width: 100%;
   }
   &__name {
-    font-size: $text-body; font-weight: 590; color: var(--app-text-primary);
+    font-size: $text-body; font-weight: 600; color: var(--app-text-primary);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     max-width: 100%;
   }
