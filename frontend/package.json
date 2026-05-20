@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint . --ext .vue,.ts,.tsx --fix",
     "typecheck": "vue-tsc --noEmit",
+    "precommit": "npm run lint && npm run typecheck",
     "test:ci": "echo 'no tests yet'",
     "format": "prettier --write \"src/**/*.{vue,ts,tsx,css}\""
   },
