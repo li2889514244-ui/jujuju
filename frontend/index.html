@@ -15,5 +15,10 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <style>
+      html.dark{--el-bg-color:#000!important;--el-bg-color-page:#000!important;--el-bg-color-overlay:#1C1C1E!important;--el-text-color-primary:#FFF!important;--el-text-color-regular:#EBEBF5!important;--el-text-color-secondary:rgba(235,235,245,.6)!important;--el-color-primary:#007AFF!important;--el-border-color:rgba(84,84,88,.65)!important;--el-fill-color-blank:#000!important}
+      html.light{--el-bg-color:#FFF!important;--el-bg-color-page:#F2F2F7!important;--el-bg-color-overlay:#FFF!important;--el-text-color-primary:#000!important;--el-text-color-regular:#1C1C1E!important;--el-text-color-secondary:rgba(60,60,67,.6)!important;--el-color-primary:#007AFF!important;--el-border-color:rgba(60,60,67,.2)!important;--el-fill-color-blank:#FFF!important}
+      body{background:var(--el-bg-color-page)!important;color:var(--el-text-color-primary)!important}
+    </style>
   </body>
 </html>
