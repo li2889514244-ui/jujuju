@@ -299,8 +299,9 @@
                     v-model="anomalyForm.dataset"
                     type="textarea"
                     :rows="4"
-                    placeholder="输入JSON数组，如: [100, 120, 95, 500, 110]"
+                    placeholder="输入JSON数组，如: [100, 120, 95, 500, 110]&#10;或点击下方按钮自动填充账号数据"
                   />
+                  <el-button size="small" style="margin-top:8px" @click="autoFillAnomalyData">使用我的账号数据</el-button>
                 </el-form-item>
                 <el-form-item label="指标">
                   <el-input v-model="anomalyForm.metric" placeholder="如：粉丝数、播放量" />
@@ -595,6 +596,7 @@ import {
   Calendar,
 } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
+import { analyticsApi } from '@/api/analytics'
 import {
   generateContent,
   getBestPublishTime,
@@ -711,6 +713,18 @@ async function handleTrendPredict() {
   } finally {
     trendLoading.value = false
   }
+}
+
+async function autoFillAnomalyData() {
+  try {
+    const res = await analyticsApi.getOverview()
+    const followers = res.data?.accounts?.totalFollowers
+    if (followers) {
+      const sample = [followers, Math.round(followers * 1.05), Math.round(followers * 0.98), Math.round(followers * 1.12), Math.round(followers * 0.95)]
+      anomalyForm.value.dataset = JSON.stringify(sample)
+      anomalyForm.value.metric = '粉丝数'
+    }
+  } catch { ElMessage.warning('获取数据失败') }
 }
 
 async function handleAnomalyDetect() {
