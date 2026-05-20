@@ -44,6 +44,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
     border-color: rgba(#0a84ff, 0.15);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
+    .glass-card__header { border-bottom-color: rgba(#0a84ff, 0.08); }
   }
 
   &--sm { padding: 14px; }
@@ -69,7 +70,7 @@ defineEmits<{ click: [e: MouseEvent] }>()
 
   &__title {
     font-size: 14px;
-    font-weight: 590;
+    font-weight: 600;
     color: var(--app-text-secondary);
     letter-spacing: -0.01em;
   }

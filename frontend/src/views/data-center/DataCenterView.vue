@@ -211,7 +211,9 @@ async function loadOverview() {
   try {
     const res = await analyticsApi.getOverview()
     overview.value = res.data
-  } catch { /* silent */ }
+  } catch {
+    ElMessage.error('数据加载失败')
+  }
 }
 
 async function loadTrend() {

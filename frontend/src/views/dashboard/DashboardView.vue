@@ -2,7 +2,7 @@
   <div class="dashboard">
     <!-- Hero KPI: 唯一的视觉焦点 -->
     <div class="dashboard__hero-kpi" v-if="accountRows.length > 0">
-      <span class="hero-kpi__value">{{ formatNum(groupSummaryCards[0]?.rawValue || 0) }}</span>
+      <span class="hero-kpi__value">{{ formatLargeNum(groupSummaryCards[0]?.rawValue || 0) }}</span>
       <span class="hero-kpi__label">总粉丝</span>
     </div>
 
@@ -10,7 +10,7 @@
     <div class="dashboard__sub-row" v-if="accountRows.length > 0">
       <div class="dashboard__sub-kpis">
         <span class="sub-kpi" v-for="card in groupSummaryCards.slice(1)" :key="card.label">
-          <b>{{ formatNum(card.rawValue) }}</b>
+          <b>{{ formatLargeNum(card.rawValue) }}</b>
           <small>{{ card.label }}</small>
         </span>
       </div>
@@ -82,6 +82,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
+import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
 import GlassCard from '@/components/common/GlassCard.vue'
@@ -89,6 +90,7 @@ import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import { analyticsApi } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
 import { getPlatformColor, getPlatformLabel } from '@/composables/usePlatform'
+import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
 
 const period = ref('week')
 const loading = ref(false)
@@ -156,19 +158,13 @@ const groupSummaryCards = computed<SummaryCardData[]>(() => {
 })
 function onGroupChange() {}
 
-function formatNum(num: number): string {
-  if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
-  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
-  if (num === 0) return '-'
-  return num.toLocaleString()
-}
 
 async function refreshAll() {
   loading.value = true
   try {
     const [overviewRes, compRes] = await Promise.all([
       analyticsApi.getOverview(),
-      analyticsApi.getComparison().catch(() => null),
+      analyticsApi.getComparison().catch((e) => { console.warn('Comparison unavailable:', e); return null }),
     ])
     const ov = overviewRes.data
 
@@ -198,7 +194,7 @@ async function refreshAll() {
           shares: allStats.reduce((sum: number, s: any) => sum + (s.shares || 0), 0),
         }
       }
-    } catch { /* daily stats might be empty */ }
+    } catch { /* daily stats unavailable — showing counts without stats */ }
 
     accountRows.value = accs.map((a: any) => {
       const daily = dailyMap[a.id] || { views: 0, likes: 0, comments: 0, shares: 0 }
@@ -243,8 +239,11 @@ async function refreshAll() {
       }))
 
     lastUpdate.value = dayjs().format('HH:mm:ss')
-  } catch { /* silent */ }
-  loading.value = false
+  } catch {
+    ElMessage.error('数据加载失败，请检查网络连接后重试')
+  } finally {
+    loading.value = false
+  }
 }
 
 async function loadFollowerTrend() {
@@ -279,7 +278,7 @@ const platformChartOption = computed(() => ({
 function exportCSV() {
   const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
   const rows = accountRows.value.map(r => [
-    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, r.tokenStatus === 'valid' ? '已连接' : r.tokenStatus === 'expiring_soon' ? '即将过期' : r.tokenStatus === 'expired' ? '已失效' : r.hasCookies ? '在线' : '待授权'
+    r.nickname, r.platform, r.followers, r.views, r.likes, r.comments, r.shares, r.postCount, tokenStatusLabel(r)
   ])
   const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
@@ -303,13 +302,15 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 
   // === Sub KPIs + actions ===
   &__sub-row {
-    display: flex; justify-content: center; align-items: center; gap: $space-2xl;
+    display: flex; justify-content: center; align-items: flex-end; gap: $space-2xl;
   }
   &__sub-kpis {
-    display: flex; gap: $space-2xl;
+    display: flex; gap: $space-3xl;
   }
   &__sub-actions {
     display: flex; align-items: center; gap: $space-sm;
+    padding-left: $space-2xl;
+    border-left: 1px solid var(--app-separator);
   }
 
   // === Groups ===
@@ -361,7 +362,7 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 // === Section header ===
 .section-header {
   display: flex; align-items: baseline; gap: $space-sm;
-  &__title { font-size: $text-body; font-weight: 600; color: var(--app-text-primary); text-transform: uppercase; letter-spacing: 0.06em; }
+  &__title { font-size: $text-micro; font-weight: 600; color: var(--app-text-tertiary); text-transform: uppercase; letter-spacing: 0.08em; }
   &__count { font-size: $text-caption; color: var(--app-text-tertiary); }
   &__link { font-size: $text-caption; color: #0a84ff; text-decoration: none; font-weight: 500; margin-left: auto;
     &:hover { text-decoration: underline; }
@@ -375,7 +376,7 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 .account-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: $space-sm;
+  gap: $space-lg;
 }
 
 .account-card {
@@ -397,7 +398,7 @@ onMounted(() => { refreshAll(); loadFollowerTrend() })
 
   &__name {
     flex: 1;
-    font-size: $text-body; font-weight: 590; color: var(--app-text-primary);
+    font-size: $text-body; font-weight: 600; color: var(--app-text-primary);
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     min-width: 0;
   }
