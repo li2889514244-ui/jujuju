@@ -140,7 +140,7 @@ function toggleCollapse() { isCollapsed.value = !isCollapsed.value }
 
   &__item {
     display: flex; align-items: center; gap: 10px;
-    padding: 10px 12px; border-radius: 8px;
+    padding: 10px 12px; border-radius: 6px;
     color: var(--app-text-secondary); text-decoration: none;
     font-size: 14px; font-weight: 450;
     transition: all 0.2s ease;
