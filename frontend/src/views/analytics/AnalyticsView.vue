@@ -207,7 +207,7 @@ const followerChart = computed(() => ({
             type: 'text',
             left: 'center',
             top: 'center',
-            style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
+            style: { text: '暂无数据', fontSize: 16, fill: '#AEAEB2' },
           },
         ]
       : undefined,
@@ -234,7 +234,7 @@ const engagementChart = computed(() => ({
             type: 'text',
             left: 'center',
             top: 'center',
-            style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
+            style: { text: '暂无数据', fontSize: 16, fill: '#AEAEB2' },
           },
         ]
       : undefined,
@@ -253,7 +253,7 @@ const publishEffectChart = computed(() => ({
             type: 'text',
             left: 'center',
             top: 'center',
-            style: { text: '暂无数据', fontSize: 16, fill: '#6e6e73' },
+            style: { text: '暂无数据', fontSize: 16, fill: '#AEAEB2' },
           },
         ]
       : undefined,
