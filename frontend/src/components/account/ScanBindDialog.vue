@@ -296,7 +296,7 @@ function disconnectSSE() {
     transition: all 0.2s;
 
     &:hover {
-      border-color: #0a84ff;
+      border-color: #E60012;
       box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
       transform: translateY(-2px);
     }

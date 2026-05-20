@@ -271,7 +271,7 @@ function handleUserCommand(command: string) {
     border-radius: 6px;
     transition: background 0.2s;
     &:hover {
-      background: rgba(10, 132, 255, 0.1);
+      background: rgba(230, 0, 18, 0.1);
     }
   }
 
@@ -350,9 +350,9 @@ function handleUserCommand(command: string) {
     background: var(--el-fill-color-lighter);
   }
   &--unread {
-    background: rgba(10, 132, 255, 0.08);
+    background: rgba(230, 0, 18, 0.08);
     &:hover {
-      background: rgba(10, 132, 255, 0.14);
+      background: rgba(230, 0, 18, 0.14);
     }
   }
   &__icon {

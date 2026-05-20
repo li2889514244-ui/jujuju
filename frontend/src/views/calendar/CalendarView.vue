@@ -167,12 +167,12 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
 const editingEvent = ref<CalEvent | null>(null)
-const form = ref({ title: '', allDay: false, color: '#0a84ff', description: '' })
+const form = ref({ title: '', allDay: false, color: '#E60012', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
 const predefineColors = [
-  '#0a84ff',
+  '#E60012',
   '#30d158',
   '#ff9f0a',
   '#ff453a',
@@ -228,7 +228,7 @@ function nextPeriod() {
 
 function openAddDialog() {
   editingEvent.value = null
-  form.value = { title: '', allDay: false, color: '#0a84ff', description: '' }
+  form.value = { title: '', allDay: false, color: '#E60012', description: '' }
   formDate.value = new Date()
   formTime.value = null
   dialogVisible.value = true
@@ -341,9 +341,9 @@ function deleteEvent() {
     color: var(--el-text-color-placeholder);
   }
   &--today {
-    background: rgba(#0a84ff, 0.06);
+    background: rgba(#E60012, 0.06);
     .cal-day__num {
-      color: #0a84ff;
+      color: #E60012;
       font-weight: 700;
     }
   }
@@ -396,7 +396,7 @@ function deleteEvent() {
     font-size: 13px;
     color: var(--el-text-color-secondary);
     &.is-today {
-      color: #0a84ff;
+      color: #E60012;
       font-weight: 600;
     }
   }
@@ -416,7 +416,7 @@ function deleteEvent() {
       border-right: none;
     }
     &.is-today {
-      background: rgba(#0a84ff, 0.06);
+      background: rgba(#E60012, 0.06);
     }
   }
 }
