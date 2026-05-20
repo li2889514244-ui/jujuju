@@ -4,7 +4,7 @@
     <div class="sidebar__logo" @click="$router.push('/dashboard')">
       <div class="sidebar__logo-icon">
         <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
-          <rect width="32" height="32" rx="7" fill="#0a84ff" />
+          <rect width="32" height="32" rx="7" fill="#E60012" />
           <path d="M10 22V10l12 6-12 6z" fill="#fff" />
         </svg>
       </div>
@@ -130,10 +130,9 @@ function toggleCollapse() {
 .sidebar {
   width: 220px;
   height: 100vh;
-  background: var(--el-fill-color);
-  backdrop-filter: blur(60px) saturate(200%);
-  -webkit-backdrop-filter: blur(60px) saturate(200%);
+  background: #FAFAFA;
   border-right: 1px solid var(--el-border-color);
+  box-shadow: 1px 0 4px rgba(0,0,0,0.04);
   display: flex;
   flex-direction: column;
   transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -197,11 +196,11 @@ function toggleCollapse() {
       color: var(--el-text-color-primary);
     }
     &--active {
-      background: rgba(#0a84ff, 0.12);
-      color: #0a84ff;
+      background: rgba(#E60012, 0.12);
+      color: #E60012;
       font-weight: 540;
       &:hover {
-        background: rgba(#0a84ff, 0.18);
+        background: rgba(#E60012, 0.18);
       }
     }
     &-icon {
@@ -251,7 +250,7 @@ function toggleCollapse() {
       background: var(--el-fill-color-lighter);
     }
     &--active {
-      background: rgba(#0a84ff, 0.1);
+      background: rgba(#E60012, 0.1);
     }
   }
   &__acc-avatar {
