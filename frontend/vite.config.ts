@@ -37,11 +37,12 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        target: 'http://localhost:3000',
+        target: 'https://ddddkiii.com',
         changeOrigin: true,
+        secure: false,
       },
       '/ws': {
-        target: 'ws://localhost:3000',
+        target: 'wss://ddddkiii.com',
         ws: true,
       },
     },

@@ -96,7 +96,7 @@
         >
       </template>
       <div v-for="(group, gi) in crossPlatformItems" :key="gi" style="margin-bottom: 16px">
-        <div style="font-weight: 600; margin-bottom: 8px; color: #f5f5f7">{{ group.title }}</div>
+        <div style="font-weight: 600; margin-bottom: 8px; color: #1D1D1F">{{ group.title }}</div>
         <el-table :data="group.items" stripe size="small">
           <el-table-column label="平台" width="100">
             <template #default="{ row }">

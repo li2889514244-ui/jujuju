@@ -297,7 +297,7 @@ function formatNum(n: any): string {
   &__value {
     font-size: $text-headline;
     font-weight: 600;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
 }
 

@@ -378,7 +378,7 @@ onMounted(() => {
   &__value {
     font-size: 24px;
     font-weight: 600;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
   &__change {
     font-size: $text-caption;
@@ -403,7 +403,7 @@ onMounted(() => {
 
 .ranking-title {
   font-size: 13px;
-  color: #f5f5f7;
+  color: #1D1D1F;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

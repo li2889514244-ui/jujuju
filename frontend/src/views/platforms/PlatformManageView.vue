@@ -467,7 +467,7 @@ onMounted(async () => {
       .stat-name {
         font-size: $text-body;
         font-weight: 500;
-        color: #f5f5f7;
+        color: #1D1D1F;
       }
       .stat-count {
         font-size: $text-caption;
@@ -498,7 +498,7 @@ onMounted(async () => {
   .account-info {
     .nickname {
       font-weight: 500;
-      color: #f5f5f7;
+      color: #1D1D1F;
     }
     .uid {
       font-size: $text-caption;
@@ -509,7 +509,7 @@ onMounted(async () => {
 
 .metric {
   font-weight: 500;
-  color: #f5f5f7;
+  color: #1D1D1F;
 }
 
 .time-text {
@@ -552,7 +552,7 @@ onMounted(async () => {
     .platform-name {
       font-size: $text-body;
       font-weight: 500;
-      color: #f5f5f7;
+      color: #1D1D1F;
     }
   }
 }

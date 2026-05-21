@@ -254,6 +254,12 @@ function handleUserCommand(command: string) {
   flex-shrink: 0;
   z-index: 5;
 
+  &__left {
+    :deep(.el-breadcrumb) {
+      font-size: $text-body;
+    }
+  }
+
   &__right {
     display: flex;
     align-items: center;
@@ -266,7 +272,7 @@ function handleUserCommand(command: string) {
     gap: 4px;
     color: var(--el-color-primary);
     text-decoration: none;
-    font-size: 13px;
+    font-size: $text-body;
     padding: 4px 10px;
     border-radius: 6px;
     transition: background 0.2s;

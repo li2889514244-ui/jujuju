@@ -55,7 +55,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, markRaw, type Component } from 'vue'
+import { computed, ref, onMounted, onUnmounted, markRaw, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   Monitor,
@@ -83,7 +83,22 @@ const isCollapsed = ref(false)
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
 
+// Auto-collapse sidebar on narrow screens (< 1200px)
+function checkViewport() {
+  const narrow = window.innerWidth < 1200
+  isCollapsed.value = narrow
+}
+
+function toggleCollapse() {
+  // Only allow manual toggle on wide screens
+  if (window.innerWidth >= 1200) {
+    isCollapsed.value = !isCollapsed.value
+  }
+}
+
 onMounted(async () => {
+  checkViewport()
+  window.addEventListener('resize', checkViewport)
   try {
     const base = (import.meta as any).env?.VITE_API_BASE_URL || ''
     const url = base ? base.replace(/\/api\/v1$/, '') + '/api/v1/health' : '/api/v1/health'
@@ -95,6 +110,10 @@ onMounted(async () => {
     backendVersion.value = '离线'
     backendOk.value = false
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkViewport)
 })
 
 const activeMenu = computed(() => route.path)
@@ -121,10 +140,6 @@ const iconMap: Record<string, Component> = {
 
 function getIcon(name: unknown): Component {
   return typeof name === 'string' && iconMap[name] ? iconMap[name] : Monitor
-}
-
-function toggleCollapse() {
-  isCollapsed.value = !isCollapsed.value
 }
 </script>
 

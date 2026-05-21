@@ -848,7 +848,7 @@ function copyContent() {
 .result-text {
   line-height: 1.8;
   font-size: $text-body;
-  color: #f5f5f7;
+  color: #1D1D1F;
 }
 
 .result-keywords {

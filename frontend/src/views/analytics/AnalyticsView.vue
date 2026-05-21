@@ -453,7 +453,7 @@ onMounted(() => {
   &__title {
     font-size: $text-body;
     font-weight: 600;
-    color: #f5f5f7;
+    color: #1D1D1F;
     margin-bottom: 12px;
   }
 }
@@ -473,7 +473,7 @@ onMounted(() => {
   &__value {
     font-size: $text-body;
     font-weight: 500;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
   &__change {
     font-size: $text-caption;
@@ -496,7 +496,7 @@ onMounted(() => {
 }
 .ranking-title {
   font-size: $text-body;
-  color: #f5f5f7;
+  color: #1D1D1F;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
