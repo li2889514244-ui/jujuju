@@ -162,7 +162,7 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
   <div style="display:flex;align-items:center;gap:12px">
     <div class="ind" :class="siteConnected?'on':'off'"></div>
     <span>{{ siteConnected ? '已连接到网站' : '等待网站连接...' }}</span>
-    <span style="margin-left:auto;color:#999;font-size:12px">v2.5</span>
+    <button class="btn" style="margin-left:auto;margin-right:8px;padding:4px 12px;font-size:12px;background:#E60012" @click="triggerCollect" :disabled="collecting">{{collecting?'采集中...':'触发采集'}}</button><span style="color:#999;font-size:12px">v2.5</span>
   </div>
   <div v-if="cookieAlerts.length" style="display:flex;flex-direction:column;gap:4px">
     <div v-for="a in cookieAlerts" :key="a.platform" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:6px;font-size:12px" :style="{background:a.expired?'#fff3f3':'#fff8e6'}">
@@ -180,9 +180,10 @@ createApp({data(){return{
   platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'},{id:'doudian',name:'抖店',icon:'🛒',hint:'扫码登录'},{id:'xhsshop',name:'小红书商家',icon:'🏪',hint:'扫码登录'},{id:'wxshop',name:'微信小店',icon:'💚',hint:'微信扫码'}],
   selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
   configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
-  cookieStatus:null,cookieAlerts:[],cookieFreshness:''
+  cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,collecting:false
 }},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
 methods:{
+  async triggerCollect(){this.collecting=true;try{await fetch('/api/data-collection/trigger',{method:'POST'});setTimeout(()=>this.collecting=false,3000)}catch(e){this.collecting=false}},
   async loadCookieStatus(){
     try{const r=await fetch('/api/cookie-status');const j=await r.json();
       this.cookieStatus=j.by_platform;
@@ -1145,7 +1146,7 @@ async def _scrape_all(accounts: list) -> list:
             if not entry:
                 continue
 
-            domain = entry[1]
+            domain = entry.get('domain') or entry.get('url', '').split('://')[1] if '://' in entry.get('url', '') else entry.get('url', '')
 
             cookie_list = []
             for pair in cookies_str.split('; '):
@@ -1321,6 +1322,16 @@ def _run_collection_once():
         _collector_running = False
 
 
+def _get_collection_interval() -> int:
+    """Return seconds until next collection based on time of day.
+    Day (8:00-21:00): 30 minutes. Night (21:00-8:00): 2 hours."""
+    now = time.localtime()
+    hour = now.tm_hour
+    if 8 <= hour < 21:
+        return 30 * 60  # daytime: 30 min
+    else:
+        return 120 * 60  # nighttime: 2 hours
+
 def _data_collector_loop():
     time.sleep(30)
     while True:
@@ -1328,7 +1339,9 @@ def _data_collector_loop():
             _run_collection_once()
         except Exception as e:
             print(f'[DC] Loop error: {e}')
-        time.sleep(30 * 60)
+        interval = _get_collection_interval()
+        print(f'[DC] Next collection in {interval // 60} min (hour={time.localtime().tm_hour})')
+        time.sleep(interval)
 
 
 # Start collector in background
