@@ -330,6 +330,7 @@ PLATFORM_DASHBOARDS = {
         'extra_pages': [
             'https://creator.douyin.com/creator-micro/data/fans',      # 粉丝画像
             'https://creator.douyin.com/creator-micro/data/content',   # 内容数据
+            'https://fxg.jinritemai.com/',                             # 抖店（电商罗盘）
         ],
     },
     'KUAISHOU': {
@@ -343,6 +344,7 @@ PLATFORM_DASHBOARDS = {
         'domain': '.xiaohongshu.com',
         'data_center': 'https://creator.xiaohongshu.com/note-manage',
         'video_list': 'https://creator.xiaohongshu.com/note-manage/notes',
+        'monetization': 'https://seller.xiaohongshu.com/',  # 小红书商家后台
     },
     'BILIBILI': {
         'url': 'https://member.bilibili.com',
