@@ -77,6 +77,17 @@ export const analyticsApi = {
     }>('/analytics/views-ranking', params as Record<string, unknown>)
   },
 
+  getMonetization(days?: number) {
+    return get<{
+      totalRevenue: number
+      totalGmv: number
+      totalOrders: number
+      totalCommission: number
+      byPlatform: Array<{ platform: string; revenue: number; gmv: number; orders: number; commission: number }>
+      dailyTrend: Array<{ date: string; revenue: number; gmv: number; orders: number; commission: number }>
+    }>('/analytics/monetization', { days })
+  },
+
   // 触发桌面伴侣采集真实数据（伴侣在本地 localhost:5409 运行）
   async triggerRealDataCollection() {
     try {

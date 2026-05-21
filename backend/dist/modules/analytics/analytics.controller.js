@@ -73,6 +73,9 @@ let AnalyticsController = class AnalyticsController {
         await this.verifyAccountOwnership(accountId, userId, userRole);
         return this.analyticsService.getAccountAnalytics(accountId);
     }
+    async getMonetization(userId, days) {
+        return this.analyticsService.getMonetization(userId, days ? Number(days) : 30);
+    }
     async getAccountPosts(accountId, userId, userRole, page, pageSize, sortBy, sortOrder) {
         await this.verifyAccountOwnership(accountId, userId, userRole);
         return this.analyticsService.getAccountPosts(accountId, {
@@ -186,6 +189,14 @@ __decorate([
     __metadata("design:paramtypes", [String, Number, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getEngagementRate", null);
+__decorate([
+    (0, common_1.Get)('monetization'),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('days')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getMonetization", null);
 __decorate([
     (0, common_1.Get)('export'),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),

@@ -61,6 +61,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '数据中心', icon: 'DataAnalysis' },
       },
       {
+        path: 'monetization',
+        name: 'Monetization',
+        component: () => import('@/views/monetization/MonetizationView.vue'),
+        meta: { title: '变现中心', icon: 'Money' },
+      },
+      {
         path: 'report',
         name: 'Report',
         component: () => import('@/views/report/ReportView.vue'),

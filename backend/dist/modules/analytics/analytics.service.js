@@ -414,6 +414,61 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         }));
         return { items: mapped, total, page, pageSize };
     }
+    async getMonetization(userId, days = 30) {
+        const since = new Date();
+        since.setDate(since.getDate() - days);
+        since.setHours(0,0,0,0);
+
+        // Get all user accounts
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, status: 'ACTIVE' },
+            select: { id: true, platform: true, nickname: true }
+        });
+
+        const accountIds = accounts.map(a => a.id);
+
+        // Aggregate monetization data from DailyStats
+        const agg = await this.prisma.dailyStats.aggregate({
+            where: { accountId: { in: accountIds }, date: { gte: since } },
+            _sum: { revenue: true, gmv: true, orders: true, commission: true }
+        });
+
+        // Per-platform breakdown
+        const byPlatform = await this.prisma.dailyStats.groupBy({
+            by: ['platform'],
+            where: { accountId: { in: accountIds }, date: { gte: since } },
+            _sum: { revenue: true, gmv: true, orders: true, commission: true }
+        });
+
+        // Daily trend for revenue
+        const dailyTrend = await this.prisma.dailyStats.groupBy({
+            by: ['date'],
+            where: { accountId: { in: accountIds }, date: { gte: since } },
+            _sum: { revenue: true, gmv: true, orders: true, commission: true },
+            orderBy: { date: 'asc' }
+        });
+
+        return {
+            totalRevenue: agg._sum.revenue || 0,
+            totalGmv: agg._sum.gmv || 0,
+            totalOrders: agg._sum.orders || 0,
+            totalCommission: agg._sum.commission || 0,
+            byPlatform: byPlatform.map(p => ({
+                platform: p.platform,
+                revenue: p._sum.revenue || 0,
+                gmv: p._sum.gmv || 0,
+                orders: p._sum.orders || 0,
+                commission: p._sum.commission || 0
+            })),
+            dailyTrend: dailyTrend.map(d => ({
+                date: d.date,
+                revenue: d._sum.revenue || 0,
+                gmv: d._sum.gmv || 0,
+                orders: d._sum.orders || 0,
+                commission: d._sum.commission || 0
+            }))
+        };
+    }
     calcChange(current, previous) {
         const result = {};
         for (const key of Object.keys(current)) {
