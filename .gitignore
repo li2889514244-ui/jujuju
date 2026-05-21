@@ -73,6 +73,7 @@ social-auto-upload/*
 # 调试脚本
 _*.js
 _*.py
+migrate-monet.js
 *.bat
 !setup.bat
 !start.bat

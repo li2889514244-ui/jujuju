@@ -359,6 +359,7 @@ PLATFORM_DASHBOARDS = {
         'domain': '.weixin.qq.com',
         'data_center': 'https://channels.weixin.qq.com/platform/data-center',
         'video_list': 'https://channels.weixin.qq.com/platform/post/list',
+        'monetization': 'https://store.weixin.qq.com/',
     },
 }
 
