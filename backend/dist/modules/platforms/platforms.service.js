@@ -173,14 +173,22 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 views: metrics.views || 0,
                 likes: metrics.likes || 0,
                 comments: metrics.comments || 0,
-                shares: metrics.shares || 0
+                shares: metrics.shares || 0,
+                revenue: metrics.revenue || 0,
+                gmv: metrics.gmv || 0,
+                orders: metrics.orders || 0,
+                commission: metrics.commission || 0
             },
             update: {
                 ...(metrics.followers != null ? { followers: metrics.followers } : {}),
                 ...(metrics.views != null ? { views: metrics.views } : {}),
                 ...(metrics.likes != null ? { likes: metrics.likes } : {}),
                 ...(metrics.comments != null ? { comments: metrics.comments } : {}),
-                ...(metrics.shares != null ? { shares: metrics.shares } : {})
+                ...(metrics.shares != null ? { shares: metrics.shares } : {}),
+                ...(metrics.revenue != null ? { revenue: metrics.revenue } : {}),
+                ...(metrics.gmv != null ? { gmv: metrics.gmv } : {}),
+                ...(metrics.orders != null ? { orders: metrics.orders } : {}),
+                ...(metrics.commission != null ? { commission: metrics.commission } : {})
             }
         });
 

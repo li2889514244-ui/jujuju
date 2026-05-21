@@ -73,6 +73,7 @@ import {
   Expand,
   Sunny,
   Moon,
+  Money,
 } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -136,6 +137,7 @@ const iconMap: Record<string, Component> = {
   MagicStick: markRaw(MagicStick),
   Calendar: markRaw(Calendar),
   ChatDotSquare: markRaw(MagicStick),
+  Money: markRaw(Money),
 }
 
 function getIcon(name: unknown): Component {

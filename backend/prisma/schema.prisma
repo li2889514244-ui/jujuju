@@ -192,8 +192,12 @@ model DailyStats {
   views     Int          @default(0)
   likes     Int          @default(0)
   comments  Int          @default(0)
-  shares    Int          @default(0)
-  createdAt DateTime     @default(now())
+  shares     Int          @default(0)
+  revenue    Int          @default(0)
+  gmv        Int          @default(0)
+  orders     Int          @default(0)
+  commission Int          @default(0)
+  createdAt  DateTime     @default(now())
 
   account   Account @relation(fields: [accountId], references: [id])
   accountId String
