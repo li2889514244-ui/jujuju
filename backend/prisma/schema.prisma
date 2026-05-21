@@ -42,6 +42,9 @@ enum PlatformEnum {
   WEIBO
   WECHAT_VIDEO
   TIKTOK
+  DOUDIAN
+  XIAOHONGSHU_SHOP
+  WECHAT_SHOP
 }
 
 // ==================== 用户与组织 ====================

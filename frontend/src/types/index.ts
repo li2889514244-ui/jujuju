@@ -38,6 +38,9 @@ export type Platform =
   | 'bilibili'
   | 'weibo'
   | 'tiktok'
+  | 'doudian'
+  | 'xiaohongshu_shop'
+  | 'wechat_shop'
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   douyin: '抖音',
@@ -47,6 +50,9 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   bilibili: 'B站',
   weibo: '微博',
   tiktok: 'TikTok',
+  doudian: '抖店',
+  xiaohongshu_shop: '小红书商家',
+  wechat_shop: '微信小店',
 }
 
 // ===== Account =====
