@@ -83,8 +83,10 @@ export const analyticsApi = {
       totalGmv: number
       totalOrders: number
       totalCommission: number
-      byPlatform: Array<{ platform: string; revenue: number; gmv: number; orders: number; commission: number }>
-      dailyTrend: Array<{ date: string; revenue: number; gmv: number; orders: number; commission: number }>
+      totalBuyerCount: number
+      totalAvgOrderValue: number
+      byPlatform: Array<{ platform: string; revenue: number; gmv: number; orders: number; commission: number; buyerCount: number; avgOrderValue: number }>
+      dailyTrend: Array<{ date: string; revenue: number; gmv: number; orders: number; commission: number; buyerCount: number; avgOrderValue: number }>
     }>('/analytics/monetization', { days })
   },
 

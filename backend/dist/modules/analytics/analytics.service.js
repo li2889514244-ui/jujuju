@@ -430,21 +430,21 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         // Aggregate monetization data from DailyStats
         const agg = await this.prisma.dailyStats.aggregate({
             where: { accountId: { in: accountIds }, date: { gte: since } },
-            _sum: { revenue: true, gmv: true, orders: true, commission: true }
+            _sum: { revenue: true, gmv: true, orders: true, commission: true, buyerCount: true, avgOrderValue: true }
         });
 
         // Per-platform breakdown
         const byPlatform = await this.prisma.dailyStats.groupBy({
             by: ['platform'],
             where: { accountId: { in: accountIds }, date: { gte: since } },
-            _sum: { revenue: true, gmv: true, orders: true, commission: true }
+            _sum: { revenue: true, gmv: true, orders: true, commission: true, buyerCount: true, avgOrderValue: true }
         });
 
         // Daily trend for revenue
         const dailyTrend = await this.prisma.dailyStats.groupBy({
             by: ['date'],
             where: { accountId: { in: accountIds }, date: { gte: since } },
-            _sum: { revenue: true, gmv: true, orders: true, commission: true },
+            _sum: { revenue: true, gmv: true, orders: true, commission: true, buyerCount: true, avgOrderValue: true },
             orderBy: { date: 'asc' }
         });
 
@@ -453,19 +453,25 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             totalGmv: agg._sum.gmv || 0,
             totalOrders: agg._sum.orders || 0,
             totalCommission: agg._sum.commission || 0,
+            totalBuyerCount: agg._sum.buyerCount || 0,
+            totalAvgOrderValue: agg._sum.avgOrderValue || 0,
             byPlatform: byPlatform.map(p => ({
                 platform: p.platform,
                 revenue: p._sum.revenue || 0,
                 gmv: p._sum.gmv || 0,
                 orders: p._sum.orders || 0,
-                commission: p._sum.commission || 0
+                commission: p._sum.commission || 0,
+                buyerCount: p._sum.buyerCount || 0,
+                avgOrderValue: p._sum.avgOrderValue || 0
             })),
             dailyTrend: dailyTrend.map(d => ({
                 date: d.date,
                 revenue: d._sum.revenue || 0,
                 gmv: d._sum.gmv || 0,
                 orders: d._sum.orders || 0,
-                commission: d._sum.commission || 0
+                commission: d._sum.commission || 0,
+                buyerCount: d._sum.buyerCount || 0,
+                avgOrderValue: d._sum.avgOrderValue || 0
             }))
         };
     }
