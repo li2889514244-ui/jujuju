@@ -125,6 +125,8 @@ model Account {
   proxyConfig    String? // JSON 字符串
   metadata       String? // JSON 字符串
   lastActiveAt   DateTime?
+  storeScore     Float?
+  storeDiagnosis String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -200,6 +202,9 @@ model DailyStats {
   gmv        Int          @default(0)
   orders     Int          @default(0)
   commission Int          @default(0)
+  buyerCount Int          @default(0)
+  productCount Int        @default(0)
+  avgOrderValue Int       @default(0)
   createdAt  DateTime     @default(now())
 
   account   Account @relation(fields: [accountId], references: [id])

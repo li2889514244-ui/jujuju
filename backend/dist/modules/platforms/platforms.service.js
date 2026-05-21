@@ -151,13 +151,19 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
         });
         if (!account) throw new common_1.NotFoundException('Account not found');
 
+        // Store-level profile fields (if reported)
+        const accountUpdate = {
+            followers: metrics.followers || account.followers,
+            following: metrics.following || account.following,
+            lastActiveAt: new Date()
+        };
+        if (metrics._nickname) accountUpdate.nickname = metrics._nickname;
+        if (metrics._storeName) accountUpdate.nickname = metrics._storeName;
+        if (metrics.storeScore != null) accountUpdate.storeScore = metrics.storeScore;
+        if (metrics.storeDiagnosis != null) accountUpdate.storeDiagnosis = metrics.storeDiagnosis;
         await this.prisma.account.update({
             where: { id: accountId },
-            data: {
-                followers: metrics.followers || account.followers,
-                following: metrics.following || account.following,
-                lastActiveAt: new Date()
-            }
+            data: accountUpdate
         });
 
         const today = new Date();
@@ -177,7 +183,10 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 revenue: metrics.revenue || 0,
                 gmv: metrics.gmv || 0,
                 orders: metrics.orders || 0,
-                commission: metrics.commission || 0
+                commission: metrics.commission || 0,
+                buyerCount: metrics.buyerCount || 0,
+                productCount: metrics.productCount || 0,
+                avgOrderValue: metrics.avgOrderValue || 0
             },
             update: {
                 ...(metrics.followers != null ? { followers: metrics.followers } : {}),
@@ -188,7 +197,10 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 ...(metrics.revenue != null ? { revenue: metrics.revenue } : {}),
                 ...(metrics.gmv != null ? { gmv: metrics.gmv } : {}),
                 ...(metrics.orders != null ? { orders: metrics.orders } : {}),
-                ...(metrics.commission != null ? { commission: metrics.commission } : {})
+                ...(metrics.commission != null ? { commission: metrics.commission } : {}),
+                ...(metrics.buyerCount != null ? { buyerCount: metrics.buyerCount } : {}),
+                ...(metrics.productCount != null ? { productCount: metrics.productCount } : {}),
+                ...(metrics.avgOrderValue != null ? { avgOrderValue: metrics.avgOrderValue } : {})
             }
         });
 

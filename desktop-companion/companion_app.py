@@ -585,6 +585,43 @@ _METRIC_PATTERNS = {
     ],
 }
 
+# Store-specific metric patterns (抖店/微信小店/小红书商家)
+_STORE_METRIC_PATTERNS = {
+    'buyerCount': [
+        re.compile(r'成交人数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'支付人数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'下单人数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        re.compile(r'买家数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+    ],
+    'productCount': [
+        re.compile(r'在售商品\s*[：:]?\s*([\d,.]+)'),
+        re.compile(r'商品数\s*[：:]?\s*([\d,.]+)'),
+        re.compile(r'在线商品\s*[：:]?\s*([\d,.]+)'),
+    ],
+    'avgOrderValue': [
+        re.compile(r'客单价\s*[：:]?\s*¥?\s*([\d,.]+)'),
+        re.compile(r'笔单价\s*[：:]?\s*¥?\s*([\d,.]+)'),
+    ],
+    'storeScore': [
+        # 抖店体验分 (usually 0-100 or 0-5)
+        re.compile(r'店铺体验分\s*[：:]?\s*([\d.]+)'),
+        re.compile(r'体验分\s*[：:]?\s*([\d.]+)'),
+        re.compile(r'商家体验分\s*[：:]?\s*([\d.]+)'),
+        # 微信小店评分
+        re.compile(r'店铺评分\s*[：:]?\s*([\d.]+)'),
+        re.compile(r'综合评分\s*[：:]?\s*([\d.]+)'),
+        # 小红书店铺分
+        re.compile(r'店铺分\s*[：:]?\s*([\d.]+)'),
+        re.compile(r'商家分\s*[：:]?\s*([\d.]+)'),
+    ],
+    'storeDiagnosis': [
+        # Store diagnosis text — grab the section after "店铺诊断" label
+        re.compile(r'店铺诊断[：:]\s*(.{10,200}?)(?:\n|$)'),
+        re.compile(r'诊断结果[：:]\s*(.{10,200}?)(?:\n|$)'),
+        re.compile(r'经营诊断[：:]\s*(.{10,200}?)(?:\n|$)'),
+    ],
+}
+
 
 def _sanitize_text(s: str) -> str:
     """Remove garbled characters from scraped text (double-encoding cleanup)"""
@@ -901,6 +938,111 @@ async def _scrape_monetization(page) -> dict:
     return result
 
 
+async def _scrape_store_dashboard(page, platform: str) -> dict:
+    """Scrape detailed store metrics from store backend pages.
+    Covers 抖店(fxg.jinritemai.com), 微信小店(store.weixin.qq.com), 小红书商家(seller.xiaohongshu.com)"""
+    result = {'revenue': 0, 'gmv': 0, 'orders': 0, 'commission': 0,
+              'buyerCount': 0, 'productCount': 0, 'avgOrderValue': 0,
+              'storeScore': None, 'storeDiagnosis': None, '_storeName': None}
+
+    try:
+        text = await page.evaluate('() => document.body.innerText')
+        search_text = text[:10000]
+
+        # 1. Basic monetization (reuse existing patterns)
+        mon_patterns = {
+            'revenue': [
+                re.compile(r'累计收入\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'总收益\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'成交金额\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            ],
+            'gmv': [
+                re.compile(r'GMV\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'销售额\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'交易额\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            ],
+            'orders': [
+                re.compile(r'订单数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'成交单数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'支付订单\s*[：:]?\s*([\d,.]+[万wW]?)'),
+            ],
+            'commission': [
+                re.compile(r'佣金\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+                re.compile(r'预计佣金\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            ],
+        }
+        for key, pats in mon_patterns.items():
+            for pat in pats:
+                m = pat.search(search_text)
+                if m:
+                    result[key] = _parse_metric_num(m.group(1))
+                    break
+
+        # 2. Store-specific metrics
+        for key, pats in _STORE_METRIC_PATTERNS.items():
+            for pat in pats:
+                m = pat.search(search_text)
+                if m:
+                    val = m.group(1).strip()
+                    if key in ('storeScore',):
+                        try:
+                            result[key] = float(val)
+                        except ValueError:
+                            result[key] = None
+                    elif key == 'storeDiagnosis':
+                        result[key] = _sanitize_text(val)
+                    else:
+                        result[key] = _parse_metric_num(val)
+                    break
+
+        # 3. Store name
+        store_name_patterns = [
+            re.compile(r'店铺名称\s*[：:]\s*(\S.{2,30})'),
+            re.compile(r'小店名称\s*[：:]\s*(\S.{2,30})'),
+        ]
+        for pat in store_name_patterns:
+            m = pat.search(search_text)
+            if m:
+                result['_storeName'] = _sanitize_text(m.group(1).strip())
+                break
+
+        # 4. Table-based extraction for store pages
+        try:
+            table_data = await page.evaluate('''() => {
+                const rows = [];
+                document.querySelectorAll('table tr, [class*="row"], [class*="item"], [class*="card"], [class*="metric"]').forEach(el => {
+                    const cells = el.querySelectorAll('td, th, [class*="cell"], [class*="label"], [class*="value"], [class*="name"]');
+                    if (cells.length >= 2) {
+                        rows.push([(cells[0].innerText||'').trim(), (cells[1].innerText||'').trim()]);
+                    }
+                });
+                return rows;
+            }''')
+            store_patterns = ['店铺名','收入','GMV','成交','订单','佣金','买家','商品','客单价','体验分','评分','诊断','销售额','支付人数','在售']
+            for label, value in table_data:
+                if any(w in label for w in store_patterns):
+                    for key, pats in {**mon_patterns, **_STORE_METRIC_PATTERNS}.items():
+                        for pat in pats:
+                            if pat.search(label) and (key not in result or result.get(key) in (None, 0)):
+                                if key in ('storeScore',):
+                                    try:
+                                        result[key] = float(value)
+                                    except ValueError:
+                                        pass
+                                elif key == 'storeDiagnosis':
+                                    result[key] = _sanitize_text(value)
+                                else:
+                                    result[key] = _parse_metric_num(value)
+                                break
+        except:
+            pass
+
+    except Exception as e:
+        print(f'[STORE] scrape error {platform}: {e}')
+
+    return result
+
+
 async def _scrape_account_pages(context, platform: str) -> dict:
     """Scan once, grab all pages in a single authenticated session.
     Navigates dashboard → data center → video list → monetization.
@@ -945,14 +1087,18 @@ async def _scrape_account_pages(context, platform: str) -> dict:
             except Exception as e:
                 print(f'[DC] video-list error {platform}: {e}')
 
-        # 4. Monetization / Revenue
+        # 4. Monetization / Revenue — store platforms use dedicated store scraper
+        store_platforms = ('DOUDIAN', 'XIAOHONGSHU_SHOP', 'WECHAT_SHOP')
         if monetization_url:
             try:
                 await page.goto(monetization_url, wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(6000)
-                rev = await _scrape_monetization(page)
+                if platform in store_platforms:
+                    rev = await _scrape_store_dashboard(page, platform)
+                else:
+                    rev = await _scrape_monetization(page)
                 for k, v in rev.items():
-                    if v is not None and v > 0:
+                    if v is not None and (isinstance(v, bool) or v > 0 or isinstance(v, str)):
                         metrics[k] = v
             except Exception as e:
                 print(f'[DC] monetization error {platform}: {e}')

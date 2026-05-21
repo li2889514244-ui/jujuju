@@ -18,7 +18,7 @@
 
     <!-- KPI Cards -->
     <el-row :gutter="20" class="monetization__overview">
-      <el-col :xs="12" :sm="6" v-for="card in kpiCards" :key="card.label">
+      <el-col :xs="12" :sm="8" :md="4" v-for="card in kpiCards" :key="card.label">
         <el-card shadow="hover" class="overview-card">
           <div class="overview-card__label">{{ card.label }}</div>
           <div class="overview-card__value">{{ card.value }}</div>
@@ -35,6 +35,7 @@
             <el-radio-button value="revenue">收入</el-radio-button>
             <el-radio-button value="gmv">GMV</el-radio-button>
             <el-radio-button value="orders">订单</el-radio-button>
+            <el-radio-button value="buyerCount">买家</el-radio-button>
             <el-radio-button value="commission">佣金</el-radio-button>
           </el-radio-group>
         </div>
@@ -65,8 +66,14 @@
             <el-table-column label="订单数" width="120">
               <template #default="{ row }">{{ formatNum(row.orders) }}</template>
             </el-table-column>
+            <el-table-column label="买家" width="100">
+              <template #default="{ row }">{{ formatNum(row.buyerCount) }}</template>
+            </el-table-column>
             <el-table-column label="佣金" width="140">
               <template #default="{ row }">¥{{ formatNum(row.commission) }}</template>
+            </el-table-column>
+            <el-table-column label="客单价" width="100">
+              <template #default="{ row }">¥{{ formatNum(row.avgOrderValue) }}</template>
             </el-table-column>
           </el-table>
         </el-card>
@@ -96,6 +103,8 @@ const kpiCards = computed(() => {
     { label: '累计收入', value: '¥' + formatNum(d.totalRevenue || 0) },
     { label: '总 GMV', value: '¥' + formatNum(d.totalGmv || 0) },
     { label: '总订单', value: formatNum(d.totalOrders || 0) },
+    { label: '成交买家', value: formatNum(d.totalBuyerCount || 0) },
+    { label: '客单价', value: '¥' + formatNum(d.totalAvgOrderValue || 0) },
     { label: '总佣金', value: '¥' + formatNum(d.totalCommission || 0) },
   ]
 })
@@ -113,6 +122,7 @@ const trendChartOption = computed(() => {
     revenue: '收入',
     gmv: 'GMV',
     orders: '订单',
+    buyerCount: '买家',
     commission: '佣金',
   }
   return {
