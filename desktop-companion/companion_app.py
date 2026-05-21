@@ -601,41 +601,81 @@ async def _scrape_dashboard(page) -> dict:
     if views_val:
         metrics['views'] = views_val
 
-    # Extract real nickname — use Douyin ID from profile section
-    # Filter out nav item names (内容管理, 互动管理, etc.)
+    # Extract real nickname — try multiple strategies per platform
     _NAV_NAMES = {'内容管理','互动管理','数据中心','变现中心','创作中心','首页','活动管理','作品管理','合集管理','共创中心','原创保护中心','评论管理','私信消息'}
     try:
         info = await page.evaluate('''() => {
             const result = { nickname: null, avatar: null };
             const text = document.body.innerText;
-            const lines = text.split('\\n');
-            for (let i = 0; i < Math.min(lines.length, 30); i++) {
-                const line = lines[i].trim();
-                if (line.startsWith('抖音号') || line.startsWith('快手号') || line.startsWith('小红书号')) {
+            const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            // Strategy 1: Look for platform account ID label (抖音号/快手号/小红书号)
+            for (let i = 0; i < Math.min(lines.length, 50); i++) {
+                const line = lines[i];
+                if (line.match(/^(抖音号|快手号|小红书号|账号ID)/)) {
                     const id = line.replace(/.*[：:]/, '').trim();
                     if (id) { result.nickname = id; break; }
                 }
             }
+
+            // Strategy 2: Try page title (often contains account name)
             if (!result.nickname) {
-                for (let i = 0; i < Math.min(lines.length, 25); i++) {
-                    if (lines[i].trim() === '抖音' && i+1 < lines.length) {
-                        const candidate = lines[i+1].trim();
-                        if (/^\d{5,20}$/.test(candidate)) { result.nickname = candidate; break; }
+                const title = document.title || '';
+                const clean = title.replace(/[\\-|–—].*$/, '').replace(/创作者中心|创作服务平台|数据平台|抖音|快手|小红书/g, '').trim();
+                if (clean.length >= 2 && clean.length <= 30 && !/^\d+$/.test(clean)) {
+                    result.nickname = clean;
+                }
+            }
+
+            // Strategy 3: Look for profile name in header area via DOM selectors
+            if (!result.nickname) {
+                const selectors = [
+                    '[class*="account-name"]', '[class*="nickname"]', '[class*="profile-name"]',
+                    '[class*="user-name"]', 'h1', '[class*="creator-name"]',
+                ];
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el) {
+                        const txt = el.innerText.trim();
+                        if (txt.length >= 2 && txt.length <= 30 && !/^\d{5,}$/.test(txt)) {
+                            result.nickname = txt; break;
+                        }
                     }
                 }
             }
+
+            // Strategy 4: First non-numeric line before '抖音号' or 'ID' in top area
+            if (!result.nickname) {
+                for (let i = 0; i < Math.min(lines.length, 40); i++) {
+                    const line = lines[i];
+                    if (line.match(/^(抖音号|快手号|小红书号|ID|账号)/)) {
+                        // Check the line(s) right above this for the display name
+                        for (let j = i-1; j >= Math.max(0, i-5); j--) {
+                            const candidate = lines[j];
+                            if (candidate.length >= 2 && candidate.length <= 30 &&
+                                !/^\d{5,}$/.test(candidate) &&
+                                !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞)/.test(candidate)) {
+                                result.nickname = candidate; break;
+                            }
+                        }
+                        if (result.nickname) break;
+                    }
+                }
+            }
+
             // Try avatar
             const imgs = document.querySelectorAll('img');
             for (const el of imgs) {
                 const src = el.src || '';
-                if (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp')) {
+                if (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp') ||
+                    src.includes('kuaishou') || src.includes('xhscdn') || src.includes('xiaohongshu')) {
                     if (el.width > 30 || el.height > 30) { result.avatar = src; break; }
                 }
             }
             return result;
         }''')
         nick = _sanitize_text(info.get('nickname') or '')
-        if nick and nick not in _NAV_NAMES:
+        if nick and nick not in _NAV_NAMES and len(nick) >= 2:
             metrics['_nickname'] = nick
         if info.get('avatar'):
             metrics['_avatar'] = info['avatar']
