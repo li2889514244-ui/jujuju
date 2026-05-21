@@ -20,6 +20,9 @@ PLATFORMS = {
     'xiaohongshu': {'name':'小红书','url':'https://creator.xiaohongshu.com/','key':'XIAOHONGSHU'},
     'kuaishou': {'name':'快手','url':'https://cp.kuaishou.com/','key':'KUAISHOU'},
     'tencent':  {'name':'视频号','url':'https://channels.weixin.qq.com/','key':'WECHAT_VIDEO'},
+    'doudian': {'name':'抖店','url':'https://fxg.jinritemai.com/','key':'DOUDIAN'},
+    'xhsshop': {'name':'小红书商家','url':'https://seller.xiaohongshu.com/','key':'XIAOHONGSHU_SHOP'},
+    'wxshop':  {'name':'微信小店','url':'https://store.weixin.qq.com/','key':'WECHAT_SHOP'},
 }
 
 # ── 浏览器检测 ──────────────────────────────────────────────
@@ -174,7 +177,7 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
 <script>
 const {createApp}=Vue
 createApp({data(){return{
-  platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'}],
+  platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'},{id:'doudian',name:'抖店',icon:'🛒',hint:'扫码登录'},{id:'xhsshop',name:'小红书商家',icon:'🏪',hint:'扫码登录'},{id:'wxshop',name:'微信小店',icon:'💚',hint:'微信扫码'}],
   selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
   configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
   cookieStatus:null,cookieAlerts:[],cookieFreshness:''
@@ -330,7 +333,6 @@ PLATFORM_DASHBOARDS = {
         'extra_pages': [
             'https://creator.douyin.com/creator-micro/data/fans',      # 粉丝画像
             'https://creator.douyin.com/creator-micro/data/content',   # 内容数据
-            'https://fxg.jinritemai.com/',                             # 抖店（电商罗盘）
         ],
     },
     'KUAISHOU': {
@@ -344,7 +346,6 @@ PLATFORM_DASHBOARDS = {
         'domain': '.xiaohongshu.com',
         'data_center': 'https://creator.xiaohongshu.com/note-manage',
         'video_list': 'https://creator.xiaohongshu.com/note-manage/notes',
-        'monetization': 'https://seller.xiaohongshu.com/',  # 小红书商家后台
     },
     'BILIBILI': {
         'url': 'https://member.bilibili.com',
@@ -361,6 +362,20 @@ PLATFORM_DASHBOARDS = {
         'domain': '.weixin.qq.com',
         'data_center': 'https://channels.weixin.qq.com/platform/data-center',
         'video_list': 'https://channels.weixin.qq.com/platform/post/list',
+    },
+    'DOUDIAN': {
+        'url': 'https://fxg.jinritemai.com',
+        'domain': '.jinritemai.com',
+        'monetization': 'https://fxg.jinritemai.com/',
+    },
+    'XIAOHONGSHU_SHOP': {
+        'url': 'https://seller.xiaohongshu.com',
+        'domain': '.xiaohongshu.com',
+        'monetization': 'https://seller.xiaohongshu.com/',
+    },
+    'WECHAT_SHOP': {
+        'url': 'https://store.weixin.qq.com',
+        'domain': '.weixin.qq.com',
         'monetization': 'https://store.weixin.qq.com/',
     },
 }
