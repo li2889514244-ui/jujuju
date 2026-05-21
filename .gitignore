@@ -73,10 +73,17 @@ social-auto-upload/*
 # 调试脚本
 _*.js
 _*.py
+*.bat
+!setup.bat
+!start.bat
+!install.bat
 
 # 部署脚本（含阿里云凭证，禁止提交）
 deploy-ali.js
 deploy-ali.ps1
+deploy-frontend.js
+deploy-frontend-only.js
+deploy-all.js
 check-ecs.js
 scan-ecs.js
 sshconn.py
@@ -84,3 +91,19 @@ check-cmd.js
 test-cmd.js
 gen-secrets.js
 genkey.bat
+
+# 自动生成文件
+frontend/src/auto-imports.d.ts
+frontend/src/components.d.ts
+frontend/.eslintrc-auto-import.json
+
+# Python
+__pycache__/
+*.pyc
+*.spec
+
+# 桌面伴侣配置（含凭证）
+desktop-companion/companion_config.json
+
+# 外部爬虫工具
+bazhuayu_style_scraper.py
