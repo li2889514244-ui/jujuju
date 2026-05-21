@@ -62,7 +62,7 @@ const charStyle = computed(() => ({
 
   &__label {
     font-size: $text-body;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
 }
 </style>

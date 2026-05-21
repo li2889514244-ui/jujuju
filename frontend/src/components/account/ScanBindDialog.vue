@@ -316,7 +316,7 @@ function disconnectSSE() {
 
   &__platform-name {
     font-size: 13px;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
 
   &__scanning {
@@ -389,7 +389,7 @@ function disconnectSSE() {
   &__account-name {
     font-size: $text-title;
     font-weight: 500;
-    color: #f5f5f7;
+    color: #1D1D1F;
   }
 
   &__account-platform {

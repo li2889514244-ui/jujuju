@@ -319,12 +319,47 @@ def _save_config(cfg: dict):
 _CONFIG_CACHE = _load_config()
 
 PLATFORM_DASHBOARDS = {
-    'DOUYIN':       ('https://creator.douyin.com',       '.douyin.com',       'https://creator.douyin.com/creator-micro/data/content', 'https://creator.douyin.com/creator-micro/content/manage'),
-    'KUAISHOU':     ('https://cp.kuaishou.com',          '.kuaishou.com',     'https://cp.kuaishou.com/article/manage',               'https://cp.kuaishou.com/article/publish/list'),
-    'XIAOHONGSHU':  ('https://creator.xiaohongshu.com',  '.xiaohongshu.com',  'https://creator.xiaohongshu.com/note-manage',          'https://creator.xiaohongshu.com/note-manage/notes'),
-    'BILIBILI':     ('https://member.bilibili.com',      '.bilibili.com',     'https://member.bilibili.com/platform/upload/video',   'https://member.bilibili.com/platform/content'),
-    'WEIBO':        ('https://weibo.com',                '.weibo.com',        None,                                                     None),
-    'WECHAT_VIDEO': ('https://channels.weixin.qq.com',   '.weixin.qq.com',    'https://channels.weixin.qq.com/platform/data-center', 'https://channels.weixin.qq.com/platform/post/list'),
+    'DOUYIN': {
+        'url': 'https://creator.douyin.com',
+        'domain': '.douyin.com',
+        'data_center': 'https://creator.douyin.com/creator-micro/data/content',
+        'video_list': 'https://creator.douyin.com/creator-micro/content/manage',
+        'monetization': 'https://creator.douyin.com/creator-micro/revenue/monetize',
+        'creator_center': 'https://creator.douyin.com/creator-micro/creation',  # 创作中心→发布管理
+        'works_manage': 'https://creator.douyin.com/creator-micro/content/manage?tab=work',  # 作品管理
+        'extra_pages': [
+            'https://creator.douyin.com/creator-micro/data/fans',      # 粉丝画像
+            'https://creator.douyin.com/creator-micro/data/content',   # 内容数据
+        ],
+    },
+    'KUAISHOU': {
+        'url': 'https://cp.kuaishou.com',
+        'domain': '.kuaishou.com',
+        'data_center': 'https://cp.kuaishou.com/article/manage',
+        'video_list': 'https://cp.kuaishou.com/article/publish/list',
+    },
+    'XIAOHONGSHU': {
+        'url': 'https://creator.xiaohongshu.com',
+        'domain': '.xiaohongshu.com',
+        'data_center': 'https://creator.xiaohongshu.com/note-manage',
+        'video_list': 'https://creator.xiaohongshu.com/note-manage/notes',
+    },
+    'BILIBILI': {
+        'url': 'https://member.bilibili.com',
+        'domain': '.bilibili.com',
+        'data_center': 'https://member.bilibili.com/platform/upload/video',
+        'video_list': 'https://member.bilibili.com/platform/content',
+    },
+    'WEIBO': {
+        'url': 'https://weibo.com',
+        'domain': '.weibo.com',
+    },
+    'WECHAT_VIDEO': {
+        'url': 'https://channels.weixin.qq.com',
+        'domain': '.weixin.qq.com',
+        'data_center': 'https://channels.weixin.qq.com/platform/data-center',
+        'video_list': 'https://channels.weixin.qq.com/platform/post/list',
+    },
 }
 
 _collector_running = False
@@ -785,15 +820,81 @@ async def _scrape_video_list(page, platform: str) -> list:
     return result[:10]
 
 
+async def _scrape_monetization(page) -> dict:
+    """Extract revenue/monetization metrics from creator monetization page
+    Supports 抖音变现中心, 快手变现, etc."""
+    result = {}
+    text = await page.evaluate('() => document.body.innerText')
+
+    patterns = {
+        'revenue': [
+            re.compile(r'累计收入\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'总收益\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'预估收入\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'本月收入\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+        ],
+        'gmv': [
+            re.compile(r'GMV\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'成交金额\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'销售额\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+        ],
+        'orders': [
+            re.compile(r'订单数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'成交单数\s*[：:]?\s*([\d,.]+[万wW]?)'),
+        ],
+        'commission': [
+            re.compile(r'佣金\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+            re.compile(r'带货佣金\s*[：:]?\s*¥?\s*([\d,.]+[万wW]?)'),
+        ],
+    }
+
+    # Search first 6000 chars for monetization data
+    search_text = text[:6000]
+    for key, pats in patterns.items():
+        for pat in pats:
+            m = pat.search(search_text)
+            if m:
+                result[key] = _parse_metric_num(m.group(1))
+                break
+
+    # Also try table-based extraction
+    try:
+        table_data = await page.evaluate('''() => {
+            const rows = [];
+            document.querySelectorAll('table tr, [class*="row"], [class*="item"], [class*="card"]').forEach(el => {
+                const cells = el.querySelectorAll('td, th, [class*="cell"], [class*="label"], [class*="value"]');
+                if (cells.length >= 2) {
+                    rows.push([(cells[0].innerText||'').trim(), (cells[1].innerText||'').trim()]);
+                }
+            });
+            return rows;
+        }''')
+        rev_patterns = ['收入','收益','GMV','成交','订单','佣金','销售额','带货','变现']
+        for label, value in table_data:
+            if any(w in label for w in rev_patterns):
+                for key, pats in patterns.items():
+                    for pat in pats:
+                        if pat.search(label) and key not in result:
+                            result[key] = _parse_metric_num(value)
+                            break
+    except:
+        pass
+
+    return result
+
+
 async def _scrape_account_pages(context, platform: str) -> dict:
     """Scan once, grab all pages in a single authenticated session.
-    Navigates dashboard → data center → video list.
+    Navigates dashboard → data center → video list → monetization.
     Returns {'metrics': {...}, 'video_stats': [...]}"""
     entry = PLATFORM_DASHBOARDS.get(platform)
     if not entry:
         return {'metrics': {}, 'video_stats': []}
 
-    url, domain, data_center_url, video_list_url = entry if len(entry) == 4 else (entry[0], entry[1], None, None)
+    url = entry['url']
+    data_center_url = entry.get('data_center')
+    video_list_url = entry.get('video_list')
+    monetization_url = entry.get('monetization')
 
     page = await context.new_page()
     metrics = {}
@@ -825,6 +926,37 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                 video_stats = await _scrape_video_list(page, platform)
             except Exception as e:
                 print(f'[DC] video-list error {platform}: {e}')
+
+        # 4. Monetization / Revenue
+        if monetization_url:
+            try:
+                await page.goto(monetization_url, wait_until='domcontentloaded', timeout=30000)
+                await page.wait_for_timeout(6000)
+                rev = await _scrape_monetization(page)
+                for k, v in rev.items():
+                    if v is not None and v > 0:
+                        metrics[k] = v
+            except Exception as e:
+                print(f'[DC] monetization error {platform}: {e}')
+
+        # 5. Extra pages (粉丝画像, 内容数据, etc.)
+        for extra_url in entry.get('extra_pages', []):
+            try:
+                await page.goto(extra_url, wait_until='domcontentloaded', timeout=30000)
+                await page.wait_for_timeout(5000)
+                extra_text = await page.evaluate('() => document.body.innerText')
+                # Try to extract any numeric metrics from extra pages
+                for key, pats in _METRIC_PATTERNS.items():
+                    if key not in metrics or metrics.get(key, 0) == 0:
+                        for pat in pats:
+                            m = pat.search(extra_text[:6000])
+                            if m:
+                                val = _parse_metric_num(m.group(1))
+                                if val > 0:
+                                    metrics[key] = val
+                                    break
+            except Exception as e:
+                print(f'[DC] extra-page error {extra_url}: {e}')
 
     finally:
         await page.close()

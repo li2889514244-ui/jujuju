@@ -58,12 +58,39 @@ small, .text-caption { font-size: $text-caption; color: var(--el-text-color-plac
 .spring-scale:hover { transform: scale(1.02); }
 .spring-scale:active { transform: scale(0.97); }
 
-@media (max-width: 768px) {
-  .app-layout__content { padding: $space-lg 16px; }
-  .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
+// === 响应式 ===
+// ≥ 1440px: 全宽桌面 — 默认样式
+// 1200-1439px: 小桌面 — 减小内边距
+@media (max-width: 1439px) {
+  .app-layout__content { padding: $space-xl $space-lg; }
+  .account-grid { grid-template-columns: repeat(3, 1fr) !important; }
+  .dashboard__charts { gap: $space-md; }
+  .hero-kpi__value { font-size: 64px !important; }
 }
+
+// 1024-1199px: 平板横屏 — 侧边栏已折叠
+@media (max-width: 1023px) {
+  .app-layout__content { padding: $space-lg $space-lg; }
+  .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .dashboard__charts { grid-template-columns: 1fr !important; }
+  .hero-kpi__value { font-size: 52px !important; }
+  .data-center__overview .el-col { flex: 0 0 33.33%; max-width: 33.33%; }
+  .publish-wizard__body { max-width: 100% !important; }
+}
+
+// 768-1023px: 平板竖屏
+@media (max-width: 768px) {
+  .app-layout__content { padding: $space-lg 16px !important; }
+  .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
+  .data-center__body .el-col { flex: 0 0 100%; max-width: 100%; }
+  .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
+  .sub-kpi b { font-size: 18px; }
+}
+
+// ≤ 480px: 手机
 @media (max-width: 480px) {
   .account-grid { grid-template-columns: 1fr !important; }
-  .dashboard__hero-kpi .hero-kpi__value { font-size: 48px; }
+  .hero-kpi__value { font-size: 40px !important; }
   .dashboard__charts { grid-template-columns: 1fr; }
+  .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
 }
