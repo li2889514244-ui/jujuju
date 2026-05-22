@@ -239,16 +239,17 @@ onMounted(() => {
 
 .char-count {
   text-align: right;
-  color: #999;
+  color: var(--el-text-color-placeholder);
   font-size: 12px;
   margin-top: 4px;
 }
 
 .tip-box {
-  background: #f5f7fa;
+  background: var(--el-fill-color);
   padding: 12px;
   border-radius: 6px;
   line-height: 1.8;
+  color: var(--el-text-color-secondary);
 }
 
 .list-header {
@@ -257,7 +258,7 @@ onMounted(() => {
   align-items: center;
 }
 
-.waiting-text { color: #909399; font-size: 13px; }
-.processing-text { color: #e6a23c; font-size: 13px; }
-.error-text { color: #f56c6c; font-size: 13px; cursor: help; }
+.waiting-text { color: var(--el-text-color-placeholder); font-size: 13px; }
+.processing-text { color: var(--el-color-warning); font-size: 13px; }
+.error-text { color: var(--el-color-danger); font-size: 13px; cursor: help; }
 </style>

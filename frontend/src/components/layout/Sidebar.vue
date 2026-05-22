@@ -48,7 +48,7 @@ import { computed, ref, onMounted, onUnmounted, markRaw, type Component } from '
 import { useRoute, useRouter } from 'vue-router'
 import {
   Monitor, User, EditPen, Promotion, TrendCharts, Document, UserFilled,
-  Connection, Aim, MagicStick, Calendar, Fold, Expand, Money,
+  Connection, Aim, MagicStick, Calendar, Fold, Expand, Money, VideoCamera,
 } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -103,6 +103,7 @@ const iconMap: Record<string, Component> = {
   Connection: markRaw(Connection), Aim: markRaw(Aim),
   MagicStick: markRaw(MagicStick), Calendar: markRaw(Calendar),
   ChatDotSquare: markRaw(MagicStick), Money: markRaw(Money),
+  VideoCamera: markRaw(VideoCamera),
 }
 
 function getIcon(name: unknown): Component {
