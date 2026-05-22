@@ -96,7 +96,7 @@ Docker:
 
 | 项目 | 值 |
 |------|-----|
-| 前端地址 | `https://jujuju-28b.pages.dev` |
+| 前端地址 | `https://ddddkiii.com` |
 | 后端 API | `https://ddddkiii.com/api/v1` |
 | Cloudflare Zone ID | `cc90c0bdeda3504ed06bafa09a4312c4` |
 | Cloudflare Account ID | `b47f88a1b8b3837796143701fbdf5d43` |
@@ -109,7 +109,7 @@ Docker:
 ### 网络架构
 
 ```
-https://jujuju-28b.pages.dev (CF Pages)
+https://ddddkiii.com (Nginx on ECS)
     ↓ API 调用
 https://ddddkiii.com/api/v1
     ↓ CNAME → Tunnel
