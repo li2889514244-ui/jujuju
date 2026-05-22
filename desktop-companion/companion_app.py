@@ -6,6 +6,7 @@ import asyncio, json, os, re, sys, threading, time, uuid, base64
 from pathlib import Path
 from queue import Queue, Empty
 from flask import Flask, request, jsonify, Response, make_response
+from pixing_worker import start_worker, stop_worker, get_status as get_worker_status
 
 app = Flask(__name__)
 # Use EXE directory or script directory for persistent config
@@ -72,6 +73,35 @@ def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
     elif _BROWSER_CHANNEL:
         opts['channel'] = _BROWSER_CHANNEL
     return opts
+
+
+# ── 持久化浏览器 Profile ─────────────────────────────────────
+_PROFILE_ROOT = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MatrixFlow' / 'browser-profiles'
+
+
+async def _get_persistent_context(headless: bool = True, extra_args: list = None) -> tuple:
+    """返回 (context, page) — 使用持久化 profile，抖音不再每次跳验证"""
+    _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+    profile_dir = _PROFILE_ROOT / 'default'
+
+    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN']
+    if extra_args:
+        args.extend(extra_args)
+
+    kwargs = {
+        'headless': headless,
+        'args': args,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'locale': 'zh-CN',
+        'viewport': {'width': 1280, 'height': 800},
+    }
+    if _BROWSER_PATH:
+        kwargs['executable_path'] = _BROWSER_PATH
+    elif _BROWSER_CHANNEL:
+        kwargs['channel'] = _BROWSER_CHANNEL
+
+    context = await pw.chromium.launch_persistent_context(str(profile_dir), **kwargs)
+    return context
 
 # ── HTML UI ──────────────────────────────────────────────────
 UI_HTML = r'''<!DOCTYPE html>
@@ -168,6 +198,15 @@ body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;c
     </div>
   </div>
   <div v-if="cookieStatus && !cookieAlerts.length" style="font-size:12px;color:#67c23a">所有平台 Cookie 正常 (最新 {{cookieFreshness}} 前)</div>
+  <!-- Pixing Video Worker -->
+  <div style="padding:16px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;margin-top:4px">
+    <span class="ind" :class="pwRunning?'on':'off'" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span>
+    <span style="font-size:13px;font-weight:600">数字人视频</span>
+    <span style="font-size:12px;color:#999" v-if="pwRunning">运行中 · 已完成 {{pwCompleted}} 个</span>
+    <span style="font-size:12px;color:#999" v-else>已停止</span>
+    <span v-if="pwTask" style="font-size:11px;color:#667eea;margin-left:auto">当前: {{pwTask}}</span>
+    <button style="margin-left:auto;padding:4px 12px;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:11px;cursor:pointer" @click="togglePixingWorker">{{pwRunning?'停止':'启动'}}</button>
+  </div>
 </div>
 
 <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
@@ -177,9 +216,12 @@ createApp({data(){return{
   platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'}],
   selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
   configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
-  cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,collecting:false
+  cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,
+  pwRunning:false,pwCompleted:0,pwTask:'',
 }},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
 methods:{
+  async fetchPixingStatus(){try{const r=await fetch('/api/pixing-worker/status');const j=await r.json();this.pwRunning=j.running;this.pwCompleted=j.completed;this.pwTask=j.current_task||''}catch(e){}},
+  async togglePixingWorker(){const url=this.pwRunning?'/api/pixing-worker/stop':'/api/pixing-worker/start';await fetch(url,{method:'POST'});await this.fetchPixingStatus()},
   async triggerCollect(){this.collecting=true;try{await fetch('/api/data-collection/trigger',{method:'POST'});setTimeout(()=>this.collecting=false,3000)}catch(e){this.collecting=false}},
   async loadCookieStatus(){
     try{const r=await fetch('/api/cookie-status');const j=await r.json();
@@ -276,12 +318,14 @@ cancelScan(){
 mounted(){
   this.checkConfig()
   this.loadCookieStatus()
+  this.fetchPixingStatus()
   this.platformFromUrl=this.getParam('platform')
   this.tokenFromUrl=this.getParam('token')
   this.apiFromUrl=this.getParam('api')
   if(this.platformFromUrl&&this.tokenFromUrl){this.selected=this.platformFromUrl}
   setInterval(async()=>{try{const r=await fetch('/health');if(r.ok)this.siteConnected=true}catch{this.siteConnected=false}},3000)
-  setInterval(()=>{if(this.configured)this.loadCookieStatus()},60000) // refresh cookie status every minute
+  setInterval(()=>{if(this.configured)this.loadCookieStatus()},60000)
+  setInterval(()=>{if(this.configured)this.fetchPixingStatus()},10000)
 }}).mount('body')
 </script></body></html>'''
 
@@ -432,6 +476,9 @@ def handle_login():
                     cfg['saved_password'] = password
                 _save_config(cfg)
                 _CONFIG_CACHE.update(cfg)
+                # 自动启动数字人视频 worker
+                try: start_worker()
+                except Exception: pass
                 return jsonify({'status': 'ok', 'message': '登录成功'})
         msg = '邮箱或密码错误'
         try:
@@ -446,6 +493,23 @@ def handle_login():
 def get_token():
     cfg = _load_config()
     return jsonify({'token': cfg.get('token', ''), 'api_url': cfg.get('api_url', '')})
+
+# ══════════════════════════════════════════════════════════════════
+# Pixing Video Worker endpoints
+# ══════════════════════════════════════════════════════════════════
+@app.route('/api/pixing-worker/start', methods=['POST'])
+def pw_start():
+    start_worker()
+    return jsonify({'ok': True, 'status': get_worker_status()})
+
+@app.route('/api/pixing-worker/stop', methods=['POST'])
+def pw_stop():
+    stop_worker()
+    return jsonify({'ok': True, 'status': get_worker_status()})
+
+@app.route('/api/pixing-worker/status')
+def pw_status():
+    return jsonify(get_worker_status())
 
 @app.route('/api/auto-login', methods=['POST'])
 def auto_login():
@@ -1133,7 +1197,22 @@ async def _scrape_all(accounts: list) -> list:
 
     results = []
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(**_launch_browser_opts(headless=True))
+        # 持久化浏览器 profile — 抖音不会再跳设备验证
+        _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+        profile_dir = str(_PROFILE_ROOT / 'default')
+        launch_opts = {
+            'headless': True,
+            'args': ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN'],
+            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+            'locale': 'zh-CN',
+            'viewport': {'width': 1280, 'height': 800},
+        }
+        if _BROWSER_PATH:
+            launch_opts['executable_path'] = _BROWSER_PATH
+        elif _BROWSER_CHANNEL:
+            launch_opts['channel'] = _BROWSER_CHANNEL
+        ctx = await pw.chromium.launch_persistent_context(profile_dir, **launch_opts)
+
         for acc in accounts:
             aid = (acc.get('id') or '').strip()
             platform = (acc.get('platform') or '').strip().upper()
@@ -1158,13 +1237,7 @@ async def _scrape_all(accounts: list) -> list:
                         'path': '/',
                     })
 
-            ctx = await browser.new_context(
-                user_agent=(
-                    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                    'AppleWebKit/537.36 (KHTML, like Gecko) '
-                    'Chrome/124.0.0.0 Safari/537.36'),
-                locale='zh-CN',
-            )
+            await ctx.clear_cookies()
             if cookie_list:
                 try:
                     await ctx.add_cookies(cookie_list)
@@ -1177,10 +1250,9 @@ async def _scrape_all(accounts: list) -> list:
                 print(f'[DC] scrape error {platform}/{aid}: {e}')
                 result = {'metrics': {}, 'video_stats': []}
 
-            await ctx.close()
             results.append({'accountId': aid, 'metrics': result['metrics'], 'videoStats': result['video_stats']})
 
-        await browser.close()
+        await ctx.close()
     return results
 
 
@@ -1353,11 +1425,19 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
             try:
                 from playwright.async_api import async_playwright
                 async with async_playwright() as pw:
-                    browser = await pw.chromium.launch(**_launch_browser_opts(headless=False, extra_args=['--start-maximized']))
-                    context = await browser.new_context(
-                        viewport={'width':1280,'height':800},
-                        user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-                    )
+                    _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+                    profile_dir = str(_PROFILE_ROOT / ('scan-' + platform))
+                    launch_opts = {
+                        'headless': False,
+                        'args': ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN', '--start-maximized'],
+                        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                        'viewport': {'width': 1280, 'height': 800},
+                    }
+                    if _BROWSER_PATH:
+                        launch_opts['executable_path'] = _BROWSER_PATH
+                    elif _BROWSER_CHANNEL:
+                        launch_opts['channel'] = _BROWSER_CHANNEL
+                    context = await pw.chromium.launch_persistent_context(profile_dir, **launch_opts)
                     page = await context.new_page()
 
                     if use_sse:
@@ -1387,14 +1467,14 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             if msg == 'CANCEL':
                                 if use_sse:
                                     queue.put(json.dumps({'type':'error','data':'用户取消'}))
-                                await browser.close()
+                                await context.close()
                                 return
                         except Empty:
                             pass
                     else:
                         if use_sse:
                             queue.put(json.dumps({"type":"error","data":"操作超时（5分钟），请重试"}))
-                        await browser.close()
+                        await context.close()
                         return
                     if use_sse:
                         queue.put(json.dumps({'type':'status','data':'正在提取 Cookie...'}))
@@ -1410,7 +1490,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     if not cookie_str:
                         if use_sse:
                             queue.put(json.dumps({'type':'error','data':'未获取到 Cookie，请在 Chrome 窗口中确认已登录'}))
-                        await browser.close()
+                        await context.close()
                         return
 
                     # Scrape real video号 ID and nickname from the logged-in page
@@ -1546,7 +1626,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies),'account_id':account_id}}))
                         else:
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
-                    await browser.close()
+                    await context.close()
                     if session_id:
                         scan_status[session_id] = 'done'
                         if session_id in active_sessions: del active_sessions[session_id]
