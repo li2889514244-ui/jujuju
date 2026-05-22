@@ -2,19 +2,13 @@
   <div class="sidebar" :class="{ 'sidebar--collapsed': isCollapsed }">
     <!-- Logo -->
     <div class="sidebar__logo" @click="$router.push('/dashboard')">
-      <div class="sidebar__logo-icon">
-        <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
-          <defs>
-            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#00d4ff"/>
-              <stop offset="100%" stop-color="#7c3aed"/>
-            </linearGradient>
-          </defs>
-          <rect width="32" height="32" rx="7" fill="url(#lg)" />
-          <path d="M10 22V10l12 6-12 6z" fill="#fff" opacity="0.9" />
+      <div class="sidebar__logo-mark">
+        <svg viewBox="0 0 28 28" fill="none" width="20" height="20">
+          <rect width="28" height="28" rx="6" fill="#d49b50" />
+          <path d="M9 20V8l10 6-10 6z" fill="#f5f0e8" opacity="0.92" />
         </svg>
       </div>
-      <span v-if="!isCollapsed" class="sidebar__logo-text gradient-text">披星云</span>
+      <span v-if="!isCollapsed" class="sidebar__logo-text">披星云</span>
     </div>
 
     <!-- Menu -->
@@ -30,6 +24,7 @@
           <component :is="getIcon(r.meta?.icon)" />
         </el-icon>
         <span v-if="!isCollapsed" class="sidebar__item-label">{{ r.meta?.title }}</span>
+        <span v-if="!isCollapsed && activeMenu === '/' + r.path" class="sidebar__item-indicator"></span>
       </router-link>
     </nav>
 
@@ -39,23 +34,11 @@
         <span class="sidebar__status-dot"></span>
         <span v-if="!isCollapsed" class="sidebar__status-text">{{ backendVersion }}</span>
       </div>
-      <div
-        class="sidebar__theme-toggle"
-        @click="toggleTheme"
-        :title="isLight ? '切换深色' : '切换浅色'"
-      >
+      <div class="sidebar__toggle" @click="toggleCollapse" :title="isCollapsed ? '展开' : '收起'">
         <el-icon :size="16">
-          <Sunny v-if="isLight" />
-          <Moon v-else />
+          <component :is="isCollapsed ? Expand : Fold" />
         </el-icon>
       </div>
-      <el-tooltip :content="isCollapsed ? '展开' : '收起'" placement="right">
-        <div class="sidebar__toggle" @click="toggleCollapse">
-          <el-icon :size="16" class="sidebar__toggle-icon">
-            <component :is="isCollapsed ? Expand : Fold" />
-          </el-icon>
-        </div>
-      </el-tooltip>
     </div>
   </div>
 </template>
@@ -64,22 +47,8 @@
 import { computed, ref, onMounted, onUnmounted, markRaw, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  Monitor,
-  User,
-  EditPen,
-  Promotion,
-  TrendCharts,
-  Document,
-  UserFilled,
-  Connection,
-  Aim,
-  MagicStick,
-  Calendar,
-  Fold,
-  Expand,
-  Sunny,
-  Moon,
-  Money,
+  Monitor, User, EditPen, Promotion, TrendCharts, Document, UserFilled,
+  Connection, Aim, MagicStick, Calendar, Fold, Expand, Money,
 } from '@element-plus/icons-vue'
 import { useTheme } from '@/composables/useTheme'
 
@@ -90,14 +59,11 @@ const isCollapsed = ref(false)
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
 
-// Auto-collapse sidebar on narrow screens (< 1200px)
 function checkViewport() {
-  const narrow = window.innerWidth < 1200
-  isCollapsed.value = narrow
+  isCollapsed.value = window.innerWidth < 1200
 }
 
 function toggleCollapse() {
-  // Only allow manual toggle on wide screens
   if (window.innerWidth >= 1200) {
     isCollapsed.value = !isCollapsed.value
   }
@@ -131,19 +97,12 @@ const menuRoutes = computed(() => {
 })
 
 const iconMap: Record<string, Component> = {
-  Odometer: markRaw(Monitor),
-  User: markRaw(User),
-  EditPen: markRaw(EditPen),
-  Promotion: markRaw(Promotion),
-  DataAnalysis: markRaw(TrendCharts),
-  Document: markRaw(Document),
-  UserFilled: markRaw(UserFilled),
-  Connection: markRaw(Connection),
-  Aim: markRaw(Aim),
-  MagicStick: markRaw(MagicStick),
-  Calendar: markRaw(Calendar),
-  ChatDotSquare: markRaw(MagicStick),
-  Money: markRaw(Money),
+  Odometer: markRaw(Monitor), User: markRaw(User), EditPen: markRaw(EditPen),
+  Promotion: markRaw(Promotion), DataAnalysis: markRaw(TrendCharts),
+  Document: markRaw(Document), UserFilled: markRaw(UserFilled),
+  Connection: markRaw(Connection), Aim: markRaw(Aim),
+  MagicStick: markRaw(MagicStick), Calendar: markRaw(Calendar),
+  ChatDotSquare: markRaw(MagicStick), Money: markRaw(Money),
 }
 
 function getIcon(name: unknown): Component {
@@ -153,11 +112,10 @@ function getIcon(name: unknown): Component {
 
 <style lang="scss" scoped>
 .sidebar {
-  width: 220px;
+  width: $sidebar-width;
   height: 100vh;
-  background: linear-gradient(180deg, rgba(13, 18, 37, 0.95) 0%, rgba(10, 14, 26, 0.98) 100%);
+  background: linear-gradient(180deg, rgba(32, 29, 27, 0.95) 0%, rgba(26, 24, 23, 0.98) 100%);
   border-right: 1px solid $color-border;
-  box-shadow: 1px 0 12px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(0, 212, 255, 0.05);
   display: flex;
   flex-direction: column;
   transition: width 0.3s $ease-out;
@@ -165,25 +123,28 @@ function getIcon(name: unknown): Component {
   z-index: 10;
   user-select: none;
 
-  &--collapsed { width: 68px; }
+  &--collapsed { width: $sidebar-collapsed-width; }
 
   &__logo {
     height: 56px;
     display: flex;
     align-items: center;
-    gap: $space-sm;
+    gap: 10px;
     padding: 0 18px;
     cursor: pointer;
     border-bottom: 1px solid $color-border;
-    &-icon {
+
+    &-mark {
       width: 28px; height: 28px;
-      border-radius: 7px;
+      border-radius: 6px;
       flex-shrink: 0;
-      filter: drop-shadow(0 0 6px rgba(0, 212, 255, 0.3));
+      display: flex; align-items: center; justify-content: center;
     }
     &-text {
-      font-size: $text-title;
-      font-weight: 700;
+      font-family: $font-display;
+      font-size: 18px;
+      font-weight: 600;
+      color: $color-cream;
       white-space: nowrap;
       letter-spacing: 0.02em;
     }
@@ -194,37 +155,43 @@ function getIcon(name: unknown): Component {
     padding: 8px 10px;
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     flex: 1;
   }
 
   &__item {
     display: flex;
     align-items: center;
-    gap: $space-sm;
-    padding: $space-sm 12px;
-    border-radius: 8px;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 7px;
     color: $color-text-secondary;
     text-decoration: none;
-    font-size: $text-body;
+    font-size: 14px;
     font-weight: 450;
-    transition: all 0.25s $ease-out;
+    transition: all 0.2s $ease-out;
     white-space: nowrap;
     position: relative;
 
     &:hover {
-      background: rgba(0, 212, 255, 0.06);
+      background: rgba(212, 155, 80, 0.06);
       color: $color-text-primary;
     }
     &--active {
-      background: rgba(0, 212, 255, 0.1);
-      color: $color-cyan;
-      font-weight: 540;
-      box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.15);
-      &:hover { background: rgba(0, 212, 255, 0.14); }
+      background: rgba(212, 155, 80, 0.1);
+      color: $color-bronze;
+      font-weight: 500;
+      .sidebar__item-icon { color: $color-bronze; }
     }
     &-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
     &-label { overflow: hidden; text-overflow: ellipsis; }
+    &-indicator {
+      position: absolute;
+      right: 10px;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      background: $color-bronze;
+    }
   }
 
   &__bottom {
@@ -239,31 +206,30 @@ function getIcon(name: unknown): Component {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 10px;
+    padding: 5px 10px;
     border-radius: 20px;
-    background: rgba(255, 51, 102, 0.08);
-    &--ok { background: rgba(0, 227, 150, 0.08); }
+    background: rgba(212, 83, 74, 0.08);
+    &--ok { background: rgba(107, 158, 108, 0.08); }
     &-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: $color-pink;
-      box-shadow: 0 0 6px rgba(255, 51, 102, 0.5);
+      width: 5px; height: 5px; border-radius: 50%;
+      background: $color-rust;
     }
-    &--ok &-dot {
-      background: $color-green;
-      box-shadow: 0 0 6px rgba(0, 227, 150, 0.5);
+    &--ok &-dot { background: $color-sage; }
+    &-text {
+      font-size: $text-micro;
+      color: $color-text-tertiary;
+      font-family: $font-mono;
     }
-    &-text { font-size: $text-micro; color: $color-text-tertiary; }
   }
-  &__theme-toggle, &__toggle {
+  &__toggle {
     width: 32px; height: 32px; border-radius: 6px;
     display: flex; align-items: center; justify-content: center;
     cursor: pointer; color: $color-text-tertiary;
     transition: all 0.2s; flex-shrink: 0;
     &:hover {
-      background: rgba(0, 212, 255, 0.06);
+      background: rgba(212, 155, 80, 0.06);
       color: $color-text-primary;
     }
   }
-  &__toggle-icon { font-size: $text-headline; font-weight: 300; }
 }
 </style>

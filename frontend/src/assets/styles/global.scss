@@ -1,76 +1,95 @@
-// 披星云 v2 — 深空科幻全局样式
+// 披星云 v3 — Warm Precision 全局样式
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #app {
   width: 100%; height: 100%;
-  font-family: $font-family;
+  font-family: $font-body;
   font-size: 15px; line-height: 1.5;
   background: $color-bg-primary;
   color: $color-text-primary;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   overflow: hidden;
 }
 
-// 星空粒子背景
+// 暖色渐变背景（替代星空）
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at 20% 50%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(124, 58, 237, 0.03) 0%, transparent 50%),
-    radial-gradient(ellipse at 50% 80%, rgba(255, 51, 102, 0.02) 0%, transparent 50%);
+    radial-gradient(ellipse at 50% 0%, rgba(212, 155, 80, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 100%, rgba(200, 133, 64, 0.02) 0%, transparent 40%),
+    radial-gradient(ellipse at 20% 100%, rgba(107, 158, 108, 0.02) 0%, transparent 40%);
   pointer-events: none;
   z-index: 0;
 }
 
+// 排版
 h1, h2, h3, h4, h5, h6 {
   line-height: 1.2; font-weight: 600; letter-spacing: -0.01em;
   color: $color-text-primary;
+  font-family: $font-display;
 }
-a { text-decoration: none; color: $color-cyan; }
-p { line-height: 1.5; }
+a { text-decoration: none; color: $color-bronze; }
+p { line-height: 1.6; }
 small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
-.text-micro { font-size: $text-micro; text-transform: uppercase; letter-spacing: 0.05em; }
+.text-micro { font-size: $text-micro; text-transform: uppercase; letter-spacing: 0.06em; }
 
-// 霓虹滚动条
+// 暖色滚动条
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
-::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.2); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.4); }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(212, 155, 80, 0.15); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(212, 155, 80, 0.3); }
 
-::selection { background: rgba(0, 212, 255, 0.3); color: #fff; }
-:focus-visible { outline: 2px solid $color-cyan; outline-offset: 2px; border-radius: 2px; }
+::selection { background: rgba(212, 155, 80, 0.25); color: $color-cream; }
+:focus-visible { outline: 2px solid $color-bronze; outline-offset: 2px; border-radius: 2px; }
 
-// Element Plus 组件覆写
+// === Element Plus 组件覆写 ===
 .el-button--primary {
-  border-radius: 9999px; font-weight: 600; letter-spacing: -0.01em;
-  background: linear-gradient(135deg, $color-cyan, $color-purple) !important;
+  border-radius: 9999px; font-weight: 500; letter-spacing: -0.01em;
+  background: $color-bronze !important;
   border: none !important;
-  box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
   transition: all 0.3s $ease-out;
   &:hover {
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.35);
+    background: lighten($color-bronze, 6%) !important;
+    box-shadow: 0 2px 8px rgba(212, 155, 80, 0.25);
     transform: translateY(-1px);
   }
+  &:active { transform: scale(0.98); }
 }
+
+.el-button--default {
+  border-radius: $radius-full;
+  background: $color-bg-elevated !important;
+  border-color: $color-border !important;
+  color: $color-text-secondary !important;
+  transition: all 0.2s;
+  &:hover {
+    border-color: rgba(212, 155, 80, 0.2) !important;
+    color: $color-text-primary !important;
+    background: lighten($color-bg-elevated, 4%) !important;
+  }
+}
+
 .el-card {
   border-radius: $radius-lg;
   border: 1px solid $color-border;
-  background: $color-bg-glass;
-  @include glass;
+  background: $color-bg-elevated;
+  box-shadow: $shadow-sm;
 }
+
 .el-dialog {
   border-radius: $radius-xl;
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  border: 1px solid $color-border;
   box-shadow: $shadow-lg;
   background: $color-bg-elevated;
-  @include glass-heavy;
 }
 .el-dialog__header {
   padding: 28px 28px 0;
-  .el-dialog__title { font-size: 18px; font-weight: 600; color: $color-text-primary; }
+  .el-dialog__title { font-size: 18px; font-weight: 600; }
 }
 .el-dialog__headerbtn {
   top: 28px; right: 28px; width: 32px; height: 32px;
@@ -78,19 +97,78 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
 }
 .el-dialog__body { padding: 24px 28px; color: $color-text-secondary; }
 .el-dialog__footer { padding: 0 28px 28px; }
+
 .el-input__wrapper {
-  border-radius: 10px;
+  border-radius: 8px;
   transition: all 0.2s;
-  background: rgba(255, 255, 255, 0.04) !important;
+  background: $color-bg-tertiary !important;
   border-color: $color-border !important;
   box-shadow: none !important;
+  &:hover { border-color: rgba(212, 155, 80, 0.15) !important; }
+  &.is-focus { border-color: $color-bronze !important; box-shadow: 0 0 0 1px rgba(212, 155, 80, 0.2) !important; }
 }
-.el-input__inner { color: $color-text-primary !important; }
-.el-tag { border-radius: 9999px; }
-.el-menu { background: transparent !important; border-right: none !important; }
-.el-radio-group { .el-radio-button__inner { background: transparent !important; } }
+.el-input__inner { color: $color-text-primary !important; &::placeholder { color: $color-text-placeholder !important; } }
 
-// 动画
+.el-tag {
+  border-radius: 9999px; font-weight: 500;
+  &.el-tag--primary { background: rgba(212, 155, 80, 0.12); border-color: rgba(212, 155, 80, 0.2); color: $color-bronze; }
+}
+
+.el-menu { background: transparent !important; border-right: none !important; }
+
+.el-select {
+  .el-input__wrapper { background: $color-bg-tertiary !important; }
+}
+.el-select-dropdown {
+  background: $color-bg-elevated !important;
+  border: 1px solid $color-border !important;
+  .el-select-dropdown__item {
+    color: $color-text-secondary !important;
+    &.is-selected { color: $color-bronze !important; }
+    &:hover { background: rgba(212, 155, 80, 0.06) !important; }
+  }
+}
+
+.el-radio-group {
+  .el-radio-button__inner {
+    background: $color-bg-tertiary !important;
+    border-color: $color-border !important;
+    color: $color-text-secondary !important;
+    &:hover { color: $color-bronze !important; }
+  }
+  .is-active .el-radio-button__inner {
+    background: rgba(212, 155, 80, 0.12) !important;
+    border-color: rgba(212, 155, 80, 0.25) !important;
+    color: $color-bronze !important;
+    box-shadow: none !important;
+  }
+}
+
+.el-table {
+  --el-table-tr-bg-color: transparent;
+  --el-table-row-hover-bg-color: rgba(212, 155, 80, 0.04);
+  --el-table-border-color: rgba(212, 155, 80, 0.06);
+  --el-table-header-bg-color: rgba(212, 155, 80, 0.03);
+  background: transparent;
+  color: $color-text-primary;
+  th { color: $color-text-secondary !important; font-weight: 500; }
+  td { border-bottom-color: rgba(212, 155, 80, 0.04) !important; }
+}
+
+.el-pagination {
+  button, .el-pager li {
+    background: $color-bg-tertiary !important;
+    color: $color-text-secondary !important;
+    border-radius: 6px;
+    &.is-active { background: rgba(212, 155, 80, 0.15) !important; color: $color-bronze !important; }
+  }
+}
+
+.el-badge__content { background: $color-rust; }
+
+.el-avatar { background: linear-gradient(135deg, $color-bronze, $color-copper) !important; color: $color-cream; }
+
+// === 动画 ===
 .fade-enter-active, .fade-leave-active { transition: opacity 0.25s $ease-out; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
 .slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s $ease-spring; }
@@ -100,46 +178,45 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
 .stagger-item { opacity: 0; transform: translateY(16px); transition: all 0.5s $ease-out; }
 .stagger-item.stagger-visible { opacity: 1; transform: translateY(0); }
 
-.spring-scale { transition: transform 0.35s $ease-spring; }
-.spring-scale:hover { transform: scale(1.02); }
-.spring-scale:active { transform: scale(0.97); }
-
-// === 通用科幻组件 ===
+// === 通用组件 ===
 .glass-panel {
-  @include glass;
+  @include panel;
+  padding: $space-lg;
+}
+
+.card-default {
+  @include card;
+  padding: $space-lg;
+  @include card-hover;
+}
+
+.card-flat {
+  background: $color-bg-secondary;
+  border: 1px solid $color-border;
   border-radius: $radius-lg;
   padding: $space-lg;
 }
 
-.neon-card {
-  @include glass;
-  @include glow-border;
-  border-radius: $radius-lg;
-  padding: $space-lg;
-  transition: all 0.3s $ease-out;
-  &:hover {
-    box-shadow: 0 0 28px rgba(0, 212, 255, 0.2), 0 0 8px rgba(0, 212, 255, 0.3);
-  }
+.section-label {
+  font-size: $text-micro;
+  font-weight: 500;
+  color: $color-text-tertiary;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.neon-text {
-  @include glow-text;
-  color: $color-cyan;
+// 装饰线
+.rule-line {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, $color-border, rgba(212, 155, 80, 0.03), transparent);
 }
 
-.gradient-text {
-  background: linear-gradient(135deg, $color-cyan, $color-purple);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-// 网格背景（数据面板用）
-.bg-grid {
-  background-image:
-    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+.display-number {
+  font-family: $font-display;
+  font-weight: 600;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
 }
 
 // === 响应式 ===
@@ -154,9 +231,8 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
   .app-layout__content { padding: $space-lg $space-lg; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .dashboard__charts { grid-template-columns: 1fr !important; }
-  .hero-kpi__value { font-size: 44px !important; }
+  .hero-kpi__value { font-size: 40px !important; }
   .data-center__overview .el-col { flex: 0 0 33.33%; max-width: 33.33%; }
-  .publish-wizard__body { max-width: 100% !important; }
 }
 
 @media (max-width: 768px) {
@@ -164,12 +240,9 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .data-center__body .el-col { flex: 0 0 100%; max-width: 100%; }
   .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
-  .sub-kpi b { font-size: 18px; }
 }
 
 @media (max-width: 480px) {
   .account-grid { grid-template-columns: 1fr !important; }
   .hero-kpi__value { font-size: 36px !important; }
-  .dashboard__charts { grid-template-columns: 1fr; }
-  .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
 }

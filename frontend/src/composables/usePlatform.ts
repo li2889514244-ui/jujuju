@@ -5,13 +5,13 @@ export interface PlatformMeta {
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
-  douyin: { label: '抖音', color: '#00d4ff', char: '抖' },
-  kuaishou: { label: '快手', color: '#ff6b35', char: '快' },
-  xiaohongshu: { label: '小红书', color: '#ff3366', char: '红' },
-  video_account: { label: '视频号', color: '#00e396', char: '视' },
-  bilibili: { label: 'B站', color: '#fb7299', char: 'B' },
-  weibo: { label: '微博', color: '#ffb800', char: '微' },
-  tiktok: { label: 'TikTok', color: '#7c3aed', char: 'T' },
+  douyin: { label: '抖音', color: '#a09888', char: '抖' },
+  kuaishou: { label: '快手', color: '#e06b30', char: '快' },
+  xiaohongshu: { label: '小红书', color: '#d44550', char: '红' },
+  video_account: { label: '视频号', color: '#6b9e6c', char: '视' },
+  bilibili: { label: 'B站', color: '#e07b8e', char: 'B' },
+  weibo: { label: '微博', color: '#d49b50', char: '微' },
+  tiktok: { label: 'TikTok', color: '#8a8078', char: 'T' },
 }
 
 const ALIASES: Record<string, string> = {
@@ -26,7 +26,7 @@ function normalizeKey(platform: string): string {
 }
 
 export function getPlatformColor(platform: string): string {
-  return PLATFORM_META[normalizeKey(platform)]?.color || '#6e6e73'
+  return PLATFORM_META[normalizeKey(platform)]?.color || '#8a8078'
 }
 
 export function getPlatformLabel(platform: string): string {
@@ -38,5 +38,5 @@ export function getPlatformChar(platform: string): string {
 }
 
 export function getPlatformMeta(platform: string): PlatformMeta {
-  return PLATFORM_META[normalizeKey(platform)] || { label: platform, color: '#6e6e73', char: '?' }
+  return PLATFORM_META[normalizeKey(platform)] || { label: platform, color: '#8a8078', char: '?' }
 }

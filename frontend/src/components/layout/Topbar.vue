@@ -1,7 +1,7 @@
 <template>
   <div class="topbar">
     <div class="topbar__left">
-      <el-breadcrumb separator="/">
+      <el-breadcrumb separator="›">
         <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
         <el-breadcrumb-item v-if="currentRoute?.meta?.title">
           {{ currentRoute.meta.title }}
@@ -11,13 +11,13 @@
 
     <div class="topbar__right">
       <!-- Desktop Download -->
-      <el-tooltip content="下载桌面伴侣，扫码绑定平台账号" placement="bottom">
+      <el-tooltip content="下载桌面伴侣" placement="bottom">
         <a
           href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
           target="_blank"
-          class="topbar__download"
+          class="topbar__action"
         >
-          <el-icon :size="20"><Download /></el-icon>
+          <el-icon :size="18"><Download /></el-icon>
           <span>桌面端</span>
         </a>
       </el-tooltip>
@@ -25,9 +25,9 @@
       <!-- Team Switcher -->
       <el-dropdown trigger="click" @command="handleTeamSwitch">
         <div class="topbar__team">
-          <el-icon><OfficeBuilding /></el-icon>
+          <el-icon :size="16"><OfficeBuilding /></el-icon>
           <span>{{ teamStore.currentTeam?.name || '选择团队' }}</span>
-          <el-icon><ArrowDown /></el-icon>
+          <el-icon :size="12"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -52,23 +52,19 @@
       >
         <template #reference>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="topbar__notification">
-            <el-icon :size="20" class="topbar__icon" role="button" aria-label="通知" tabindex="0"
-              ><Bell
-            /></el-icon>
+            <el-icon :size="19" class="topbar__icon-btn" role="button" aria-label="通知" tabindex="0">
+              <Bell />
+            </el-icon>
           </el-badge>
         </template>
         <div class="notification-panel">
           <div class="notification-panel__header">
             <span>通知</span>
             <el-button
-              link
-              type="primary"
-              size="small"
+              link type="primary" size="small"
               @click="handleMarkAllRead"
               :disabled="unreadCount === 0"
-            >
-              全部已读
-            </el-button>
+            >全部已读</el-button>
           </div>
           <div class="notification-panel__body" v-loading="notifLoading">
             <div v-if="notifications.length === 0" class="notification-panel__empty">暂无通知</div>
@@ -80,9 +76,9 @@
               @click="handleNotifClick(item)"
             >
               <div class="notification-item__icon">
-                <el-icon :color="getNotifColor(item.type)"
-                  ><component :is="getNotifIcon(item.type)"
-                /></el-icon>
+                <el-icon :color="getNotifColor(item.type)" :size="16">
+                  <component :is="getNotifIcon(item.type)" />
+                </el-icon>
               </div>
               <div class="notification-item__content">
                 <div class="notification-item__title">{{ item.title }}</div>
@@ -96,11 +92,10 @@
       <!-- User Menu -->
       <el-dropdown trigger="click" @command="handleUserCommand">
         <div class="topbar__user">
-          <el-avatar :size="32" :src="userStore.avatar">
+          <el-avatar :size="30" :src="userStore.avatar">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
           <span class="topbar__username">{{ userStore.username }}</span>
-          <el-icon><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -142,7 +137,6 @@ const currentRoute = computed(() => route)
 onMounted(() => {
   teamStore.fetchTeams()
   fetchNotifications()
-  // 每30秒轮询未读数
   pollTimer = setInterval(fetchUnreadCount, 30000)
 })
 
@@ -154,9 +148,7 @@ async function fetchUnreadCount() {
   try {
     const res = await notificationApi.getUnreadCount()
     unreadCount.value = res.data.unreadCount
-  } catch {
-    /* silent */
-  }
+  } catch { /* silent */ }
 }
 
 async function fetchNotifications() {
@@ -165,9 +157,7 @@ async function fetchNotifications() {
     const res = await notificationApi.getAll({ limit: 10 })
     notifications.value = res.data.notifications
     unreadCount.value = res.data.unreadCount
-  } catch {
-    /* silent */
-  }
+  } catch { /* silent */ }
   notifLoading.value = false
 }
 
@@ -187,27 +177,18 @@ async function handleNotifClick(item: Notification) {
 
 function getNotifIcon(type: string) {
   switch (type) {
-    case 'PUBLISH_FAILED':
-    case 'ACCOUNT_EXPIRED':
-      return WarningFilled
-    case 'PUBLISH_SUCCESS':
-      return SuccessFilled
-    default:
-      return InfoFilled
+    case 'PUBLISH_FAILED': case 'ACCOUNT_EXPIRED': return WarningFilled
+    case 'PUBLISH_SUCCESS': return SuccessFilled
+    default: return InfoFilled
   }
 }
 
 function getNotifColor(type: string) {
   switch (type) {
-    case 'PUBLISH_FAILED':
-    case 'ACCOUNT_EXPIRED':
-      return '#ff453a'
-    case 'PUBLISH_SUCCESS':
-      return '#30d158'
-    case 'FOLLOWER_ALERT':
-      return '#ff9f0a'
-    default:
-      return '#6e6e73'
+    case 'PUBLISH_FAILED': case 'ACCOUNT_EXPIRED': return '#d4534a'
+    case 'PUBLISH_SUCCESS': return '#6b9e6c'
+    case 'FOLLOWER_ALERT': return '#e0a030'
+    default: return '#8a8078'
   }
 }
 
@@ -232,21 +213,17 @@ function handleTeamSwitch(team: Team) {
 
 function handleUserCommand(command: string) {
   switch (command) {
-    case 'logout':
-      userStore.logout()
-      break
-    case 'profile':
-    case 'password':
-      break
+    case 'logout': userStore.logout(); break
+    case 'profile': case 'password': break
   }
 }
 </script>
 
 <style lang="scss" scoped>
 .topbar {
-  height: 52px;
-  background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color);
+  height: $topbar-height;
+  background: $color-bg-secondary;
+  border-bottom: 1px solid $color-border;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -256,29 +233,30 @@ function handleUserCommand(command: string) {
 
   &__left {
     :deep(.el-breadcrumb) {
-      font-size: $text-body;
+      font-size: 13px;
+      .el-breadcrumb__item { color: $color-text-tertiary; }
+      .el-breadcrumb__inner { color: $color-text-secondary; font-weight: 400; }
+      .el-breadcrumb__separator { color: $color-text-tertiary; margin: 0 6px; }
     }
   }
 
   &__right {
     display: flex;
     align-items: center;
-    gap: $space-lg;
+    gap: 20px;
   }
 
-  &__download {
+  &__action {
     display: flex;
     align-items: center;
-    gap: 4px;
-    color: var(--el-color-primary);
+    gap: 5px;
+    color: $color-text-secondary;
     text-decoration: none;
-    font-size: $text-body;
-    padding: 4px 10px;
+    font-size: 13px;
+    padding: 5px 10px;
     border-radius: 6px;
-    transition: background 0.2s;
-    &:hover {
-      background: rgba(230, 0, 18, 0.1);
-    }
+    transition: all 0.2s;
+    &:hover { background: rgba(212, 155, 80, 0.06); color: $color-bronze; }
   }
 
   &__team {
@@ -286,27 +264,26 @@ function handleUserCommand(command: string) {
     align-items: center;
     gap: 6px;
     cursor: pointer;
-    color: var(--el-text-color-secondary);
-    font-size: $text-body;
+    color: $color-text-secondary;
+    font-size: 13px;
     padding: 6px 12px;
     border-radius: 6px;
-    transition: background 0.2s;
-    &:hover {
-      background: var(--el-fill-color-lighter);
-    }
+    transition: all 0.2s;
+    &:hover { background: rgba(212, 155, 80, 0.06); }
   }
 
   &__notification {
     cursor: pointer;
+    :deep(.el-badge__content) {
+      font-size: 10px; height: 16px; line-height: 16px; padding: 0 4px;
+    }
   }
 
-  &__icon {
-    color: var(--el-text-color-secondary);
+  &__icon-btn {
+    color: $color-text-secondary;
     cursor: pointer;
     transition: color 0.2s;
-    &:hover {
-      color: var(--el-color-primary);
-    }
+    &:hover { color: $color-bronze; }
   }
 
   &__user {
@@ -314,22 +291,28 @@ function handleUserCommand(command: string) {
     align-items: center;
     gap: 8px;
     cursor: pointer;
+    padding: 4px 8px 4px 4px;
+    border-radius: 9999px;
+    transition: background 0.2s;
+    &:hover { background: rgba(212, 155, 80, 0.06); }
   }
   &__username {
-    font-size: $text-body;
-    color: var(--el-text-color-primary);
+    font-size: 13px;
+    color: $color-text-primary;
+    font-weight: 450;
   }
 }
 
+// Notification panel
 .notification-panel {
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding-bottom: 12px;
-    border-bottom: 1px solid var(--el-border-color-light);
-    font-weight: 600;
-    font-size: 15px;
+    border-bottom: 1px solid $color-border;
+    font-weight: 500;
+    font-size: 14px;
   }
   &__body {
     max-height: 360px;
@@ -338,49 +321,36 @@ function handleUserCommand(command: string) {
   }
   &__empty {
     text-align: center;
-    color: var(--el-text-color-secondary);
-    padding: $space-2xl 0;
-    font-size: $text-body;
+    color: $color-text-tertiary;
+    padding: 40px 0;
+    font-size: 13px;
   }
 }
 
 .notification-item {
   display: flex;
   align-items: flex-start;
-  gap: $space-sm;
-  padding: $space-sm 4px;
+  gap: 10px;
+  padding: 10px 6px;
   border-radius: 6px;
   cursor: pointer;
-  transition: background 0.2s;
-  &:hover {
-    background: var(--el-fill-color-lighter);
-  }
-  &--unread {
-    background: rgba(230, 0, 18, 0.08);
-    &:hover {
-      background: rgba(230, 0, 18, 0.14);
-    }
-  }
-  &__icon {
-    padding-top: 2px;
-    font-size: 18px;
-  }
-  &__content {
-    flex: 1;
-    min-width: 0;
-  }
+  transition: background 0.15s;
+  &:hover { background: rgba(212, 155, 80, 0.05); }
+  &--unread { background: rgba(212, 155, 80, 0.06); }
+  &__icon { padding-top: 1px; }
+  &__content { flex: 1; min-width: 0; }
   &__title {
     font-size: 13px;
-    color: var(--el-text-color-primary);
+    color: $color-text-primary;
     line-height: 1.4;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
   &__time {
-    font-size: $text-caption;
-    color: var(--el-text-color-secondary);
-    margin-top: 4px;
+    font-size: 12px;
+    color: $color-text-tertiary;
+    margin-top: 2px;
   }
 }
 </style>

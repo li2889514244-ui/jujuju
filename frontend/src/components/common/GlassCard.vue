@@ -34,60 +34,49 @@ defineEmits<{ click: [e: MouseEvent] }>()
 <style lang="scss" scoped>
 .glass-card {
   border-radius: $radius-lg;
-  border: 1px solid var(--el-border-color);
-  transition: all 0.35s $ease-spring;
+  border: 1px solid $color-border;
+  transition: all 0.3s $ease-out;
 
   &--default {
-    @include glass;
+    @include panel;
   }
   &--elevated {
-    @include glass-heavy;
-    box-shadow: var(--el-box-shadow);
+    background: $color-bg-elevated;
+    border-color: $color-border;
+    box-shadow: $shadow-md;
   }
   &--tinted {
-    background: rgba(#E60012, 0.06);
-    border-color: rgba(#E60012, 0.15);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
+    background: rgba(212, 155, 80, 0.04);
+    border-color: rgba(212, 155, 80, 0.1);
     .glass-card__header {
-      border-bottom-color: rgba(#E60012, 0.08);
+      border-bottom-color: rgba(212, 155, 80, 0.06);
     }
   }
 
-  &--sm {
-    padding: $space-sm;
-  }
-  &--md {
-    padding: $space-lg;
-  }
-  &--lg {
-    padding: $space-xl;
-  }
+  &--sm { padding: $space-sm; }
+  &--md { padding: $space-lg; }
+  &--lg { padding: $space-xl; }
 
   &--hover:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--el-box-shadow);
-    border-color: var(--el-border-color);
+    border-color: rgba(212, 155, 80, 0.15);
+    box-shadow: $shadow-md;
   }
 
   &--interactive {
     cursor: pointer;
-    &:active {
-      transform: scale(0.98);
-    }
+    &:active { transform: scale(0.98); }
   }
 
   &__header {
     padding-bottom: 12px;
     margin-bottom: 12px;
-    border-bottom: 1px solid var(--el-border-color-light);
+    border-bottom: 1px solid $color-border;
   }
 
   &__title {
     font-size: $text-body;
-    font-weight: 600;
-    color: var(--el-text-color-secondary);
-    letter-spacing: -0.01em;
+    font-weight: 500;
+    color: $color-text-secondary;
   }
 
   &__body {

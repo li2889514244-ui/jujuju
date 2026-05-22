@@ -1,23 +1,19 @@
 <template>
   <div class="dashboard">
-    <StarField :opacity="0.6" />
-
-    <!-- Hero KPI: 霓虹大数字 -->
+    <!-- Hero KPI -->
     <div class="dashboard__hero" v-if="accountRows.length > 0">
-      <div class="hero-ring"></div>
-      <div class="hero-core">
-        <span class="hero-value neon-text">{{ formatLargeNum(groupSummaryCards[0]?.rawValue || 0) }}</span>
-        <span class="hero-label">总粉丝</span>
-      </div>
+      <p class="hero-label">总粉丝</p>
+      <p class="hero-value display-number">{{ formatLargeNum(groupSummaryCards[0]?.rawValue || 0) }}</p>
+      <div class="hero-rule"></div>
     </div>
 
     <!-- 次级指标 + 操作 -->
     <div class="dashboard__sub-row" v-if="accountRows.length > 0">
       <div class="sub-kpis">
-        <span class="sub-kpi" v-for="card in groupSummaryCards.slice(1)" :key="card.label">
-          <b class="gradient-text">{{ formatLargeNum(card.rawValue) }}</b>
-          <small>{{ card.label }}</small>
-        </span>
+        <div class="sub-kpi" v-for="card in groupSummaryCards.slice(1)" :key="card.label">
+          <span class="sub-kpi__value display-number">{{ formatLargeNum(card.rawValue) }}</span>
+          <span class="sub-kpi__label">{{ card.label }}</span>
+        </div>
       </div>
       <div class="sub-actions">
         <el-radio-group v-model="period" size="small" @change="onPeriodChange">
@@ -31,7 +27,7 @@
 
     <!-- 分组切换 -->
     <div class="dashboard__groups" v-if="accountGroups.length > 0">
-      <el-select v-model="selectedGroup" size="small" @change="onGroupChange" placeholder="全部" style="width:120px">
+      <el-select v-model="selectedGroup" size="small" @change="onGroupChange" style="width:120px">
         <el-option label="全部" value="all" />
         <el-option v-for="g in accountGroups" :key="g.name" :label="g.name" :value="g.name" />
       </el-select>
@@ -39,17 +35,17 @@
 
     <!-- 图表区 -->
     <div class="dashboard__charts" v-if="accountRows.length > 0">
-      <div class="neon-card stagger-item">
+      <div class="card-default stagger-item">
         <div class="chart-header">
           <span class="chart-title">增长趋势</span>
           <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
-            <el-radio-button :value="7">7天</el-radio-button>
-            <el-radio-button :value="30">30天</el-radio-button>
+            <el-radio-button :value="7">7 天</el-radio-button>
+            <el-radio-button :value="30">30 天</el-radio-button>
           </el-radio-group>
         </div>
         <DataChart :option="followerChartOption" :height="280" />
       </div>
-      <div class="neon-card stagger-item">
+      <div class="card-default stagger-item">
         <div class="chart-header">
           <span class="chart-title">平台分布</span>
         </div>
@@ -62,7 +58,7 @@
       <div class="section-header">
         <span class="section-header__title">账号</span>
         <span class="section-header__count">{{ accountRows.length }}</span>
-        <router-link to="/accounts" class="section-header__link">全部 →</router-link>
+        <router-link to="/accounts" class="section-header__link">查看全部</router-link>
       </div>
       <div class="account-grid">
         <router-link
@@ -70,16 +66,16 @@
           :key="acc.id"
           :to="`/accounts/${acc.id}`"
           class="account-card stagger-item"
+          :style="{ transitionDelay: `${i * 40}ms` }"
         >
-          <el-avatar :size="36" :src="acc.avatar" :style="{
-            background: acc.avatar ? '' : `linear-gradient(135deg, ${platformGradient(acc.platform)})`,
-            color: '#fff',
-            boxShadow: `0 0 12px ${platformGlow(acc.platform)}`
-          }">
+          <el-avatar :size="34" :src="acc.avatar">
             {{ acc.nickname?.charAt(0) }}
           </el-avatar>
-          <span class="account-card__name">{{ acc.nickname }}</span>
-          <PlatformBadge :platform="acc.platform" size="sm" />
+          <div class="account-card__info">
+            <span class="account-card__name">{{ acc.nickname }}</span>
+            <PlatformBadge :platform="acc.platform" size="sm" />
+          </div>
+          <el-icon :size="14" class="account-card__arrow"><ArrowRight /></el-icon>
         </router-link>
       </div>
     </div>
@@ -88,17 +84,13 @@
     <div class="dashboard__empty" v-if="accountRows.length === 0 && !loading">
       <div class="empty-state">
         <div class="empty-state__icon">
-          <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
-            <circle cx="40" cy="40" r="38" stroke="url(#eg)" stroke-width="1.5" stroke-dasharray="6 4" opacity="0.5"/>
-            <defs><linearGradient id="eg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#00d4ff"/><stop offset="100%" stop-color="#7c3aed"/></linearGradient></defs>
-            <circle cx="40" cy="40" r="12" stroke="#00d4ff" stroke-width="0.5" opacity="0.3">
-              <animate attributeName="r" values="12;20;12" dur="3s" repeatCount="indefinite"/>
-              <animate attributeName="opacity" values="0.3;0;0.3" dur="3s" repeatCount="indefinite"/>
-            </circle>
-            <circle cx="40" cy="40" r="4" fill="#00d4ff" opacity="0.6"/>
+          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+            <rect x="8" y="12" width="56" height="48" rx="8" stroke="#d49b50" stroke-width="1" opacity="0.3" />
+            <circle cx="36" cy="36" r="14" stroke="#d49b50" stroke-width="1" opacity="0.15" stroke-dasharray="4 4" />
+            <circle cx="36" cy="36" r="5" fill="#d49b50" opacity="0.4" />
           </svg>
         </div>
-        <h3 class="empty-state__title gradient-text">连接你的第一个账号</h3>
+        <h3 class="empty-state__title">连接你的第一个账号</h3>
         <p class="empty-state__desc">绑定社交媒体账号，开始矩阵管理与数据分析</p>
         <el-button type="primary" size="large" @click="$router.push('/accounts')">添加账号</el-button>
       </div>
@@ -108,29 +100,11 @@
 
 <script setup lang="ts">
 import dayjs from 'dayjs'
-import { Refresh } from '@element-plus/icons-vue'
+import { Refresh, ArrowRight } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
-import StarField from '@/components/common/StarField.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
-
-const platformGradient = (p: string) => {
-  const map: Record<string, string> = {
-    DOUYIN: '#00d4ff, #0a0e1a', KUAISHOU: '#ff6b35, #0a0e1a',
-    XIAOHONGSHU: '#ff3366, #0a0e1a', BILIBILI: '#fb7299, #0a0e1a',
-    WEIBO: '#ffb800, #0a0e1a', WECHAT_VIDEO: '#00e396, #0a0e1a',
-  }
-  return map[p] || '#00d4ff, #7c3aed'
-}
-const platformGlow = (p: string) => {
-  const map: Record<string, string> = {
-    DOUYIN: 'rgba(0,212,255,0.3)', KUAISHOU: 'rgba(255,107,53,0.3)',
-    XIAOHONGSHU: 'rgba(255,51,102,0.3)', BILIBILI: 'rgba(251,114,153,0.3)',
-    WEIBO: 'rgba(255,184,0,0.3)', WECHAT_VIDEO: 'rgba(0,227,150,0.3)',
-  }
-  return map[p] || 'rgba(0,212,255,0.3)'
-}
 
 const {
   period, loading, trendDays, selectedGroup,
@@ -167,7 +141,7 @@ function exportCSV() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: $space-3xl 0 $space-xl;
+    padding: $space-3xl 0 $space-lg;
     position: relative;
     z-index: 1;
   }
@@ -198,6 +172,7 @@ function exportCSV() {
     gap: $space-lg;
     position: relative;
     z-index: 1;
+    padding-bottom: $space-2xl;
   }
   &__empty {
     display: flex;
@@ -209,68 +184,51 @@ function exportCSV() {
   }
 }
 
-// Hero ring animation
-.hero-ring {
-  position: absolute;
-  width: 200px; height: 200px;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 212, 255, 0.08);
-  animation: ring-spin 20s linear infinite;
-  &::before {
-    content: '';
-    position: absolute;
-    inset: -4px;
-    border-radius: 50%;
-    border: 1px solid rgba(124, 58, 237, 0.06);
-    animation: ring-spin 15s linear infinite reverse;
-  }
-}
-@keyframes ring-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.hero-core {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: $space-sm;
-  z-index: 1;
-}
-
-.hero-value {
-  font-size: 80px;
-  font-weight: 700;
-  letter-spacing: -0.04em;
-  line-height: 1;
-  font-feature-settings: 'tnum';
-  font-variant-numeric: tabular-nums;
-  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.3));
-}
-
+// Hero
 .hero-label {
-  font-size: $text-body;
+  font-size: 12px;
   color: $color-text-tertiary;
   text-transform: uppercase;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.14em;
+  margin-bottom: $space-sm;
+}
+.hero-value {
+  font-size: 80px;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  color: $color-cream;
+}
+.hero-rule {
+  width: 48px;
+  height: 2px;
+  background: $color-bronze;
+  margin-top: 20px;
+  border-radius: 1px;
+  opacity: 0.5;
 }
 
 // Sub KPIs
-.sub-kpis { display: flex; gap: $space-3xl; }
+.sub-kpis {
+  display: flex;
+  gap: $space-3xl;
+}
 .sub-kpi {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  b {
-    font-size: $text-headline;
-    font-weight: 700;
-    font-feature-settings: 'tnum';
+  gap: 4px;
+  &__value {
+    font-size: 28px;
+    font-weight: 500;
+    color: $color-text-primary;
+    line-height: 1;
   }
-  small {
-    font-size: $text-micro;
+  &__label {
+    font-size: 11px;
     color: $color-text-tertiary;
     text-transform: uppercase;
+    letter-spacing: 0.08em;
   }
 }
 .sub-actions {
@@ -288,10 +246,11 @@ function exportCSV() {
   margin-bottom: $space-md;
 }
 .chart-title {
-  font-size: $text-caption;
-  color: $color-text-secondary;
+  font-size: 12px;
+  font-weight: 500;
+  color: $color-text-tertiary;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
 }
 
 // Section header
@@ -300,24 +259,24 @@ function exportCSV() {
   align-items: baseline;
   gap: $space-sm;
   &__title {
-    font-size: $text-micro;
-    font-weight: 600;
+    font-size: 12px;
+    font-weight: 500;
     color: $color-text-tertiary;
     text-transform: uppercase;
     letter-spacing: 0.08em;
   }
   &__count {
-    font-size: $text-caption;
-    color: $color-cyan;
+    font-size: 13px;
+    color: $color-bronze;
+    font-weight: 500;
   }
   &__link {
-    font-size: $text-caption;
-    color: $color-cyan;
+    font-size: 13px;
+    color: $color-text-tertiary;
     text-decoration: none;
-    font-weight: 500;
     margin-left: auto;
     transition: color 0.2s;
-    &:hover { color: $color-purple; }
+    &:hover { color: $color-bronze; }
   }
 }
 
@@ -325,59 +284,70 @@ function exportCSV() {
 .account-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: $space-lg;
+  gap: $space-md;
 }
 
 .account-card {
   display: flex;
   align-items: center;
-  gap: $space-sm;
-  padding: $space-md $space-lg;
+  gap: 12px;
+  padding: 14px 16px;
   border-radius: $radius-md;
-  background: rgba(16, 24, 48, 0.4);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: $color-bg-secondary;
   border: 1px solid $color-border;
   text-decoration: none;
-  transition: all 0.3s $ease-out;
+  transition: all 0.25s $ease-out;
   cursor: pointer;
-  position: relative;
-  overflow: hidden;
 
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(135deg, rgba(0,212,255,0), rgba(124,58,237,0));
-    transition: opacity 0.3s;
-    opacity: 0;
-  }
   &:hover {
-    border-color: rgba(0, 212, 255, 0.3);
-    box-shadow: 0 0 20px rgba(0, 212, 255, 0.1);
-    transform: translateY(-2px);
-    &::before {
-      background: linear-gradient(135deg, rgba(0,212,255,0.04), rgba(124,58,237,0.04));
-      opacity: 1;
-    }
+    border-color: rgba(212, 155, 80, 0.18);
+    background: $color-bg-tertiary;
+  }
+  &__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
   &__name {
-    flex: 1;
-    font-size: $text-body;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 500;
     color: $color-text-primary;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
   }
+  &__arrow {
+    color: $color-text-tertiary;
+    flex-shrink: 0;
+    transition: all 0.2s;
+    opacity: 0;
+  }
+  &:hover &__arrow { opacity: 1; color: $color-bronze; }
 }
 
 // Empty state
 .empty-state {
-  display: flex; flex-direction: column; align-items: center; gap: 24px; text-align: center;
-  &__icon { opacity: 0.8; }
-  &__title { font-size: $text-headline; font-weight: 700; margin: 0; }
-  &__desc { font-size: $text-body; color: $color-text-secondary; margin: 0; max-width: 320px; }
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  text-align: center;
+  &__icon { opacity: 0.7; }
+  &__title {
+    font-family: $font-display;
+    font-size: $text-headline;
+    font-weight: 500;
+    color: $color-text-primary;
+    margin: 0;
+  }
+  &__desc {
+    font-size: $text-body;
+    color: $color-text-secondary;
+    margin: 0;
+    max-width: 320px;
+    line-height: 1.6;
+  }
 }
 </style>

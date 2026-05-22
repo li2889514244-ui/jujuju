@@ -34,10 +34,10 @@ export function useDashboard() {
     const totalLikes = rows.reduce((s, r) => s + r.likes, 0)
     const totalInteract = rows.reduce((s, r) => s + r.comments + r.shares, 0)
     return [
-      { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#E60012' },
-      { label: '总播放量', rawValue: totalViews, trend: null, color: '#ff9f0a' },
-      { label: '总点赞', rawValue: totalLikes, trend: null, color: '#30d158' },
-      { label: '总互动', rawValue: totalInteract, trend: null, color: '#ff453a' },
+      { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#d49b50' },
+      { label: '总播放量', rawValue: totalViews, trend: null, color: '#6b9e6c' },
+      { label: '总点赞', rawValue: totalLikes, trend: null, color: '#e0a030' },
+      { label: '总互动', rawValue: totalInteract, trend: null, color: '#d4534a' },
     ]
   })
 
@@ -167,15 +167,15 @@ export function useDashboard() {
   }
   function onGroupChange() {}
 
-  const neonColors = ['#00d4ff', '#7c3aed', '#ff3366', '#00e396', '#ffb800', '#fb7299']
+  const warmColors = ['#d49b50', '#c88540', '#e0a030', '#d4534a', '#6b9e6c', '#8a8078']
 
   const followerChartOption = computed(() => ({
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis' as const,
-      backgroundColor: 'rgba(16, 24, 48, 0.95)',
-      borderColor: 'rgba(0, 212, 255, 0.2)',
-      textStyle: { color: '#e8eaed', fontSize: 12 },
+      backgroundColor: 'rgba(40, 37, 34, 0.95)',
+      borderColor: 'rgba(212, 155, 80, 0.15)',
+      textStyle: { color: '#f0ece4', fontSize: 12 },
     },
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
     xAxis: {
@@ -183,14 +183,14 @@ export function useDashboard() {
       data: Array.from({ length: trendDays.value }, (_, i) =>
         dayjs().subtract(trendDays.value - 1 - i, 'day').format('MM-DD'),
       ),
-      axisLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.15)' } },
+      axisLine: { lineStyle: { color: 'rgba(212, 155, 80, 0.1)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#5a6680', fontSize: 11 },
+      axisLabel: { color: '#6b6560', fontSize: 11 },
     },
     yAxis: {
       type: 'value' as const,
-      splitLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.06)' } },
-      axisLabel: { color: '#5a6680', fontSize: 11 },
+      splitLine: { lineStyle: { color: 'rgba(212, 155, 80, 0.04)' } },
+      axisLabel: { color: '#6b6560', fontSize: 11 },
     },
     series:
       followerTrendData.value.length > 0
@@ -200,18 +200,14 @@ export function useDashboard() {
             smooth: true,
             symbol: 'circle',
             symbolSize: 4,
-            lineStyle: {
-              width: 2,
-              shadowBlur: 12,
-              shadowColor: 'rgba(0, 212, 255, 0.4)',
-            },
-            itemStyle: { color: '#00d4ff' },
+            lineStyle: { width: 2 },
+            itemStyle: { color: '#d49b50' },
             areaStyle: {
               color: {
                 type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1,
                 colorStops: [
-                  { offset: 0, color: 'rgba(0, 212, 255, 0.25)' },
-                  { offset: 1, color: 'rgba(0, 212, 255, 0)' },
+                  { offset: 0, color: 'rgba(212, 155, 80, 0.2)' },
+                  { offset: 1, color: 'rgba(212, 155, 80, 0)' },
                 ],
               },
             },
@@ -224,13 +220,13 @@ export function useDashboard() {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item' as const,
-      backgroundColor: 'rgba(16, 24, 48, 0.95)',
-      borderColor: 'rgba(0, 212, 255, 0.2)',
-      textStyle: { color: '#e8eaed', fontSize: 12 },
+      backgroundColor: 'rgba(40, 37, 34, 0.95)',
+      borderColor: 'rgba(212, 155, 80, 0.15)',
+      textStyle: { color: '#f0ece4', fontSize: 12 },
     },
     legend: {
       bottom: 0,
-      textStyle: { color: '#8892b0', fontSize: 11 },
+      textStyle: { color: '#a09888', fontSize: 11 },
     },
     series: [{
       type: 'pie' as const,
@@ -238,20 +234,17 @@ export function useDashboard() {
       center: ['50%', '45%'],
       itemStyle: {
         borderRadius: 4,
-        borderColor: '#0a0e1a',
+        borderColor: '#1a1817',
         borderWidth: 3,
-        shadowBlur: 12,
-        shadowColor: 'rgba(0, 212, 255, 0.3)',
       },
       label: { show: false },
       emphasis: {
-        label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#e8eaed' },
-        itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0, 212, 255, 0.5)' },
+        label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#f0ece4' },
       },
       data:
         platformDistribution.value.length > 0
           ? platformDistribution.value
-          : [{ value: 0, name: '暂无数据', itemStyle: { color: '#3d4a60' } }],
+          : [{ value: 0, name: '暂无数据', itemStyle: { color: '#4a4540' } }],
     }],
   }))
 

@@ -167,19 +167,19 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
 const editingEvent = ref<CalEvent | null>(null)
-const form = ref({ title: '', allDay: false, color: '#E60012', description: '' })
+const form = ref({ title: '', allDay: false, color: '#d49b50', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
 const predefineColors = [
-  '#E60012',
-  '#30d158',
-  '#ff9f0a',
-  '#ff453a',
-  '#6e6e73',
-  '#8b5cf6',
-  '#06b6d4',
-  '#f59e0b',
+  '#d49b50',
+  '#6b9e6c',
+  '#e0a030',
+  '#d4534a',
+  '#8a8078',
+  '#c88540',
+  '#a09888',
+  '#6b6560',
 ]
 
 const periodLabel = computed(() => {
@@ -228,7 +228,7 @@ function nextPeriod() {
 
 function openAddDialog() {
   editingEvent.value = null
-  form.value = { title: '', allDay: false, color: '#E60012', description: '' }
+  form.value = { title: '', allDay: false, color: '#d49b50', description: '' }
   formDate.value = new Date()
   formTime.value = null
   dialogVisible.value = true
@@ -307,7 +307,7 @@ function deleteEvent() {
 }
 
 .cal-month {
-  @include glass;
+  @include panel;
   border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   overflow: hidden;
@@ -341,9 +341,9 @@ function deleteEvent() {
     color: var(--el-text-color-placeholder);
   }
   &--today {
-    background: rgba(#E60012, 0.06);
+    background: rgba(#d49b50, 0.06);
     .cal-day__num {
-      color: #E60012;
+      color: #d49b50;
       font-weight: 700;
     }
   }
@@ -382,7 +382,7 @@ function deleteEvent() {
 }
 
 .cal-week {
-  @include glass;
+  @include panel;
   border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   &__header {
@@ -396,7 +396,7 @@ function deleteEvent() {
     font-size: 13px;
     color: var(--el-text-color-secondary);
     &.is-today {
-      color: #E60012;
+      color: #d49b50;
       font-weight: 600;
     }
   }
@@ -416,7 +416,7 @@ function deleteEvent() {
       border-right: none;
     }
     &.is-today {
-      background: rgba(#E60012, 0.06);
+      background: rgba(#d49b50, 0.06);
     }
   }
 }

@@ -291,13 +291,13 @@ function formatNum(n: any): string {
   text-align: center;
   &__label {
     font-size: $text-caption;
-    color: #6e6e73;
+    color: #6b6560;
     margin-bottom: 6px;
   }
   &__value {
     font-size: $text-headline;
     font-weight: 600;
-    color: #1D1D1F;
+    color: #f0ece4;
   }
 }
 

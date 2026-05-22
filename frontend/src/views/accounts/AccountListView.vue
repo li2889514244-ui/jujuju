@@ -79,7 +79,7 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#E60012"
+          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#d49b50"
             ><CircleCheckFilled
           /></el-icon>
           <span v-else class="account-card__check-empty" />
@@ -113,7 +113,7 @@
     </div>
 
     <div v-if="enhancedAccounts.length === 0 && !loading" class="empty-state">
-      <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#E60012" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#E60012" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#E60012" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#d49b50" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#d49b50" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#d49b50" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
       <h3>连接你的第一个账号</h3>
       <p>绑定社交媒体账号，开始矩阵管理与数据分析</p>
     </div>
@@ -485,8 +485,8 @@ function handleBindSuccess() {
   }
 
   &--selected {
-    border-color: #E60012;
-    background: rgba(#E60012, 0.06);
+    border-color: #d49b50;
+    background: rgba(#d49b50, 0.06);
   }
 
   &__check {

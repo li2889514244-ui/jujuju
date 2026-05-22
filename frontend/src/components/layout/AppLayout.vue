@@ -59,7 +59,7 @@ function onPageEnter() {
     overflow-y: auto;
     overflow-x: hidden;
     padding: $space-2xl $space-3xl;
-    &::-webkit-scrollbar { width: 4px; }
+    position: relative;
   }
 }
 </style>
