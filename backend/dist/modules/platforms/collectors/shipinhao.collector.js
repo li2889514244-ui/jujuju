@@ -27,7 +27,7 @@ let ShipinhaoCollector = ShipinhaoCollector_1 = class ShipinhaoCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new shipinhao_client_1.ShipinhaoClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);

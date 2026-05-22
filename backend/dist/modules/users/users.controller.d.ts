@@ -1,5 +1,5 @@
 import { UsersService } from './users.service';
-import { Role } from '@prisma/client';
+import { Role } from '../../common/prisma-enums';
 import { PrismaService } from '../../prisma/prisma.service';
 declare class UpdateUserDto {
     name?: string;
@@ -15,15 +15,15 @@ export declare class UsersController {
             organization: {
                 name: string;
                 id: string;
-                plan: import(".prisma/client").$Enums.Plan;
+                plan: string;
             } | null;
             name: string;
             email: string;
             phone: string | null;
             id: string;
             avatar: string | null;
-            role: import(".prisma/client").$Enums.Role;
-            status: import(".prisma/client").$Enums.UserStatus;
+            role: import(".prisma/client").$Enums.UserRole;
+            status: import(".prisma/client").$Enums.AccountStatus;
             lastLoginAt: Date | null;
             createdAt: Date;
             updatedAt: Date;
@@ -36,16 +36,16 @@ export declare class UsersController {
         organization: {
             name: string;
             id: string;
-            status: import(".prisma/client").$Enums.OrgStatus;
-            plan: import(".prisma/client").$Enums.Plan;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            plan: string;
         } | null;
         name: string;
         email: string;
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
@@ -53,7 +53,7 @@ export declare class UsersController {
             id: string;
             avatar: string | null;
             status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
         }[];
@@ -62,16 +62,16 @@ export declare class UsersController {
         organization: {
             name: string;
             id: string;
-            status: import(".prisma/client").$Enums.OrgStatus;
-            plan: import(".prisma/client").$Enums.Plan;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            plan: string;
         } | null;
         name: string;
         email: string;
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
@@ -79,7 +79,7 @@ export declare class UsersController {
             id: string;
             avatar: string | null;
             status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
         }[];
@@ -90,8 +90,8 @@ export declare class UsersController {
         phone: string | null;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         updatedAt: Date;
     }>;
     remove(id: string): Promise<{
@@ -101,8 +101,8 @@ export declare class UsersController {
         password: string;
         name: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;

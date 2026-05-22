@@ -21,25 +21,21 @@ const roles_guard_1 = require("../auth/guards/roles.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const class_validator_1 = require("class-validator");
-const swagger_2 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 const prisma_service_1 = require("../../prisma/prisma.service");
 class UpdateUserDto {
 }
 __decorate([
-    (0, swagger_2.ApiPropertyOptional)({ description: '用户名' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_2.ApiPropertyOptional)({ description: '手机号' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], UpdateUserDto.prototype, "phone", void 0);
 __decorate([
-    (0, swagger_2.ApiPropertyOptional)({ description: '头像URL' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
@@ -68,7 +64,7 @@ let UsersController = class UsersController {
     }
     async findOne(id, currentUserId, currentRole) {
         if (id !== currentUserId && !['OWNER', 'ADMIN'].includes(currentRole)) {
-            throw new common_1.ForbiddenException('无权查看其他用户信息');
+            throw new common_1.ForbiddenException('鏃犳潈鏌ョ湅鍏朵粬鐢ㄦ埛淇℃伅');
         }
         return this.usersService.findById(id);
     }
@@ -82,11 +78,7 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN'),
-    (0, swagger_1.ApiOperation)({ summary: '获取用户列表（管理员）' }),
-    (0, swagger_1.ApiQuery)({ name: 'page', required: false, description: '页码（从1开始）' }),
-    (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: '每页条数（最大100）' }),
-    (0, swagger_1.ApiQuery)({ name: 'search', required: false, description: '搜索关键词' }),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
     __param(0, (0, common_1.Query)('page')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('search')),
@@ -96,7 +88,6 @@ __decorate([
 ], UsersController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('me'),
-    (0, swagger_1.ApiOperation)({ summary: '获取当前用户信息' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -104,9 +95,6 @@ __decorate([
 ], UsersController.prototype, "getProfile", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, swagger_1.ApiOperation)({ summary: '获取指定用户详情' }),
-    (0, swagger_1.ApiResponse)({ status: 403, description: '无权查看他人信息' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: '用户不存在' }),
     __param(0, (0, common_1.Param)('id')),
     __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(2, (0, current_user_decorator_1.CurrentUser)('role')),
@@ -116,7 +104,6 @@ __decorate([
 ], UsersController.prototype, "findOne", null);
 __decorate([
     (0, common_1.Put)('me'),
-    (0, swagger_1.ApiOperation)({ summary: '更新当前用户信息' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -125,9 +112,7 @@ __decorate([
 ], UsersController.prototype, "updateProfile", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN'),
-    (0, swagger_1.ApiOperation)({ summary: '删除用户（软删除，管理员）' }),
-    (0, swagger_1.ApiResponse)({ status: 404, description: '用户不存在' }),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

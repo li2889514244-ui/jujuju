@@ -49,8 +49,8 @@ let PublishScheduler = PublishScheduler_1 = class PublishScheduler {
                         platform: post.account.platform,
                         title: post.title || '',
                         content: post.content || '',
-                        mediaUrls: post.mediaUrls || [],
-                        tags: post.tags || [],
+                        mediaUrls: JSON.parse(post.mediaUrls || '[]'),
+                        tags: JSON.parse(post.tags || '[]'),
                     };
                     await this.uploaderService.executePublish(task);
                     await this.notificationsService.create({

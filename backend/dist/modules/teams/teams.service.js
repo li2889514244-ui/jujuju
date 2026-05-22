@@ -25,7 +25,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
         });
         const organizationId = dto.organizationId || user?.organizationId;
         if (!organizationId) {
-            throw new common_1.ForbiddenException('用户未加入任何组织，无法创建团队');
+            throw new common_1.ForbiddenException('');
         }
         const team = await this.prisma.team.create({
             data: {
@@ -38,7 +38,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
                 },
             },
         });
-        this.logger.log(`团队创建成功: ${team.name} (${team.id})`);
+        this.logger.log(`鍥㈤槦鍒涘缓鎴愬姛: ${team.name} (${team.id})`);
         return team;
     }
     async findAll(organizationId) {
@@ -84,7 +84,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
             },
         });
         if (!team) {
-            throw new common_1.NotFoundException('团队不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
         return team;
     }
@@ -93,20 +93,20 @@ let TeamsService = TeamsService_1 = class TeamsService {
             where: { email: dto.email },
         });
         if (!invitee) {
-            throw new common_1.NotFoundException('该邮箱未注册，请先注册账号');
+            throw new common_1.NotFoundException('[garbled]');
         }
         const inviter = await this.prisma.user.findUnique({
             where: { id: inviterId },
             select: { organizationId: true, role: true },
         });
         if (!inviter?.organizationId) {
-            throw new common_1.ForbiddenException('您未加入任何组织');
+            throw new common_1.ForbiddenException('');
         }
         if (!['OWNER', 'ADMIN', 'MANAGER'].includes(inviter.role)) {
-            throw new common_1.ForbiddenException('您没有邀请成员的权限');
+            throw new common_1.ForbiddenException('');
         }
         if (invitee.organizationId === inviter.organizationId) {
-            throw new common_1.ConflictException('该用户已在您的组织中');
+            throw new common_1.ConflictException('');
         }
         const updatedUser = await this.prisma.user.update({
             where: { id: invitee.id },
@@ -124,7 +124,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
                 },
             },
         });
-        this.logger.log(`成员邀请成功: ${dto.email} 加入组织 ${inviter.organizationId}，角色: ${dto.role}`);
+        this.logger.log(`鎴愬憳閭€璇锋垚鍔? ${dto.email} 鍔犲叆缁勭粐 ${inviter.organizationId}锛岃鑹? ${dto.role}`);
         return updatedUser;
     }
     async updateMemberRole(organizationId, memberId, newRole, operatorId) {
@@ -132,16 +132,16 @@ let TeamsService = TeamsService_1 = class TeamsService {
             where: { id: operatorId },
         });
         if (!operator || !['OWNER', 'ADMIN'].includes(operator.role)) {
-            throw new common_1.ForbiddenException('您没有修改成员角色的权限');
+            throw new common_1.ForbiddenException('');
         }
         if (memberId === operatorId) {
-            throw new common_1.ForbiddenException('不能修改自己的角色');
+            throw new common_1.ForbiddenException('[garbled]');
         }
         const member = await this.prisma.user.findFirst({
             where: { id: memberId, organizationId },
         });
         if (!member) {
-            throw new common_1.NotFoundException('成员不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
         const roleHierarchy = {
             OWNER: 5,
@@ -153,7 +153,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
         const operatorLevel = roleHierarchy[operator.role] || 0;
         const targetLevel = roleHierarchy[newRole] || 0;
         if (targetLevel >= operatorLevel) {
-            throw new common_1.ForbiddenException('不能设置与自己相同或更高的角色');
+            throw new common_1.ForbiddenException('[garbled]');
         }
         return this.prisma.user.update({
             where: { id: memberId },
@@ -171,19 +171,19 @@ let TeamsService = TeamsService_1 = class TeamsService {
             where: { id: operatorId },
         });
         if (!operator || !['OWNER', 'ADMIN'].includes(operator.role)) {
-            throw new common_1.ForbiddenException('您没有移除成员的权限');
+            throw new common_1.ForbiddenException('');
         }
         if (memberId === operatorId) {
-            throw new common_1.ForbiddenException('不能移除自己');
+            throw new common_1.ForbiddenException('');
         }
         const member = await this.prisma.user.findFirst({
             where: { id: memberId, organizationId },
         });
         if (!member) {
-            throw new common_1.NotFoundException('成员不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
         if (member.role === 'OWNER') {
-            throw new common_1.ForbiddenException('不能移除组织所有者');
+            throw new common_1.ForbiddenException('[garbled]');
         }
         return this.prisma.user.update({
             where: { id: memberId },

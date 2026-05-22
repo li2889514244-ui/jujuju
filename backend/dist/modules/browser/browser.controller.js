@@ -19,13 +19,11 @@ const browser_service_1 = require("./browser.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("../auth/guards/roles.guard");
 const roles_decorator_1 = require("../../common/decorators/roles.decorator");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 const class_validator_1 = require("class-validator");
-const swagger_2 = require("@nestjs/swagger");
 class CreateBrowserInstanceDto {
 }
 __decorate([
-    (0, swagger_2.ApiProperty)({ description: '关联账号ID' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateBrowserInstanceDto.prototype, "accountId", void 0);
@@ -47,16 +45,13 @@ let BrowserController = class BrowserController {
 exports.BrowserController = BrowserController;
 __decorate([
     (0, common_1.Get)('instances'),
-    (0, swagger_1.ApiOperation)({ summary: '获取浏览器实例列表' }),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Array)
 ], BrowserController.prototype, "getInstances", null);
 __decorate([
     (0, common_1.Post)('instances'),
-    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
-    (0, swagger_1.ApiOperation)({ summary: '创建浏览器实例' }),
-    (0, swagger_1.ApiResponse)({ status: 201, description: '创建成功' }),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [CreateBrowserInstanceDto]),
@@ -64,8 +59,7 @@ __decorate([
 ], BrowserController.prototype, "createInstance", null);
 __decorate([
     (0, common_1.Delete)('instances/:id'),
-    (0, roles_decorator_1.Roles)('OWNER', 'ADMIN', 'MANAGER'),
-    (0, swagger_1.ApiOperation)({ summary: '关闭浏览器实例' }),
+    (0, roles_decorator_1.Roles)(prisma_enums_1.Role.OWNER, prisma_enums_1.Role.ADMIN, prisma_enums_1.Role.MANAGER),
     __param(0, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),

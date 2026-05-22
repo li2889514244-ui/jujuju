@@ -27,7 +27,7 @@ let WeiboCollector = WeiboCollector_1 = class WeiboCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new weibo_client_1.WeiboClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);

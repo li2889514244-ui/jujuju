@@ -18,7 +18,7 @@ const swagger_1 = require("@nestjs/swagger");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const competitors_service_1 = require("./competitors.service");
-const client_1 = require("@prisma/client");
+const prisma_enums_1 = require("../../common/prisma-enums");
 let CompetitorsController = class CompetitorsController {
     constructor(competitorsService) {
         this.competitorsService = competitorsService;
@@ -26,17 +26,15 @@ let CompetitorsController = class CompetitorsController {
     async create(userId, dto) {
         return this.competitorsService.create({ ...dto, userId });
     }
-    async findAll(userId, platform, skip, take, search) {
+    async findAll(userId, platform, skip, take) {
         return this.competitorsService.findAll(userId, {
             platform,
-            search,
             skip: skip ? parseInt(skip) : undefined,
             take: take ? parseInt(take) : undefined,
         });
     }
     async compare(userId, ids, days) {
-        if (!ids) return [];
-        const competitorIds = ids.split(',').filter(function(id) { return id.length > 0; });
+        const competitorIds = ids.split(',');
         return this.competitorsService.compare(userId, competitorIds, days ? parseInt(days) : 7);
     }
     async findById(userId, id) {
@@ -49,7 +47,7 @@ let CompetitorsController = class CompetitorsController {
 exports.CompetitorsController = CompetitorsController;
 __decorate([
     (0, common_1.Post)(),
-    (0, swagger_1.ApiOperation)({ summary: '添加竞对账号' }),
+    (0, swagger_1.ApiOperation)({ summary: '娣诲姞绔炲璐﹀彿' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -58,19 +56,18 @@ __decorate([
 ], CompetitorsController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, swagger_1.ApiOperation)({ summary: '获取竞对列表' }),
+    (0, swagger_1.ApiOperation)({ summary: '鑾峰彇绔炲鍒楄〃' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('platform')),
     __param(2, (0, common_1.Query)('skip')),
     __param(3, (0, common_1.Query)('take')),
-    __param(4, (0, common_1.Query)('search')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, String, String, String, String]),
+    __metadata("design:paramtypes", [String, String, String, String]),
     __metadata("design:returntype", Promise)
 ], CompetitorsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Get)('compare'),
-    (0, swagger_1.ApiOperation)({ summary: '竞对数据对比' }),
+    (0, swagger_1.ApiOperation)({ summary: '绔炲鏁版嵁瀵规瘮' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('ids')),
     __param(2, (0, common_1.Query)('days')),
@@ -80,7 +77,7 @@ __decorate([
 ], CompetitorsController.prototype, "compare", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, swagger_1.ApiOperation)({ summary: '获取竞对详情' }),
+    (0, swagger_1.ApiOperation)({ summary: '鑾峰彇绔炲璇︽儏' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),
@@ -89,7 +86,7 @@ __decorate([
 ], CompetitorsController.prototype, "findById", null);
 __decorate([
     (0, common_1.Delete)(':id'),
-    (0, swagger_1.ApiOperation)({ summary: '删除竞对' }),
+    (0, swagger_1.ApiOperation)({ summary: '鍒犻櫎绔炲' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Param)('id')),
     __metadata("design:type", Function),

@@ -14,7 +14,6 @@ exports.PlatformsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const oauth_service_1 = require("./oauth/oauth.service");
-const crypto = require("crypto");
 const platform_config_1 = require("./config/platform-config");
 const douyin_collector_1 = require("./collectors/douyin.collector");
 const kuaishou_collector_1 = require("./collectors/kuaishou.collector");
@@ -27,7 +26,6 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
         this.prisma = prisma;
         this.oauthService = oauthService;
         this.logger = new common_1.Logger(PlatformsService_1.name);
-        this.encryptionKey = process.env.COOKIE_ENCRYPTION_KEY || 'default-key-change-me';
         this.collectors = new Map([
             ['DOUYIN', douyinCollector],
             ['KUAISHOU', kuaishouCollector],
@@ -76,13 +74,13 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 throw new common_1.BadRequestException('无权操作此账号');
             }
         }
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         const { oauthToken, tokenExpiresAt, scope, ...restMetadata } = metadata || {};
         await this.prisma.account.update({
             where: { id: accountId },
             data: {
                 metadata: restMetadata,
-                status: 'INACTIVE',
+                status: 'DISABLED',
             },
         });
         this.logger.log(`平台授权已解除: ${account.platform} - ${account.nickname}`);
@@ -145,67 +143,6 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
     async refreshExpiringTokens() {
         return this.oauthService.refreshExpiringTokens();
     }
-    async reportMetrics(userId, accountId, metrics) {
-        const account = await this.prisma.account.findFirst({
-            where: { id: accountId, userId: userId }
-        });
-        if (!account) throw new common_1.NotFoundException('Account not found');
-
-        // Store-level profile fields (if reported)
-        const accountUpdate = {
-            followers: metrics.followers || account.followers,
-            following: metrics.following || account.following,
-            lastActiveAt: new Date()
-        };
-        if (metrics._nickname) accountUpdate.nickname = metrics._nickname;
-        if (metrics._storeName) accountUpdate.nickname = metrics._storeName;
-        if (metrics.storeScore != null) accountUpdate.storeScore = metrics.storeScore;
-        if (metrics.storeDiagnosis != null) accountUpdate.storeDiagnosis = metrics.storeDiagnosis;
-        await this.prisma.account.update({
-            where: { id: accountId },
-            data: accountUpdate
-        });
-
-        const today = new Date();
-        today.setHours(0,0,0,0);
-
-        await this.prisma.dailyStats.upsert({
-            where: { accountId_date: { accountId, date: today } },
-            create: {
-                accountId,
-                platform: account.platform,
-                date: today,
-                followers: metrics.followers || 0,
-                views: metrics.views || 0,
-                likes: metrics.likes || 0,
-                comments: metrics.comments || 0,
-                shares: metrics.shares || 0,
-                revenue: metrics.revenue || 0,
-                gmv: metrics.gmv || 0,
-                orders: metrics.orders || 0,
-                commission: metrics.commission || 0,
-                buyerCount: metrics.buyerCount || 0,
-                productCount: metrics.productCount || 0,
-                avgOrderValue: metrics.avgOrderValue || 0
-            },
-            update: {
-                ...(metrics.followers != null ? { followers: metrics.followers } : {}),
-                ...(metrics.views != null ? { views: metrics.views } : {}),
-                ...(metrics.likes != null ? { likes: metrics.likes } : {}),
-                ...(metrics.comments != null ? { comments: metrics.comments } : {}),
-                ...(metrics.shares != null ? { shares: metrics.shares } : {}),
-                ...(metrics.revenue != null ? { revenue: metrics.revenue } : {}),
-                ...(metrics.gmv != null ? { gmv: metrics.gmv } : {}),
-                ...(metrics.orders != null ? { orders: metrics.orders } : {}),
-                ...(metrics.commission != null ? { commission: metrics.commission } : {}),
-                ...(metrics.buyerCount != null ? { buyerCount: metrics.buyerCount } : {}),
-                ...(metrics.productCount != null ? { productCount: metrics.productCount } : {}),
-                ...(metrics.avgOrderValue != null ? { avgOrderValue: metrics.avgOrderValue } : {})
-            }
-        });
-
-        return { success: true };
-    }
     async getAuthorizedAccounts(params) {
         const { userId, teamId, platform, skip = 0, take = 20 } = params;
         const where = { status: 'ACTIVE' };
@@ -227,14 +164,11 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     nickname: true,
                     avatar: true,
                     bio: true,
-                    cookies: true,
-                    metadata: true,
                     followers: true,
                     following: true,
                     status: true,
                     lastActiveAt: true,
                     createdAt: true,
-                    updatedAt: true,
                     owner: { select: { id: true, name: true } },
                     team: { select: { id: true, name: true } },
                 },
@@ -258,45 +192,8 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     tokenStatus = 'valid';
                 }
             }
-            // For cookie-based platforms (no OAuth token), check cookie freshness via lastActiveAt
-            const COOKIE_VALID_HOURS = 24;
-            const COOKIE_EXPIRING_HOURS = 48;
-            const isCookiePlatform = account.platform === 'WECHAT_VIDEO';
-            if (isCookiePlatform && !tokenExpiresAt) {
-                const lastActive = account.lastActiveAt || account.updatedAt;
-                if (!lastActive) {
-                    tokenStatus = account.cookies ? 'expiring_soon' : 'expired';
-                } else {
-                    const hoursSince = (Date.now() - new Date(lastActive).getTime()) / 3600000;
-                    if (hoursSince <= COOKIE_VALID_HOURS) {
-                        tokenStatus = 'valid';
-                    } else if (hoursSince <= COOKIE_EXPIRING_HOURS) {
-                        tokenStatus = 'expiring_soon';
-                    } else {
-                        tokenStatus = 'expired';
-                    }
-                }
-            }
-            // Decrypt cookies for data collector
-            let cookiesPlain = null;
-            if (account.cookies) {
-                try {
-                    const parts = account.cookies.split(':');
-                    if (parts.length >= 3) {
-                        const iv = Buffer.from(parts[0], 'hex');
-                        const authTag = Buffer.from(parts[1], 'hex');
-                        const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
-                        const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
-                        decipher.setAuthTag(authTag);
-                        let decrypted = decipher.update(parts.slice(2).join(':'), 'hex', 'utf8');
-                        decrypted += decipher.final('utf8');
-                        cookiesPlain = decrypted;
-                    }
-                } catch (e) { cookiesPlain = account.cookies; }
-            }
             return {
                 ...account,
-                cookies: cookiesPlain,
                 tokenStatus,
                 hasOAuth: !!metadata?.oauthToken,
             };
@@ -307,42 +204,6 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             skip,
             take,
         };
-    }
-    async reportPostStats(userId, accountId, posts) {
-        const account = await this.prisma.account.findFirst({
-            where: { id: accountId, userId: userId }
-        });
-        if (!account) throw new common_1.NotFoundException('Account not found');
-        let created = 0;
-        let updated = 0;
-        for (const p of posts) {
-            if (!p.title || !p.views) continue;
-            try {
-                // Upsert post by title + accountId
-                const existing = await this.prisma.post.findFirst({
-                    where: { accountId, title: p.title }
-                });
-                let postId = existing?.id;
-                if (!postId) {
-                    const newPost = await this.prisma.post.create({
-                        data: { accountId, title: p.title, status: 'PUBLISHED', platformUrl: '' }
-                    });
-                    postId = newPost.id;
-                    created++;
-                }
-                // Upsert post stats
-                await this.prisma.postStats.upsert({
-                    where: { postId },
-                    create: { postId, views: p.views || 0, likes: p.likes || 0, comments: p.comments || 0, shares: p.shares || 0, saves: 0 },
-                    update: { views: p.views || 0, likes: p.likes || 0, comments: p.comments || 0, shares: p.shares || 0 },
-                });
-                updated++;
-            } catch (e) {
-                this.logger.warn('PostStats upsert failed: ' + e.message);
-            }
-        }
-        this.logger.log('reportPostStats: ' + created + ' created, ' + updated + ' updated');
-        return { created, updated };
     }
 };
 exports.PlatformsService = PlatformsService;

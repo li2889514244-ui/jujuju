@@ -117,7 +117,7 @@ let UsersService = UsersService_1 = class UsersService {
         }
         return this.prisma.user.update({
             where: { id },
-            data: { status: 'INACTIVE' },
+            data: { status: 'DISABLED' },
         });
     }
     async findByOrganization(organizationId) {

@@ -140,12 +140,11 @@ let OAuthService = OAuthService_1 = class OAuthService {
                     bio: userInfo.bio,
                     followers: userInfo.followers || 0,
                     following: userInfo.following || 0,
-                    metadata: {
-                        ...({}),
+                    metadata: JSON.stringify({
                         oauthToken: encryptedToken,
                         tokenExpiresAt: new Date(token.expiresAt).toISOString(),
                         scope: token.scope,
-                    },
+                    }),
                 },
                 create: {
                     platform: platform,
@@ -157,11 +156,11 @@ let OAuthService = OAuthService_1 = class OAuthService {
                     following: userInfo.following || 0,
                     userId,
                     teamId,
-                    metadata: {
+                    metadata: JSON.stringify({
                         oauthToken: encryptedToken,
                         tokenExpiresAt: new Date(token.expiresAt).toISOString(),
                         scope: token.scope,
-                    },
+                    }),
                 },
             });
             this.logger.log(`OAuth授权成功: ${platform} - ${userInfo.nickname} (${account.id})`);
@@ -188,7 +187,7 @@ let OAuthService = OAuthService_1 = class OAuthService {
         if (!account) {
             throw new common_1.BadRequestException('账号不存在');
         }
-        const metadata = account.metadata;
+        const metadata = (account.metadata ? JSON.parse(account.metadata) : {});
         if (!metadata?.oauthToken) {
             this.logger.warn(`账号 ${accountId} 无OAuth Token`);
             return false;
@@ -203,11 +202,11 @@ let OAuthService = OAuthService_1 = class OAuthService {
             await this.prisma.account.update({
                 where: { id: accountId },
                 data: {
-                    metadata: {
+                    metadata: JSON.stringify({
                         ...metadata,
                         oauthToken: encryptedToken,
                         tokenExpiresAt: new Date(newToken.expiresAt).toISOString(),
-                    },
+                    }),
                     lastActiveAt: new Date(),
                 },
             });
@@ -221,16 +220,16 @@ let OAuthService = OAuthService_1 = class OAuthService {
     }
     async refreshExpiringTokens() {
         const threeDaysFromNow = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000);
-        // Fetch all active accounts, then filter in JS since metadata is a JSON string column (not native Json type)
-        const allAccounts = await this.prisma.account.findMany({
-            where: { status: 'ACTIVE' },
+        const accounts = await this.prisma.account.findMany({
+            where: {
+                status: 'ACTIVE',
+                metadata: { not: null },
+            },
         });
-        const accounts = allAccounts.filter(acc => {
-            if (!acc.metadata) return false;
+        const expiringAccounts = accounts.filter((a) => {
             try {
-                const meta = JSON.parse(acc.metadata);
-                if (!meta.tokenExpiresAt) return false;
-                return new Date(meta.tokenExpiresAt) <= threeDaysFromNow;
+                const md = JSON.parse(a.metadata || '{}');
+                return md.tokenExpiresAt && new Date(md.tokenExpiresAt) <= threeDaysFromNow;
             }
             catch {
                 return false;
@@ -238,7 +237,7 @@ let OAuthService = OAuthService_1 = class OAuthService {
         });
         let refreshed = 0;
         let failed = 0;
-        for (const account of accounts) {
+        for (const account of expiringAccounts) {
             try {
                 const success = await this.refreshAccountToken(account.id);
                 if (success)

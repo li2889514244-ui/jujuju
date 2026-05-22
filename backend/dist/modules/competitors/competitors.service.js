@@ -29,10 +29,10 @@ let CompetitorsService = CompetitorsService_1 = class CompetitorsService {
             },
         });
         if (existing) {
-            throw new common_1.ConflictException('该竞对账号已存在');
+            throw new common_1.ConflictException('');
         }
         const competitor = await this.prisma.competitor.create({ data });
-        this.logger.log(`竞对添加: ${competitor.nickname} (${competitor.platform})`);
+        this.logger.log(`绔炲娣诲姞: ${competitor.nickname} (${competitor.platform})`);
         return competitor;
     }
     async findAll(userId, params) {
@@ -68,7 +68,7 @@ let CompetitorsService = CompetitorsService_1 = class CompetitorsService {
             },
         });
         if (!competitor) {
-            throw new common_1.NotFoundException('竞对不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
         return competitor;
     }
@@ -77,10 +77,10 @@ let CompetitorsService = CompetitorsService_1 = class CompetitorsService {
             where: { id, userId },
         });
         if (!competitor) {
-            throw new common_1.NotFoundException('竞对不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
         await this.prisma.competitor.delete({ where: { id } });
-        this.logger.log(`竞对删除: ${competitor.nickname}`);
+        this.logger.log(`绔炲鍒犻櫎: ${competitor.nickname}`);
         return { success: true };
     }
     async recordSnapshot(competitorId, data) {

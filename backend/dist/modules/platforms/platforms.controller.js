@@ -62,16 +62,6 @@ let PlatformsController = class PlatformsController {
     async refreshExpiringTokens() {
         return this.platformsService.refreshExpiringTokens();
     }
-    async reportMetrics(userId, body) {
-        const { accountId, metrics } = body;
-        if (!accountId || !metrics) throw new common_1.BadRequestException('accountId and metrics required');
-        return this.platformsService.reportMetrics(userId, accountId, metrics);
-    }
-    async reportPostStats(userId, body) {
-        const { accountId, posts } = body;
-        if (!accountId || !posts) throw new common_1.BadRequestException('accountId and posts required');
-        return this.platformsService.reportPostStats(userId, accountId, posts);
-    }
 };
 exports.PlatformsController = PlatformsController;
 __decorate([
@@ -153,26 +143,6 @@ __decorate([
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], PlatformsController.prototype, "refreshExpiringTokens", null);
-__decorate([
-    (0, common_1.Post)('report-metrics'),
-    (0, swagger_1.ApiOperation)({ summary: 'Receive metrics report from desktop companion' }),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", Promise)
-], PlatformsController.prototype, "reportMetrics", null);
-__decorate([
-    (0, common_1.Post)('report-post-stats'),
-    (0, swagger_1.ApiOperation)({ summary: 'Receive per-video stats from companion' }),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
-    __param(1, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", Promise)
-], PlatformsController.prototype, "reportPostStats", null);
 exports.PlatformsController = PlatformsController = __decorate([
     (0, swagger_1.ApiTags)('platforms'),
     (0, swagger_1.ApiBearerAuth)('access-token'),

@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.UpdateAccountDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
-const client_1 = require("@prisma/client"); const prisma_enums_1 = require("../../../common/prisma-enums");
+const client_1 = require("@prisma/client");
 class UpdateAccountDto {
 }
 exports.UpdateAccountDto = UpdateAccountDto;
@@ -47,9 +47,9 @@ __decorate([
     __metadata("design:type", Object)
 ], UpdateAccountDto.prototype, "proxyConfig", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: '账号状态', enum: prisma_enums_1.AccountStatus }),
+    (0, swagger_1.ApiPropertyOptional)({ description: '账号状态', enum: client_1.AccountStatus }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsEnum)(prisma_enums_1.AccountStatus),
+    (0, class_validator_1.IsEnum)(client_1.AccountStatus),
     __metadata("design:type", String)
 ], UpdateAccountDto.prototype, "status", void 0);
 __decorate([

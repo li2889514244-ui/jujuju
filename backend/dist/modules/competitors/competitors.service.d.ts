@@ -1,5 +1,5 @@
 import { PrismaService } from '../../prisma/prisma.service';
-import { Platform } from '@prisma/client';
+import { Platform } from '../../common/prisma-enums';
 export declare class CompetitorsService {
     private prisma;
     private readonly logger;
@@ -14,7 +14,7 @@ export declare class CompetitorsService {
         userId: string;
     }): Promise<{
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
@@ -46,7 +46,7 @@ export declare class CompetitorsService {
             }[];
         } & {
             id: string;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             platformUserId: string;
             nickname: string;
             avatar: string | null;
@@ -77,7 +77,7 @@ export declare class CompetitorsService {
         }[];
     } & {
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
         platformUserId: string;
         nickname: string;
         avatar: string | null;
@@ -124,7 +124,7 @@ export declare class CompetitorsService {
         }[];
     } & {
         id: string;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
         platformUserId: string;
         nickname: string;
         avatar: string | null;

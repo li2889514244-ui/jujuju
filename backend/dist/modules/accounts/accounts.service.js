@@ -36,7 +36,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
     decryptCookie(text) {
         const parts = text.split(':');
         if (parts.length === 2) {
-            this.logger.warn('检测到旧格式 CBC 加密 Cookie，建议重新设置以升级为 GCM');
+            this.logger.warn('');
             const [ivHex, encrypted] = parts;
             const iv = Buffer.from(ivHex, 'hex');
             const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
@@ -65,7 +65,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
             },
         });
         if (existing) {
-            throw new common_1.ConflictException('该平台账号已存在');
+            throw new common_1.ConflictException('');
         }
         const encryptedCookies = dto.cookies
             ? this.encryptCookie(dto.cookies)
@@ -78,7 +78,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
                 avatar: dto.avatar,
                 bio: dto.bio,
                 cookies: encryptedCookies,
-                proxyConfig: dto.proxyConfig || undefined,
+                proxyConfig: dto.proxyConfig ? JSON.stringify(dto.proxyConfig) : undefined,
                 teamId: dto.teamId,
                 userId,
             },
@@ -91,12 +91,14 @@ let AccountsService = AccountsService_1 = class AccountsService {
                 },
             },
         });
-        this.logger.log(`账号创建成功: ${dto.platform} - ${dto.nickname} (${account.id})`);
+        this.logger.log(`璐﹀彿鍒涘缓鎴愬姛: ${dto.platform} - ${dto.nickname} (${account.id})`);
         return this.sanitizeAccount(account);
     }
     async findAll(params) {
-        const { teamId, groupId, platform, skip = 0, take = 20 } = params;
+        const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params;
         const where = {};
+        if (userId)
+            where.userId = userId;
         if (teamId)
             where.teamId = teamId;
         if (groupId)
@@ -157,17 +159,27 @@ let AccountsService = AccountsService_1 = class AccountsService {
             },
         });
         if (!account) {
-            throw new common_1.NotFoundException('账号不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
-        // Data is shared across all users
+        if (userId && account.userId !== userId) {
+            const user = await this.prisma.user.findUnique({ where: { id: userId } });
+            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+                throw new common_1.ForbiddenException('[garbled]');
+            }
+        }
         return this.sanitizeAccount(account);
     }
     async update(id, dto, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('账号不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
-        // Shared data: allow modification by any authenticated user
+        if (account.userId !== userId) {
+            const user = await this.prisma.user.findUnique({ where: { id: userId } });
+            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+                throw new common_1.ForbiddenException('[garbled]');
+            }
+        }
         const updateData = { ...dto };
         if (dto.cookies) {
             updateData.cookies = this.encryptCookie(dto.cookies);
@@ -189,25 +201,29 @@ let AccountsService = AccountsService_1 = class AccountsService {
     async remove(id, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('账号不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
-        // Cascade delete related records
-        await this.prisma.dailyStats.deleteMany({ where: { accountId: id } });
-        const posts = await this.prisma.post.findMany({ where: { accountId: id }, select: { id: true } });
-        if (posts.length > 0) {
-            await this.prisma.postStats.deleteMany({ where: { postId: { in: posts.map(p => p.id) } } });
-            await this.prisma.post.deleteMany({ where: { accountId: id } });
+        if (account.userId !== userId) {
+            const user = await this.prisma.user.findUnique({ where: { id: userId } });
+            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+                throw new common_1.ForbiddenException('[garbled]');
+            }
         }
         await this.prisma.account.delete({ where: { id } });
-        this.logger.log(`账号已删除: ${id}`);
+        this.logger.log(`璐﹀彿宸插垹闄? ${id}`);
         return { success: true };
     }
     async getCookies(id, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('账号不存在');
+            throw new common_1.NotFoundException('[garbled]');
         }
-        // Shared data: allow by any authenticated user
+        if (account.userId !== userId) {
+            const user = await this.prisma.user.findUnique({ where: { id: userId } });
+            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
+                throw new common_1.ForbiddenException('');
+            }
+        }
         if (!account.cookies) {
             return { cookies: null };
         }
@@ -215,37 +231,9 @@ let AccountsService = AccountsService_1 = class AccountsService {
     }
     sanitizeAccount(account) {
         const { cookies, ...rest } = account;
-        // Compute tokenStatus from OAuth token or cookie freshness
-        const metadata = account.metadata;
-        const tokenExpiresAt = metadata?.tokenExpiresAt;
-        let tokenStatus = 'unknown';
-        if (tokenExpiresAt) {
-            const expiresAt = new Date(tokenExpiresAt).getTime();
-            if (Date.now() >= expiresAt) {
-                tokenStatus = 'expired';
-            } else if (Date.now() >= expiresAt - 3 * 24 * 60 * 60 * 1000) {
-                tokenStatus = 'expiring_soon';
-            } else {
-                tokenStatus = 'valid';
-            }
-        }
-        if (account.platform === 'WECHAT_VIDEO' && !tokenExpiresAt) {
-            const lastActive = account.lastActiveAt || account.updatedAt;
-            const hoursSince = lastActive ? (Date.now() - new Date(lastActive).getTime()) / 3600000 : null;
-            if (hoursSince === null) {
-                tokenStatus = cookies ? 'expiring_soon' : 'expired';
-            } else if (hoursSince <= 24) {
-                tokenStatus = 'valid';
-            } else if (hoursSince <= 48) {
-                tokenStatus = 'expiring_soon';
-            } else {
-                tokenStatus = 'expired';
-            }
-        }
         return {
             ...rest,
             hasCookies: !!cookies,
-            tokenStatus,
         };
     }
 };
@@ -254,25 +242,4 @@ exports.AccountsService = AccountsService = AccountsService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService])
 ], AccountsService);
-
-
-/** Bulk delete accounts (shared data) */
-AccountsService.prototype.bulkDelete = async function(ids, userId) {
-    await this.prisma.dailyStats.deleteMany({ where: { accountId: { in: ids } } });
-    const posts = await this.prisma.post.findMany({ where: { accountId: { in: ids } }, select: { id: true } });
-    if (posts.length > 0) {
-        await this.prisma.postStats.deleteMany({ where: { postId: { in: posts.map(p => p.id) } } });
-        await this.prisma.post.deleteMany({ where: { accountId: { in: ids } } });
-    }
-    return this.prisma.account.deleteMany({ where: { id: { in: ids } } });
-};
-
-/** Bulk move accounts to a group (shared data) */
-AccountsService.prototype.bulkMove = async function(ids, groupId, userId) {
-    return this.prisma.account.updateMany({
-        where: { id: { in: ids } },
-        data: { groupId: groupId }
-    });
-};
-
 //# sourceMappingURL=accounts.service.js.map

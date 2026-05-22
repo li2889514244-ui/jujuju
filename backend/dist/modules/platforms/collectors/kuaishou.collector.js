@@ -27,7 +27,7 @@ let KuaishouCollector = KuaishouCollector_1 = class KuaishouCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new kuaishou_client_1.KuaishouClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);

@@ -8,7 +8,7 @@ export type Role = (typeof Role)[keyof typeof Role];
 export const Platform = {
   DOUYIN: 'DOUYIN', KUAISHOU: 'KUAISHOU', XIAOHONGSHU: 'XIAOHONGSHU',
   BILIBILI: 'BILIBILI', WEIBO: 'WEIBO', WECHAT_VIDEO: 'WECHAT_VIDEO',
-  TIKTOK: 'TIKTOK',
+  TIKTOK: 'TIKTOK', DOUDIAN: 'DOUDIAN', XIAOHONGSHU_SHOP: 'XIAOHONGSHU_SHOP', WECHAT_SHOP: 'WECHAT_SHOP',
 } as const;
 export type Platform = (typeof Platform)[keyof typeof Platform];
 

@@ -28,18 +28,25 @@ export declare class AnalyticsController {
     getDailyStats(dto: QueryAnalyticsDto, userId: string, userRole: string): Promise<({
         account: {
             id: string;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
         };
     } & {
         id: string;
         date: Date;
-        platform: import(".prisma/client").$Enums.Platform;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
         followers: number;
         views: number;
         likes: number;
         comments: number;
         shares: number;
+        revenue: number;
+        gmv: number;
+        orders: number;
+        commission: number;
+        buyerCount: number;
+        productCount: number;
+        avgOrderValue: number;
         createdAt: Date;
         accountId: string;
     })[]>;
@@ -47,7 +54,7 @@ export declare class AnalyticsController {
         post: {
             account: {
                 id: string;
-                platform: import(".prisma/client").$Enums.Platform;
+                platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
             };
             title: string | null;
@@ -94,30 +101,37 @@ export declare class AnalyticsController {
         accounts: {
             dailyStats: ({
                 account: {
-                    platform: import(".prisma/client").$Enums.Platform;
+                    platform: import(".prisma/client").$Enums.PlatformEnum;
                     nickname: string;
                 };
             } & {
                 id: string;
                 date: Date;
-                platform: import(".prisma/client").$Enums.Platform;
+                platform: import(".prisma/client").$Enums.PlatformEnum;
                 followers: number;
                 views: number;
                 likes: number;
                 comments: number;
                 shares: number;
+                revenue: number;
+                gmv: number;
+                orders: number;
+                commission: number;
+                buyerCount: number;
+                productCount: number;
+                avgOrderValue: number;
                 createdAt: Date;
                 accountId: string;
             })[];
             id: string;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
         }[];
         topPosts: {
             id: string;
             title: string | null;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             account: string;
             views: number;
             likes: number;
@@ -127,18 +141,25 @@ export declare class AnalyticsController {
         }[];
         dailyTrend: ({
             account: {
-                platform: import(".prisma/client").$Enums.Platform;
+                platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
             };
         } & {
             id: string;
             date: Date;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             followers: number;
             views: number;
             likes: number;
             comments: number;
             shares: number;
+            revenue: number;
+            gmv: number;
+            orders: number;
+            commission: number;
+            buyerCount: number;
+            productCount: number;
+            avgOrderValue: number;
             createdAt: Date;
             accountId: string;
         })[];
@@ -207,7 +228,7 @@ export declare class AnalyticsController {
             rank: number;
             postId: string;
             title: string | null;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             accountName: string;
             accountAvatar: string | null;
             views: number;

@@ -27,7 +27,7 @@ let BilibiliCollector = BilibiliCollector_1 = class BilibiliCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new bilibili_client_1.BilibiliClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);

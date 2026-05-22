@@ -18,6 +18,7 @@ import { CompetitorsModule } from './modules/competitors/competitors.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
 import { ContentReviewModule } from './modules/content-review/content-review.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { PixingVideoModule } from './modules/pixing-video/pixing-video.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -51,6 +52,7 @@ import databaseConfig from './config/database.config';
     SchedulerModule,
     ContentReviewModule,
     NotificationsModule,
+    PixingVideoModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

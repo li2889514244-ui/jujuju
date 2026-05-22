@@ -1,7 +1,7 @@
 import { TeamsService } from './teams.service';
 import { CreateTeamDto } from './dto/create-team.dto';
 import { InviteMemberDto } from './dto/invite-member.dto';
-import { Role } from '@prisma/client';
+import { Role } from '../../common/prisma-enums';
 export declare class TeamsController {
     private readonly teamsService;
     constructor(teamsService: TeamsService);
@@ -25,7 +25,7 @@ export declare class TeamsController {
         accounts: {
             id: string;
             status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
         }[];
     } & {
@@ -40,8 +40,8 @@ export declare class TeamsController {
         email: string;
         id: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
     }[]>;
@@ -53,13 +53,13 @@ export declare class TeamsController {
         name: string;
         email: string;
         id: string;
-        role: import(".prisma/client").$Enums.Role;
+        role: import(".prisma/client").$Enums.UserRole;
     }>;
     updateMemberRole(memberId: string, role: Role, userId: string, orgId: string): Promise<{
         name: string;
         email: string;
         id: string;
-        role: import(".prisma/client").$Enums.Role;
+        role: import(".prisma/client").$Enums.UserRole;
     }>;
     removeMember(memberId: string, userId: string, orgId: string): Promise<{
         id: string;
@@ -68,8 +68,8 @@ export declare class TeamsController {
         password: string;
         name: string;
         avatar: string | null;
-        role: import(".prisma/client").$Enums.Role;
-        status: import(".prisma/client").$Enums.UserStatus;
+        role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
@@ -79,13 +79,13 @@ export declare class TeamsController {
         organization: {
             name: string;
             id: string;
-            plan: import(".prisma/client").$Enums.Plan;
+            plan: string;
         };
         accounts: {
             id: string;
             avatar: string | null;
             status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.Platform;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
             owner: {

@@ -27,7 +27,7 @@ let XiaohongshuCollector = XiaohongshuCollector_1 = class XiaohongshuCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new xiaohongshu_client_1.XiaohongshuClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);

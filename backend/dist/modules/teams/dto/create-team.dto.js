@@ -11,17 +11,14 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateTeamDto = void 0;
 const class_validator_1 = require("class-validator");
-const swagger_1 = require("@nestjs/swagger");
 class CreateTeamDto {
 }
 exports.CreateTeamDto = CreateTeamDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: '团队名称', example: '运营一组' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], CreateTeamDto.prototype, "name", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: '组织ID（不传则使用当前用户的组织）' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)

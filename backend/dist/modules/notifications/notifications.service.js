@@ -25,7 +25,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
                 type: params.type,
                 title: params.title,
                 content: params.content || null,
-                metadata: params.metadata || undefined,
+                metadata: params.metadata ? JSON.stringify(params.metadata) : undefined,
             },
         });
         this.logger.log(`通知已创建: [${params.type}] ${params.title} -> ${params.userId}`);

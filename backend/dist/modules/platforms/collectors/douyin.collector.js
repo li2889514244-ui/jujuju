@@ -29,7 +29,7 @@ let DouyinCollector = DouyinCollector_1 = class DouyinCollector {
         if (!account)
             throw new Error('账号不存在');
         const client = new douyin_client_1.DouyinClient();
-        const metadata = account.metadata;
+        const metadata = (account.metadata || '{}');
         if (metadata?.oauthToken) {
             const token = this.oauthService['decryptToken'](metadata.oauthToken);
             client.setToken(token);
