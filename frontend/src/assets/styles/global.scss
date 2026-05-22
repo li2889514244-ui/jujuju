@@ -1,84 +1,164 @@
-// 披星云 — 全局样式（颜色变量在 index.html 末尾注入）
+// 披星云 v2 — 深空科幻全局样式
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #app {
   width: 100%; height: 100%;
-  font-family: var(--el-font-family);
+  font-family: $font-family;
   font-size: 15px; line-height: 1.5;
-  background: var(--el-bg-color-page);
-  color: var(--el-text-color-primary);
+  background: $color-bg-primary;
+  color: $color-text-primary;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
 
-h1, h2, h3, h4, h5, h6 { line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
-a { text-decoration: none; color: var(--el-color-primary); }
+// 星空粒子背景
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(0, 212, 255, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(124, 58, 237, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(255, 51, 102, 0.02) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  line-height: 1.2; font-weight: 600; letter-spacing: -0.01em;
+  color: $color-text-primary;
+}
+a { text-decoration: none; color: $color-cyan; }
 p { line-height: 1.5; }
-small, .text-caption { font-size: $text-caption; color: var(--el-text-color-placeholder); }
+small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
 .text-micro { font-size: $text-micro; text-transform: uppercase; letter-spacing: 0.05em; }
 
+// 霓虹滚动条
 ::-webkit-scrollbar { width: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D0D0D0; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #B0B0B0; }
+::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.02); }
+::-webkit-scrollbar-thumb { background: rgba(0, 212, 255, 0.2); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 212, 255, 0.4); }
 
-::selection { background: rgba(230,0,18,0.2); color: #1D1D1F; }
-:focus-visible { outline: 2px solid #E60012; outline-offset: 2px; border-radius: 2px; }
+::selection { background: rgba(0, 212, 255, 0.3); color: #fff; }
+:focus-visible { outline: 2px solid $color-cyan; outline-offset: 2px; border-radius: 2px; }
 
-.el-button--primary { border-radius: 9999px; font-weight: 600; letter-spacing: -0.01em; }
-.el-card { border-radius: 16px; border: 1px solid var(--el-border-color); }
+// Element Plus 组件覆写
+.el-button--primary {
+  border-radius: 9999px; font-weight: 600; letter-spacing: -0.01em;
+  background: linear-gradient(135deg, $color-cyan, $color-purple) !important;
+  border: none !important;
+  box-shadow: 0 0 12px rgba(0, 212, 255, 0.2);
+  transition: all 0.3s $ease-out;
+  &:hover {
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.35);
+    transform: translateY(-1px);
+  }
+}
+.el-card {
+  border-radius: $radius-lg;
+  border: 1px solid $color-border;
+  background: $color-bg-glass;
+  @include glass;
+}
 .el-dialog {
-  border-radius: 20px; border: 1px solid var(--el-border-color);
-  box-shadow: 0 8px 40px rgba(0,0,0,0.12);
+  border-radius: $radius-xl;
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  box-shadow: $shadow-lg;
+  background: $color-bg-elevated;
+  @include glass-heavy;
 }
 .el-dialog__header {
   padding: 28px 28px 0;
-  .el-dialog__title { font-size: 18px; font-weight: 600; }
+  .el-dialog__title { font-size: 18px; font-weight: 600; color: $color-text-primary; }
 }
 .el-dialog__headerbtn {
   top: 28px; right: 28px; width: 32px; height: 32px;
-  .el-dialog__close { color: var(--el-text-color-secondary); }
+  .el-dialog__close { color: $color-text-secondary; }
 }
-.el-dialog__body { padding: 24px 28px; color: var(--el-text-color-regular); }
+.el-dialog__body { padding: 24px 28px; color: $color-text-secondary; }
 .el-dialog__footer { padding: 0 28px 28px; }
-.el-input__wrapper { border-radius: 10px; transition: all 0.2s; }
+.el-input__wrapper {
+  border-radius: 10px;
+  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: $color-border !important;
+  box-shadow: none !important;
+}
+.el-input__inner { color: $color-text-primary !important; }
 .el-tag { border-radius: 9999px; }
+.el-menu { background: transparent !important; border-right: none !important; }
+.el-radio-group { .el-radio-button__inner { background: transparent !important; } }
 
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s cubic-bezier(0.16,1,0.3,1); }
+// 动画
+.fade-enter-active, .fade-leave-active { transition: opacity 0.25s $ease-out; }
 .fade-enter-from, .fade-leave-to { opacity: 0; }
-.slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s cubic-bezier(0.175,0.885,0.32,1.275); }
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s $ease-spring; }
 .slide-up-enter-from { opacity: 0; transform: translateY(12px); }
 .slide-up-leave-to { opacity: 0; transform: translateY(-8px); }
 
-.stagger-item { opacity: 0; transform: translateY(16px); transition: all 0.5s cubic-bezier(0.16,1,0.3,1); }
+.stagger-item { opacity: 0; transform: translateY(16px); transition: all 0.5s $ease-out; }
 .stagger-item.stagger-visible { opacity: 1; transform: translateY(0); }
 
-.spring-scale { transition: transform 0.35s cubic-bezier(0.175,0.885,0.32,1.275); }
+.spring-scale { transition: transform 0.35s $ease-spring; }
 .spring-scale:hover { transform: scale(1.02); }
 .spring-scale:active { transform: scale(0.97); }
 
+// === 通用科幻组件 ===
+.glass-panel {
+  @include glass;
+  border-radius: $radius-lg;
+  padding: $space-lg;
+}
+
+.neon-card {
+  @include glass;
+  @include glow-border;
+  border-radius: $radius-lg;
+  padding: $space-lg;
+  transition: all 0.3s $ease-out;
+  &:hover {
+    box-shadow: 0 0 28px rgba(0, 212, 255, 0.2), 0 0 8px rgba(0, 212, 255, 0.3);
+  }
+}
+
+.neon-text {
+  @include glow-text;
+  color: $color-cyan;
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, $color-cyan, $color-purple);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+// 网格背景（数据面板用）
+.bg-grid {
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
 // === 响应式 ===
-// ≥ 1440px: 全宽桌面 — 默认样式
-// 1200-1439px: 小桌面 — 减小内边距
 @media (max-width: 1439px) {
   .app-layout__content { padding: $space-xl $space-lg; }
   .account-grid { grid-template-columns: repeat(3, 1fr) !important; }
   .dashboard__charts { gap: $space-md; }
-  .hero-kpi__value { font-size: 64px !important; }
+  .hero-kpi__value { font-size: 56px !important; }
 }
 
-// 1024-1199px: 平板横屏 — 侧边栏已折叠
 @media (max-width: 1023px) {
   .app-layout__content { padding: $space-lg $space-lg; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .dashboard__charts { grid-template-columns: 1fr !important; }
-  .hero-kpi__value { font-size: 52px !important; }
+  .hero-kpi__value { font-size: 44px !important; }
   .data-center__overview .el-col { flex: 0 0 33.33%; max-width: 33.33%; }
   .publish-wizard__body { max-width: 100% !important; }
 }
 
-// 768-1023px: 平板竖屏
 @media (max-width: 768px) {
   .app-layout__content { padding: $space-lg 16px !important; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
@@ -87,10 +167,9 @@ small, .text-caption { font-size: $text-caption; color: var(--el-text-color-plac
   .sub-kpi b { font-size: 18px; }
 }
 
-// ≤ 480px: 手机
 @media (max-width: 480px) {
   .account-grid { grid-template-columns: 1fr !important; }
-  .hero-kpi__value { font-size: 40px !important; }
+  .hero-kpi__value { font-size: 36px !important; }
   .dashboard__charts { grid-template-columns: 1fr; }
   .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
 }

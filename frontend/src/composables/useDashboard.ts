@@ -167,48 +167,92 @@ export function useDashboard() {
   }
   function onGroupChange() {}
 
+  const neonColors = ['#00d4ff', '#7c3aed', '#ff3366', '#00e396', '#ffb800', '#fb7299']
+
   const followerChartOption = computed(() => ({
-    tooltip: { trigger: 'axis' as const },
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: 'rgba(16, 24, 48, 0.95)',
+      borderColor: 'rgba(0, 212, 255, 0.2)',
+      textStyle: { color: '#e8eaed', fontSize: 12 },
+    },
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
     xAxis: {
       type: 'category' as const,
       data: Array.from({ length: trendDays.value }, (_, i) =>
-        dayjs()
-          .subtract(trendDays.value - 1 - i, 'day')
-          .format('MM-DD'),
+        dayjs().subtract(trendDays.value - 1 - i, 'day').format('MM-DD'),
       ),
+      axisLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.15)' } },
+      axisTick: { show: false },
+      axisLabel: { color: '#5a6680', fontSize: 11 },
     },
-    yAxis: { type: 'value' as const },
+    yAxis: {
+      type: 'value' as const,
+      splitLine: { lineStyle: { color: 'rgba(0, 212, 255, 0.06)' } },
+      axisLabel: { color: '#5a6680', fontSize: 11 },
+    },
     series:
       followerTrendData.value.length > 0
-        ? [
-            {
-              name: '粉丝',
-              type: 'line' as const,
-              smooth: true,
-              areaStyle: { opacity: 0.15 },
-              data: followerTrendData.value,
+        ? [{
+            name: '粉丝',
+            type: 'line' as const,
+            smooth: true,
+            symbol: 'circle',
+            symbolSize: 4,
+            lineStyle: {
+              width: 2,
+              shadowBlur: 12,
+              shadowColor: 'rgba(0, 212, 255, 0.4)',
             },
-          ]
+            itemStyle: { color: '#00d4ff' },
+            areaStyle: {
+              color: {
+                type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1,
+                colorStops: [
+                  { offset: 0, color: 'rgba(0, 212, 255, 0.25)' },
+                  { offset: 1, color: 'rgba(0, 212, 255, 0)' },
+                ],
+              },
+            },
+            data: followerTrendData.value,
+          }]
         : [],
   }))
 
   const platformChartOption = computed(() => ({
-    tooltip: { trigger: 'item' as const },
-    legend: { bottom: 0 },
-    series: [
-      {
-        type: 'pie' as const,
-        radius: ['40%', '70%'],
-        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-        label: { show: false },
-        emphasis: { label: { show: true, fontSize: 16, fontWeight: 'bold' as const } },
-        data:
-          platformDistribution.value.length > 0
-            ? platformDistribution.value
-            : [{ value: 0, name: '暂无数据' }],
+    backgroundColor: 'transparent',
+    tooltip: {
+      trigger: 'item' as const,
+      backgroundColor: 'rgba(16, 24, 48, 0.95)',
+      borderColor: 'rgba(0, 212, 255, 0.2)',
+      textStyle: { color: '#e8eaed', fontSize: 12 },
+    },
+    legend: {
+      bottom: 0,
+      textStyle: { color: '#8892b0', fontSize: 11 },
+    },
+    series: [{
+      type: 'pie' as const,
+      radius: ['45%', '75%'],
+      center: ['50%', '45%'],
+      itemStyle: {
+        borderRadius: 4,
+        borderColor: '#0a0e1a',
+        borderWidth: 3,
+        shadowBlur: 12,
+        shadowColor: 'rgba(0, 212, 255, 0.3)',
       },
-    ],
+      label: { show: false },
+      emphasis: {
+        label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#e8eaed' },
+        itemStyle: { shadowBlur: 20, shadowColor: 'rgba(0, 212, 255, 0.5)' },
+      },
+      data:
+        platformDistribution.value.length > 0
+          ? platformDistribution.value
+          : [{ value: 0, name: '暂无数据', itemStyle: { color: '#3d4a60' } }],
+    }],
   }))
 
   onMounted(() => {

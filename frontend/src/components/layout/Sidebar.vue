@@ -4,11 +4,17 @@
     <div class="sidebar__logo" @click="$router.push('/dashboard')">
       <div class="sidebar__logo-icon">
         <svg viewBox="0 0 32 32" fill="none" width="22" height="22">
-          <rect width="32" height="32" rx="7" fill="#E60012" />
-          <path d="M10 22V10l12 6-12 6z" fill="#fff" />
+          <defs>
+            <linearGradient id="lg" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0%" stop-color="#00d4ff"/>
+              <stop offset="100%" stop-color="#7c3aed"/>
+            </linearGradient>
+          </defs>
+          <rect width="32" height="32" rx="7" fill="url(#lg)" />
+          <path d="M10 22V10l12 6-12 6z" fill="#fff" opacity="0.9" />
         </svg>
       </div>
-      <span v-if="!isCollapsed" class="sidebar__logo-text">披星云</span>
+      <span v-if="!isCollapsed" class="sidebar__logo-text gradient-text">披星云</span>
     </div>
 
     <!-- Menu -->
@@ -149,19 +155,17 @@ function getIcon(name: unknown): Component {
 .sidebar {
   width: 220px;
   height: 100vh;
-  background: #FAFAFA;
-  border-right: 1px solid var(--el-border-color);
-  box-shadow: 1px 0 4px rgba(0,0,0,0.04);
+  background: linear-gradient(180deg, rgba(13, 18, 37, 0.95) 0%, rgba(10, 14, 26, 0.98) 100%);
+  border-right: 1px solid $color-border;
+  box-shadow: 1px 0 12px rgba(0, 0, 0, 0.3), 1px 0 0 rgba(0, 212, 255, 0.05);
   display: flex;
   flex-direction: column;
-  transition: width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: width 0.3s $ease-out;
   flex-shrink: 0;
   z-index: 10;
   user-select: none;
 
-  &--collapsed {
-    width: 68px;
-  }
+  &--collapsed { width: 68px; }
 
   &__logo {
     height: 56px;
@@ -170,21 +174,18 @@ function getIcon(name: unknown): Component {
     gap: $space-sm;
     padding: 0 18px;
     cursor: pointer;
+    border-bottom: 1px solid $color-border;
     &-icon {
-      width: 28px;
-      height: 28px;
+      width: 28px; height: 28px;
       border-radius: 7px;
-      color: #fff;
-      display: flex;
-      align-items: center;
-      justify-content: center;
       flex-shrink: 0;
+      filter: drop-shadow(0 0 6px rgba(0, 212, 255, 0.3));
     }
     &-text {
       font-size: $text-title;
-      font-weight: 600;
-      color: var(--el-text-color-primary);
+      font-weight: 700;
       white-space: nowrap;
+      letter-spacing: 0.02em;
     }
   }
 
@@ -202,96 +203,33 @@ function getIcon(name: unknown): Component {
     align-items: center;
     gap: $space-sm;
     padding: $space-sm 12px;
-    border-radius: 6px;
-    color: var(--el-text-color-secondary);
+    border-radius: 8px;
+    color: $color-text-secondary;
     text-decoration: none;
     font-size: $text-body;
     font-weight: 450;
-    transition: all 0.2s ease;
+    transition: all 0.25s $ease-out;
     white-space: nowrap;
+    position: relative;
 
     &:hover {
-      background: var(--el-fill-color-lighter);
-      color: var(--el-text-color-primary);
+      background: rgba(0, 212, 255, 0.06);
+      color: $color-text-primary;
     }
     &--active {
-      background: rgba(#E60012, 0.12);
-      color: #E60012;
+      background: rgba(0, 212, 255, 0.1);
+      color: $color-cyan;
       font-weight: 540;
-      &:hover {
-        background: rgba(#E60012, 0.18);
-      }
+      box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.15);
+      &:hover { background: rgba(0, 212, 255, 0.14); }
     }
-    &-icon {
-      font-size: 18px;
-      width: 24px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-    &-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-  }
-
-  &__accounts {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 12px;
-    border-top: 1px solid var(--el-border-color);
-    margin-top: 4px;
-  }
-  &__section-title {
-    font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
-    text-transform: uppercase;
-    padding: 8px 0 6px;
-    letter-spacing: 0.5px;
-  }
-  &__acc-group {
-    margin-bottom: 6px;
-  }
-  &__platform-name {
-    font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
-    padding: 2px 0;
-    text-transform: uppercase;
-  }
-  &__acc-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-    &:hover {
-      background: var(--el-fill-color-lighter);
-    }
-    &--active {
-      background: rgba(#E60012, 0.1);
-    }
-  }
-  &__acc-avatar {
-    flex-shrink: 0;
-  }
-  &__acc-name {
-    flex: 1;
-    font-size: $text-caption;
-    color: var(--el-text-color-secondary);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  &__acc-followers {
-    font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
-    flex-shrink: 0;
+    &-icon { font-size: 18px; width: 24px; text-align: center; flex-shrink: 0; }
+    &-label { overflow: hidden; text-overflow: ellipsis; }
   }
 
   &__bottom {
     padding: 12px 10px;
-    border-top: 1px solid var(--el-border-color);
+    border-top: 1px solid $color-border;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -303,59 +241,29 @@ function getIcon(name: unknown): Component {
     gap: 6px;
     padding: 6px 10px;
     border-radius: 20px;
-    background: rgba(255, 69, 58, 0.1);
-    &--ok {
-      background: rgba(48, 209, 88, 0.1);
-    }
+    background: rgba(255, 51, 102, 0.08);
+    &--ok { background: rgba(0, 227, 150, 0.08); }
     &-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: #ff453a;
+      width: 6px; height: 6px; border-radius: 50%;
+      background: $color-pink;
+      box-shadow: 0 0 6px rgba(255, 51, 102, 0.5);
     }
     &--ok &-dot {
-      background: #30d158;
+      background: $color-green;
+      box-shadow: 0 0 6px rgba(0, 227, 150, 0.5);
     }
-    &-text {
-      font-size: $text-micro;
-      color: var(--el-text-color-placeholder);
-    }
+    &-text { font-size: $text-micro; color: $color-text-tertiary; }
   }
-  &__theme-toggle {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--el-text-color-placeholder);
-    transition: all 0.2s;
-    flex-shrink: 0;
+  &__theme-toggle, &__toggle {
+    width: 32px; height: 32px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: $color-text-tertiary;
+    transition: all 0.2s; flex-shrink: 0;
     &:hover {
-      background: var(--el-fill-color-lighter);
-      color: var(--el-text-color-primary);
+      background: rgba(0, 212, 255, 0.06);
+      color: $color-text-primary;
     }
   }
-  &__toggle {
-    width: 32px;
-    height: 32px;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: var(--el-text-color-placeholder);
-    transition: all 0.2s;
-    flex-shrink: 0;
-    &:hover {
-      background: var(--el-fill-color-lighter);
-      color: var(--el-text-color-primary);
-    }
-    &-icon {
-      font-size: $text-headline;
-      font-weight: 300;
-    }
-  }
+  &__toggle-icon { font-size: $text-headline; font-weight: 300; }
 }
 </style>

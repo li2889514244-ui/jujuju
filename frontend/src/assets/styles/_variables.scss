@@ -1,40 +1,45 @@
-// 披星云 — 红白设计系统
+// 披星云 v2 — 深空科幻设计系统
 
-// === 基础色 ===
-$color-bg-primary: #FFFFFF;
-$color-bg-secondary: #F8F8F8;
-$color-bg-tertiary: #FAFAFA;
-$color-bg-elevated: #FFFFFF;
-$color-bg-glass: rgba(255, 255, 255, 0.95);
+// === 深空底色 ===
+$color-bg-primary: #0a0e1a;
+$color-bg-secondary: #0d1225;
+$color-bg-tertiary: #111827;
+$color-bg-elevated: #141e30;
+$color-bg-glass: rgba(16, 24, 48, 0.6);
 
-$color-text-primary: #1D1D1F;
-$color-text-secondary: #8E8E93;
-$color-text-tertiary: #AEAEB2;
-$color-text-placeholder: #C7C7CC;
+$color-text-primary: #e8eaed;
+$color-text-secondary: #8892b0;
+$color-text-tertiary: #5a6680;
+$color-text-placeholder: #3d4a60;
 
-$color-border: #E5E5E5;
-$color-border-active: #E60012;
-$color-separator: #F0F0F0;
+$color-border: rgba(0, 212, 255, 0.12);
+$color-border-active: #00d4ff;
+$color-separator: rgba(255, 255, 255, 0.05);
 
-// === 红白配色系统色 ===
-$color-red: #E60012;
-$color-red-light: #EE3342;
-$color-blue: #E60012;
-$color-green: #34C759;
-$color-orange: #FF9500;
+// === 霓虹科幻配色 ===
+$color-cyan: #00d4ff;
+$color-purple: #7c3aed;
+$color-pink: #ff3366;
+$color-green: #00e396;
+$color-amber: #ffb800;
 
-$primary-color: $color-red;
+$primary-color: $color-cyan;
 $success-color: $color-green;
-$warning-color: $color-orange;
-$danger-color: $color-red;
-$info-color: #8E8E93;
+$warning-color: $color-amber;
+$danger-color: $color-pink;
+$info-color: $color-purple;
+
+// === 辉光 ===
+$glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3), 0 0 4px rgba(0, 212, 255, 0.5);
+$glow-purple: 0 0 20px rgba(124, 58, 237, 0.3), 0 0 4px rgba(124, 58, 237, 0.5);
+$glow-pink: 0 0 16px rgba(255, 51, 102, 0.25);
 
 // === Layout ===
 $sidebar-width: 220px;
 $sidebar-collapsed-width: 68px;
 $topbar-height: 52px;
 
-// === Stripe 间距量表 ===
+// === 间距量表 ===
 $space-xs: 8px;
 $space-sm: 12px;
 $space-md: 16px;
@@ -45,23 +50,23 @@ $space-3xl: 72px;
 $space-4xl: 96px;
 $section-gap: 64px;
 
-// === 响应式断点 ===
+// === 断点 ===
 $bp-sm: 640px;
 $bp-md: 768px;
 $bp-lg: 1024px;
 $bp-xl: 1280px;
 
 // === 圆角 ===
-$radius-sm: 8px;
-$radius-md: 12px;
-$radius-lg: 16px;
-$radius-xl: 20px;
+$radius-sm: 6px;
+$radius-md: 10px;
+$radius-lg: 14px;
+$radius-xl: 18px;
 $radius-full: 9999px;
 
-// === 阴影 ===
-$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-$shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.5);
+// === 阴影（全部发光向） ===
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 0 6px rgba(0, 212, 255, 0.08);
+$shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5), 0 0 12px rgba(0, 212, 255, 0.1);
+$shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 212, 255, 0.12);
 
 // === 动画 ===
 $ease-out: cubic-bezier(0.16, 1, 0.3, 1);
@@ -69,35 +74,63 @@ $ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
 $ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
 // === 字体 ===
-$font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text',
-  'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-$font-mono: 'SF Mono', 'JetBrains Mono', 'Fira Code', monospace;
+$font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Inter',
+  'PingFang SC', 'Microsoft YaHei', sans-serif;
+$font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
 
-// === Stripe 排版 scale ===
-$text-display: 56px;    // KPI 数字
-$text-hero: 36px;       // 页面标题
-$text-headline: 24px;   // 区块标题
-$text-title: 18px;      // 卡片标题
-$text-body: 15px;       // 正文
-$text-caption: 13px;    // 辅助文字
-$text-micro: 11px;      // 标签/元数据
+// === 排版 scale ===
+$text-display: 64px;
+$text-hero: 36px;
+$text-headline: 24px;
+$text-title: 18px;
+$text-body: 15px;
+$text-caption: 13px;
+$text-micro: 11px;
 
-// === 平台色 ===
-$douyin-color: #000000;
-$kuaishou-color: #ff4906;
-$xiaohongshu-color: #ff2442;
+// === 平台色（霓虹化） ===
+$douyin-color: #00d4ff;
+$kuaishou-color: #ff6b35;
+$xiaohongshu-color: #ff3366;
 $bilibili-color: #fb7299;
-$weibo-color: #ff8200;
+$weibo-color: #ffb800;
 
-// === 毛玻璃 ===
+// === 玻璃拟态 ===
 @mixin glass {
-  background: rgba(255, 255, 255, 0.85);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(16, 24, 48, 0.55);
+  backdrop-filter: blur(24px) saturate(120%);
+  -webkit-backdrop-filter: blur(24px) saturate(120%);
+  border: 1px solid rgba(0, 212, 255, 0.1);
 }
 
 @mixin glass-heavy {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(40px);
-  -webkit-backdrop-filter: blur(40px);
+  background: rgba(18, 28, 52, 0.75);
+  backdrop-filter: blur(40px) saturate(150%);
+  -webkit-backdrop-filter: blur(40px) saturate(150%);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+}
+
+@mixin glow-border {
+  border: 1px solid rgba(0, 212, 255, 0.25);
+  box-shadow: $glow-cyan;
+}
+
+@mixin glow-text {
+  text-shadow: 0 0 12px rgba(0, 212, 255, 0.4);
+}
+
+@mixin scanline {
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0, 212, 255, 0.015) 2px,
+      rgba(0, 212, 255, 0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 0;
+  }
 }

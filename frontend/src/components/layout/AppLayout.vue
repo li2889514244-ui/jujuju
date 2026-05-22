@@ -43,7 +43,7 @@ function onPageEnter() {
   width: 100%;
   height: 100vh;
   overflow: hidden;
-  background: var(--el-bg-color);
+  background: $color-bg-primary;
 
   &__main {
     flex: 1;
@@ -59,9 +59,7 @@ function onPageEnter() {
     overflow-y: auto;
     overflow-x: hidden;
     padding: $space-2xl $space-3xl;
-    &::-webkit-scrollbar {
-      width: 4px;
-    }
+    &::-webkit-scrollbar { width: 4px; }
   }
 }
 </style>
