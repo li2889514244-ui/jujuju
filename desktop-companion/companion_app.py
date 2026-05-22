@@ -694,8 +694,9 @@ async def _scrape_dashboard(page) -> dict:
             // Strategy 2: Try page title (often contains account name)
             if (!result.nickname) {
                 const title = document.title || '';
-                const clean = title.replace(/[\\-|–—].*$/, '').replace(/创作者中心|创作服务平台|数据平台|抖音|快手|小红书/g, '').trim();
-                if (clean.length >= 2 && clean.length <= 30 && !/^\d+$/.test(clean)) {
+                const clean = title.replace(/[\\-|–—].*$/, '').replace(/创作者中心|创作服务平台|数据平台|抖音|快手|小红书|视频号助手|腾讯视频号/g, '').trim();
+                const platformUINames = ['视频号助手', '视频号', '微信', '抖音创作服务平台', '快手创作者中心'];
+                if (clean.length >= 2 && clean.length <= 30 && !/^\d+$/.test(clean) && !platformUINames.includes(clean)) {
                     result.nickname = clean;
                 }
             }
@@ -1047,6 +1048,22 @@ async def _scrape_account_pages(context, platform: str) -> dict:
         # 1. Dashboard
         await page.goto(url, wait_until='domcontentloaded', timeout=30000)
         await page.wait_for_timeout(8000)
+
+        # Check if we landed on a login page (cookie expired / invalid)
+        current_url = page.url.lower()
+        page_title = (await page.title()).lower() if hasattr(page, 'title') else ''
+        login_keywords = ['login', 'qrcode', 'qr_code', 'scan', 'passport',
+                          'signin', 'authorize', 'verify']
+        if any(kw in current_url for kw in login_keywords):
+            print(f'[DC] {platform}: redirected to login page (url={current_url[:80]}), skipping')
+            return {'metrics': {}, 'video_stats': []}
+
+        # Also check page title for login indicators
+        login_titles = ['登录', 'sign in', 'log in']
+        if any(kw in page_title for kw in login_titles):
+            print(f'[DC] {platform}: login page detected by title "{page_title[:60]}", skipping')
+            return {'metrics': {}, 'video_stats': []}
+
         metrics = await _scrape_dashboard(page)
 
         # 2. Data center
@@ -1271,28 +1288,24 @@ def _run_collection_once():
             except Exception as e:
                 print(f'[DC] Video report error {item["accountId"]}: {e}')
 
-        # Sync nicknames and avatars extracted from dashboard
+        # Sync avatars extracted from dashboard (only avatars — nicknames
+        # are set once during QR scan and must not be overwritten by scraping)
         for item in scraped:
             m = item.get('metrics', {})
-            nickname = m.pop('_nickname', None)
+            m.pop('_nickname', None)  # discard — dashboard titles are not nickname sources
             avatar = m.pop('_avatar', None)
-            if nickname or avatar:
-                update = {}
-                if nickname:
-                    update['nickname'] = nickname
-                if avatar:
-                    update['avatar'] = avatar
+            if avatar:
                 try:
                     r = requests.put(
                         f'{api_url}/accounts/{item["accountId"]}',
-                        json=update,
+                        json={'avatar': avatar},
                         headers={'Authorization': f'Bearer {token}'},
                         timeout=15,
                     )
                     if r.status_code < 400:
-                        print(f'[DC] Synced profile for {item["accountId"]}: {update}')
+                        print(f'[DC] Synced avatar for {item["accountId"]}')
                 except Exception as e:
-                    print(f'[DC] Profile sync error {item["accountId"]}: {e}')
+                    print(f'[DC] Avatar sync error {item["accountId"]}: {e}')
 
         _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
         _collector_last_error = None
