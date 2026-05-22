@@ -1,25 +1,114 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="dark">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="MatrixFlow - 多平台矩阵账号管理、内容发布与数据分析一站式解决方案" />
-    <meta name="keywords" content="矩阵管理,多平台运营,抖音,快手,小红书,B站,内容发布,数据分析" />
-    <meta name="theme-color" content="#E60012" />
+    <meta name="theme-color" content="#0a0e1a" />
     <meta property="og:title" content="MatrixFlow - 矩阵账号管理平台" />
     <meta property="og:description" content="多平台矩阵账号管理、内容发布与数据分析一站式解决方案" />
     <meta property="og:type" content="website" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>MatrixFlow - 矩阵账号管理平台</title>
-    <script type="module" crossorigin src="/assets/js/index-DmLk_zca.js"></script>
+    <script type="module" crossorigin src="/assets/js/index-LdNH_E_9.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/js/vendor-BAWYU9fo.js">
     <link rel="modulepreload" crossorigin href="/assets/js/element-plus-DUycBP9r.js">
-    <link rel="stylesheet" crossorigin href="/assets/css/index-ClAxvEQ6.css">
+    <link rel="stylesheet" crossorigin href="/assets/css/index-Dapy3b4r.css">
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app"></div>
     <style>
-      :root{--el-color-primary:#E60012!important;--el-color-primary-light-3:#EE3342!important;--el-color-primary-light-5:#F26671!important;--el-color-primary-light-7:#F699A1!important;--el-color-primary-light-9:#FCCCD0!important;--el-color-primary-dark-2:#B8000E!important;--el-color-success:#34C759!important;--el-color-warning:#FF9500!important;--el-color-danger:#E60012!important;--el-color-info:#8E8E93!important;--el-color-primary-rgb:230,0,18!important;--el-color-success-rgb:52,199,89!important;--el-color-warning-rgb:255,149,0!important;--el-color-danger-rgb:230,0,18!important;--el-color-info-rgb:142,142,147!important;--el-bg-color:#FFFFFF!important;--el-bg-color-page:#F8F8F8!important;--el-bg-color-overlay:#FFFFFF!important;--el-text-color-primary:#1D1D1F!important;--el-text-color-regular:#1C1C1E!important;--el-text-color-secondary:#3A3A3C!important;--el-text-color-placeholder:#6E6E73!important;--el-text-color-disabled:#C7C7CC!important;--el-border-color:#E5E5E5!important;--el-border-color-light:#F0F0F0!important;--el-border-color-lighter:#F5F5F5!important;--el-fill-color:#F0F0F0!important;--el-fill-color-light:#F5F5F5!important;--el-fill-color-lighter:#FAFAFA!important;--el-fill-color-blank:#FFFFFF!important;--el-border-radius-base:10px!important;--el-border-radius-small:6px!important;--el-border-radius-round:9999px!important;--el-table-tr-bg-color:transparent!important;--el-table-row-hover-bg-color:var(--el-fill-color-lighter)!important;--el-font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue','PingFang SC',sans-serif!important}
+      /* === 原版红白主题（light / 默认） === */
+      :root, .light {
+        --el-color-primary: #E60012 !important;
+        --el-color-primary-light-3: #EE3342 !important;
+        --el-color-primary-light-5: #F26671 !important;
+        --el-color-primary-light-7: #F699A1 !important;
+        --el-color-primary-light-9: #FCCCD0 !important;
+        --el-color-primary-dark-2: #B8000E !important;
+        --el-color-success: #34C759 !important;
+        --el-color-warning: #FF9500 !important;
+        --el-color-danger: #E60012 !important;
+        --el-color-info: #8E8E93 !important;
+        --el-color-primary-rgb: 230,0,18 !important;
+        --el-color-success-rgb: 52,199,89 !important;
+        --el-color-warning-rgb: 255,149,0 !important;
+        --el-color-danger-rgb: 230,0,18 !important;
+        --el-color-info-rgb: 142,142,147 !important;
+        --el-bg-color: #FFFFFF !important;
+        --el-bg-color-page: #F8F8F8 !important;
+        --el-bg-color-overlay: #FFFFFF !important;
+        --el-text-color-primary: #1D1D1F !important;
+        --el-text-color-regular: #1C1C1E !important;
+        --el-text-color-secondary: #3A3A3C !important;
+        --el-text-color-placeholder: #6E6E73 !important;
+        --el-text-color-disabled: #C7C7CC !important;
+        --el-border-color: #E5E5E5 !important;
+        --el-border-color-light: #F0F0F0 !important;
+        --el-border-color-lighter: #F5F5F5 !important;
+        --el-fill-color: #F0F0F0 !important;
+        --el-fill-color-light: #F5F5F5 !important;
+        --el-fill-color-lighter: #FAFAFA !important;
+        --el-fill-color-blank: #FFFFFF !important;
+        --el-mask-color: rgba(0,0,0,0.6) !important;
+        --el-mask-color-extra-light: rgba(0,0,0,0.3) !important;
+        --el-table-tr-bg-color: transparent !important;
+        --el-table-row-hover-bg-color: var(--el-fill-color-lighter) !important;
+        --el-table-border-color: #E5E5E5 !important;
+        --el-table-header-bg-color: #FAFAFA !important;
+        --el-menu-bg-color: #FAFAFA !important;
+        --el-menu-hover-bg-color: #F0F0F0 !important;
+        --el-menu-active-color: #E60012 !important;
+        --el-menu-text-color: #3A3A3C !important;
+        --el-border-radius-base: 10px !important;
+        --el-border-radius-small: 6px !important;
+        --el-border-radius-round: 9999px !important;
+        --el-font-family: -apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue','PingFang SC',sans-serif !important;
+      }
+
+      /* === 深空科幻主题（dark） === */
+      .dark {
+        --el-color-primary: #00d4ff !important;
+        --el-color-primary-light-3: #33ddff !important;
+        --el-color-primary-light-5: #66e5ff !important;
+        --el-color-primary-light-7: #99eeff !important;
+        --el-color-primary-light-9: #ccf6ff !important;
+        --el-color-primary-dark-2: #00aacc !important;
+        --el-color-success: #00e396 !important;
+        --el-color-warning: #ffb800 !important;
+        --el-color-danger: #ff3366 !important;
+        --el-color-info: #7c3aed !important;
+        --el-color-primary-rgb: 0,212,255 !important;
+        --el-color-success-rgb: 0,227,150 !important;
+        --el-color-warning-rgb: 255,184,0 !important;
+        --el-color-danger-rgb: 255,51,102 !important;
+        --el-color-info-rgb: 124,58,237 !important;
+        --el-bg-color: #0d1225 !important;
+        --el-bg-color-page: #0a0e1a !important;
+        --el-bg-color-overlay: #141e30 !important;
+        --el-text-color-primary: #e8eaed !important;
+        --el-text-color-regular: #c8ccd4 !important;
+        --el-text-color-secondary: #8892b0 !important;
+        --el-text-color-placeholder: #5a6680 !important;
+        --el-text-color-disabled: #3d4a60 !important;
+        --el-border-color: rgba(0,212,255,0.1) !important;
+        --el-border-color-light: rgba(0,212,255,0.06) !important;
+        --el-border-color-lighter: rgba(0,212,255,0.03) !important;
+        --el-fill-color: rgba(0,212,255,0.04) !important;
+        --el-fill-color-light: rgba(0,212,255,0.06) !important;
+        --el-fill-color-lighter: rgba(0,212,255,0.02) !important;
+        --el-fill-color-blank: #0a0e1a !important;
+        --el-mask-color: rgba(0,0,0,0.7) !important;
+        --el-mask-color-extra-light: rgba(0,0,0,0.4) !important;
+        --el-table-tr-bg-color: transparent !important;
+        --el-table-row-hover-bg-color: rgba(0,212,255,0.04) !important;
+        --el-table-border-color: rgba(0,212,255,0.06) !important;
+        --el-table-header-bg-color: rgba(0,212,255,0.03) !important;
+        --el-menu-bg-color: transparent !important;
+        --el-menu-hover-bg-color: rgba(0,212,255,0.06) !important;
+        --el-menu-active-color: #00d4ff !important;
+        --el-menu-text-color: #8892b0 !important;
+      }
     </style>
   </body>
 </html>
