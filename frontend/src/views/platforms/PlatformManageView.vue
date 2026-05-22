@@ -467,11 +467,11 @@ onMounted(async () => {
       .stat-name {
         font-size: $text-body;
         font-weight: 500;
-        color: #1D1D1F;
+        color: #f0ece4;
       }
       .stat-count {
         font-size: $text-caption;
-        color: #6e6e73;
+        color: #b8b0a8;
         margin-top: 4px;
       }
     }
@@ -498,23 +498,23 @@ onMounted(async () => {
   .account-info {
     .nickname {
       font-weight: 500;
-      color: #1D1D1F;
+      color: #f0ece4;
     }
     .uid {
       font-size: $text-caption;
-      color: #6e6e73;
+      color: #b8b0a8;
     }
   }
 }
 
 .metric {
   font-weight: 500;
-  color: #1D1D1F;
+  color: #f0ece4;
 }
 
 .time-text {
   font-size: 13px;
-  color: #6e6e73;
+  color: #b8b0a8;
 }
 
 .pagination-wrapper {
@@ -545,14 +545,14 @@ onMounted(async () => {
     }
 
     &.authorized {
-      border-color: #30d158;
+      border-color: #6b9e6c;
       background: #f0f9eb;
     }
 
     .platform-name {
       font-size: $text-body;
       font-weight: 500;
-      color: #1D1D1F;
+      color: #f0ece4;
     }
   }
 }

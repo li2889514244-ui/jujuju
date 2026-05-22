@@ -453,7 +453,7 @@ onMounted(() => {
   &__title {
     font-size: $text-body;
     font-weight: 600;
-    color: #1D1D1F;
+    color: #f0ece4;
     margin-bottom: 12px;
   }
 }
@@ -473,7 +473,7 @@ onMounted(() => {
   &__value {
     font-size: $text-body;
     font-weight: 500;
-    color: #1D1D1F;
+    color: #f0ece4;
   }
   &__change {
     font-size: $text-caption;
@@ -483,10 +483,10 @@ onMounted(() => {
   }
 }
 .change--up {
-  color: #30d158;
+  color: #6b9e6c;
 }
 .change--down {
-  color: #ff453a;
+  color: #d4534a;
 }
 .ranking-header {
   display: flex;
@@ -496,14 +496,14 @@ onMounted(() => {
 }
 .ranking-title {
   font-size: $text-body;
-  color: #1D1D1F;
+  color: #f0ece4;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ranking-meta {
   font-size: $text-caption;
-  color: #6e6e73;
+  color: #b8b0a8;
   margin-top: 2px;
 }
 .rank-badge {
@@ -521,7 +521,7 @@ onMounted(() => {
   background: #f5a623;
 }
 .rank-2 {
-  background: #6e6e73;
+  background: #b8b0a8;
 }
 .rank-3 {
   background: #b87333;

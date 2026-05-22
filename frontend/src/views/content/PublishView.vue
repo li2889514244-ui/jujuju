@@ -207,7 +207,7 @@
           <el-icon v-if="r.status === 'success'"><CircleCheckFilled /></el-icon>
           <el-icon v-else-if="r.status === 'failed'"><CircleCloseFilled /></el-icon>
           <span>{{ r.nickname }}</span>
-          <span v-if="r.error" style="color: #ff453a; font-size: 13px">{{ r.error }}</span>
+          <span v-if="r.error" style="color: #d4534a; font-size: 13px">{{ r.error }}</span>
         </div>
       </el-card>
     </div>
@@ -381,7 +381,7 @@ onMounted(() => {
   &__empty {
     padding: 16px;
     text-align: center;
-    color: #6e6e73;
+    color: #b8b0a8;
   }
 }
 .account-item {
@@ -396,7 +396,7 @@ onMounted(() => {
   }
   &__followers {
     font-size: 13px;
-    color: #6e6e73;
+    color: #b8b0a8;
     margin-left: 4px;
   }
 }
@@ -415,10 +415,10 @@ onMounted(() => {
   padding: 8px 0;
   border-bottom: 1px solid #f0f0f0;
   &.result-success {
-    color: #30d158;
+    color: #6b9e6c;
   }
   &.result-failed {
-    color: #ff453a;
+    color: #d4534a;
   }
 }
 </style>

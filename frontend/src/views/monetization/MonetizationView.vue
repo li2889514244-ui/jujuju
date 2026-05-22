@@ -208,7 +208,7 @@ onMounted(() => {
   &__value {
     font-size: 28px;
     font-weight: 700;
-    color: #1D1D1F;
+    color: #f0ece4;
     font-feature-settings: 'tnum';
   }
 }

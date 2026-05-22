@@ -91,12 +91,12 @@
     >
       <template #header>
         <span>跨平台内容对比</span>
-        <span style="font-size: 13px; color: #6e6e73; margin-left: 8px"
+        <span style="font-size: 13px; color: #b8b0a8; margin-left: 8px"
           >同一内容在不同平台的表现</span
         >
       </template>
       <div v-for="(group, gi) in crossPlatformItems" :key="gi" style="margin-bottom: 16px">
-        <div style="font-weight: 600; margin-bottom: 8px; color: #1D1D1F">{{ group.title }}</div>
+        <div style="font-weight: 600; margin-bottom: 8px; color: #f0ece4">{{ group.title }}</div>
         <el-table :data="group.items" stripe size="small">
           <el-table-column label="平台" width="100">
             <template #default="{ row }">

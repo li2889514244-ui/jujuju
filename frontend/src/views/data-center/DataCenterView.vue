@@ -218,7 +218,7 @@ const trendChartOption = computed(() => ({
             type: 'text',
             left: 'center',
             top: 'center',
-            style: { text: '暂无数据', fontSize: 16, fill: '#AEAEB2' },
+            style: { text: '暂无数据', fontSize: 16, fill: '#8a8078' },
           },
         ]
       : undefined,
@@ -372,13 +372,13 @@ onMounted(() => {
   text-align: center;
   &__label {
     font-size: 13px;
-    color: #6e6e73;
+    color: $color-text-secondary;
     margin-bottom: 8px;
   }
   &__value {
     font-size: 24px;
     font-weight: 600;
-    color: #1D1D1F;
+    color: $color-text-primary;
   }
   &__change {
     font-size: $text-caption;
@@ -387,12 +387,8 @@ onMounted(() => {
   }
 }
 
-.trend--up {
-  color: #30d158;
-}
-.trend--down {
-  color: #ff453a;
-}
+.trend--up { color: $color-sage; }
+.trend--down { color: $color-rust; }
 
 .chart-header {
   display: flex;
@@ -403,7 +399,7 @@ onMounted(() => {
 
 .ranking-title {
   font-size: 13px;
-  color: #1D1D1F;
+  color: $color-text-primary;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -411,7 +407,7 @@ onMounted(() => {
 }
 .ranking-meta {
   font-size: 11px;
-  color: #6e6e73;
+  color: $color-text-secondary;
   margin-top: 2px;
 }
 
@@ -426,13 +422,7 @@ onMounted(() => {
   font-weight: bold;
   color: #fff;
 }
-.rank-1 {
-  background: #f5a623;
-}
-.rank-2 {
-  background: #6e6e73;
-}
-.rank-3 {
-  background: #b87333;
-}
+.rank-1 { background: $color-gold; }
+.rank-2 { background: $color-text-tertiary; }
+.rank-3 { background: $color-copper; }
 </style>

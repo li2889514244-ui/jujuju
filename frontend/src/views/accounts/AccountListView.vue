@@ -549,8 +549,8 @@ function handleBindSuccess() {
     padding: 2px 10px;
     border-radius: $radius-full;
     &.status--valid {
-      background: rgba(#30d158, 0.1);
-      color: #30d158;
+      background: rgba(#6b9e6c, 0.1);
+      color: #6b9e6c;
     }
     &.status--expiring_soon {
       background: rgba(#ff9f0a, 0.1);
@@ -558,8 +558,8 @@ function handleBindSuccess() {
     }
     &.status--expired,
     &.status--unknown {
-      background: rgba(#ff453a, 0.1);
-      color: #ff453a;
+      background: rgba(#d4534a, 0.1);
+      color: #d4534a;
     }
   }
   &__actions {
