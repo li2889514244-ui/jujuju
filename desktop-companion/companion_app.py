@@ -234,13 +234,16 @@ methods:{
     }catch(e){}
   },
   async checkConfig(){
-    try{const r=await fetch('/api/config');const j=await r.json();this.configured=j.configured}catch(e){this.configured=false}
+    try{const r=await fetch('/api/config');const j=await r.json();this.configured=j.configured;if(j.saved_email){this.loginEmail=j.saved_email;this.rememberPwd=true}}catch(e){this.configured=false}
+  },
+  async tryAutoLogin(){
+    try{const r=await fetch('/api/auto-login',{method:'POST'});const j=await r.json();if(j.configured){this.configured=true}}catch(e){}
   },
   async doLogin(){
     if(!this.loginEmail||!this.loginPass){this.loginError='请输入邮箱和密码';return}
     this.loginLoading=true;this.loginError=''
     try{
-      const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:this.loginEmail,password:this.loginPass})})
+      const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:this.loginEmail,password:this.loginPass,remember:this.rememberPwd})})
       const j=await r.json()
       if(j.error){this.loginError=j.error}
       else{this.configured=true;this.loginEmail='';this.loginPass=''}
@@ -317,6 +320,7 @@ cancelScan(){
 },
 mounted(){
   this.checkConfig()
+  this.tryAutoLogin()
   this.loadCookieStatus()
   this.fetchPixingStatus()
   this.platformFromUrl=this.getParam('platform')
