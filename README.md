@@ -111,8 +111,8 @@ cd frontend && pnpm dev
 
 | 环境 | 分支 | URL |
 |------|------|-----|
-| Production | `main` | `jujuju-28b.pages.dev` |
-| Preview | PR | `jujuju-28b.pages.dev` (branch preview) |
+| Production | `master` | `ddddkiii.com` |
+| Preview | PR | N/A (direct ECS deploy) |
 
 **GitHub Secrets 需要配置:**
 

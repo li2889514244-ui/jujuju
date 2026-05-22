@@ -32,7 +32,7 @@ async function bootstrap() {
     } else if (isDev) {
         origin = ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:5173', 'http://localhost:8080'];
     } else {
-        origin = ['https://fda2071c.jujuju-28b.pages.dev', /\.jujuju-28b\.pages\.dev$/, /\.pages\.dev$/];
+        origin = ['https://ddddkiii.com', 'https://www.ddddkiii.com', /\.ddddkiii\.com$/];
     }
 
     app.enableCors({ origin, credentials: true, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Version'], maxAge: 86400 });
