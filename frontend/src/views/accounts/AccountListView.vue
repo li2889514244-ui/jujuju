@@ -553,8 +553,8 @@ function handleBindSuccess() {
       color: #6b9e6c;
     }
     &.status--expiring_soon {
-      background: rgba(#ff9f0a, 0.1);
-      color: #ff9f0a;
+      background: rgba(224, 160, 48, 0.15);
+      color: #f0c060;
     }
     &.status--expired,
     &.status--unknown {
