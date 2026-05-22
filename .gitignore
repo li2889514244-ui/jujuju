@@ -107,4 +107,4 @@ __pycache__/
 desktop-companion/companion_config.json
 
 # 外部爬虫工具
-bazhuayu_style_scraper.py
+bazhuayu_style_scraper.py_debug_archive/

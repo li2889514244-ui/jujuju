@@ -1,9 +1,25 @@
 import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { Platform } from '../../../common/prisma-enums';
 
 export class QueryAnalyticsDto {
-  @ApiPropertyOptional() @IsOptional() @IsString() accountId?: string;
-  @ApiPropertyOptional() @IsOptional() @IsString() platform?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() startDate?: string;
-  @ApiPropertyOptional() @IsOptional() @IsDateString() endDate?: string;
+  @IsOptional()
+  @IsString()
+  accountId?: string;
+
+  @IsOptional()
+  @IsEnum(Platform)
+  platform?: Platform;
+
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @IsOptional()
+  @IsString()
+  granularity?: 'day' | 'week' | 'month';
 }

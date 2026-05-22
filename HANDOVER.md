@@ -7,47 +7,30 @@
 
 多平台矩阵账号管理 SaaS（抖音/快手/小红书/B站/视频号/微博/TikTok）。
 
-- **前端**: Vue 3 + Element Plus，部署在 Cloudflare Pages
-- **后端**: NestJS，部署在阿里云 ECS
+- **前端**: Vue 3 + Element Plus，ECS nginx serve 静态文件（/var/www/matrixflow）
+- **后端**: NestJS，ECS PM2 管理（端口 3001）
 - **数据库**: PostgreSQL + Redis，运行在 Docker 中
+- **隧道**: Cloudflare Tunnel → ECS nginx:3000
 - **目标**: 用户登录网站 → 绑定平台账号 → AI 创作内容 → 一键多平台发布 → 数据分析
 
 ---
 
-## 二、核心问题（请先修这个）
+## 二、架构现状（2026-05-22）
 
-### 问题 1: 后端频繁崩溃（最关键）
+### 已修复的问题
+- **UploaderModule 循环依赖**：已从 app.module.ts 移除 UploaderModule，ContentService 不再依赖 UploaderService
+- **dist/main.js 损坏**：源码已从 git 历史恢复，build 可通过
+- **ScanBindModule / CalendarModule**：未在 app.module.ts 中注册（依赖不完整）
+- ECS 后端运行中，健康检查正常
 
-**现象**: NestJS 启动后几分钟到几小时崩溃，PM2 不断重启（曾达 692 次），用户登录报 "Network Error"。
+### 已知风险
+1. ECS 仅 1.7GB 内存，NestJS + PostgreSQL + Redis + cloudflared 同时运行可能触发 OOM
+2. 服务器重启后部分服务可能不自启（PM2 startup 不可用）
+3. 视频号 Cookie 每天过期，需重新扫码
 
-**根因**:
-1. ECS 仅 1.7GB 内存，运行 NestJS + PostgreSQL + Redis + cloudflared 超出容量，OOM Killer 杀进程
-2. NestJS 存在循环依赖：`UploaderService` ↔ `ContentService`，NestJS 无法解析导致启动即崩溃
-3. `dist/main.js` 多次因 git 冲突变成 0 字节
-
-**已做的修复**:
-- `backend/src/modules/content/content.service.ts` — 已移除 `UploaderService` 注入和 `executeImmediatePublish()` 方法
-- `backend/src/modules/content/content.module.ts` — 已移除 `UploaderModule` 引用，只保留 `PrismaModule`
-- `backend/src/modules/uploader/uploader.module.ts` — 仍有 `forwardRef(() => ContentModule)`，UploaderModule 仍注册在 app.module.ts 中
-- ECS 已加 4GB swap
-
-**建议方案**:
-- 从 app.module.ts 移除 UploaderModule（ECS 无 Playwright/Chromium，该模块不可用）
-- 或用 Docker Compose 部署全部服务，设严格内存限制
-- 或升级 ECS 到 4GB+，用 `docker compose up -d` 一键部署
-
-### 问题 2: 服务器重启后服务不自启
-
-`/etc/systemd/system/matrixflow.service` 已创建但 `systemctl` 在该 ECS 上不可用。PM2 的 `startup` 命令也失败。Docker 容器设了 `--restart always` 但有时不生效。
-
-### 问题 3: 扫码绑定需要本地服务
-
-架构设计：扫码绑定不走服务器，用用户本地真实 IP 打开平台登录页（避免阿里云数据中心 IP 被封）。
-
-- 用户下载 `social-auto-upload` 压缩包
-- 双击 `setup.bat` 安装 Python + Playwright + Chromium（仅首次）
-- 双击 `start.bat` 启动本地 Flask（`localhost:5409`）
-- 网页通过 SSE 连接 `localhost:5409`，获取二维码，扫码，Cookie 自动上传云端
+### 扫码绑定
+- 桌面伴侣 `desktop-companion/dist/披星云伴侣.exe`（pyinstaller 打包）
+- 用户本地运行，扫码后 Cookie 自动上传云端
 
 ---
 
@@ -109,14 +92,9 @@ Docker:
 ### 网络架构
 
 ```
-https://ddddkiii.com (Nginx on ECS)
-    ↓ API 调用
-https://ddddkiii.com/api/v1
-    ↓ CNAME → Tunnel
-Cloudflare Tunnel (QUIC 加密)
-    ↓
-ECS cloudflared → localhost:3000
-    ↓
+https://ddddkiii.com → Cloudflare Tunnel → ECS nginx:3000
+                                              ├── /       → /var/www/matrixflow (前端静态)
+                                              └── /api/*  → proxy_pass http://localhost:3001 (NestJS)
 NestJS → PostgreSQL + Redis (Docker)
 ```
 
@@ -249,15 +227,14 @@ docker run -d --restart always --name cloudflared --network host cloudflare/clou
 
 ---
 
-## 九、已知 Bug / 技术债
+## 九、已知状态（2026-05-22）
 
-1. **AI 助手显示"暂未接入"**: 有两个 `onMounted` 互相覆盖状态。`AIAssistantView.vue` 中第一个 onMounted 设 `connected`，第二个设 `providers[0]`（值为 `mock`）。已在本地修复但 CF Pages 可能未部署。
-2. **Dashboard 数据全是 0**: 新账号无数据时正常，但前端应显示"添加账号开始使用"而非空图表。
-3. **UploaderModule 循环依赖**: 核心问题，见上文。
-4. **ECS Node.js 版本**: v24.14.1 是奇数不稳定版，应考虑降级到 v22 LTS。
-5. **dist/main.js 依赖 git 传输**: 易损坏（曾变成 0 字节），应用 Docker 镜像替代。
-6. **前端 mock 数据**: AnalyticsView 和 DashboardView 的图表已接真实 API，但数据空时显示不佳。
-7. **`nest build` 在 ECS 上失败**: `@nestjs/cli` 在 `node_modules/.bin/` 缺失，需用 `npx nest build` 本地构建。
+1. **UploaderModule**: 已从 app.module.ts 移除（ECS 无 Chromium，不可用）
+2. **源码恢复**: backend/src 已从 git 历史恢复 102 文件，`tsc --noEmit` 通过
+3. **ECS Node.js v24**: 奇数版本，建议长期降级到 v22 LTS
+4. **ECS 内存**: 1.7GB + 4GB swap，同时运行 NestJS + PostgreSQL + Redis + cloudflared 处于临界状态
+5. **前端 mock 数据**: Dashboard 账号为空时显示不佳
+6. **_debug_archive/**: 213 个历史临调脚本已归档，可安全删除
 
 ---
 
