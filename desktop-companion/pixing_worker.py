@@ -107,74 +107,168 @@ async def _execute_task(task: dict):
             print(f"[PixingWorker] 打开 {PIXING_EDU_URL}")
             await page.goto(PIXING_EDU_URL, wait_until="domcontentloaded", timeout=30000)
             await page.wait_for_timeout(3000)
+            # 等页面完全加载（SPA 需要 JS 渲染）
+            await page.wait_for_load_state("networkidle")
+            await page.wait_for_timeout(2000)
 
-            # ── 第2步：选老师 ──
+            # ── 第2步：点击"视频创作"按钮 ──
+            print(f"[PixingWorker] 点击视频创作")
+            for btn_text in ["视频创作", "创建视频", "新建视频", "创作"]:
+                try:
+                    await page.click(f"text={btn_text}", timeout=5000)
+                    print(f"[PixingWorker] 点击了 '{btn_text}'")
+                    break
+                except:
+                    continue
+            await page.wait_for_timeout(2000)
+
+            # ── 第3步：选择老师形象 ──
             print(f"[PixingWorker] 选择老师: {teacher}")
-            # TODO: 根据实际披星教育页面结构调整选择器
-            # 示例：点击老师选择按钮，输入老师名字，点击确认
+            # 点击老师选择区域
+            for sel in ['text=选择老师', 'text=老师形象', '[placeholder*="老师"]', '.teacher-select', '.teacher-item']:
+                try:
+                    await page.click(sel, timeout=3000)
+                    break
+                except:
+                    continue
+            await page.wait_for_timeout(1000)
+            # 在弹出的列表中找到并点击对应老师
             try:
-                # 尝试找到包含老师名字的元素并点击
                 await page.click(f"text={teacher}", timeout=5000)
+                print(f"[PixingWorker] 已选择老师: {teacher}")
             except:
-                # 备选：通过搜索框输入
-                search_input = await page.query_selector('input[placeholder*="老师"], input[placeholder*="选择"]')
-                if search_input:
-                    await search_input.fill(teacher)
-                    await page.wait_for_timeout(1000)
+                # 备选：搜索老师名字
+                search = await page.query_selector('input[placeholder*="搜索"], input[placeholder*="老师"]')
+                if search:
+                    await search.fill(teacher)
+                    await page.wait_for_timeout(1500)
                     await page.click(f"text={teacher}", timeout=5000)
             await page.wait_for_timeout(2000)
 
-            # ── 第3步：输入文案 ──
-            print(f"[PixingWorker] 输入文案")
-            text_input = await page.query_selector('textarea, [contenteditable="true"]')
+            # ── 第4步：选择跟老师同名的音频 ──
+            print(f"[PixingWorker] 选择音频: {teacher}")
+            for sel in ['text=选择音频', 'text=音频', '[placeholder*="音频"]', '.audio-select']:
+                try:
+                    await page.click(sel, timeout=3000)
+                    break
+                except:
+                    continue
+            await page.wait_for_timeout(1000)
+            # 选择同名音频
+            try:
+                await page.click(f"text={teacher}", timeout=5000)
+                print(f"[PixingWorker] 已选择音频: {teacher}")
+            except:
+                print(f"[PixingWorker] 警告: 未找到同名音频，跳过")
+            await page.wait_for_timeout(2000)
+
+            # ── 第5步：粘贴文案 ──
+            print(f"[PixingWorker] 输入文案 ({len(text)}字)")
+            text_input = await page.query_selector('textarea, [contenteditable="true"], .editor, .text-input')
             if text_input:
                 await text_input.click()
-                await text_input.fill(text)
-            await page.wait_for_timeout(1000)
+                await page.wait_for_timeout(500)
+                # 用 clipboard 方式粘贴（更可靠处理长文本）
+                await page.evaluate('(t) => navigator.clipboard.writeText(t)', text)
+                await page.keyboard.press('Control+v')
+            await page.wait_for_timeout(1500)
 
-            # ── 第4步：合成视频 ──
-            print(f"[PixingWorker] 触发视频合成")
-            # 找"生成"/"合成"/"开始"按钮
-            for btn_text in ["生成视频", "合成", "开始生成", "创建视频", "提交"]:
+            # ── 第6步：点击合成视频 ──
+            print(f"[PixingWorker] 点击合成视频")
+            for btn_text in ["合成视频", "合成", "开始合成", "生成视频"]:
                 try:
                     await page.click(f"text={btn_text}", timeout=3000)
                     print(f"[PixingWorker] 点击了 '{btn_text}'")
                     break
                 except:
                     continue
-            await page.wait_for_timeout(5000)
+            await page.wait_for_timeout(3000)
 
-            # ── 第5步：等待合成完成 + 下载 ──
+            # ── 第7步：选择"1.0中级训练" → 点击"去合成" ──
+            print(f"[PixingWorker] 选择 1.0中级训练 → 去合成")
+            synth_btn = None
+            try:
+                mid_level = await page.query_selector('text=1.0中级训练')
+                if mid_level:
+                    parent = await mid_level.evaluate_handle('el => el.closest("div,li,tr,[class*=\\"item\\"],[class*=\\"card\\"],[class*=\\"row\\"]")')
+                    if parent:
+                        synth_btn = await parent.query_selector('text=去合成')
+                        if synth_btn:
+                            await synth_btn.click()
+                            print(f"[PixingWorker] 已点击 1.0中级训练 的去合成")
+            except:
+                pass
+            if not synth_btn:
+                try:
+                    await page.click('text=去合成', timeout=3000)
+                    print(f"[PixingWorker] 直接点击了去合成")
+                except:
+                    print(f"[PixingWorker] 警告: 未找到去合成按钮")
+            await page.wait_for_timeout(3000)
+
+            # ── 第7步：等待合成完成 + 获取视频 ──
             print(f"[PixingWorker] 等待视频合成...")
             DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-            # 等最多10分钟
-            for i in range(120):
+            for i in range(240):  # 最多等20分钟
                 await page.wait_for_timeout(5000)
-                # 检查是否有下载按钮或完成提示
+                # 检查是否有下载/完成提示
+                video_url = None
                 try:
-                    download_btn = await page.query_selector('a[download], [class*="download"], text=下载')
-                    if download_btn:
-                        print(f"[PixingWorker] 检测到下载按钮")
-                        # 获取视频 URL
-                        video_url = await download_btn.get_attribute("href") or ""
-                        if video_url:
-                            update_task(task_id, status="completed", videoUrl=video_url)
-                            print(f"[PixingWorker] 视频链接: {video_url}")
+                    # 查找视频元素或下载按钮
+                    video_el = await page.query_selector('video, [class*="video"], [class*="player"]')
+                    if video_el:
+                        video_url = await video_el.get_attribute("src") or ""
+                    if not video_url:
+                        dl = await page.query_selector('a[download], [class*="download"], text=下载')
+                        if dl:
+                            video_url = await dl.get_attribute("href") or ""
+                except:
+                    pass
+                if video_url:
+                    update_task(task_id, status="completed", videoUrl=video_url)
+                    print(f"[PixingWorker] 视频完成: {video_url[:80]}")
+                    break
+                # 检查是否失败
+                try:
+                    err = await page.query_selector('[class*="error"], text=失败, text=错误')
+                    if err:
+                        err_text = await err.inner_text()
+                        update_task(task_id, status="failed", error=err_text[:500])
+                        print(f"[PixingWorker] 合成失败: {err_text[:100]}")
                         break
                 except:
                     pass
-                if i % 12 == 0:
+                if i % 24 == 0:
                     print(f"[PixingWorker] 仍在等待... ({i * 5}s)")
 
-            # ── 第6步：字幕处理 ──
-            # 尝试获取/生成字幕
+            # ── 第8步：字幕 ──
             srt_content = None
+            # 方式1：从页面提取字幕
             try:
-                srt_elem = await page.query_selector('[class*="subtitle"], [class*="srt"], pre')
+                # 查找字幕文本区域
+                srt_elem = await page.query_selector('[class*="subtitle"], [class*="srt"], pre, text=字幕内容')
                 if srt_elem:
                     srt_content = await srt_elem.inner_text()
+                    print(f"[PixingWorker] 从页面提取字幕: {len(srt_content)}字")
             except:
                 pass
+            # 方式2：尝试下载字幕文件
+            if not srt_content:
+                try:
+                    srt_link = await page.query_selector('a[href*=".srt"], a[href*=".vtt"], text=下载字幕')
+                    if srt_link:
+                        srt_url = await srt_link.get_attribute("href")
+                        if srt_url:
+                            import requests as req
+                            r = req.get(srt_url, timeout=30)
+                            srt_content = r.text
+                            print(f"[PixingWorker] 下载字幕文件: {len(srt_content)}字")
+                except:
+                    pass
+            # 方式3：用输入文案自动生成 SRT（中文 ~4字/秒）
+            if not srt_content:
+                srt_content = _text_to_srt(text)
+                print(f"[PixingWorker] 自动生成字幕: {len(srt_content)}字")
 
             if srt_content:
                 update_task(task_id, srtContent=srt_content)
@@ -229,6 +323,42 @@ def start_worker():
     t = threading.Thread(target=worker_loop, daemon=True, name="PixingWorker")
     t.start()
     print("[PixingWorker] 线程已启动")
+
+
+def _text_to_srt(text: str, chars_per_sec: int = 4, max_line: int = 20) -> str:
+    """用输入文案自动生成 SRT 字幕（中文 ~4字/秒）"""
+    import re
+    # 按标点分句
+    sentences = re.split(r'([。！？\n])', text)
+    segments = []
+    current = ""
+    for part in sentences:
+        current += part
+        if part in '。！？\n' and len(current) > 2:
+            segments.append(current.strip())
+            current = ""
+    if current.strip():
+        segments.append(current.strip())
+
+    srt = []
+    start_sec = 0
+    for i, seg in enumerate(segments):
+        if not seg:
+            continue
+        duration = max(1, len(seg) / chars_per_sec)
+        end_sec = start_sec + duration
+
+        def fmt(sec):
+            h = int(sec // 3600)
+            m = int((sec % 3600) // 60)
+            s = int(sec % 60)
+            ms = int((sec - int(sec)) * 1000)
+            return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
+
+        srt.append(f"{i + 1}\n{fmt(start_sec)} --> {fmt(end_sec)}\n{seg}\n")
+        start_sec = end_sec
+
+    return "\n".join(srt)
 
 
 def stop_worker():
