@@ -37,7 +37,7 @@ var pendingRoute = '\n' +
 '        return res.status(401).json({ code: 401, message: \"Unauthorized\" });\n' +
 '      }\n' +
 '      var token = authHeader.split(\" \")[1];\n' +
-'      var secret = process.env.JWT_SECRET || \"97c8b81752478a5567e8383274541183689a3baca2bc11947ba7a7ed9dc30117ef44002f6e0ce856ddf6da652110e3049210dad8f9f9f9a099831225b01a0fa9\";\n' +
+'      var secret = process.env.JWT_SECRET;\n' +
 '      var decoded = jwt.verify(token, secret);\n' +
 '      var userId = decoded.sub || decoded.id;\n' +
 '      if (!userId) return res.status(401).json({ code: 401, message: \"Invalid token\" });\n' +

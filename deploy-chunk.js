@@ -1,7 +1,8 @@
+require('./load-secrets');
 const Core = require('@alicloud/pop-core');
 const client = new Core({
-  accessKeyId: 'LTAI5tAA3vrwKomAL4mqq2c2',
-  accessKeySecret: 'lz1LJwW9pDwEC2DXU2optOIbXcDeIHv',
+  accessKeyId: process.env.ALI_ACCESS_KEY_ID,
+  accessKeySecret: process.env.ALI_ACCESS_KEY_SECRET,
   endpoint: 'https://ecs.cn-guangzhou.aliyuncs.com',
   apiVersion: '2014-05-26',
 });
@@ -10,16 +11,16 @@ async function run(script) {
   const b64 = Buffer.from(script).toString('base64');
   if (b64.length > 24000) throw new Error('Script too big: ' + b64.length);
   const c = await client.request('CreateCommand', {
-    RegionId: 'cn-guangzhou', Name: 'dc-' + Date.now(),
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou', Name: 'dc-' + Date.now(),
     Type: 'RunShellScript', CommandContent: b64, ContentEncoding: 'Base64', Timeout: '120',
   });
   const inv = await client.request('InvokeCommand', {
-    RegionId: 'cn-guangzhou', CommandId: c.CommandId,
-    'InstanceId.1': 'i-7xvb9wno2duq8msd35l1', Timed: false,
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou', CommandId: c.CommandId,
+    'InstanceId.1': process.env.ECS_INSTANCE_ID, Timed: false,
   });
   await new Promise(r => setTimeout(r, 15000));
   const res = await client.request('DescribeInvocationResults', {
-    RegionId: 'cn-guangzhou', InvokeId: inv.InvokeId,
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou', InvokeId: inv.InvokeId,
   });
   const o = res.Invocation?.InvocationResults?.InvocationResult?.[0];
   console.log(o?.InvocationStatus, 'Exit:', o?.ExitCode);

@@ -1,7 +1,8 @@
+require('./load-secrets');
 const Core = require('@alicloud/pop-core');
 const client = new Core({
-  accessKeyId: 'LTAI5tAA3vrwKomAL4mqq2c2',
-  accessKeySecret: 'lz1LJwW9pDwEC2DXU2optOIbXcDeIHv',
+  accessKeyId: process.env.ALI_ACCESS_KEY_ID,
+  accessKeySecret: process.env.ALI_ACCESS_KEY_SECRET,
   endpoint: 'https://ecs.cn-guangzhou.aliyuncs.com',
   apiVersion: '2014-05-26',
 });
@@ -31,8 +32,8 @@ echo "Nginx reloaded"
 
 async function main() {
   const result = await client.request('RunCommand', {
-    RegionId: 'cn-guangzhou',
-    InstanceId: ['i-7xvb9wno2duq8msd35l1'],
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou',
+    InstanceId: [process.env.ECS_INSTANCE_ID],
     Type: 'RunShellScript',
     CommandContent: script,
     Timeout: 90,
@@ -42,7 +43,7 @@ async function main() {
   for (let i = 0; i < 25; i++) {
     await new Promise(r => setTimeout(r, 3000));
     const inv = await client.request('DescribeInvocationResults', {
-      RegionId: 'cn-guangzhou', CommandId: result.CommandId, InstanceId: 'i-7xvb9wno2duq8msd35l1',
+      RegionId: process.env.ALI_REGION || 'cn-guangzhou', CommandId: result.CommandId, InstanceId: process.env.ECS_INSTANCE_ID,
     });
     const results = inv.Invocation?.InvocationResults?.InvocationResult;
     const res = Array.isArray(results) ? results[0] : results;

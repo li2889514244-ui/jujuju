@@ -1,10 +1,11 @@
+require('./load-secrets');
 const fs = require('fs');
 const path = require('path');
 const Core = require('@alicloud/pop-core');
 
 const client = new Core({
-  accessKeyId: 'LTAI5tAA3vrwKomAL4mqq2c2',
-  accessKeySecret: 'lz1LJwW9pDwEC2DXU2optOIbXcDeIHv',
+  accessKeyId: process.env.ALI_ACCESS_KEY_ID,
+  accessKeySecret: process.env.ALI_ACCESS_KEY_SECRET,
   endpoint: 'https://ecs.cn-guangzhou.aliyuncs.com',
   apiVersion: '2014-05-26',
 });
@@ -51,7 +52,7 @@ ls /var/www/matrixflow/index.html && echo "Frontend OK"
   console.log(`Script size: ${b64.length} chars`);
 
   const c = await client.request('CreateCommand', {
-    RegionId: 'cn-guangzhou',
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou',
     Name: 'direct-deploy-' + Date.now(),
     Type: 'RunShellScript',
     CommandContent: b64,
@@ -62,9 +63,9 @@ ls /var/www/matrixflow/index.html && echo "Frontend OK"
   console.log('CommandId:', c.CommandId);
 
   const inv = await client.request('InvokeCommand', {
-    RegionId: 'cn-guangzhou',
+    RegionId: process.env.ALI_REGION || 'cn-guangzhou',
     CommandId: c.CommandId,
-    'InstanceId.1': 'i-7xvb9wno2duq8msd35l1',
+    'InstanceId.1': process.env.ECS_INSTANCE_ID,
     Timed: false,
   });
   console.log('InvokeId:', inv.InvokeId);
@@ -73,7 +74,7 @@ ls /var/www/matrixflow/index.html && echo "Frontend OK"
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 10000));
     const res = await client.request('DescribeInvocationResults', {
-      RegionId: 'cn-guangzhou',
+      RegionId: process.env.ALI_REGION || 'cn-guangzhou',
       InvokeId: inv.InvokeId,
     });
     const result = res.Invocation?.InvocationResults?.InvocationResult?.[0];

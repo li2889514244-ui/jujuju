@@ -79,6 +79,9 @@ migrate-monet.js
 !start.bat
 !install.bat
 
+# 密钥文件（含生产凭证，禁止提交）
+secrets.env
+
 # 部署脚本（含阿里云凭证，禁止提交）
 deploy-ali.js
 deploy-ali.ps1
@@ -92,6 +95,17 @@ check-cmd.js
 test-cmd.js
 gen-secrets.js
 genkey.bat
+deploy-ecs.py
+rotate_ecs.py
+rotate_ecs.ps1
+fix-ecs.js
+deploy-chunk.js
+deploy-direct.js
+deploy-fast.js
+deploy-pixing.js
+deploy-pixing-master.js
+deploy-backend-build.js
+build-backend.js
 
 # 自动生成文件
 frontend/src/auto-imports.d.ts
