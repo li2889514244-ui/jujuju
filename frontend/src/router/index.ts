@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
         path: 'monetization',
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
-        meta: { title: '变现中心', icon: 'Money' },
+        meta: { title: '变现中心', icon: 'Money', hidden: true },
       },
       {
         path: 'report',
@@ -112,7 +112,7 @@ const routes: RouteRecordRaw[] = [
         path: 'pixing-video',
         name: 'PixingVideo',
         component: () => import('@/views/pixing-video/PixingVideoView.vue'),
-        meta: { title: '数字人视频', icon: 'VideoCamera' },
+        meta: { title: '数字人视频', icon: 'VideoCamera', hidden: true },
       },
     ],
   },
