@@ -1535,7 +1535,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     )
                     existing_id = None
                     try:
-                        for acc in (check_resp.json().get('data',{}).get('accounts',[]) or []):
+                        for acc in ((check_resp.json().get('data') or {}).get('accounts') or []):
                             if acc.get('platformUserId') == platform_uid or acc.get('nickname') == nickname:
                                 existing_id = acc.get('id')
                                 break
@@ -1567,7 +1567,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     if not account_id:
                         # Try to find by platformUserId
                         check2 = requests.get(f"{api_url.rstrip('/')}/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=15)
-                        for acc in (check2.json().get('data',{}).get('accounts',[]) or []):
+                        for acc in ((check2.json().get('data') or {}).get('accounts') or []):
                             if acc.get('platformUserId') == platform_uid:
                                 account_id = acc.get('id'); break
 
