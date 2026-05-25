@@ -11,8 +11,8 @@ const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'matrixflow-jwt-secret-key';
-const COOKIE_KEY = (process.env.COOKIE_ENCRYPTION_KEY || 'matrixflow-cookie-key-32chars!!').padEnd(32).slice(0, 32);
+const JWT_SECRET = process.env.JWT_SECRET || '97c8b81752478a5567e8383274541183689a3baca2bc11947ba7a7ed9dc30117ef44002f6e0ce856ddf6da652110e3049210dad8f9f9f9a099831225b01a0fa9';
+const COOKIE_KEY = (process.env.COOKIE_ENCRYPTION_KEY || 'mf-cookie-enc-key-2026-secure!!').padEnd(32).slice(0, 32);
 const JWT_EXPIRES = process.env.JWT_ACCESS_EXPIRES || '7d';
 
 app.use(helmet({ crossOriginResourcePolicy: false }));

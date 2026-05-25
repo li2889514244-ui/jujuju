@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'matrixflow-jwt-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || '97c8b81752478a5567e8383274541183689a3baca2bc11947ba7a7ed9dc30117ef44002f6e0ce856ddf6da652110e3049210dad8f9f9f9a099831225b01a0fa9';
 
 function authMiddleware(req, res, next) {
   const auth = req.headers.authorization;
