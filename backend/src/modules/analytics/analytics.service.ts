@@ -49,6 +49,35 @@ export class AnalyticsService {
   /**
    * 鑾峰彇姣忔棩缁熻鏁版嵁
    */
+  async createManualMonetization(userId: string, dto: {
+    date: string; platform: string; revenue?: number; gmv?: number;
+    orders?: number; buyerCount?: number; commission?: number;
+    avgOrderValue?: number;
+  }) {
+    const account = await this.prisma.account.findFirst({
+      where: { userId, platform: dto.platform as Platform },
+      select: { id: true },
+    });
+    if (!account) throw new Error('未找到该平台的账号');
+
+    const date = new Date(dto.date);
+    date.setHours(0, 0, 0, 0);
+
+    const data: any = {};
+    if (dto.revenue !== undefined) data.revenue = dto.revenue;
+    if (dto.gmv !== undefined) data.gmv = dto.gmv;
+    if (dto.orders !== undefined) data.orders = dto.orders;
+    if (dto.buyerCount !== undefined) data.buyerCount = dto.buyerCount;
+    if (dto.commission !== undefined) data.commission = dto.commission;
+    if (dto.avgOrderValue !== undefined) data.avgOrderValue = dto.avgOrderValue;
+
+    return this.prisma.dailyStats.upsert({
+      where: { accountId_date: { accountId: account.id, date } },
+      create: { accountId: account.id, date, platform: dto.platform as Platform, ...data },
+      update: data,
+    });
+  }
+
   async getDailyStats(dto: QueryAnalyticsDto) {
     const where: Prisma.DailyStatsWhereInput = {};
 

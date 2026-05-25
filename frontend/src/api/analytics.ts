@@ -90,6 +90,14 @@ export const analyticsApi = {
     }>('/analytics/monetization', { days })
   },
 
+  createManualMonetization(data: {
+    date: string; platform: string; revenue?: number; gmv?: number;
+    orders?: number; buyerCount?: number; commission?: number;
+    avgOrderValue?: number;
+  }) {
+    return post('/analytics/monetization/manual', data)
+  },
+
   // 触发桌面伴侣采集真实数据（伴侣在本地 localhost:5409 运行）
   async triggerRealDataCollection() {
     try {

@@ -1,9 +1,12 @@
 import {
   Controller,
   Get,
+  Post,
+  Body,
   Query,
   UseGuards,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -99,6 +102,20 @@ export class AnalyticsController {
   @ApiOperation({ summary: '数据同比环比对比（周环比、月环比、年同比）' })
   async getComparison(@CurrentUser('id') userId: string) {
     return this.analyticsService.getComparison(userId);
+  }
+
+  @Post('monetization/manual')
+  @ApiOperation({ summary: '手动录入变现数据' })
+  async createManualMonetization(
+    @CurrentUser('id') userId: string,
+    @Body() dto: {
+      date: string; platform: string; revenue?: number; gmv?: number;
+      orders?: number; buyerCount?: number; commission?: number;
+      avgOrderValue?: number;
+    },
+  ) {
+    if (!dto.date || !dto.platform) throw new BadRequestException('日期和平台不能为空');
+    return this.analyticsService.createManualMonetization(userId, dto);
   }
 
   @Get('views-ranking')

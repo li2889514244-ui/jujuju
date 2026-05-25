@@ -13,8 +13,44 @@
         <el-form-item>
           <el-button type="primary" @click="refreshAll" :loading="loading">查询</el-button>
         </el-form-item>
+        <el-form-item>
+          <el-button type="success" @click="openManualDialog">手动录入</el-button>
+        </el-form-item>
       </el-form>
     </el-card>
+
+    <!-- 手动录入弹窗 -->
+    <el-dialog v-model="manualDialogVisible" title="手动录入变现数据" width="500px">
+      <el-form :model="manualForm" label-width="80px">
+        <el-form-item label="日期" required>
+          <el-date-picker v-model="manualForm.date" type="date" placeholder="选择日期" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="平台" required>
+          <el-select v-model="manualForm.platform" placeholder="选择平台" style="width:100%">
+            <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="收入(¥)">
+          <el-input v-model.number="manualForm.revenue" type="number" placeholder="0" />
+        </el-form-item>
+        <el-form-item label="GMV(¥)">
+          <el-input v-model.number="manualForm.gmv" type="number" placeholder="0" />
+        </el-form-item>
+        <el-form-item label="订单数">
+          <el-input v-model.number="manualForm.orders" type="number" placeholder="0" />
+        </el-form-item>
+        <el-form-item label="买家数">
+          <el-input v-model.number="manualForm.buyerCount" type="number" placeholder="0" />
+        </el-form-item>
+        <el-form-item label="佣金(¥)">
+          <el-input v-model.number="manualForm.commission" type="number" placeholder="0" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="manualDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="manualSubmitting" @click="submitManual">提交</el-button>
+      </template>
+    </el-dialog>
 
     <!-- KPI Cards -->
     <el-row :gutter="20" class="monetization__overview">
@@ -95,6 +131,50 @@ const days = ref(30)
 const loading = ref(false)
 const trendMetric = ref('revenue')
 const data = ref<any>(null)
+
+// Manual entry dialog
+const manualDialogVisible = ref(false)
+const manualSubmitting = ref(false)
+const manualForm = ref({
+  date: '',
+  platform: '',
+  revenue: null as number | null,
+  gmv: null as number | null,
+  orders: null as number | null,
+  buyerCount: null as number | null,
+  commission: null as number | null,
+})
+
+function openManualDialog() {
+  manualForm.value = { date: '', platform: '', revenue: null, gmv: null, orders: null, buyerCount: null, commission: null }
+  manualDialogVisible.value = true
+}
+
+async function submitManual() {
+  if (!manualForm.value.date || !manualForm.value.platform) {
+    ElMessage.warning('请填写日期和平台')
+    return
+  }
+  manualSubmitting.value = true
+  try {
+    await analyticsApi.createManualMonetization({
+      date: dayjs(manualForm.value.date).format('YYYY-MM-DD'),
+      platform: manualForm.value.platform,
+      ...(manualForm.value.revenue !== null && { revenue: manualForm.value.revenue }),
+      ...(manualForm.value.gmv !== null && { gmv: manualForm.value.gmv }),
+      ...(manualForm.value.orders !== null && { orders: manualForm.value.orders }),
+      ...(manualForm.value.buyerCount !== null && { buyerCount: manualForm.value.buyerCount }),
+      ...(manualForm.value.commission !== null && { commission: manualForm.value.commission }),
+    })
+    ElMessage.success('录入成功')
+    manualDialogVisible.value = false
+    refreshAll()
+  } catch (e: any) {
+    ElMessage.error(e?.message || '录入失败')
+  } finally {
+    manualSubmitting.value = false
+  }
+}
 
 const kpiCards = computed(() => {
   const d = data.value
