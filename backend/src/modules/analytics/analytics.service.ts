@@ -10,6 +10,42 @@ export class AnalyticsService {
 
   constructor(private prisma: PrismaService) {}
 
+  async getFollowersTrend(userId: string, days: number = 7) {
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    const accounts = await this.prisma.account.findMany({
+      where: { userId },
+      select: { id: true },
+    });
+    const accountIds = accounts.map((a) => a.id);
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { gte: startDate },
+      },
+      select: { date: true, followers: true },
+      orderBy: { date: 'asc' },
+    });
+
+    const byDate: Record<string, number> = {};
+    for (const s of stats) {
+      const key = s.date.toISOString().slice(0, 10);
+      byDate[key] = (byDate[key] || 0) + s.followers;
+    }
+
+    const result = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      result.push({ value: byDate[key] || 0 });
+    }
+    return result;
+  }
+
   /**
    * 鑾峰彇姣忔棩缁熻鏁版嵁
    */

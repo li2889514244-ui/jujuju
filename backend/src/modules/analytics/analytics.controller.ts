@@ -27,6 +27,15 @@ export class AnalyticsController {
     private readonly prisma: PrismaService,
   ) {}
 
+  @Get('followers/trend')
+  @ApiOperation({ summary: '获取粉丝增长趋势' })
+  async getFollowerTrend(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+  ) {
+    return this.analyticsService.getFollowersTrend(userId, days || 7);
+  }
+
   @Get('overview')
   @ApiOperation({ summary: '获取数据概览' })
   async getOverview(@CurrentUser('id') userId: string) {
