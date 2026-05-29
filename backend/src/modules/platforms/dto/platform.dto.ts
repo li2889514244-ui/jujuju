@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsInt, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, IsInt, Min, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
@@ -34,6 +34,54 @@ export class BatchCollectDto {
   @IsOptional()
   @IsEnum(['account', 'content', 'daily'])
   type?: 'account' | 'content' | 'daily';
+}
+
+export class ReportMetricsDto {
+  @ApiProperty({ description: '账号ID' })
+  @IsString()
+  accountId!: string;
+
+  @ApiProperty({ description: '指标数据' })
+  @IsObject()
+  metrics!: Record<string, any>;
+
+  @ApiPropertyOptional({ description: '指定日期 (YYYY-MM-DD)，默认今天' })
+  @IsOptional()
+  @IsString()
+  date?: string;
+}
+
+export class ReportPostStatItem {
+  @ApiPropertyOptional({ description: '标题' })
+  @IsOptional()
+  @IsString()
+  title?: string;
+
+  @ApiPropertyOptional({ description: '播放量' })
+  @IsOptional()
+  views?: number;
+
+  @ApiPropertyOptional({ description: '点赞数' })
+  @IsOptional()
+  likes?: number;
+
+  @ApiPropertyOptional({ description: '评论数' })
+  @IsOptional()
+  comments?: number;
+
+  @ApiPropertyOptional({ description: '分享数' })
+  @IsOptional()
+  shares?: number;
+}
+
+export class ReportPostStatsDto {
+  @ApiProperty({ description: '账号ID' })
+  @IsString()
+  accountId!: string;
+
+  @ApiProperty({ description: '帖子列表', type: [ReportPostStatItem] })
+  @IsArray()
+  posts!: ReportPostStatItem[];
 }
 
 export class PlatformFilterDto {
