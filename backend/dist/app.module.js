@@ -28,6 +28,7 @@ const scheduler_module_1 = require("./modules/scheduler/scheduler.module");
 const content_review_module_1 = require("./modules/content-review/content-review.module");
 const notifications_module_1 = require("./modules/notifications/notifications.module");
 const pixing_video_module_1 = require("./modules/pixing-video/pixing-video.module");
+const mcp_module_1 = require("./modules/mcp/mcp.module");
 const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
 const jwt_config_1 = require("./config/jwt.config");
 const redis_config_1 = require("./config/redis.config");
@@ -65,6 +66,7 @@ exports.AppModule = AppModule = __decorate([
             content_review_module_1.ContentReviewModule,
             notifications_module_1.NotificationsModule,
             pixing_video_module_1.PixingVideoModule,
+            mcp_module_1.McpModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },

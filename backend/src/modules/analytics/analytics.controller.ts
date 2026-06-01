@@ -4,15 +4,19 @@ import {
   Post,
   Body,
   Query,
+  Param,
   UseGuards,
   ForbiddenException,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
   ApiBearerAuth,
   ApiQuery,
+  ApiParam,
 } from '@nestjs/swagger';
 import { AnalyticsService } from './analytics.service';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
@@ -35,8 +39,9 @@ export class AnalyticsController {
   async getFollowerTrend(
     @CurrentUser('id') userId: string,
     @Query('days') days?: number,
+    @Query('platform') platform?: string,
   ) {
-    return this.analyticsService.getFollowersTrend(userId, days || 7);
+    return this.analyticsService.getFollowersTrend(userId, days || 7, platform);
   }
 
   @Get('overview')
@@ -133,6 +138,106 @@ export class AnalyticsController {
       limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
       period: period || 'all',
       platform,
+    });
+  }
+
+  // ─── 以下为补全的 7 个缺失端点 ───
+
+  @Get('likes/trend')
+  @ApiOperation({ summary: '获取点赞增长趋势' })
+  async getLikesTrend(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.getLikesTrend(userId, days || 7, platform);
+  }
+
+  @Get('publish-effect')
+  @ApiOperation({ summary: '获取发布效果数据' })
+  async getPublishEffect(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+    @Query('contentId') contentId?: string,
+  ) {
+    return this.analyticsService.getPublishEffect(userId, days, contentId);
+  }
+
+  @Get('engagement')
+  @ApiOperation({ summary: '获取互动率趋势' })
+  async getEngagementRate(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.getEngagementRate(userId, days || 7, platform);
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: '导出数据报表（CSV/JSON）' })
+  async exportReport(
+    @CurrentUser('id') userId: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('format') format?: string,
+    @Res() res?: Response,
+  ) {
+    const result = await this.analyticsService.exportReport(
+      userId, startDate, endDate, format || 'json',
+    );
+    if (format === 'csv' && res) {
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="analytics-report-${new Date().toISOString().slice(0, 10)}.csv"`,
+      );
+      // Add BOM for Excel UTF-8 compatibility
+      res.send('\uFEFF' + result);
+      return;
+    }
+    return result;
+  }
+
+  @Get('monetization')
+  @ApiOperation({ summary: '获取变现数据中心数据' })
+  async getMonetization(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.getMonetization(userId, days || 30, platform);
+  }
+
+  @Get('account/:id')
+  @ApiOperation({ summary: '获取单个账号分析数据' })
+  @ApiParam({ name: 'id', description: '账号ID' })
+  async getAccountAnalytics(
+    @Param('id') accountId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: string,
+  ) {
+    await this.verifyAccountOwnership(accountId, userId, userRole);
+    return this.analyticsService.getAccountAnalytics(accountId);
+  }
+
+  @Get('account/:id/posts')
+  @ApiOperation({ summary: '获取单个账号的内容列表' })
+  @ApiParam({ name: 'id', description: '账号ID' })
+  async getAccountPosts(
+    @Param('id') accountId: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('role') userRole: string,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+  ) {
+    await this.verifyAccountOwnership(accountId, userId, userRole);
+    return this.analyticsService.getAccountPosts(accountId, {
+      page: page || 1,
+      pageSize: pageSize || 20,
+      sortBy: sortBy || 'createdAt',
+      sortOrder: sortOrder || 'desc',
     });
   }
 

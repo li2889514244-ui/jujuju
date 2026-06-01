@@ -2,13 +2,14 @@
 披星云桌面伴侣 v2.4 — 带 UI 界面，一键扫码 + 自动数据采集
 用法: python companion_app.py
 """
-import asyncio, json, os, re, sys, threading, time, uuid, base64
+import asyncio, json, os, re, sys, tempfile, threading, time, uuid, base64
 from pathlib import Path
 from queue import Queue, Empty
-from flask import Flask, request, jsonify, Response, make_response
+from flask import Flask, request, jsonify, Response, make_response, send_from_directory
 from pixing_worker import start_worker, stop_worker, get_status as get_worker_status
+from chrome_cdp import ChromeCDP
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
 # Use EXE directory or script directory for persistent config
 if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys.executable).parent.resolve()
@@ -61,6 +62,11 @@ def _find_browser():
 _BROWSER_PATH, _BROWSER_CHANNEL = _find_browser()
 print(f'[Browser] path={_BROWSER_PATH} channel={_BROWSER_CHANNEL}')
 
+# ── CDP 模式 Chrome 实例 ───────────────────────────────────────
+_CDP_PORT = 9222
+_cdp = ChromeCDP(port=_CDP_PORT, chrome_path=_BROWSER_PATH)
+_CDP_URL = _cdp.get_url()
+
 
 def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
     """Return kwargs for chromium.launch based on detected browser"""
@@ -106,110 +112,246 @@ async def _get_persistent_context(headless: bool = True, extra_args: list = None
 # ── HTML UI ──────────────────────────────────────────────────
 UI_HTML = r'''<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<title>披星云桌面伴侣</title>
+<title>披星云伴侣</title>
 <style>
+:root{--sidebar-w:220px;--sidebar-bg:#141829;--sidebar-hover:#1e2640;--sidebar-active:#2a3558;--accent:#4f6ef7;--accent-hover:#3d5bd9;--danger:#e05050;--success:#34c759;--text:#1d1d1f;--text2:#6e6e73;--border:#e5e5ea;--bg:#f2f2f7;--card-bg:#ffffff;--radius:6px}
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:"Microsoft YaHei","PingFang SC",sans-serif;background:#f0f2f5;color:#333;min-height:100vh}
-.header{background:linear-gradient(135deg,#667eea,#764ba2);color:#fff;padding:20px 32px;display:flex;align-items:center;gap:16px}
-.header h1{font-size:22px;font-weight:600}
-.dot{width:10px;height:10px;border-radius:50%;background:#4caf50;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
-.main{max-width:960px;margin:24px auto;padding:0 16px;display:grid;grid-template-columns:1fr 1fr;gap:20px}
-.card{background:#fff;border-radius:12px;padding:24px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
-.card h2{font-size:16px;margin-bottom:16px;color:#555;border-bottom:2px solid #667eea;padding-bottom:8px}
-.platforms{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.pbtn{border:2px solid #e8e8e8;border-radius:10px;padding:20px 12px;text-align:center;cursor:pointer;transition:.2s;background:#fafafa}
-.pbtn:hover{border-color:#667eea;background:#f0f0ff;transform:translateY(-2px)}
-.pbtn.active{border-color:#667eea;background:#eef0ff;box-shadow:0 0 0 3px rgba(102,126,234,.2)}
-.pbtn .icon{font-size:32px;margin-bottom:8px}
-.pbtn .name{font-size:14px;font-weight:600}
-.pbtn .hint{font-size:11px;color:#999;margin-top:4px}
-.scan-area{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;text-align:center}
-.scan-area img.qr{max-width:220px;border-radius:8px;border:2px solid #eee;margin-bottom:16px}
-.scan-area .tip{color:#666;font-size:14px;margin-bottom:12px}
-.scan-area .waiting{color:#999;font-size:13px}
-.scan-area .success{color:#4caf50;font-size:48px;margin-bottom:8px}
-.scan-area .error{color:#f44336;font-size:14px;margin-top:8px}
-.status-bar{max-width:960px;margin:20px auto;background:#fff;border-radius:12px;padding:16px 24px;box-shadow:0 2px 12px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px}
-.status-bar .ind{width:12px;height:12px;border-radius:50%}
-.status-bar .ind.on{background:#4caf50}.status-bar .ind.off{background:#f44336}
-.spinner{border:3px solid #e8e8e8;border-top:3px solid #667eea;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:16px auto}
-@keyframes spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}
-.progress{width:100%;height:6px;background:#e8e8e8;border-radius:3px;margin:12px 0;overflow:hidden}
-.progress .fill{height:100%;background:#667eea;border-radius:3px;transition:width .5s}
-.btn{background:#667eea;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;margin-top:12px}
-.btn:hover{background:#5a6fd6}
-.step{display:flex;align-items:center;gap:8px;padding:8px 0;color:#666;font-size:13px}
-.step .num{width:24px;height:24px;border-radius:50%;background:#667eea;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;user-select:none;-webkit-user-select:none;display:flex}
+
+/* ── Sidebar ── */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--sidebar-bg);color:#b0b8d0;display:flex;flex-direction:column;overflow:hidden}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:20px 18px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-logo .logo-icon{width:32px;height:32px;border-radius:var(--radius);background:linear-gradient(135deg,#4f6ef7,#7c5cfc);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;flex-shrink:0}
+.sidebar-logo .logo-text{font-size:15px;font-weight:600;color:#e8ecf4;letter-spacing:.5px}
+.sidebar-logo .logo-ver{font-size:10px;color:#6b7394;margin-left:auto}
+
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px}
+.sidebar-nav .nav-section{font-size:10px;text-transform:uppercase;color:#5b6388;padding:12px 10px 6px;letter-spacing:1px;font-weight:600}
+.sidebar-nav .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);cursor:pointer;transition:all .12s;margin-bottom:2px;font-size:13px}
+.sidebar-nav .nav-item:hover{background:var(--sidebar-hover);color:#d0d6ee}
+.sidebar-nav .nav-item.active{background:var(--sidebar-active);color:#fff;font-weight:500}
+.sidebar-nav .nav-item .plat-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+.sidebar-nav .nav-item .plat-name{flex:1}
+.sidebar-nav .nav-item .plat-badge{font-size:10px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:10px}
+
+.sidebar-bottom{padding:12px;border-top:1px solid rgba(255,255,255,.06)}
+.sidebar-status{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius);font-size:11px;color:#8890b0}
+.sidebar-status .ind{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-status .ind.on{background:var(--success);box-shadow:0 0 6px rgba(52,199,89,.5)}
+.sidebar-status .ind.off{background:#ff9500}
+.sidebar-footer-btns{display:flex;gap:6px;margin-top:8px}
+.sidebar-footer-btns button{flex:1;padding:6px 0;border:none;border-radius:var(--radius);font-size:11px;cursor:pointer;transition:.12s}
+.btn-collect{background:rgba(79,110,247,.15);color:#8ba4ff}
+.btn-collect:hover{background:rgba(79,110,247,.25)}
+.btn-pw{background:rgba(255,149,0,.12);color:#ffb84d}
+.btn-pw:hover{background:rgba(255,149,0,.2)}
+
+/* ── Content Area ── */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.content-toolbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--card-bg);border-bottom:1px solid var(--border);min-height:52px}
+.content-toolbar h2{font-size:15px;font-weight:600;color:var(--text)}
+.content-toolbar .online-dot{width:7px;height:7px;border-radius:50%;margin-left:auto}
+.content-body{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* ── Login Panel (centered) ── */
+.login-wrapper{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.login-card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:40px;width:380px;box-shadow:0 2px 20px rgba(0,0,0,.06)}
+.login-card .login-logo{text-align:center;margin-bottom:28px}
+.login-card .login-logo .li{font-size:36px;margin-bottom:8px}
+.login-card .login-logo h1{font-size:20px;font-weight:600;color:var(--text)}
+.login-card .login-logo p{font-size:12px;color:var(--text2);margin-top:4px}
+.login-card .field{margin-bottom:16px}
+.login-card .field label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.login-card .field input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;transition:.12s;font-family:inherit;background:#fafafa}
+.login-card .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,110,247,.12);background:#fff}
+.login-card .field-check{display:flex;align-items:center;gap:8px;margin-bottom:20px;font-size:12px;color:var(--text2);cursor:pointer}
+.login-card .field-check input{width:15px;height:15px;accent-color:var(--accent)}
+.login-card .login-btn{width:100%;padding:11px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:.12s;font-family:inherit}
+.login-card .login-btn:hover{background:var(--accent-hover)}
+.login-card .login-btn:disabled{opacity:.6;cursor:default}
+.login-card .login-err{color:var(--danger);font-size:12px;margin-top:10px;text-align:center}
+
+/* ── Main Workspace ── */
+.workspace{width:100%;max-width:640px}
+.workspace-empty{text-align:center;padding:60px 20px;color:var(--text2)}
+.workspace-empty .empty-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.workspace-empty h3{font-size:16px;color:var(--text);margin-bottom:8px}
+.workspace-empty p{font-size:13px;line-height:1.7}
+
+/* ── Status States ── */
+.scan-card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center}
+.scan-card .scan-title{font-size:15px;font-weight:600;margin-bottom:20px;color:var(--text)}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin:12px 0}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s}
+.step-list{text-align:left;display:inline-block}
+.step-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:var(--text2)}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.result-ok{font-size:40px;margin-bottom:12px}
+.result-ok.success{color:var(--success)}
+.result-msg{font-size:14px;margin-bottom:6px}
+.result-sub{font-size:12px;color:var(--text2)}
+.result-err{color:var(--danger);font-size:14px;margin-bottom:12px}
+
+.btn{display:inline-block;padding:9px 22px;border:none;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;transition:.12s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover{background:#2db84e}
+.btn-secondary{background:#e5e5ea;color:var(--text)}
+.btn-secondary:hover{background:#d5d5da}
+.btn-sm{padding:5px 12px;font-size:11px}
+.mt12{margin-top:12px}.mt8{margin-top:8px}
+
+/* ── Account List ── */
+.acct-list{margin-top:20px}
+.acct-list h4{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.acct-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f3;font-size:12px}
+.acct-row .acct-platform{background:var(--accent);color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:500;flex-shrink:0}
+.acct-row .acct-name{flex:1;color:var(--text);font-weight:500}
+.acct-row .acct-time{color:var(--text2);font-size:11px;flex-shrink:0}
+.acct-row .acct-del{color:var(--danger);font-size:11px;cursor:pointer;flex-shrink:0;padding:2px 6px;border-radius:3px}
+.acct-row .acct-del:hover{background:rgba(224,80,80,.1)}
+
+/* ── Cookie Alerts ── */
+.cookie-alert{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff8e1;border-radius:var(--radius);margin-top:6px;font-size:11px}
+.cookie-alert.warn{background:#fff3f3}
 </style></head><body>
-<div class="header"><div class="dot"></div><h1>披星云桌面伴侣</h1><span style="opacity:.7;font-size:13px" v-if="configured">已连接</span></div>
 
-<!-- Login panel -->
-<div class="login-panel" v-if="!configured" style="max-width:480px;margin:24px auto;background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 12px rgba(0,0,0,.08)">
-  <h2 style="margin-bottom:20px;color:#333">登录披星云</h2>
-  <div style="margin-bottom:14px"><label style="display:block;font-size:13px;color:#666;margin-bottom:4px">邮箱</label><input v-model="loginEmail" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px" placeholder="输入邮箱"></div>
-  <div style="margin-bottom:8px"><label style="display:block;font-size:13px;color:#666;margin-bottom:4px">密码</label><input v-model="loginPass" type="password" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px" placeholder="输入密码" @keyup.enter="doLogin"></div>
-  <div style="margin-bottom:20px"><label style="font-size:13px;color:#666;cursor:pointer;display:flex;align-items:center;gap:6px"><input type="checkbox" v-model="rememberPwd" style="width:16px;height:16px"> 记住密码（自动登录）</label></div>
-  <div v-if="loginError" style="color:#f44336;font-size:13px;margin-bottom:12px">{{loginError}}</div>
-  <button class="btn" style="width:100%;padding:12px;font-size:15px" @click="doLogin" :disabled="loginLoading">{{loginLoading?'登录中...':'登录'}}</button>
-  <div v-if="loginHint" style="text-align:center;margin-top:12px;color:#999;font-size:12px">{{loginHint}}</div>
-</div>
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">&#10025;</div>
+    <span class="logo-text">披星云</span>
+    <span class="logo-ver">v3.1</span>
+  </div>
 
-<div class="main" v-if="configured">
-  <div class="card">
-    <h2>选择平台</h2>
-    <div class="platforms">
-      <div class="pbtn" v-for="p in platforms" :key="p.id" :class="{active:selected===p.id}" @click="selectPlatform(p.id)">
-        <div class="icon">{{p.icon}}</div><div class="name">{{p.name}}</div><div class="hint">{{p.hint}}</div>
+  <!-- Platform navigation -->
+  <nav class="sidebar-nav" v-if="configured">
+    <div class="nav-section">平台</div>
+    <div class="nav-item" v-for="p in platforms" :key="p.id" :class="{active:selected===p.id}" @click="selectPlatform(p.id)">
+      <span class="plat-icon">{{p.icon}}</span>
+      <span class="plat-name">{{p.name}}</span>
+    </div>
+  </nav>
+
+  <!-- Bottom status + actions -->
+  <div class="sidebar-bottom" v-if="configured">
+    <div class="sidebar-status">
+      <span class="ind" :class="siteConnected?'on':'off'"></span>
+      <span>{{siteConnected?'已连接 MatrixFlow':'等待连接...'}}</span>
+    </div>
+    <div class="sidebar-footer-btns">
+      <button class="btn-collect" @click="triggerCollect" :disabled="collecting">{{collecting?'采集中...':'触发采集'}}</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ CONTENT ═══ -->
+<main class="content">
+
+  <!-- Toolbar -->
+  <header class="content-toolbar" v-if="configured">
+    <h2>{{selectedPlatform?selectedPlatform.name+' - 扫码绑定':'选择左侧平台开始操作'}}</h2>
+    <div class="online-dot" :style="{background:siteConnected?'#34c759':'#ff9500'}"></div>
+  </header>
+
+  <div class="content-body">
+
+    <!-- ── Login Screen ── -->
+    <div class="login-wrapper" v-if="!configured">
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="li">&#10025;</div>
+          <h1>披星云伴侣</h1>
+          <p>多平台矩阵账号管理桌面工具</p>
+        </div>
+        <div class="field"><label>邮箱</label><input v-model="loginEmail" placeholder="输入邮箱" @keyup.enter="doLogin"></div>
+        <div class="field"><label>密码</label><input v-model="loginPass" type="password" placeholder="输入密码" @keyup.enter="doLogin"></div>
+        <label class="field-check"><input type="checkbox" v-model="rememberPwd">记住密码（自动登录）</label>
+        <div class="login-err" v-if="loginError">{{loginError}}</div>
+        <button class="login-btn" @click="doLogin" :disabled="loginLoading">{{loginLoading?'登录中...':'登 录'}}</button>
       </div>
     </div>
-  </div>
-  <div class="card">
-    <h2>{{ selectedPlatform ? selectedPlatform.name + ' - 扫码登录' : (configured ? '选择平台开始扫码绑定' : '请先登录') }}</h2>
-    <div class="scan-area">
-      <template v-if="status==='idle'">
-        <div style="color:#999;font-size:15px;line-height:1.8">
-          <div class="step"><span class="num">1</span> 打开 MatrixFlow 网站登录</div>
-          <div class="step"><span class="num">2</span> 点击"添加账号"</div>
-          <div class="step"><span class="num">3</span> 网站会自动连接桌面伴侣</div>
-          <div class="step"><span class="num">4</span> 选择平台 → 弹出 Chrome → 扫码</div>
+
+    <!-- ── Workspace (after login) ── -->
+    <div class="workspace" v-if="configured">
+
+      <!-- Empty / idle state -->
+      <div class="workspace-empty" v-if="status==='idle'&&!selected">
+        <div class="empty-icon">&#8592;</div>
+        <h3>选择平台开始</h3>
+        <p>在左侧导航栏选择一个平台<br>Chrome 浏览器将自动打开对应平台的登录页</p>
+      </div>
+
+      <!-- Idle with platform selected -->
+      <div class="scan-card" v-if="status==='idle'&&selected">
+        <div class="scan-title">{{selectedPlatform.name}} 扫码绑定</div>
+        <div class="step-list">
+          <div class="step-row"><span class="step-num">1</span>打开 MatrixFlow 网站并登录</div>
+          <div class="step-row"><span class="step-num">2</span>点击"添加账号"按钮</div>
+          <div class="step-row"><span class="step-num">3</span>网站自动连接桌面伴侣</div>
+          <div class="step-row"><span class="step-num">4</span>Chrome 弹出 → 手机扫码登录</div>
         </div>
-      </template>
-      <div v-if="status==='loading'"><div class="spinner"></div><p class="waiting">正在启动浏览器...</p></div>
-      <div v-if="status==='browser'"><p style="color:#4caf50;font-size:18px;margin-bottom:8px">浏览器已打开</p><p class="tip">请在 Chrome 窗口中扫码登录</p><p class="waiting" style="margin:4px 0">登录成功后，点击下方按钮</p><button class="btn" style="background:#4caf50;font-size:16px;padding:12px 32px;margin:8px 0" @click="confirmLogin">已完成登录，提取 Cookie</button><br><button class="btn" style="background:#999;margin-top:4px" @click="cancelScan">取消</button></div>
-      <div v-if="status==='scan'"><img class="qr" :src="qrUrl" v-if="qrUrl"><p class="tip">用手机扫描上方二维码</p></div>
-      <div v-if="status==='uploading'"><div class="spinner"></div><p class="waiting">登录成功！正在上传 Cookie...</p></div>
-      <div v-if="status==='done'"><div class="success">&#10003;</div><p style="color:#4caf50;font-size:16px">绑定成功！</p><p style="color:#999;margin:8px 0">刷新 MatrixFlow 网页即可看到新账号</p></div>
-      <div v-if="status==='error'"><div class="error">{{ errorMsg }}</div><button class="btn" @click="reset">重试</button></div>
+        <div style="margin-top:20px">
+          <button class="btn btn-primary" @click="selectPlatform(selected)">开始绑定</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="scan-card" v-if="status==='loading'">
+        <div class="spinner"></div>
+        <p style="color:var(--text2);font-size:13px">正在启动浏览器...</p>
+        <div class="progress-bar"><div class="fill" :style="{width:progress+'%'}"></div></div>
+      </div>
+
+      <!-- Browser open -->
+      <div class="scan-card" v-if="status==='browser'">
+        <div class="result-ok success">&#10003;</div>
+        <p class="result-msg" style="font-weight:600">Chrome 浏览器已打开</p>
+        <p style="color:var(--text2);font-size:13px;margin:8px 0">请在 Chrome 窗口中完成扫码登录</p>
+        <button class="btn btn-success mt12" style="font-size:14px;padding:10px 28px" @click="confirmLogin">已完成登录，提取 Cookie</button>
+        <br><button class="btn btn-secondary btn-sm mt8" @click="cancelScan">取消</button>
+      </div>
+
+      <!-- Uploading -->
+      <div class="scan-card" v-if="status==='uploading'">
+        <div class="spinner"></div>
+        <p style="color:var(--text2);font-size:13px">正在上传 Cookie 到服务器...</p>
+      </div>
+
+      <!-- Done -->
+      <div class="scan-card" v-if="status==='done'">
+        <div class="result-ok success">&#10003;</div>
+        <p class="result-msg" style="font-weight:600">绑定成功</p>
+        <p class="result-sub">刷新 MatrixFlow 网页即可看到新账号</p>
+        <button class="btn btn-primary mt12" @click="reset">继续绑定其他平台</button>
+      </div>
+
+      <!-- Error -->
+      <div class="scan-card" v-if="status==='error'">
+        <p class="result-err">{{errorMsg}}</p>
+        <button class="btn btn-primary" @click="reset">重试</button>
+      </div>
+
+      <!-- Account list -->
+      <div class="acct-list" v-if="localAccounts.length">
+        <h4>已绑定账号 ({{localAccounts.length}})</h4>
+        <div class="acct-row" v-for="a in localAccounts" :key="a.id">
+          <span class="acct-platform">{{a.platform}}</span>
+          <span class="acct-name">{{a.nickname||a.platform_uid||a.id.slice(0,8)}}</span>
+          <span class="acct-time">{{a.last_collected_at?a.last_collected_at.slice(11,16):'待采集'}}</span>
+          <span class="acct-del" @click="removeLocalAccount(a.id)">删除</span>
+        </div>
+      </div>
+
     </div>
   </div>
-</div>
+</main>
 
-<div class="status-bar" v-if="configured" style="flex-direction:column;align-items:stretch;gap:8px">
-  <div style="display:flex;align-items:center;gap:12px">
-    <div class="ind" :class="siteConnected?'on':'off'"></div>
-    <span>{{ siteConnected ? '已连接到网站' : '等待网站连接...' }}</span>
-    <button class="btn" style="margin-left:auto;margin-right:8px;padding:4px 12px;font-size:12px;background:#E60012" @click="triggerCollect" :disabled="collecting">{{collecting?'采集中...':'触发采集'}}</button><span style="color:#999;font-size:12px">v2.5</span>
-  </div>
-  <div v-if="cookieAlerts.length" style="display:flex;flex-direction:column;gap:4px">
-    <div v-for="a in cookieAlerts" :key="a.platform" style="display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:6px;font-size:12px" :style="{background:a.expired?'#fff3f3':'#fff8e6'}">
-      <span :style="{color:a.expired?'#f44336':'#e6a23c'}">{{a.expired?'⚠':'⚡'}}</span>
-      <span>{{a.name}} Cookie {{a.expired?'已过期('+a.hours+'h)':'即将过期('+a.hours+'h)'}} — 需重新扫码</span>
-    </div>
-  </div>
-  <div v-if="cookieStatus && !cookieAlerts.length" style="font-size:12px;color:#67c23a">所有平台 Cookie 正常 (最新 {{cookieFreshness}} 前)</div>
-  <!-- Pixing Video Worker -->
-  <div style="padding:16px;background:#fff;border-radius:12px;box-shadow:0 2px 12px rgba(0,0,0,.08);display:flex;align-items:center;gap:12px;margin-top:4px">
-    <span class="ind" :class="pwRunning?'on':'off'" style="width:10px;height:10px;border-radius:50%;display:inline-block"></span>
-    <span style="font-size:13px;font-weight:600">数字人视频</span>
-    <span style="font-size:12px;color:#999" v-if="pwRunning">运行中 · 已完成 {{pwCompleted}} 个</span>
-    <span style="font-size:12px;color:#999" v-else>已停止</span>
-    <span v-if="pwTask" style="font-size:11px;color:#667eea;margin-left:auto">当前: {{pwTask}}</span>
-    <button style="margin-left:auto;padding:4px 12px;border-radius:6px;border:1px solid #ddd;background:#fff;font-size:11px;cursor:pointer" @click="togglePixingWorker">{{pwRunning?'停止':'启动'}}</button>
-  </div>
-</div>
-
-<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="/static/vue.global.prod.js"></script>
 <script>
 const {createApp}=Vue
 createApp({data(){return{
@@ -218,6 +360,7 @@ createApp({data(){return{
   configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
   cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,
   pwRunning:false,pwCompleted:0,pwTask:'',
+  localAccounts:[],
 }},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
 methods:{
   async fetchPixingStatus(){try{const r=await fetch('/api/pixing-worker/status');const j=await r.json();this.pwRunning=j.running;this.pwCompleted=j.completed;this.pwTask=j.current_task||''}catch(e){}},
@@ -232,6 +375,15 @@ methods:{
         this.cookieFreshness=minH<1?Math.round(minH*60)+'分钟':Math.round(minH)+'小时';
       }
     }catch(e){}
+  },
+  async loadLocalAccounts(){
+    try{const r=await fetch('/api/local-accounts');const j=await r.json();
+      if(j.code===0){this.localAccounts=j.data||[]}
+    }catch(e){}
+  },
+  async removeLocalAccount(id){
+    if(!confirm('确定删除此账号绑定？'))return;
+    try{await fetch('/api/local-accounts/'+id,{method:'DELETE'});await this.loadLocalAccounts()}catch(e){}
   },
   async checkConfig(){
     try{const r=await fetch('/api/config');const j=await r.json();this.configured=j.configured;if(j.saved_email){this.loginEmail=j.saved_email;this.rememberPwd=true}}catch(e){this.configured=false}
@@ -252,15 +404,14 @@ methods:{
   },
   async selectPlatform(id){
     if(this.status==='loading'||this.status==='browser'||this.status==='uploading')return
+    if(!id){this.errorMsg='请选择平台';return}
     this.selected=id;this.errorMsg=''
-    // Try URL params first (website-initiated), then companion's saved token
     let token=this.tokenFromUrl||this.getParam('token')
     let apiUrl=this.apiFromUrl||this.getParam('api')||'https://ddddkiii.com/api/v1'
     if(!token){
       try{
         const r=await fetch('/api/config');const j=await r.json()
         if(j.token_set){
-          // Get the actual token from server-side session
           const tr=await fetch('/api/get-token');const tj=await tr.json()
           token=tj.token;apiUrl=j.api_url
         }
@@ -273,7 +424,6 @@ methods:{
   startScan(token,apiUrl){
     this.status='loading';this.progress=0
     this.timer=setInterval(()=>{if(this.progress<90)this.progress+=1},400)
-    // Use trigger endpoint (no SSE) — more reliable
     const url=`/api/scan-bind/trigger?platform=${this.selected}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(apiUrl)}`
     fetch(url).then(r=>r.json()).then(j=>{
       if(j.code===0){
@@ -301,7 +451,6 @@ confirmLogin(){
   fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sid})}).then(r=>r.json()).then(j=>{
     console.log('[UI] confirm-login response:',JSON.stringify(j))
     if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg;return}
-    // Poll for completion
     let attempts=0
     const poll=setInterval(()=>{
       fetch('/api/scan-bind/poll/'+sid).then(r=>r.json()).then(s=>{
@@ -322,6 +471,7 @@ mounted(){
   this.checkConfig()
   this.tryAutoLogin()
   this.loadCookieStatus()
+  this.loadLocalAccounts()
   this.fetchPixingStatus()
   this.platformFromUrl=this.getParam('platform')
   this.tokenFromUrl=this.getParam('token')
@@ -329,6 +479,7 @@ mounted(){
   if(this.platformFromUrl&&this.tokenFromUrl){this.selected=this.platformFromUrl}
   setInterval(async()=>{try{const r=await fetch('/health');if(r.ok)this.siteConnected=true}catch{this.siteConnected=false}},3000)
   setInterval(()=>{if(this.configured)this.loadCookieStatus()},60000)
+  setInterval(()=>{if(this.configured)this.loadLocalAccounts()},30000)
   setInterval(()=>{if(this.configured)this.fetchPixingStatus()},10000)
 }}).mount('body')
 </script></body></html>'''
@@ -347,17 +498,11 @@ def _load_config() -> dict:
             return cfg
         except Exception:
             pass
-    # For EXE: try to copy bundled config on first run
-    if getattr(sys, 'frozen', False):
-        try:
-            bundled = Path(sys._MEIPASS) / 'companion_config.json'
-            if bundled.exists():
-                cfg = json.loads(bundled.read_text(encoding='utf-8'))
-                if cfg.get('token'):
-                    _save_config(cfg)
-                    return cfg
-        except: pass
-    return {'api_url': 'https://ddddkiii.com/api/v1', 'token': ''}
+    # 首次启动：生成默认配置（不会覆盖已有配置，升级安全）
+    default = {'api_url': 'https://ddddkiii.com/api/v1', 'token': ''}
+    if not CONFIG_FILE.exists():
+        _save_config(default)
+    return default
 
 
 def _save_config(cfg: dict):
@@ -550,7 +695,7 @@ def handle_config():
         _save_config(cfg)
         _CONFIG_CACHE = cfg
         return jsonify({'status': 'ok'})
-    safe = {k: v for k, v in _CONFIG_CACHE.items() if k not in ('token', 'saved_password')}
+    safe = {k: v for k, v in _CONFIG_CACHE.items() if k not in ('token', 'saved_password', 'refreshToken', 'accessToken', 'saved_password')}
     if _CONFIG_CACHE.get('token'):
         safe['token_set'] = True
     if _CONFIG_CACHE.get('saved_email'):
@@ -593,9 +738,52 @@ def api_cookie_status():
 
 @app.route('/api/data-collection/trigger', methods=['POST'])
 def data_collection_trigger():
+    global _collector_loop_started
+    # 首次触发时启动后台定时循环
+    if not _collector_loop_started:
+        _collector_loop_started = True
+        threading.Thread(target=_data_collector_loop, daemon=True).start()
+    # 立即执行一次采集
     t = threading.Thread(target=_run_collection_once, daemon=True)
     t.start()
     return jsonify({'status': 'started'})
+
+
+# ══════════════════════════════════════════════════════════════════
+# 本地账号管理 API（1账号1Profile 架构）
+# ══════════════════════════════════════════════════════════════════
+@app.route('/api/local-accounts')
+def local_accounts_list():
+    """列出所有本地绑定的账号"""
+    from local_db import get_all_accounts
+    accounts = get_all_accounts()
+    return jsonify({'code': 0, 'data': accounts})
+
+
+@app.route('/api/local-accounts/<account_id>', methods=['DELETE'])
+def local_accounts_delete(account_id):
+    """删除本地账号绑定（Profile 目录保留，只标记删除）"""
+    from local_db import remove_account, get_profile_path
+    profile = get_profile_path(account_id)
+    remove_account(account_id)
+    # 可选：也删除 Profile 目录
+    if profile and profile.exists():
+        import shutil
+        try:
+            shutil.rmtree(str(profile), ignore_errors=True)
+        except: pass
+    return jsonify({'code': 0, 'msg': 'deleted'})
+
+
+@app.route('/api/local-accounts/<account_id>/rebind', methods=['POST'])
+def local_accounts_rebind(account_id):
+    """重新扫码绑定某个账号（刷新 cookie）"""
+    from local_db import get_account
+    acc = get_account(account_id)
+    if not acc:
+        return jsonify({'code': 404, 'msg': '账号不存在'}), 404
+    # 触发扫码流程（使用现有 scan-bind 机制）
+    return jsonify({'code': 0, 'msg': '请在桌面伴侣中重新扫码', 'platform': acc['platform']})
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -750,12 +938,21 @@ async def _scrape_dashboard(page) -> dict:
             const text = document.body.innerText;
             const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
 
-            // Strategy 1: Look for platform account ID label (抖音号/快手号/小红书号)
+            // Strategy 1: Find real display name (line before 抖音号/快手号/小红书号 label)
+            // NOT the account ID itself — that's an identifier, not the nickname
             for (let i = 0; i < Math.min(lines.length, 50); i++) {
                 const line = lines[i];
                 if (line.match(/^(抖音号|快手号|小红书号|账号ID)/)) {
-                    const id = line.replace(/.*[：:]/, '').trim();
-                    if (id) { result.nickname = id; break; }
+                    // Look at lines above this for the actual display name
+                    for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
+                        const candidate = lines[j];
+                        if (candidate.length >= 2 && candidate.length <= 30 &&
+                            !/^\\d{5,}$/.test(candidate) &&
+                            !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞)/.test(candidate)) {
+                            result.nickname = candidate; break;
+                        }
+                    }
+                    if (result.nickname) break;
                 }
             }
 
@@ -764,7 +961,7 @@ async def _scrape_dashboard(page) -> dict:
                 const title = document.title || '';
                 const clean = title.replace(/[\\-|–—].*$/, '').replace(/创作者中心|创作服务平台|数据平台|抖音|快手|小红书|视频号助手|腾讯视频号/g, '').trim();
                 const platformUINames = ['视频号助手', '视频号', '微信', '抖音创作服务平台', '快手创作者中心'];
-                if (clean.length >= 2 && clean.length <= 30 && !/^\d+$/.test(clean) && !platformUINames.includes(clean)) {
+                if (clean.length >= 2 && clean.length <= 30 && !/^\\d+$/.test(clean) && !platformUINames.includes(clean)) {
                     result.nickname = clean;
                 }
             }
@@ -779,28 +976,22 @@ async def _scrape_dashboard(page) -> dict:
                     const el = document.querySelector(sel);
                     if (el) {
                         const txt = el.innerText.trim();
-                        if (txt.length >= 2 && txt.length <= 30 && !/^\d{5,}$/.test(txt)) {
+                        if (txt.length >= 2 && txt.length <= 30 && !/^\\d{5,}$/.test(txt)) {
                             result.nickname = txt; break;
                         }
                     }
                 }
             }
 
-            // Strategy 4: First non-numeric line before '抖音号' or 'ID' in top area
+            // Strategy 4: Fallback — first short line near top that looks like a name
             if (!result.nickname) {
-                for (let i = 0; i < Math.min(lines.length, 40); i++) {
-                    const line = lines[i];
-                    if (line.match(/^(抖音号|快手号|小红书号|ID|账号)/)) {
-                        // Check the line(s) right above this for the display name
-                        for (let j = i-1; j >= Math.max(0, i-5); j--) {
-                            const candidate = lines[j];
-                            if (candidate.length >= 2 && candidate.length <= 30 &&
-                                !/^\d{5,}$/.test(candidate) &&
-                                !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞)/.test(candidate)) {
-                                result.nickname = candidate; break;
-                            }
-                        }
-                        if (result.nickname) break;
+                for (let i = 0; i < Math.min(lines.length, 15); i++) {
+                    const candidate = lines[i];
+                    if (candidate.length >= 2 && candidate.length <= 20 &&
+                        !/^\\d{5,}$/.test(candidate) &&
+                        !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞|账号|平台)/.test(candidate) &&
+                        !/[\u4e00-\u9fa5]{6,}/.test(candidate)) {  // skip long Chinese phrases
+                        result.nickname = candidate; break;
                     }
                 }
             }
@@ -828,9 +1019,14 @@ async def _scrape_dashboard(page) -> dict:
 
 
 async def _scrape_data_center(page, platform: str) -> dict:
-    """Extract analytics from data center page (URL-based navigation, no click needed)"""
-    text = await page.evaluate('() => document.body.innerText')
+    """Extract analytics from data center page, including historical multi-day data"""
+    from datetime import datetime, timedelta
+
     result = {}
+    history = []
+
+    # --- Step 1: Full page text for metric extraction ---
+    text = await page.evaluate('() => document.body.innerText')
 
     # Try to find yesterday's data section first (most reliable)
     yd_match = re.search(r'昨日数据([\s\S]*?)(?:近7天|近30天|$)', text[:8000])
@@ -850,7 +1046,123 @@ async def _scrape_data_center(page, platform: str) -> dict:
             result['followers'] = _parse_metric_num(m.group(1))
             break
 
-    # Also check for tabular data (table-based layout)
+    # --- Step 2: Try to extract historical data table (7-day / 30-day tables) ---
+    try:
+        table_data = await page.evaluate('''() => {
+            // Try to find tabular historical data
+            // Douyin data center uses tables with date + metric columns
+            const result = [];
+            const allTables = document.querySelectorAll('table');
+            for (const table of allTables) {
+                const headers = [];
+                table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td').forEach(th => {
+                    headers.push((th.innerText || '').trim());
+                });
+                // Skip if no date-like header
+                if (!headers.some(h => h.includes('日期') || h.includes('时间') || /\\d{4}[-/]\\d{2}/.test(h))) {
+                    continue;
+                }
+                const tbody = table.querySelector('tbody') || table;
+                tbody.querySelectorAll('tr').forEach(row => {
+                    const cells = row.querySelectorAll('td, th');
+                    const rowData = [];
+                    cells.forEach(cell => rowData.push((cell.innerText || '').trim()));
+                    if (rowData.length >= 2) result.push(rowData);
+                });
+                if (result.length > 0) break;
+            }
+            // Fallback: find date-prefixed lines in the full text
+            if (result.length === 0) {
+                const fullText = document.body.innerText;
+                const lines = fullText.split('\\n');
+                const datePattern = /^(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2})/;
+                const numPattern = /[\\d,.]+[万wW]?/g;
+                for (let i = 0; i < lines.length; i++) {
+                    const m = lines[i].match(datePattern);
+                    if (m) {
+                        const row = [m[1]];
+                        // Collect numbers from this and next lines
+                        for (let j = i; j < Math.min(i + 3, lines.length); j++) {
+                            const nums = lines[j].match(numPattern);
+                            if (nums) row.push(...nums);
+                        }
+                        if (row.length >= 3) result.push(row);
+                    }
+                }
+            }
+            return result.slice(0, 35); // max 35 days
+        }''')
+
+        if table_data:
+            today = datetime.now().date()
+            for row in table_data:
+                if len(row) < 2:
+                    continue
+                # Try to parse date from first column
+                date_str = row[0].strip()
+                parsed_date = None
+                for fmt in ['%Y-%m-%d', '%Y/%m/%d', '%Y.%m.%d', '%m-%d', '%m/%d', '%m.%d']:
+                    try:
+                        if len(fmt) <= 5:  # short format, add current year
+                            parsed_date = datetime.strptime(f'{datetime.now().year}-{date_str}', f'%Y-{fmt}').date()
+                        else:
+                            parsed_date = datetime.strptime(date_str, fmt).date()
+                        break
+                    except ValueError:
+                        continue
+
+                if not parsed_date:
+                    # Check for "昨天", "前天", "今日" etc.
+                    if '昨天' in date_str:
+                        parsed_date = today - timedelta(days=1)
+                    elif '前天' in date_str:
+                        parsed_date = today - timedelta(days=2)
+                    elif '今日' in date_str or '今天' in date_str:
+                        parsed_date = today
+                    else:
+                        continue
+
+                # Extract metric values from remaining columns
+                metrics_for_date = {}
+                # Column mapping varies by platform — try heuristics
+                remaining = row[1:]
+                # Flatten: split each cell by whitespace and extract numbers
+                nums = []
+                for cell in remaining:
+                    for part in cell.split():
+                        val = _parse_metric_num(part)
+                        if val > 0:
+                            nums.append(val)
+
+                # Heuristic: first number = views, second = likes, third = comments
+                if len(nums) >= 1:
+                    metrics_for_date['views'] = nums[0]
+                if len(nums) >= 2:
+                    metrics_for_date['likes'] = nums[1]
+                if len(nums) >= 3:
+                    metrics_for_date['comments'] = nums[2]
+                if len(nums) >= 4:
+                    metrics_for_date['shares'] = nums[3]
+
+                if metrics_for_date:
+                    history.append({
+                        'date': parsed_date.isoformat(),
+                        **metrics_for_date,
+                    })
+
+        # Deduplicate by date
+        seen = set()
+        deduped = []
+        for h in history:
+            if h['date'] not in seen:
+                seen.add(h['date'])
+                deduped.append(h)
+        history = deduped
+
+    except Exception as e:
+        print(f'[DC] historical data extraction error: {e}')
+
+    # --- Step 3: Simple table scan (label-value pairs) ---
     try:
         table_rows = await page.evaluate('''() => {
             const rows = [];
@@ -874,6 +1186,7 @@ async def _scrape_data_center(page, platform: str) -> dict:
     except:
         pass
 
+    result['_history'] = history
     return result
 
 
@@ -1108,7 +1421,12 @@ async def _scrape_account_pages(context, platform: str) -> dict:
     video_list_url = entry.get('video_list')
     monetization_url = entry.get('monetization')
 
-    page = await context.new_page()
+    try:
+        page = await context.new_page()
+    except Exception as e:
+        print(f'[DC] Context closed, skipping {platform}: {e}')
+        return {'metrics': {}, 'video_stats': []}
+
     metrics = {}
     video_stats = []
 
@@ -1156,12 +1474,22 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                 print(f'[DC] video-list error {platform}: {e}')
 
         # 4. Monetization / Revenue — store platforms use dedicated store scraper
-        store_platforms = ('DOUDIAN', 'XIAOHONGSHU_SHOP', 'WECHAT_SHOP')
+        store_platforms = ('DOUYIN', 'XIAOHONGSHU', 'WECHAT_VIDEO')
+        store_url = entry.get('store_url')
         if monetization_url:
             try:
                 await page.goto(monetization_url, wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(6000)
-                if platform in store_platforms:
+                if platform in store_platforms and store_url:
+                    # Also try store page
+                    try:
+                        await page.goto(store_url, wait_until='domcontentloaded', timeout=30000)
+                        await page.wait_for_timeout(6000)
+                        rev = await _scrape_store_dashboard(page, platform)
+                    except Exception as e:
+                        print(f'[DC] store page error {platform}: {e}')
+                        rev = await _scrape_monetization(page)
+                elif platform in store_platforms:
                     rev = await _scrape_store_dashboard(page, platform)
                 else:
                     rev = await _scrape_monetization(page)
@@ -1191,72 +1519,132 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                 print(f'[DC] extra-page error {extra_url}: {e}')
 
     finally:
-        await page.close()
+        try: await page.close()
+        except: pass
 
     return {'metrics': metrics, 'video_stats': video_stats}
 
 
+async def _safe_close_ctx(ctx):
+    """安全关闭 context，忽略已关闭的错误"""
+    if ctx is None:
+        return
+    try:
+        await ctx.close()
+    except Exception:
+        pass
+
+
 async def _scrape_all(accounts: list) -> list:
+    """CDP 模式采集：独立 headless CDP Chrome（真 Chrome 指纹，零可见窗口）"""
     from playwright.async_api import async_playwright
+    from local_db import get_profile_path
+    import subprocess, urllib.request as urlreq
 
     results = []
+    dc_proc = None
+    cdp_browser = None
+
     async with async_playwright() as pw:
-        # 持久化浏览器 profile — 抖音不会再跳设备验证
         _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
-        profile_dir = str(_PROFILE_ROOT / 'default')
-        launch_opts = {
-            'headless': True,
-            'args': ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN'],
-            'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-            'locale': 'zh-CN',
-            'viewport': {'width': 1280, 'height': 800},
-        }
-        if _BROWSER_PATH:
-            launch_opts['executable_path'] = _BROWSER_PATH
-        elif _BROWSER_CHANNEL:
-            launch_opts['channel'] = _BROWSER_CHANNEL
-        ctx = await pw.chromium.launch_persistent_context(profile_dir, **launch_opts)
 
-        for acc in accounts:
-            aid = (acc.get('id') or '').strip()
-            platform = (acc.get('platform') or '').strip().upper()
-            cookies_str = acc.get('cookies') or ''
-            if not aid or not platform or not cookies_str:
-                continue
+        # 启动独立的 headless CDP Chrome（不影响用户可见窗口）
+        cdp_port = 9223
+        dc_profile = _PROFILE_ROOT / 'dc-headless'
+        dc_profile.mkdir(parents=True, exist_ok=True)
+        if not (dc_profile / 'First Run').exists():
+            (dc_profile / 'First Run').touch()
 
-            entry = PLATFORM_DASHBOARDS.get(platform)
-            if not entry:
-                continue
+        headless_args = [
+            str(_BROWSER_PATH or 'chrome'),
+            f'--remote-debugging-port={cdp_port}',
+            f'--user-data-dir={str(dc_profile)}',
+            '--headless=new', '--no-first-run', '--no-default-browser-check',
+            '--disable-extensions', '--disable-background-networking',
+            '--disable-sync', '--disable-component-update',
+            '--safebrowsing-disable-auto-update', 'about:blank',
+        ]
 
-            domain = entry.get('domain') or entry.get('url', '').split('://')[1] if '://' in entry.get('url', '') else entry.get('url', '')
-
-            cookie_list = []
-            for pair in cookies_str.split('; '):
-                if '=' in pair:
-                    n, v = pair.split('=', 1)
-                    cookie_list.append({
-                        'name': n.strip(),
-                        'value': v.strip(),
-                        'domain': domain,
-                        'path': '/',
-                    })
-
-            await ctx.clear_cookies()
-            if cookie_list:
-                try:
-                    await ctx.add_cookies(cookie_list)
-                except Exception:
-                    pass
-
+        try:
+            # 先清理 9223 端口残留（上次异常退出可能留僵尸 Chrome）
             try:
-                result = await _scrape_account_pages(ctx, platform)
-            except Exception as e:
-                print(f'[DC] scrape error {platform}/{aid}: {e}')
-                result = {'metrics': {}, 'video_stats': []}
+                urlreq.urlopen(f'http://127.0.0.1:{cdp_port}/json/version', timeout=2)
+                # 端口被占用，杀掉僵尸进程
+                out = subprocess.check_output(f'netstat -ano | findstr :{cdp_port}', shell=True, text=True)
+                for line in out.strip().split('\n'):
+                    parts = line.split()
+                    if parts and parts[-1].isdigit():
+                        subprocess.run(['taskkill', '/F', '/PID', parts[-1]], capture_output=True)
+                        print(f'[DC] 已清理端口 {cdp_port} 残留进程 PID={parts[-1]}')
+                        break
+                time.sleep(1)
+            except Exception:
+                pass  # 端口空闲，正常
 
-            results.append({'accountId': aid, 'metrics': result['metrics'], 'videoStats': result['video_stats']})
+            dc_proc = subprocess.Popen(headless_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            deadline = time.time() + 30
+            while time.time() < deadline:
+                try:
+                    urlreq.urlopen(f'http://127.0.0.1:{cdp_port}/json/version', timeout=2)
+                    break
+                except Exception:
+                    time.sleep(0.5)
+            else:
+                raise RuntimeError('Headless CDP Chrome 启动超时')
 
-        await ctx.close()
+            cdp_browser = await pw.chromium.connect_over_cdp(f'http://127.0.0.1:{cdp_port}')
+            print(f'[DC] Connected to headless CDP Chrome on port {cdp_port}')
+
+            for acc in accounts:
+                aid = (acc.get('id') or '').strip()
+                platform = (acc.get('platform') or '').strip().upper()
+                if not aid or not platform:
+                    continue
+                entry = PLATFORM_DASHBOARDS.get(platform)
+                if not entry:
+                    continue
+                profile_dir = get_profile_path(aid)
+                if not profile_dir:
+                    print(f'[DC] No local profile for {aid}, skipping')
+                    continue
+
+                profile_dir.mkdir(parents=True, exist_ok=True)
+                state_json = profile_dir / 'state.json'
+
+                try:
+                    ctx = await cdp_browser.new_context(
+                        storage_state=str(state_json) if state_json.exists() else None,
+                        viewport={'width': 1280, 'height': 800}, locale='zh-CN',
+                    )
+                except Exception as e:
+                    print(f'[DC] Failed to create context for {aid}: {str(e)[:120]}')
+                    continue
+
+                try:
+                    result = await _scrape_account_pages(ctx, platform)
+                except Exception as e:
+                    print(f'[DC] scrape error {platform}/{aid}: {str(e)[:120]}')
+                    result = {'metrics': {}, 'video_stats': []}
+
+                results.append({'accountId': aid, 'metrics': result['metrics'], 'videoStats': result['video_stats']})
+                await _safe_close_ctx(ctx)
+
+        except Exception as e:
+            print(f'[DC] Headless CDP error: {e}')
+        finally:
+            if cdp_browser:
+                try: await cdp_browser.close()
+                except: pass
+            if dc_proc:
+                try:
+                    dc_proc.terminate()
+                    dc_proc.wait(timeout=5)
+                except Exception:
+                    try:
+                        dc_proc.kill()
+                    except Exception:
+                        pass
+
     return results
 
 
@@ -1275,61 +1663,43 @@ def _run_collection_once():
             _collector_last_error = 'Not configured: api_url or token missing'
             return
 
+        from local_db import get_all_accounts, update_collection_time
         import requests
 
-        print(f'[DC] Fetching accounts from {api_url}/accounts')
-        resp = requests.get(
-            f'{api_url}/accounts',
-            headers={'Authorization': f'Bearer {token}'},
-            timeout=30,
-        )
-        if resp.status_code != 200:
-            _collector_last_error = f'GET /accounts returned HTTP {resp.status_code}'
-            return
-
-        raw = resp.json()
-        if isinstance(raw, dict):
-            inner = raw.get('data') or raw
-            if isinstance(inner, dict):
-                accounts = inner.get('accounts') or inner.get('data') or []
-            else:
-                accounts = inner if isinstance(inner, list) else []
-        else:
-            accounts = raw if isinstance(raw, list) else []
-
-        if not accounts:
+        # 从本地 DB 获取所有绑定的账号
+        local_accounts = get_all_accounts()
+        if not local_accounts:
             _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
             _collector_last_error = None
             return
 
-        # Decrypt encrypted cookies via individual account endpoint
-        for acc in accounts:
-            c = acc.get('cookies') or ''
-            if True:
-                aid = acc.get('id')
-                try:
-                    r = requests.get(
-                        f'{api_url}/accounts/{aid}/cookies',
-                        headers={'Authorization': f'Bearer {token}'},
-                        timeout=15,
-                    )
-                    if r.status_code == 200:
-                        inner = r.json()
-                        dec = (inner.get('data') or inner).get('cookies')
-                        if dec:
-                            acc['cookies'] = dec
-                            print(f'[DC] Decrypted cookies for {aid}')
-                except Exception as e:
-                    print(f'[DC] Decrypt failed for {aid}: {e}')
+        # 构造采集列表（本地 DB 里的账号 + 后端平台类型）
+        accounts = []
+        for acc in local_accounts:
+            accounts.append({
+                'id': acc['id'],
+                'platform': acc['platform'],
+                'nickname': acc.get('nickname', ''),
+            })
 
-        print(f'[DC] Scraping {len(accounts)} accounts')
-        scraped = asyncio.run(_scrape_all(accounts))
+        print(f'[DC] Scraping {len(accounts)} accounts from local profiles')
+        # Windows: daemon 线程中 asyncio.run() 可能卡死，手动管理 event loop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            scraped = loop.run_until_complete(_scrape_all(accounts))
+        finally:
+            loop.close()
 
         reported = 0
         for item in scraped:
-            if item['metrics'] and any(v for v in item['metrics'].values()):
+            metrics = item['metrics']
+            # Extract historical data before cleaning up
+            history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
+
+            if metrics and any(v for v in metrics.values() if isinstance(v, (int, float))):
                 payload = {'accountId': item['accountId'],
-                           'metrics': item['metrics']}
+                           'metrics': metrics}
                 try:
                     r = requests.post(
                         f'{api_url}/platforms/report-metrics',
@@ -1339,12 +1709,33 @@ def _run_collection_once():
                     )
                     if r.status_code < 400:
                         reported += 1
+                        update_collection_time(item['accountId'])
                     else:
                         print(
                             f'[DC] Report HTTP {r.status_code} for '
                             f'{item["accountId"]}: {r.text[:200]}')
                 except Exception as e:
                     print(f'[DC] Report error {item["accountId"]}: {e}')
+
+            # Report historical data (7-day / 30-day) if available
+            if history:
+                for hist_entry in history:
+                    hist_date = hist_entry.pop('date', None)
+                    if not hist_date:
+                        continue
+                    try:
+                        r = requests.post(
+                            f'{api_url}/platforms/report-metrics',
+                            json={
+                                'accountId': item['accountId'],
+                                'metrics': hist_entry,
+                                'date': hist_date,
+                            },
+                            headers={'Authorization': f'Bearer {token}'},
+                            timeout=30,
+                        )
+                    except Exception as e:
+                        print(f'[DC] History report error {item["accountId"]} {hist_date}: {e}')
 
         # Report per-video stats
         video_reported = 0
@@ -1364,11 +1755,10 @@ def _run_collection_once():
             except Exception as e:
                 print(f'[DC] Video report error {item["accountId"]}: {e}')
 
-        # Sync avatars extracted from dashboard (only avatars — nicknames
-        # are set once during QR scan and must not be overwritten by scraping)
+        # Sync avatars extracted from dashboard
         for item in scraped:
             m = item.get('metrics', {})
-            m.pop('_nickname', None)  # discard — dashboard titles are not nickname sources
+            m.pop('_nickname', None)
             avatar = m.pop('_avatar', None)
             if avatar:
                 try:
@@ -1404,6 +1794,7 @@ def _get_collection_interval() -> int:
         return 120 * 60  # nighttime: 2 hours
 
 def _data_collector_loop():
+    """后台定时采集循环 —— 仅在用户手动触发采集后才启动"""
     time.sleep(30)
     while True:
         try:
@@ -1414,9 +1805,7 @@ def _data_collector_loop():
         print(f'[DC] Next collection in {interval // 60} min (hour={time.localtime().tm_hour})')
         time.sleep(interval)
 
-
-# Start collector in background
-threading.Thread(target=_data_collector_loop, daemon=True).start()
+_collector_loop_started = False
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -1424,25 +1813,64 @@ threading.Thread(target=_data_collector_loop, daemon=True).start()
 # ══════════════════════════════════════════════════════════════════
 
 def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_sse=False, session_id=None):
+    """扫码绑定 Worker — 单窗口模式，复用 CDP Context，各平台通过清 Cookie 隔离"""
     def login_worker():
         async def _run():
+            context = None
+            page = None
             try:
+                if not _CDP_URL:
+                    err_msg = 'Chrome CDP 未启动，请先解决 Chrome 启动问题后重试'
+                    if use_sse:
+                        queue.put(json.dumps({'type':'error','data':err_msg}))
+                    return
                 from playwright.async_api import async_playwright
+                from local_db import add_account, get_or_create_profile_dir
+
                 async with async_playwright() as pw:
-                    _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
-                    profile_dir = str(_PROFILE_ROOT / ('scan-' + platform))
-                    launch_opts = {
-                        'headless': False,
-                        'args': ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN', '--start-maximized'],
-                        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-                        'viewport': {'width': 1280, 'height': 800},
-                    }
-                    if _BROWSER_PATH:
-                        launch_opts['executable_path'] = _BROWSER_PATH
-                    elif _BROWSER_CHANNEL:
-                        launch_opts['channel'] = _BROWSER_CHANNEL
-                    context = await pw.chromium.launch_persistent_context(profile_dir, **launch_opts)
-                    page = await context.new_page()
+                    try:
+                        browser = await pw.chromium.connect_over_cdp(_CDP_URL)
+                    except Exception as e:
+                        err_msg = f'无法连接 Chrome CDP: {str(e)[:100]}'
+                        if use_sse:
+                            queue.put(json.dumps({'type':'error','data':err_msg}))
+                        if session_id:
+                            scan_status[session_id] = 'error'
+                        return
+
+                    # 复用已有 context（单窗口模式），不再每次 new_context 开新窗口
+                    existing = browser.contexts
+                    context = None
+                    if existing:
+                        try:
+                            context = existing[0]
+                            # 关掉 about:blank 占位 tab
+                            for p in list(context.pages):
+                                if 'about:blank' in p.url or not p.url or p.url == 'about:blank':
+                                    try: await p.close()
+                                    except: pass
+                        except Exception:
+                            context = None
+
+                    if context is None:
+                        context = await browser.new_context(
+                            viewport={'width': 1280, 'height': 800},
+                            locale='zh-CN',
+                        )
+                    # 清 Cookie 隔离不同平台登录
+                    try:
+                        await context.clear_cookies()
+                    except Exception:
+                        print('[Worker] clear_cookies failed, creating new context')
+                        try: await context.close()
+                        except: pass
+                        context = await browser.new_context(
+                            viewport={'width': 1280, 'height': 800},
+                            locale='zh-CN',
+                        )
+
+                    page = await context.new_page()  # TAB，不是新窗口
+                    page.on('popup', lambda popup: asyncio.ensure_future(popup.close()))
 
                     if use_sse:
                         queue.put(json.dumps({'type':'browser','data':'浏览器已打开'}))
@@ -1471,41 +1899,45 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             if msg == 'CANCEL':
                                 if use_sse:
                                     queue.put(json.dumps({'type':'error','data':'用户取消'}))
-                                await context.close()
+                                if page:
+                                    try: await page.close()
+                                    except: pass
                                 return
                         except Empty:
                             pass
                     else:
                         if use_sse:
                             queue.put(json.dumps({"type":"error","data":"操作超时（5分钟），请重试"}))
-                        await context.close()
+                        if page:
+                            try: await page.close()
+                            except: pass
                         return
                     if use_sse:
-                        queue.put(json.dumps({'type':'status','data':'正在提取 Cookie...'}))
+                        queue.put(json.dumps({'type':'status','data':'正在提取信息...'}))
 
+                    # ── 提取页面信息（不再提取 cookie 字符串）──
                     cookies = await context.cookies()
                     page_text = await page.evaluate('() => document.body.innerText')
                     try:
-                        with open('C:/Users/EDY/AppData/Local/Temp/pixingyun_page.txt', 'w', encoding='utf-8') as f:
+                        with open(Path(tempfile.gettempdir()) / 'pixingyun_page.txt', 'w', encoding='utf-8') as f:
                             f.write(page_text[:5000])
                     except: pass
-                    cookie_str = '; '.join(f"{c['name']}={c['value']}" for c in cookies)
 
-                    if not cookie_str:
+                    if not cookies:
                         if use_sse:
                             queue.put(json.dumps({'type':'error','data':'未获取到 Cookie，请在 Chrome 窗口中确认已登录'}))
-                        await context.close()
+                        if page:
+                            try: await page.close()
+                            except: pass
                         return
 
-                    # Scrape real video号 ID and nickname from the logged-in page
+                    # Scrape real ID and nickname from the logged-in page
                     import re, requests
                     page_text = await page.evaluate('() => document.body.innerText')
-                    # Save page text for debugging
                     try:
                         with open(Path(tempfile.gettempdir()) / 'pixingyun_page.txt', 'w', encoding='utf-8') as f:
                             f.write(page_text[:3000])
                     except: pass
-                    real_id = ''
                     real_id = ''
                     nickname = None
                     m = re.search(r'视频号ID[:\s]*(\S+)', page_text)
@@ -1520,15 +1952,43 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                     nickname = c
                                     break
                             break
+                    # 抖音号
+                    if not real_id:
+                        m = re.search(r'抖音号[:\s]*(\S+)', page_text)
+                        if m:
+                            real_id = m.group(1).strip()
+                            if not nickname:
+                                # 抖音号上方通常是昵称
+                                for i, line in enumerate(lines):
+                                    if '抖音号' in line and i >= 1:
+                                        for j in range(i-1, max(i-3, -1), -1):
+                                            c = _sanitize_text(lines[j].strip())
+                                            if c and 2 < len(c) < 30 and not c.isdigit():
+                                                nickname = c
+                                                break
+                                        break
+                    # 快手号
+                    if not real_id:
+                        m = re.search(r'快手号[:\s]*(\S+)', page_text)
+                        if m:
+                            real_id = m.group(1).strip()
+                    # 小红书号
+                    if not real_id:
+                        m = re.search(r'小红书号[:\s]*(\S+)', page_text)
+                        if m:
+                            real_id = m.group(1).strip()
+
                     if not nickname and real_id:
                         nickname = real_id
                     if not nickname:
                         nickname = _sanitize_text(info['name'])
 
-                    platform_uid = real_id if real_id else f"vid_{int(time.time())}"
+                    platform_uid = real_id if real_id else f"{platform}_{int(time.time())}"
+                    platform_key = info['key']  # DOUYIN / WECHAT_VIDEO etc.
 
-                    # Check if account already exists
-                    check_resp = requests.get(
+                    # ── 核心：先在后端创建账号（不传 cookies），再存本地 DB ──
+                    import requests as req
+                    check_resp = req.get(
                         f"{api_url.rstrip('/')}/accounts",
                         headers={'Authorization': f'Bearer {token}'},
                         timeout=15,
@@ -1536,28 +1996,29 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     existing_id = None
                     try:
                         for acc in ((check_resp.json().get('data') or {}).get('accounts') or []):
-                            if acc.get('platformUserId') == platform_uid or acc.get('nickname') == nickname:
+                            if acc.get('platformUserId') == platform_uid or (acc.get('nickname') == nickname and acc.get('platform') == platform_key):
                                 existing_id = acc.get('id')
                                 break
                     except: pass
 
+                    account_id = existing_id
                     if existing_id:
-                        # Update existing account
-                        resp = requests.put(
+                        # 更新已有账号（不传 cookies）
+                        resp = req.put(
                             f"{api_url.rstrip('/')}/accounts/{existing_id}",
-                            json={'nickname': nickname, 'cookies': cookie_str},
+                            json={'nickname': nickname, 'cookies': ''},
                             headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
                             timeout=30,
                         )
                     else:
-                        # Create new account
-                        resp = requests.post(
+                        # 创建新账号（不传 cookies）
+                        resp = req.post(
                             f"{api_url.rstrip('/')}/accounts",
                             json={
-                                'platform': info['key'],
+                                'platform': platform_key,
                                 'platformUserId': platform_uid,
                                 'nickname': nickname,
-                                'cookies': cookie_str,
+                                'cookies': '',  # 空字符串，cookie 留本地
                             },
                             headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
                             timeout=30,
@@ -1565,77 +2026,114 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     data = resp.json()
                     account_id = (data.get('data') or {}).get('id') or existing_id
                     if not account_id:
-                        # Try to find by platformUserId
-                        check2 = requests.get(f"{api_url.rstrip('/')}/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=15)
+                        check2 = req.get(f"{api_url.rstrip('/')}/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=15)
                         for acc in ((check2.json().get('data') or {}).get('accounts') or []):
                             if acc.get('platformUserId') == platform_uid:
                                 account_id = acc.get('id'); break
 
-                    # Immediately scrape metrics while session is alive
-                    metrics = {}
-                    if account_id and 'login' not in page.url.lower():
-                        try:
-                            # Parse followers from page
-                            m = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
-                            if m: metrics['followers'] = _parse_metric_num(m.group(1))
+                    # ── 存入本地 DB + 保存 Profile 状态 ──
+                    if account_id:
+                        profile_dir = get_or_create_profile_dir(account_id, platform_key)
+                        add_account(account_id, platform_key, profile_dir.name,
+                                    platform_uid=platform_uid, nickname=nickname)
+                        # CDP 模式：保存 storage_state 到 Profile 目录，供 _scrape_all 使用
+                        target_profile = str(profile_dir)
+                        Path(target_profile).mkdir(parents=True, exist_ok=True)
+                        state_path = Path(target_profile) / 'state.json'
+                        await context.storage_state(path=str(state_path))
+                        print(f'[Worker] Storage state saved: {state_path}')
 
-                            # Parse yesterday's data
-                            yd_start = page_text.find('昨日数据')
-                            if yd_start > 0:
-                                yd = page_text[yd_start:yd_start+500]
-                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
-                                    m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
-                                    if m: metrics[key] = _parse_metric_num(m.group(1))
-
-                            # Deep scrape all pages in one pass
-                            extra = {}
+                        # 立即采集初始数据
+                        metrics = {}
+                        # 判断是否已在仪表盘（有数据内容就行，不依赖URL判断）
+                        has_dashboard = any(kw in page_text[:2000]
+                            for kw in ['关注者', '粉丝', '数据中心', 'dashboard', '粉丝数'])
+                        if has_dashboard:
                             try:
-                                extra = await _scrape_account_pages(context, platform)
-                            except Exception:
-                                pass
+                                m_f = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
+                                if m_f: metrics['followers'] = _parse_metric_num(m_f.group(1))
+                                m_f2 = re.search(r'粉丝\s*(?:\n\s*)?([\d,.]+[万wW]?)', page_text[:3000])
+                                if m_f2 and 'followers' not in metrics:
+                                    metrics['followers'] = _parse_metric_num(m_f2.group(1))
 
-                            for k, v in extra.get('metrics', {}).items():
-                                if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
-                                    metrics[k] = v
+                                yd_start = page_text.find('昨日数据')
+                                if yd_start > 0:
+                                    yd = page_text[yd_start:yd_start+500]
+                                    for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
+                                        m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
+                                        if m: metrics[key] = _parse_metric_num(m.group(1))
 
-                            if metrics:
-                                rpt = requests.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
-                                    json={'accountId': account_id, 'metrics': metrics},
-                                    headers={'Authorization': f'Bearer {token}'}, timeout=30)
-
-                            vstats = extra.get('video_stats') or []
-                            if vstats and account_id:
+                                # Deep scrape
+                                extra = {}
                                 try:
-                                    requests.post(
-                                        f'{api_url}/platforms/report-post-stats',
-                                        json={'accountId': account_id, 'posts': vstats},
-                                        headers={'Authorization': f'Bearer {token}'}, timeout=30,
-                                    )
-                                except Exception:
-                                    pass
+                                    extra = await _scrape_account_pages(context, platform_key)
+                                except Exception as e:
+                                    print(f'[DC] deep scrape error {platform_key}: {e}')
+                                for k, v in extra.get('metrics', {}).items():
+                                    if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
+                                        metrics[k] = v
 
-                            if use_sse:
-                                f_count = metrics.get('followers', '?')
-                                v_count = metrics.get('views', '?')
-                                p_count = len(vstats)
-                                queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count} 视频{p_count}条'}))
-                        except Exception as e:
-                            if use_sse:
-                                queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
+                                # Extract historical data before reporting
+                                history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
+
+                                if metrics:
+                                    req.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
+                                        json={'accountId': account_id, 'metrics': metrics},
+                                        headers={'Authorization': f'Bearer {token}'}, timeout=30)
+
+                                # Report historical data (7-day / 30-day)
+                                if history:
+                                    for hist_entry in history:
+                                        hist_date = hist_entry.pop('date', None)
+                                        if not hist_date:
+                                            continue
+                                        try:
+                                            req.post(
+                                                f'{api_url}/platforms/report-metrics',
+                                                json={'accountId': account_id, 'metrics': hist_entry, 'date': hist_date},
+                                                headers={'Authorization': f'Bearer {token}'}, timeout=30,
+                                            )
+                                        except Exception:
+                                            pass
+
+                                vstats = extra.get('video_stats') or []
+                                if vstats and account_id:
+                                    try:
+                                        req.post(
+                                            f'{api_url}/platforms/report-post-stats',
+                                            json={'accountId': account_id, 'posts': vstats},
+                                            headers={'Authorization': f'Bearer {token}'}, timeout=30,
+                                        )
+                                    except Exception:
+                                        pass
+
+                                if use_sse:
+                                    f_count = metrics.get('followers', '?')
+                                    v_count = metrics.get('views', '?')
+                                    p_count = len(vstats)
+                                    queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count} 视频{p_count}条'}))
+                            except Exception as e:
+                                if use_sse:
+                                    queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
 
                     if data.get('code') == 0:
                         _record_scan_time(platform)
                     if use_sse:
-                        if data.get('code') == 0:
+                        if data.get('code') == 0 or account_id:
                             queue.put(json.dumps({'type':'success','data':{'platform':platform,'cookies_count':len(cookies),'account_id':account_id}}))
                         else:
                             queue.put(json.dumps({'type':'error','data':f"上传失败: {data.get('message','未知错误')}"}))
-                    await context.close()
+
+                    # 只关 page，不关 context（会杀死 CDP 浏览器）
+                    if page:
+                        try: await page.close()
+                        except: pass
+
                     if session_id:
                         scan_status[session_id] = 'done'
                         if session_id in active_sessions: del active_sessions[session_id]
             except Exception as e:
-                import traceback, tempfile
+                import traceback
                 err_full = traceback.format_exc()
                 try:
                     with open(Path(tempfile.gettempdir()) / 'pixingyun_error.log', 'w', encoding='utf-8') as f:
@@ -1657,9 +2155,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
 
 @app.route('/')
 def index():
-    resp = make_response(UI_HTML)
-    resp.headers['Content-Type'] = 'text/html; charset=utf-8'
-    return resp
+    return make_response(UI_HTML)
 
 
 @app.route('/health')
@@ -1700,14 +2196,16 @@ def cancel_scan():
 @app.route('/api/scan-bind/trigger')
 def scan_bind_trigger():
     """网站调用 — 返回 JSON，快速触发扫码"""
-    platform = request.args.get('platform', 'douyin')
+    platform = request.args.get('platform', '').strip()
     token = request.args.get('token', '')
     api_url = request.args.get('api_url', '')
 
-    if not token or not api_url:
-        return jsonify({'code':400,'msg':'缺少参数'}), 400
+    if not platform or not token or not api_url:
+        return jsonify({'code':400,'msg':'缺少参数（platform/token/api_url）'}), 400
     if platform not in PLATFORMS:
         return jsonify({'code':400,'msg':f'不支持的平台: {platform}'}), 400
+    if not _CDP_URL:
+        return jsonify({'code':503,'msg':'Chrome CDP 未就绪，请先解决 Chrome 启动问题'}), 503
 
     info = PLATFORMS[platform]
     session_id = uuid.uuid4().hex[:12]
@@ -1727,12 +2225,12 @@ def scan_bind_trigger():
 @app.route('/api/scan-bind/start')
 def scan_bind_start():
     """桌面伴侣 UI 调用 — SSE 流式返回扫码进度"""
-    platform = request.args.get('platform', 'douyin')
+    platform = request.args.get('platform', '').strip()
     token = request.args.get('token', '')
     api_url = request.args.get('api_url', '')
 
-    if not token or not api_url:
-        return jsonify({'code':400,'msg':'缺少参数'}), 400
+    if not platform or not token or not api_url:
+        return jsonify({'code':400,'msg':'缺少参数（platform/token/api_url）'}), 400
     if platform not in PLATFORMS:
         return jsonify({'code':400,'msg':f'不支持的平台: {platform}'}), 400
 
@@ -1780,43 +2278,69 @@ def scan_bind_start():
 # Main
 # ══════════════════════════════════════════════════════════════════
 if __name__ == '__main__':
+    import threading, sys, os, time, urllib.request, webbrowser
+
+    no_cdp = '--no-cdp' in sys.argv
+
+    if no_cdp:
+        _CDP_URL = None  # 关键：防止 503 检查形同虚设
+        print('=' * 50)
+        print('  披星云伴侣 v3.1 (纯浏览器模式)')
+        print('  警告: 此模式下扫码绑定功能不可用')
+        print('=' * 50)
+        print(f'[Main] 启动 Flask 于 http://localhost:5409 ...')
+        app.run(host='127.0.0.1', port=5409, debug=False)
+        sys.exit(0)
+
     print('=' * 50)
-    print('  披星云桌面伴侣 v3.0')
+    print('  披星云桌面伴侣 v3.1 (单窗口 CDP 模式)')
     print('=' * 50)
 
-    import threading, sys, os
+    APP_URL = 'http://localhost:5409'
 
+    # ── 1. 先启动 Flask ──
     def start_flask():
         app.run(host='127.0.0.1', port=5409, debug=False)
 
     flask_thread = threading.Thread(target=start_flask, daemon=True)
     flask_thread.start()
 
-    # Use native window via pywebview (no browser needed)
-    try:
-        import webview
-        import time
-        time.sleep(2)  # Wait for Flask to be ready
-
-        # Create native window
-        webview.create_window(
-            title='披星云桌面伴侣 v3.0',
-            url='http://localhost:5409',
-            width=1024,
-            height=720,
-            min_size=(800, 600),
-            resizable=True,
-            text_select=True,
-        )
-        webview.start()
-    except ImportError:
-        # Fallback: open browser
-        import webbrowser
-        webbrowser.open('http://localhost:5409')
-        print('pywebview not installed, using browser fallback')
-        # Keep the main thread alive
+    # 等待 Flask 就绪
+    print('[Main] 等待 Flask 就绪...')
+    deadline = time.time() + 10
+    flask_ready = False
+    while time.time() < deadline:
         try:
-            while True:
-                import time; time.sleep(1)
-        except KeyboardInterrupt:
-            pass
+            urllib.request.urlopen(APP_URL, timeout=1)
+            flask_ready = True
+            break
+        except Exception:
+            time.sleep(0.3)
+    if not flask_ready:
+        print('[Main] 错误: Flask 启动超时')
+        sys.exit(1)
+    print('[Main] Flask 就绪')
+
+    # ── 2. 启动 CDP Chrome ──
+    cdp_ready = False
+    try:
+        print('[Main] 启动 Chrome（含 CDP 调试端口 + app 窗口）...')
+        _cdp.start(open_url=APP_URL, app_mode=True)
+        _CDP_URL = _cdp.get_url()
+        cdp_ready = True
+        print(f'[Main] Chrome 就绪 | CDP: {_CDP_URL} | App: {APP_URL}')
+    except Exception as e:
+        print(f'[Main] Chrome 启动失败: {e}')
+        webbrowser.open(APP_URL)
+        print('[Main] 回退到系统浏览器')
+        _CDP_URL = None
+
+    # ── 3. 等待用户关闭 ──
+    try:
+        while _cdp.is_running:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        print('[Main] 正在关闭...')
+        _cdp.stop()

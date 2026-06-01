@@ -11,61 +11,61 @@ export declare class UsersService {
         orderBy?: Prisma.UserOrderByWithRelationInput;
     }): Promise<{
         users: {
+            name: string;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            avatar: string | null;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            email: string;
+            phone: string | null;
+            role: import(".prisma/client").$Enums.UserRole;
+            lastLoginAt: Date | null;
             organization: {
                 name: string;
                 id: string;
                 plan: string;
             } | null;
-            name: string;
-            email: string;
-            phone: string | null;
-            id: string;
-            avatar: string | null;
-            role: import(".prisma/client").$Enums.UserRole;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            lastLoginAt: Date | null;
-            createdAt: Date;
-            updatedAt: Date;
         }[];
         total: number;
         skip: number;
         take: number;
     }>;
     findById(id: string): Promise<{
+        name: string;
+        accounts: {
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            avatar: string | null;
+            followers: number;
+            status: import(".prisma/client").$Enums.AccountStatus;
+        }[];
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
+        email: string;
+        phone: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
+        lastLoginAt: Date | null;
         organization: {
             name: string;
             id: string;
             status: import(".prisma/client").$Enums.AccountStatus;
             plan: string;
         } | null;
-        name: string;
-        email: string;
-        phone: string | null;
-        id: string;
-        avatar: string | null;
-        role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        lastLoginAt: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
-        accounts: {
-            id: string;
-            avatar: string | null;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            followers: number;
-        }[];
     }>;
     update(id: string, data: Prisma.UserUpdateInput): Promise<{
         name: string;
+        id: string;
+        updatedAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
         email: string;
         phone: string | null;
-        id: string;
-        avatar: string | null;
         role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        updatedAt: Date;
     }>;
     remove(id: string): Promise<{
         id: string;
@@ -83,12 +83,12 @@ export declare class UsersService {
     }>;
     findByOrganization(organizationId: string): Promise<{
         name: string;
-        email: string;
         id: string;
-        avatar: string | null;
-        role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        lastLoginAt: Date | null;
         createdAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
+        email: string;
+        role: import(".prisma/client").$Enums.UserRole;
+        lastLoginAt: Date | null;
     }[]>;
 }

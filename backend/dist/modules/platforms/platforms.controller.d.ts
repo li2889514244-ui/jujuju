@@ -1,6 +1,6 @@
 import { PlatformsService } from './platforms.service';
 import { OAuthService } from './oauth/oauth.service';
-import { AuthorizePlatformDto, CollectDataDto, BatchCollectDto, PlatformFilterDto } from './dto/platform.dto';
+import { AuthorizePlatformDto, CollectDataDto, BatchCollectDto, PlatformFilterDto, ReportMetricsDto, ReportPostStatsDto } from './dto/platform.dto';
 export declare class PlatformsController {
     private readonly platformsService;
     private readonly oauthService;
@@ -44,6 +44,26 @@ export declare class PlatformsController {
             success: boolean;
             error?: string;
         }[];
+    }>;
+    reportMetrics(dto: ReportMetricsDto): Promise<{
+        success: boolean;
+        error?: undefined;
+    } | {
+        success: boolean;
+        error: any;
+    }>;
+    reportPostStats(dto: ReportPostStatsDto): Promise<{
+        success: boolean;
+        error: string;
+        created?: undefined;
+        updated?: undefined;
+        total?: undefined;
+    } | {
+        success: boolean;
+        created: number;
+        updated: number;
+        total: number;
+        error?: undefined;
     }>;
     refreshToken(accountId: string): Promise<{
         success: boolean;

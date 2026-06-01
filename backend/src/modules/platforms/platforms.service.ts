@@ -12,6 +12,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OAuthService } from './oauth/oauth.service';
 import { PLATFORM_CONFIGS } from './config/platform-config';
+import { ReportMetricsDto, ReportPostStatsDto } from './dto/platform.dto';
 import { IDataCollector } from './collectors/data-collector.interface';
 import { DouyinCollector } from './collectors/douyin.collector';
 import { KuaishouCollector } from './collectors/kuaishou.collector';
@@ -203,6 +204,143 @@ export class PlatformsService {
       failed: accountIds.length - successCount,
       results,
     };
+  }
+
+  // ==================== 伴侣数据上报 ====================
+
+  /**
+   * 接收桌面伴侣上报的账号指标，写入 DailyStats 并更新 Account
+   */
+  async reportMetrics(dto: ReportMetricsDto) {
+    const { accountId, metrics, date } = dto;
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) {
+      this.logger.warn(`reportMetrics: account ${accountId} not found`);
+      return { success: false, error: 'Account not found' };
+    }
+
+    // Use provided date or default to today
+    let targetDate: Date;
+    if (date) {
+      targetDate = new Date(date);
+      targetDate.setHours(0, 0, 0, 0);
+    } else {
+      targetDate = new Date();
+      targetDate.setHours(0, 0, 0, 0);
+    }
+    const platform = account.platform as any;
+
+    try {
+      // Upsert DailyStats for the target date (including monetization + store fields)
+      const statData = {
+        followers: metrics.followers || 0,
+        views: metrics.views || 0,
+        likes: metrics.likes || 0,
+        comments: metrics.comments || 0,
+        shares: metrics.shares || 0,
+        revenue: metrics.revenue || 0,
+        gmv: metrics.gmv || 0,
+        orders: metrics.orders || 0,
+        commission: metrics.commission || 0,
+        buyerCount: metrics.buyerCount || 0,
+        productCount: metrics.productCount || 0,
+        avgOrderValue: metrics.avgOrderValue || 0,
+      };
+      await this.prisma.dailyStats.upsert({
+        where: { accountId_date: { accountId, date: targetDate } },
+        update: statData,
+        create: { accountId, platform, date: targetDate, ...statData },
+      });
+
+      // Update Account fields
+      const accountUpdates: any = {};
+      if (metrics.followers && metrics.followers > 0) accountUpdates.followers = metrics.followers;
+      if (metrics.following !== undefined) accountUpdates.following = metrics.following;
+      const nickname = metrics._nickname;
+      if (nickname && typeof nickname === 'string' && nickname.length >= 2) accountUpdates.nickname = nickname;
+      if (metrics.storeScore !== undefined) accountUpdates.storeScore = metrics.storeScore;
+      if (metrics.storeDiagnosis !== undefined) accountUpdates.storeDiagnosis = metrics.storeDiagnosis;
+
+      if (Object.keys(accountUpdates).length > 0) {
+        await this.prisma.account.update({
+          where: { id: accountId },
+          data: accountUpdates,
+        });
+      }
+
+      this.logger.log(`reportMetrics: ${accountId} followers=${metrics.followers} views=${metrics.views} revenue=${metrics.revenue}`);
+      return { success: true };
+    } catch (e: any) {
+      this.logger.error(`reportMetrics error: ${e.message}`);
+      return { success: false, error: e.message };
+    }
+  }
+
+  /**
+   * 接收桌面伴侣上报的视频/帖子数据，写入 Post + PostStats
+   */
+  async reportPostStats(dto: ReportPostStatsDto) {
+    const { accountId, posts } = dto;
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+    if (!account) {
+      this.logger.warn(`reportPostStats: account ${accountId} not found`);
+      return { success: false, error: 'Account not found' };
+    }
+
+    let created = 0;
+    let updated = 0;
+
+    for (const p of posts) {
+      try {
+        const title = p.title || '';
+        // Use title as a unique-ish key for the post within this account
+        const postId = `${accountId}_${title.substring(0, 40)}`;
+
+        // Find existing post by title match
+        const existing = await this.prisma.post.findFirst({
+          where: { accountId, title },
+        });
+
+        let post;
+        if (existing) {
+          post = existing;
+          updated++;
+        } else {
+          post = await this.prisma.post.create({
+            data: {
+              accountId,
+              title,
+              status: 'PUBLISHED',
+            },
+          });
+          created++;
+        }
+
+        // Upsert PostStats
+        await this.prisma.postStats.upsert({
+          where: { postId: post.id },
+          update: {
+            views: p.views || 0,
+            likes: p.likes || 0,
+            comments: p.comments || 0,
+            shares: p.shares || 0,
+            collectedAt: new Date(),
+          },
+          create: {
+            postId: post.id,
+            views: p.views || 0,
+            likes: p.likes || 0,
+            comments: p.comments || 0,
+            shares: p.shares || 0,
+          },
+        });
+      } catch (e: any) {
+        this.logger.warn(`reportPostStats item error: ${e.message}`);
+      }
+    }
+
+    this.logger.log(`reportPostStats: ${accountId} created=${created} updated=${updated}`);
+    return { success: true, created, updated, total: posts.length };
   }
 
   // ==================== Token管理 ====================

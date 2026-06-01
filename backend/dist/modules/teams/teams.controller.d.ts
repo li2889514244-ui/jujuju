@@ -18,16 +18,16 @@ export declare class TeamsController {
         updatedAt: Date;
     }>;
     findAll(organizationId?: string): Promise<({
+        accounts: {
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            status: import(".prisma/client").$Enums.AccountStatus;
+        }[];
         organization: {
             name: string;
             id: string;
         };
-        accounts: {
-            id: string;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-        }[];
     } & {
         id: string;
         name: string;
@@ -37,28 +37,28 @@ export declare class TeamsController {
     })[]>;
     getMembers(orgId: string): Promise<{
         name: string;
-        email: string;
         id: string;
-        avatar: string | null;
-        role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        lastLoginAt: Date | null;
         createdAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
+        email: string;
+        role: import(".prisma/client").$Enums.UserRole;
+        lastLoginAt: Date | null;
     }[]>;
     inviteMember(dto: InviteMemberDto, userId: string): Promise<{
+        name: string;
+        id: string;
+        email: string;
+        role: import(".prisma/client").$Enums.UserRole;
         organization: {
             name: string;
             id: string;
         } | null;
-        name: string;
-        email: string;
-        id: string;
-        role: import(".prisma/client").$Enums.UserRole;
     }>;
     updateMemberRole(memberId: string, role: Role, userId: string, orgId: string): Promise<{
         name: string;
-        email: string;
         id: string;
+        email: string;
         role: import(".prisma/client").$Enums.UserRole;
     }>;
     removeMember(memberId: string, userId: string, orgId: string): Promise<{
@@ -76,24 +76,24 @@ export declare class TeamsController {
         organizationId: string | null;
     }>;
     findOne(id: string): Promise<{
+        accounts: {
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            avatar: string | null;
+            followers: number;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            owner: {
+                name: string;
+                id: string;
+                email: string;
+            };
+        }[];
         organization: {
             name: string;
             id: string;
             plan: string;
         };
-        accounts: {
-            id: string;
-            avatar: string | null;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            followers: number;
-            owner: {
-                name: string;
-                email: string;
-                id: string;
-            };
-        }[];
     } & {
         id: string;
         name: string;

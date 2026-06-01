@@ -1,5 +1,6 @@
 import { PrismaService } from '../../prisma/prisma.service';
 import { OAuthService } from './oauth/oauth.service';
+import { ReportMetricsDto, ReportPostStatsDto } from './dto/platform.dto';
 import { DouyinCollector } from './collectors/douyin.collector';
 import { KuaishouCollector } from './collectors/kuaishou.collector';
 import { XiaohongshuCollector } from './collectors/xiaohongshu.collector';
@@ -40,6 +41,26 @@ export declare class PlatformsService {
             success: boolean;
             error?: string;
         }[];
+    }>;
+    reportMetrics(dto: ReportMetricsDto): Promise<{
+        success: boolean;
+        error?: undefined;
+    } | {
+        success: boolean;
+        error: any;
+    }>;
+    reportPostStats(dto: ReportPostStatsDto): Promise<{
+        success: boolean;
+        error: string;
+        created?: undefined;
+        updated?: undefined;
+        total?: undefined;
+    } | {
+        success: boolean;
+        created: number;
+        updated: number;
+        total: number;
+        error?: undefined;
     }>;
     refreshToken(accountId: string): Promise<boolean>;
     refreshExpiringTokens(): Promise<{

@@ -68,7 +68,10 @@ export interface Account {
   tokenStatus: 'valid' | 'expiring_soon' | 'expired' | 'unknown'
   lastActiveAt: string
   followers: number
+  following: number
   likes: number
+  storeScore: number | null
+  storeDiagnosis: string | null
   createdAt: string
 }
 

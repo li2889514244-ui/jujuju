@@ -37,9 +37,9 @@ export declare class ContentService {
         posts: ({
             account: {
                 id: string;
-                avatar: string | null;
                 platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
+                avatar: string | null;
             };
             stats: {
                 id: string;
@@ -73,10 +73,10 @@ export declare class ContentService {
     findById(id: string, userId?: string): Promise<{
         account: {
             id: string;
-            avatar: string | null;
+            userId: string;
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
-            userId: string;
+            avatar: string | null;
         };
         stats: {
             id: string;
@@ -160,9 +160,9 @@ export declare class ContentService {
     getScheduledPosts(): Promise<({
         account: {
             id: string;
+            userId: string;
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
-            userId: string;
         };
     } & {
         id: string;

@@ -32,9 +32,18 @@
             <el-descriptions-item label="粉丝数">{{
               account.followers?.toLocaleString()
             }}</el-descriptions-item>
+            <el-descriptions-item label="关注数">{{
+              account.following?.toLocaleString()
+            }}</el-descriptions-item>
             <el-descriptions-item label="获赞数">{{
               account.likes?.toLocaleString()
             }}</el-descriptions-item>
+            <el-descriptions-item label="店铺评分" v-if="account.storeScore != null">
+              {{ account.storeScore }}
+            </el-descriptions-item>
+            <el-descriptions-item label="店铺诊断" v-if="account.storeDiagnosis">
+              {{ account.storeDiagnosis }}
+            </el-descriptions-item>
             <el-descriptions-item label="最近活跃">{{
               formatTime(account.lastActiveAt)
             }}</el-descriptions-item>

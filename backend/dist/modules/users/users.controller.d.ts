@@ -12,87 +12,87 @@ export declare class UsersController {
     constructor(usersService: UsersService, prisma: PrismaService);
     findAll(page?: number, limit?: number, search?: string): Promise<{
         users: {
+            name: string;
+            id: string;
+            createdAt: Date;
+            updatedAt: Date;
+            avatar: string | null;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            email: string;
+            phone: string | null;
+            role: import(".prisma/client").$Enums.UserRole;
+            lastLoginAt: Date | null;
             organization: {
                 name: string;
                 id: string;
                 plan: string;
             } | null;
-            name: string;
-            email: string;
-            phone: string | null;
-            id: string;
-            avatar: string | null;
-            role: import(".prisma/client").$Enums.UserRole;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            lastLoginAt: Date | null;
-            createdAt: Date;
-            updatedAt: Date;
         }[];
         total: number;
         skip: number;
         take: number;
     }>;
     getProfile(userId: string): Promise<{
+        name: string;
+        accounts: {
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            avatar: string | null;
+            followers: number;
+            status: import(".prisma/client").$Enums.AccountStatus;
+        }[];
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
+        email: string;
+        phone: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
+        lastLoginAt: Date | null;
         organization: {
             name: string;
             id: string;
             status: import(".prisma/client").$Enums.AccountStatus;
             plan: string;
         } | null;
-        name: string;
-        email: string;
-        phone: string | null;
-        id: string;
-        avatar: string | null;
-        role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        lastLoginAt: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
-        accounts: {
-            id: string;
-            avatar: string | null;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            followers: number;
-        }[];
     }>;
     findOne(id: string, currentUserId: string, currentRole: Role): Promise<{
+        name: string;
+        accounts: {
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            avatar: string | null;
+            followers: number;
+            status: import(".prisma/client").$Enums.AccountStatus;
+        }[];
+        id: string;
+        createdAt: Date;
+        updatedAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
+        email: string;
+        phone: string | null;
+        role: import(".prisma/client").$Enums.UserRole;
+        lastLoginAt: Date | null;
         organization: {
             name: string;
             id: string;
             status: import(".prisma/client").$Enums.AccountStatus;
             plan: string;
         } | null;
-        name: string;
-        email: string;
-        phone: string | null;
-        id: string;
-        avatar: string | null;
-        role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        lastLoginAt: Date | null;
-        createdAt: Date;
-        updatedAt: Date;
-        accounts: {
-            id: string;
-            avatar: string | null;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            followers: number;
-        }[];
     }>;
     updateProfile(userId: string, dto: UpdateUserDto): Promise<{
         name: string;
+        id: string;
+        updatedAt: Date;
+        avatar: string | null;
+        status: import(".prisma/client").$Enums.AccountStatus;
         email: string;
         phone: string | null;
-        id: string;
-        avatar: string | null;
         role: import(".prisma/client").$Enums.UserRole;
-        status: import(".prisma/client").$Enums.AccountStatus;
-        updatedAt: Date;
     }>;
     remove(id: string): Promise<{
         id: string;

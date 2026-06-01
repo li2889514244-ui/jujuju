@@ -18,6 +18,65 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         this.prisma = prisma;
         this.logger = new common_1.Logger(AnalyticsService_1.name);
     }
+    async getFollowersTrend(userId, days = 7, platform) {
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        startDate.setHours(0, 0, 0, 0);
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, ...(platform ? { platform: platform } : {}) },
+            select: { id: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const stats = await this.prisma.dailyStats.findMany({
+            where: {
+                accountId: { in: accountIds },
+                date: { gte: startDate },
+            },
+            select: { date: true, followers: true },
+            orderBy: { date: 'asc' },
+        });
+        const byDate = {};
+        for (const s of stats) {
+            const key = s.date.toISOString().slice(0, 10);
+            byDate[key] = (byDate[key] || 0) + s.followers;
+        }
+        const result = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(d.getDate() - i);
+            const key = d.toISOString().slice(0, 10);
+            result.push({ date: key, value: byDate[key] || 0 });
+        }
+        return result;
+    }
+    async createManualMonetization(userId, dto) {
+        const account = await this.prisma.account.findFirst({
+            where: { userId, platform: dto.platform },
+            select: { id: true },
+        });
+        if (!account)
+            throw new Error('未找到该平台的账号');
+        const date = new Date(dto.date);
+        date.setHours(0, 0, 0, 0);
+        const data = {};
+        if (dto.revenue !== undefined)
+            data.revenue = dto.revenue;
+        if (dto.gmv !== undefined)
+            data.gmv = dto.gmv;
+        if (dto.orders !== undefined)
+            data.orders = dto.orders;
+        if (dto.buyerCount !== undefined)
+            data.buyerCount = dto.buyerCount;
+        if (dto.commission !== undefined)
+            data.commission = dto.commission;
+        if (dto.avgOrderValue !== undefined)
+            data.avgOrderValue = dto.avgOrderValue;
+        return this.prisma.dailyStats.upsert({
+            where: { accountId_date: { accountId: account.id, date } },
+            create: { accountId: account.id, date, platform: dto.platform, ...data },
+            update: data,
+        });
+    }
     async getDailyStats(dto) {
         const where = {};
         if (dto.accountId)
@@ -377,6 +436,237 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         localTime.setUTCDate(diff);
         localTime.setUTCHours(0, 0, 0, 0);
         return new Date(localTime.getTime() - utc8Offset);
+    }
+    async getLikesTrend(userId, days = 7, platform) {
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, ...(platform ? { platform: platform } : {}) },
+            select: { id: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const stats = await this.prisma.dailyStats.findMany({
+            where: { accountId: { in: accountIds }, date: { gte: startDate } },
+            orderBy: { date: 'asc' },
+            select: { date: true, likes: true },
+        });
+        const byDate = {};
+        for (const s of stats) {
+            const d = s.date.toISOString().slice(0, 10);
+            byDate[d] = (byDate[d] || 0) + s.likes;
+        }
+        const result = [];
+        for (let i = days - 1; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+            const key = d.toISOString().slice(0, 10);
+            result.push({ date: key, value: byDate[key] || 0 });
+        }
+        return result;
+    }
+    async getPublishEffect(userId, days, contentId) {
+        const accounts = await this.prisma.account.findMany({
+            where: { userId },
+            select: { id: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const where = { accountId: { in: accountIds } };
+        if (contentId)
+            where.id = contentId;
+        if (days) {
+            where.createdAt = { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) };
+        }
+        const posts = await this.prisma.post.findMany({
+            where,
+            include: {
+                stats: true,
+                account: { select: { nickname: true, platform: true } },
+            },
+            orderBy: { createdAt: 'desc' },
+            take: 50,
+        });
+        return posts.map((p) => ({
+            id: p.id,
+            title: p.title,
+            platform: p.account.platform,
+            accountName: p.account.nickname,
+            status: p.status,
+            views: p.stats?.views || 0,
+            likes: p.stats?.likes || 0,
+            comments: p.stats?.comments || 0,
+            shares: p.stats?.shares || 0,
+            publishedAt: p.publishAt || p.createdAt,
+        }));
+    }
+    async getEngagementRate(userId, days = 7, platform) {
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, ...(platform ? { platform: platform } : {}) },
+            select: { id: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const stats = await this.prisma.dailyStats.findMany({
+            where: { accountId: { in: accountIds }, date: { gte: startDate } },
+            orderBy: { date: 'asc' },
+            select: { date: true, views: true, likes: true, comments: true, shares: true },
+        });
+        const byDate = {};
+        for (const s of stats) {
+            const d = s.date.toISOString().slice(0, 10);
+            if (!byDate[d])
+                byDate[d] = { views: 0, interactions: 0 };
+            byDate[d].views += s.views;
+            byDate[d].interactions += s.likes + s.comments + s.shares;
+        }
+        return Object.entries(byDate).map(([date, data]) => ({
+            date,
+            value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
+        }));
+    }
+    async exportReport(userId, startDate, endDate, format = 'json') {
+        const report = await this.generateReport(userId, {
+            startDate: startDate ? new Date(startDate) : undefined,
+            endDate: endDate ? new Date(endDate) : undefined,
+        });
+        if (format === 'csv') {
+            const headers = 'date,platform,account,views,likes,comments,shares,followers';
+            const rows = (report.dailyTrend || []).map((d) => `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`);
+            return [headers, ...rows].join('\n');
+        }
+        return report;
+    }
+    async getMonetization(userId, days = 30, platform) {
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, ...(platform ? { platform: platform } : {}) },
+            select: { id: true, platform: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const stats = await this.prisma.dailyStats.findMany({
+            where: { accountId: { in: accountIds }, date: { gte: startDate } },
+            orderBy: { date: 'asc' },
+            include: { account: { select: { platform: true } } },
+        });
+        const totals = { revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
+        let avgCount = 0;
+        const byPlatform = {};
+        const dailyTrend = [];
+        for (const s of stats) {
+            totals.revenue += s.revenue;
+            totals.gmv += s.gmv;
+            totals.orders += s.orders;
+            totals.commission += s.commission;
+            totals.buyerCount += s.buyerCount;
+            if (s.avgOrderValue > 0) {
+                totals.avgOrderValue += s.avgOrderValue;
+                avgCount++;
+            }
+            const p = s.account.platform;
+            if (!byPlatform[p]) {
+                byPlatform[p] = { platform: p, revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
+            }
+            byPlatform[p].revenue += s.revenue;
+            byPlatform[p].gmv += s.gmv;
+            byPlatform[p].orders += s.orders;
+            byPlatform[p].commission += s.commission;
+            byPlatform[p].buyerCount += s.buyerCount;
+            if (s.avgOrderValue > 0) {
+                byPlatform[p].avgOrderValue = Math.round((byPlatform[p].avgOrderValue + s.avgOrderValue) / 2);
+            }
+            dailyTrend.push({
+                date: s.date.toISOString().slice(0, 10),
+                revenue: s.revenue,
+                gmv: s.gmv,
+                orders: s.orders,
+                commission: s.commission,
+                buyerCount: s.buyerCount,
+                avgOrderValue: s.avgOrderValue,
+            });
+        }
+        if (avgCount > 0)
+            totals.avgOrderValue = Math.round(totals.avgOrderValue / avgCount);
+        return {
+            totalRevenue: totals.revenue,
+            totalGmv: totals.gmv,
+            totalOrders: totals.orders,
+            totalCommission: totals.commission,
+            totalBuyerCount: totals.buyerCount,
+            totalAvgOrderValue: totals.avgOrderValue,
+            byPlatform: Object.values(byPlatform),
+            dailyTrend,
+        };
+    }
+    async getAccountAnalytics(accountId) {
+        const [posts, statsAgg, postCount] = await Promise.all([
+            this.prisma.post.findMany({
+                where: { accountId },
+                include: { stats: true },
+            }),
+            this.prisma.postStats.aggregate({
+                where: { post: { accountId } },
+                _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
+            }),
+            this.prisma.post.count({ where: { accountId } }),
+        ]);
+        const totalInteractions = (statsAgg._sum.likes || 0) + (statsAgg._sum.comments || 0) + (statsAgg._sum.shares || 0);
+        const totalViews = statsAgg._sum.views || 0;
+        const avgEngagementRate = totalViews > 0
+            ? Math.round((totalInteractions / totalViews) * 10000) / 100
+            : 0;
+        return {
+            totalViews,
+            totalLikes: statsAgg._sum.likes || 0,
+            totalComments: statsAgg._sum.comments || 0,
+            totalShares: statsAgg._sum.shares || 0,
+            totalSaves: statsAgg._sum.saves || 0,
+            totalPosts: postCount,
+            avgEngagementRate,
+        };
+    }
+    async getAccountPosts(accountId, params) {
+        const { page, pageSize, sortBy, sortOrder } = params;
+        const skip = (page - 1) * pageSize;
+        const where = { accountId };
+        const orderBy = {};
+        const statsFields = ['views', 'likes', 'comments', 'shares', 'saves'];
+        if (statsFields.includes(sortBy)) {
+            orderBy.stats = { [sortBy]: sortOrder };
+        }
+        else {
+            orderBy[sortBy] = sortOrder;
+        }
+        const [posts, total] = await Promise.all([
+            this.prisma.post.findMany({
+                where,
+                include: { stats: true, account: { select: { platform: true } } },
+                orderBy,
+                skip,
+                take: pageSize,
+            }),
+            this.prisma.post.count({ where }),
+        ]);
+        const items = posts.map((p) => {
+            const views = p.stats?.views || 0;
+            const likes = p.stats?.likes || 0;
+            const comments = p.stats?.comments || 0;
+            const shares = p.stats?.shares || 0;
+            const engagementRate = views > 0
+                ? Math.round(((likes + comments + shares) / views) * 10000) / 100
+                : 0;
+            return {
+                id: p.id,
+                title: p.title,
+                platform: p.account.platform,
+                status: p.status,
+                publishAt: p.publishAt?.toISOString() || null,
+                createdAt: p.createdAt.toISOString(),
+                views,
+                likes,
+                comments,
+                shares,
+                saves: p.stats?.saves || 0,
+                engagementRate,
+            };
+        });
+        return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
     }
 };
 exports.AnalyticsService = AnalyticsService;

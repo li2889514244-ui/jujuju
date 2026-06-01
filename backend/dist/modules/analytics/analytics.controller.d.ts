@@ -1,3 +1,4 @@
+import { Response } from 'express';
 import { AnalyticsService } from './analytics.service';
 import { QueryAnalyticsDto } from './dto/query-analytics.dto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -5,6 +6,10 @@ export declare class AnalyticsController {
     private readonly analyticsService;
     private readonly prisma;
     constructor(analyticsService: AnalyticsService, prisma: PrismaService);
+    getFollowerTrend(userId: string, days?: number, platform?: string): Promise<{
+        date: string;
+        value: number;
+    }[]>;
     getOverview(userId: string): Promise<{
         accounts: {
             total: number;
@@ -52,14 +57,14 @@ export declare class AnalyticsController {
     })[]>;
     getPostStats(dto: QueryAnalyticsDto, userId: string, userRole: string): Promise<({
         post: {
+            id: string;
+            status: import(".prisma/client").$Enums.PostStatus;
             account: {
                 id: string;
                 platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
             };
             title: string | null;
-            id: string;
-            status: import(".prisma/client").$Enums.PostStatus;
             platformUrl: string | null;
         };
     } & {
@@ -223,6 +228,34 @@ export declare class AnalyticsController {
             change: Record<string, number | null>;
         };
     }>;
+    createManualMonetization(userId: string, dto: {
+        date: string;
+        platform: string;
+        revenue?: number;
+        gmv?: number;
+        orders?: number;
+        buyerCount?: number;
+        commission?: number;
+        avgOrderValue?: number;
+    }): Promise<{
+        id: string;
+        date: Date;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
+        followers: number;
+        views: number;
+        likes: number;
+        comments: number;
+        shares: number;
+        revenue: number;
+        gmv: number;
+        orders: number;
+        commission: number;
+        buyerCount: number;
+        productCount: number;
+        avgOrderValue: number;
+        createdAt: Date;
+        accountId: string;
+    }>;
     getViewsRanking(userId: string, limit?: number, period?: 'week' | 'month' | 'all', platform?: string): Promise<{
         ranking: {
             rank: number;
@@ -239,6 +272,156 @@ export declare class AnalyticsController {
         }[];
         total: number;
         period: "week" | "month" | "all";
+    }>;
+    getLikesTrend(userId: string, days?: number, platform?: string): Promise<{
+        date: string;
+        value: number;
+    }[]>;
+    getPublishEffect(userId: string, days?: number, contentId?: string): Promise<{
+        id: string;
+        title: string | null;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
+        accountName: string;
+        status: import(".prisma/client").$Enums.PostStatus;
+        views: number;
+        likes: number;
+        comments: number;
+        shares: number;
+        publishedAt: Date;
+    }[]>;
+    getEngagementRate(userId: string, days?: number, platform?: string): Promise<{
+        date: string;
+        value: number;
+    }[]>;
+    exportReport(userId: string, startDate?: string, endDate?: string, format?: string, res?: Response): Promise<string | {
+        period: {
+            start: Date;
+            end: Date;
+        };
+        overview: {
+            accounts: {
+                total: number;
+                active: number;
+                byPlatform: Record<string, number>;
+                totalFollowers: number;
+            };
+            posts: {
+                total: number;
+                published: number;
+                failed: number;
+            };
+            engagement: {
+                totalViews: number;
+                totalLikes: number;
+                totalComments: number;
+                totalShares: number;
+                totalSaves: number;
+            };
+        };
+        accounts: {
+            dailyStats: ({
+                account: {
+                    platform: import(".prisma/client").$Enums.PlatformEnum;
+                    nickname: string;
+                };
+            } & {
+                id: string;
+                date: Date;
+                platform: import(".prisma/client").$Enums.PlatformEnum;
+                followers: number;
+                views: number;
+                likes: number;
+                comments: number;
+                shares: number;
+                revenue: number;
+                gmv: number;
+                orders: number;
+                commission: number;
+                buyerCount: number;
+                productCount: number;
+                avgOrderValue: number;
+                createdAt: Date;
+                accountId: string;
+            })[];
+            id: string;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            followers: number;
+        }[];
+        topPosts: {
+            id: string;
+            title: string | null;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            account: string;
+            views: number;
+            likes: number;
+            comments: number;
+            shares: number;
+            publishedAt: Date;
+        }[];
+        dailyTrend: ({
+            account: {
+                platform: import(".prisma/client").$Enums.PlatformEnum;
+                nickname: string;
+            };
+        } & {
+            id: string;
+            date: Date;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            followers: number;
+            views: number;
+            likes: number;
+            comments: number;
+            shares: number;
+            revenue: number;
+            gmv: number;
+            orders: number;
+            commission: number;
+            buyerCount: number;
+            productCount: number;
+            avgOrderValue: number;
+            createdAt: Date;
+            accountId: string;
+        })[];
+    } | undefined>;
+    getMonetization(userId: string, days?: number, platform?: string): Promise<{
+        totalRevenue: number;
+        totalGmv: number;
+        totalOrders: number;
+        totalCommission: number;
+        totalBuyerCount: number;
+        totalAvgOrderValue: number;
+        byPlatform: any[];
+        dailyTrend: any[];
+    }>;
+    getAccountAnalytics(accountId: string, userId: string, userRole: string): Promise<{
+        totalViews: number;
+        totalLikes: number;
+        totalComments: number;
+        totalShares: number;
+        totalSaves: number;
+        totalPosts: number;
+        avgEngagementRate: number;
+    }>;
+    getAccountPosts(accountId: string, userId: string, userRole: string, page?: number, pageSize?: number, sortBy?: string, sortOrder?: 'asc' | 'desc'): Promise<{
+        items: {
+            id: string;
+            title: string | null;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            status: import(".prisma/client").$Enums.PostStatus;
+            publishAt: string | null;
+            createdAt: string;
+            views: number;
+            likes: number;
+            comments: number;
+            shares: number;
+            saves: number;
+            engagementRate: number;
+        }[];
+        total: number;
+        page: number;
+        pageSize: number;
+        totalPages: number;
     }>;
     private verifyAccountOwnership;
 }

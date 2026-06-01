@@ -9,7 +9,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.PlatformFilterDto = exports.BatchCollectDto = exports.CollectDataDto = exports.AuthorizePlatformDto = void 0;
+exports.PlatformFilterDto = exports.ReportPostStatsDto = exports.ReportPostStatItem = exports.ReportMetricsDto = exports.BatchCollectDto = exports.CollectDataDto = exports.AuthorizePlatformDto = void 0;
 const class_validator_1 = require("class-validator");
 const swagger_1 = require("@nestjs/swagger");
 const class_transformer_1 = require("class-transformer");
@@ -56,6 +56,73 @@ __decorate([
     (0, class_validator_1.IsEnum)(['account', 'content', 'daily']),
     __metadata("design:type", String)
 ], BatchCollectDto.prototype, "type", void 0);
+class ReportMetricsDto {
+}
+exports.ReportMetricsDto = ReportMetricsDto;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '平台类型 (可选，由账号ID自动推断)' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportMetricsDto.prototype, "platform", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: '账号ID' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportMetricsDto.prototype, "accountId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: '指标数据' }),
+    (0, class_validator_1.IsObject)(),
+    __metadata("design:type", Object)
+], ReportMetricsDto.prototype, "metrics", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '指定日期 (YYYY-MM-DD)，默认今天' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportMetricsDto.prototype, "date", void 0);
+class ReportPostStatItem {
+}
+exports.ReportPostStatItem = ReportPostStatItem;
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '标题' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportPostStatItem.prototype, "title", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '播放量' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "views", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '点赞数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "likes", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '评论数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "comments", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '分享数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "shares", void 0);
+class ReportPostStatsDto {
+}
+exports.ReportPostStatsDto = ReportPostStatsDto;
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: '账号ID' }),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportPostStatsDto.prototype, "accountId", void 0);
+__decorate([
+    (0, swagger_1.ApiProperty)({ description: '帖子列表', type: [ReportPostStatItem] }),
+    (0, class_validator_1.IsArray)(),
+    __metadata("design:type", Array)
+], ReportPostStatsDto.prototype, "posts", void 0);
 class PlatformFilterDto {
 }
 exports.PlatformFilterDto = PlatformFilterDto;

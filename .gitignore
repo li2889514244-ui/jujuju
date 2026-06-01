@@ -119,6 +119,8 @@ __pycache__/
 
 # 桌面伴侣配置（含凭证）
 desktop-companion/companion_config.json
+desktop-companion/chrome_profile/
+desktop-companion/chrome_data/
 
 # 外部爬虫工具
 bazhuayu_style_scraper.py_debug_archive/
