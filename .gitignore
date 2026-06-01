@@ -3,10 +3,9 @@ node_modules/
 .pnp
 .pnp.js
 
-# 构建输出
-dist/
+# 构建输出（只忽略后端dist，前端dist需跟踪以支持ECS部署）
+backend/dist/
 !backend/dist/main.js
-!frontend/dist/
 build/
 *.tsbuildinfo
 
