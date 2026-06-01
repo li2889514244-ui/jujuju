@@ -202,14 +202,15 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     async getPlatformComparison(userId) {
         const accounts = await this.prisma.account.findMany({
             where: { userId },
-            select: { id: true, platform: true },
+            select: { id: true, platform: true, followers: true, likes: true },
         });
         const platforms = [...new Set(accounts.map((a) => a.platform))];
-        const result = {};
+        const result = [];
         for (const platform of platforms) {
-            const platformAccountIds = accounts
-                .filter((a) => a.platform === platform)
-                .map((a) => a.id);
+            const platformAccounts = accounts.filter((a) => a.platform === platform);
+            const platformAccountIds = platformAccounts.map((a) => a.id);
+            const totalFollowers = platformAccounts.reduce((s, a) => s + a.followers, 0);
+            const totalLikes = platformAccounts.reduce((s, a) => s + a.likes, 0);
             const [postCount, statsAgg] = await Promise.all([
                 this.prisma.post.count({
                     where: {
@@ -219,17 +220,23 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 }),
                 this.prisma.postStats.aggregate({
                     where: { post: { accountId: { in: platformAccountIds } } },
-                    _sum: { views: true, likes: true, comments: true, shares: true },
+                    _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
                 }),
             ]);
-            result[platform] = {
-                accountCount: platformAccountIds.length,
-                publishedPosts: postCount,
-                views: statsAgg._sum.views || 0,
-                likes: statsAgg._sum.likes || 0,
+            const views = statsAgg._sum.views || 0;
+            const plikes = statsAgg._sum.likes || 0;
+            result.push({
+                platform,
+                accounts: platformAccountIds.length,
+                followers: totalFollowers,
+                likes: totalLikes,
+                publishes: postCount,
+                views,
                 comments: statsAgg._sum.comments || 0,
                 shares: statsAgg._sum.shares || 0,
-            };
+                saves: statsAgg._sum.saves || 0,
+                engagementRate: views > 0 ? Math.round((plikes / views) * 10000) / 100 : 0,
+            });
         }
         return result;
     }
@@ -285,6 +292,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 likes: p.stats?.likes || 0,
                 comments: p.stats?.comments || 0,
                 shares: p.stats?.shares || 0,
+                saves: p.stats?.saves || 0,
                 publishedAt: p.updatedAt,
             })),
             dailyTrend: dailyStats,
@@ -544,7 +552,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             endDate: endDate ? new Date(endDate) : undefined,
         });
         if (format === 'csv') {
-            const headers = 'date,platform,account,views,likes,comments,shares,followers,completionRate,danmakuCount,avgPlayDuration';
+            const headers = 'date,platform,account,views,likes,comments,shares,followers';
             const rows = (report.dailyTrend || []).map((d) => `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`);
             return [headers, ...rows].join('\n');
         }

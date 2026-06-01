@@ -124,7 +124,7 @@ import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { analyticsApi } from '@/api/analytics'
-import { PLATFORM_LABELS } from '@/types'
+import { PLATFORM_LABELS, type Platform } from '@/types'
 import dayjs from 'dayjs'
 
 const days = ref(30)
@@ -193,7 +193,7 @@ const kpiCards = computed(() => {
 const byPlatform = computed(() => {
   return (data.value?.byPlatform || []).map((p: any) => ({
     ...p,
-    platformLabel: PLATFORM_LABELS[p.platform] || p.platform,
+    platformLabel: PLATFORM_LABELS[p.platform as Platform] || p.platform,
   }))
 })
 

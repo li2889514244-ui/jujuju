@@ -1,5 +1,52 @@
 <template>
   <div class="dashboard">
+    <!-- Loading Skeleton -->
+    <template v-if="loading && accountRows.length === 0">
+      <div class="dashboard__skeleton">
+        <!-- Hero skeleton -->
+        <div class="dashboard__hero">
+          <el-skeleton :rows="1" animated style="width: 80px; margin: 0 auto;" />
+          <el-skeleton :rows="1" animated style="width: 200px; height: 80px; margin: 12px auto;" />
+          <el-skeleton :rows="1" animated style="width: 48px; height: 2px; margin: 20px auto;" />
+        </div>
+        <!-- Sub KPIs skeleton -->
+        <div class="dashboard__sub-row">
+          <div class="sub-kpis">
+            <div v-for="i in 3" :key="i" class="sub-kpi">
+              <el-skeleton :rows="2" animated style="width: 80px;" />
+            </div>
+          </div>
+        </div>
+        <!-- Time comparison cards skeleton -->
+        <div class="dashboard__time-cards">
+          <div v-for="i in 2" :key="i" class="card-default" style="padding: 20px;">
+            <el-skeleton :rows="3" animated />
+          </div>
+        </div>
+        <!-- Charts skeleton -->
+        <div class="dashboard__charts">
+          <div v-for="i in 2" :key="i" class="card-default" style="padding: 20px;">
+            <el-skeleton :rows="10" animated />
+          </div>
+        </div>
+        <!-- Account cards skeleton -->
+        <div class="dashboard__accounts">
+          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
+            <el-skeleton :rows="1" animated style="width: 48px;" />
+            <el-skeleton :rows="1" animated style="width: 24px;" />
+          </div>
+          <div class="account-grid">
+            <div v-for="i in 4" :key="i" class="account-card" style="pointer-events: none;">
+              <el-skeleton :rows="1" animated style="width: 34px; height: 34px; border-radius: 50%;" />
+              <el-skeleton :rows="2" animated style="width: 100px;" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Actual content (hidden during skeleton) -->
+    <template v-else>
     <!-- Hero KPI -->
     <div class="dashboard__hero" v-if="accountRows.length > 0">
       <p class="hero-label">总粉丝</p>
@@ -111,6 +158,7 @@
         <el-button type="primary" size="large" @click="$router.push('/accounts')">添加账号</el-button>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -206,6 +254,24 @@ function exportCSV() {
     min-height: 60vh;
     position: relative;
     z-index: 1;
+  }
+
+  &__skeleton {
+    // Skeleton mimics the real layout for smooth transition
+    display: flex;
+    flex-direction: column;
+    gap: $section-gap;
+    position: relative;
+    z-index: 1;
+    padding-bottom: $space-2xl;
+
+    .dashboard__hero,
+    .dashboard__sub-row,
+    .dashboard__time-cards,
+    .dashboard__charts,
+    .dashboard__accounts {
+      opacity: 0.7;
+    }
   }
 }
 

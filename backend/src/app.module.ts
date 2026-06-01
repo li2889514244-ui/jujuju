@@ -21,7 +21,9 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { PixingVideoModule } from './modules/pixing-video/pixing-video.module';
 import { McpModule } from './modules/mcp/mcp.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
+import { ScanBindModule } from './modules/scan-bind/scan-bind.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
+import { RolesGuard } from './modules/auth/guards/roles.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
 import databaseConfig from './config/database.config';
@@ -57,9 +59,11 @@ import databaseConfig from './config/database.config';
     PixingVideoModule,
     McpModule,
     CalendarModule,
+    ScanBindModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],
 })

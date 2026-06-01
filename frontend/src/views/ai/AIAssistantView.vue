@@ -817,7 +817,7 @@ function copyContent() {
 }
 
 .subtitle {
-  color: #6e6e73;
+  color: $color-text-placeholder;
   margin: 0;
   font-size: $text-body;
 }
@@ -842,13 +842,13 @@ function copyContent() {
   align-items: center;
   justify-content: center;
   padding: 60px;
-  color: #6e6e73;
+  color: $color-text-placeholder;
 }
 
 .result-text {
   line-height: 1.8;
   font-size: $text-body;
-  color: #1D1D1F;
+  color: $color-text-primary;
 }
 
 .result-keywords {
@@ -858,7 +858,7 @@ function copyContent() {
 }
 
 .result-keywords .label {
-  color: #6e6e73;
+  color: $color-text-placeholder;
   margin-right: 8px;
 }
 
@@ -880,13 +880,13 @@ function copyContent() {
 }
 
 .time-slot.is-best {
-  border-color: #E60012;
-  background: #ecf5ff;
+  border-color: $color-bronze;
+  background: rgba($color-bronze, 0.06);
 }
 
 .slot-rank {
   font-size: $text-caption;
-  color: #6e6e73;
+  color: $color-text-placeholder;
 }
 
 .slot-time {
@@ -901,12 +901,12 @@ function copyContent() {
   justify-content: center;
   gap: 8px;
   font-size: $text-caption;
-  color: #30d158;
+  color: $color-sage;
 }
 
 .slot-reason {
   font-size: $text-caption;
-  color: #6e6e73;
+  color: $color-text-placeholder;
   margin-top: 8px;
 }
 
@@ -917,7 +917,7 @@ function copyContent() {
 
 .publish-tips ul {
   padding-left: 20px;
-  color: #98989d;
+  color: $color-text-tertiary;
 }
 
 /* Stats */
@@ -926,7 +926,7 @@ function copyContent() {
 }
 
 .stat-label {
-  color: #6e6e73;
+  color: $color-text-placeholder;
   font-size: 13px;
   margin-bottom: 8px;
 }
@@ -937,11 +937,11 @@ function copyContent() {
 }
 
 .text-success {
-  color: #30d158;
+  color: $color-sage;
 }
 
 .text-danger {
-  color: #ff453a;
+  color: $color-rust;
 }
 
 /* Insights */
@@ -955,13 +955,13 @@ function copyContent() {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  color: #98989d;
+  color: $color-text-tertiary;
   font-size: $text-body;
 }
 
 .recommendations-list {
   padding-left: 20px;
-  color: #98989d;
+  color: $color-text-tertiary;
 }
 
 .recommendations-list li {
@@ -974,7 +974,7 @@ function copyContent() {
   align-items: center;
   gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid rgba($color-border-active, 0.08);
 }
 
 .anomaly-item:last-child {
@@ -982,7 +982,7 @@ function copyContent() {
 }
 
 .empty-text {
-  color: #6e6e73;
+  color: $color-text-placeholder;
   text-align: center;
   padding: $space-lg;
 }
@@ -1004,7 +1004,7 @@ function copyContent() {
 }
 
 .review-summary {
-  color: #98989d;
+  color: $color-text-tertiary;
   margin: 0;
 }
 
@@ -1013,7 +1013,7 @@ function copyContent() {
   align-items: center;
   gap: 8px;
   padding: 8px 0;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid rgba($color-border-active, 0.08);
 }
 
 .review-issue:last-child {
@@ -1026,7 +1026,7 @@ function copyContent() {
 }
 
 .sentiment-label {
-  color: #6e6e73;
+  color: $color-text-placeholder;
   font-size: 13px;
   margin-bottom: 8px;
 }

@@ -4,7 +4,21 @@ import { ElMessage } from 'element-plus'
 import { analyticsApi } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
 import { getPlatformColor, getPlatformLabel } from '@/composables/usePlatform'
-import type { DashboardAccount, AccountGroupSummary, SummaryCardData, DailyStatsMap } from '@/types'
+import type {
+  DashboardAccount,
+  AccountGroupSummary,
+  SummaryCardData,
+  DailyStatsMap,
+  Account,
+  AccountGroup,
+  PaginatedResponse,
+} from '@/types'
+
+/** Extract raw accounts array from PaginatedResponse (with backward-compat for legacy field names). */
+function extractAccounts(data: PaginatedResponse<Account>): Account[] {
+  const raw = data as PaginatedResponse<Account> & { accounts?: Account[]; list?: Account[] }
+  return raw.items || raw.accounts || raw.list || []
+}
 
 export function useDashboard() {
   const period = ref('week')
@@ -21,9 +35,9 @@ export function useDashboard() {
   const followerTrendData = ref<number[]>([])
 
   const comparisonData = ref<{
-    weekOverWeek: { current: any; previous: any; change: any }
-    monthOverMonth: { current: any; previous: any; change: any }
-    yearOverYear: { current: any; previous: any; change: any }
+    weekOverWeek: { current: number; previous: number; change: number }
+    monthOverMonth: { current: number; previous: number; change: number }
+    yearOverYear: { current: number; previous: number; change: number }
   } | null>(null)
 
   const displayAccounts = computed(() => accountRows.value.slice(0, 8))
@@ -47,16 +61,18 @@ export function useDashboard() {
     ]
   })
 
-  // 时间维度对比卡片 — 仅使用真实 API 数据，无数据时显示 0
+  /** Pure helper: extract a numeric views value from a comparison object shape. */
+  function extractViews(val: unknown): number | null {
+    if (val == null) return null
+    if (typeof val === 'number') return val
+    if (typeof val === 'object' && val !== null && 'views' in val && typeof (val as Record<string, unknown>).views === 'number') {
+      return (val as Record<string, number>).views
+    }
+    return null
+  }
+
   const timeComparisonCards = computed<SummaryCardData[]>(() => {
     const cd = comparisonData.value
-
-    const extractViews = (val: any): number | null => {
-      if (val == null) return null
-      if (typeof val === 'number') return val
-      if (typeof val === 'object' && typeof val.views === 'number') return val.views
-      return null
-    }
 
     const weekViews = cd ? extractViews(cd.weekOverWeek?.current) : null
     const monthViews = cd ? extractViews(cd.monthOverMonth?.current) : null
@@ -85,15 +101,13 @@ export function useDashboard() {
 
       const [accRes, groupsRes] = await Promise.all([
         accountsApi.getList({ pageSize: 100, page: 1, platform: '', group: '', keyword: '' }),
-        accountsApi.getGroups().catch(() => ({ data: [] as Array<{ id: string; name: string }> })),
+        accountsApi.getGroups().catch(() => ({ data: [] as AccountGroup[] })),
       ])
-      const accData = accRes.data as unknown as {
-        accounts?: Array<Record<string, unknown>>
-        list?: Array<Record<string, unknown>>
-      }
-      const accs = accData?.accounts || accData?.list || []
+      const accData = accRes.data
+      const accs: Account[] = extractAccounts(accData)
+
       const groups: Record<string, string> = {}
-      for (const g of (groupsRes.data as Array<{ id: string; name: string }>) || []) {
+      for (const g of groupsRes.data) {
         if (g.id) groups[g.id] = g.name
       }
 
@@ -101,19 +115,15 @@ export function useDashboard() {
       try {
         const reportRes = await analyticsApi.getReport()
         const rptAccs =
-          (
-            reportRes.data as {
-              accounts?: Array<{
-                id: string
-                dailyStats?: Array<{
-                  views?: number
-                  likes?: number
-                  comments?: number
-                  shares?: number
-                }>
-              }>
-            }
-          )?.accounts || []
+          (reportRes.data as { accounts?: Array<{
+            id: string
+            dailyStats?: Array<{
+              views?: number
+              likes?: number
+              comments?: number
+              shares?: number
+            }>
+          }> })?.accounts || []
         for (const a of rptAccs) {
           const allStats = a.dailyStats || []
           dailyMap[a.id] = {
@@ -128,25 +138,27 @@ export function useDashboard() {
       }
 
       accountRows.value = accs.map((a): DashboardAccount => {
-        const daily = dailyMap[a.id as string] || { views: 0, likes: 0, comments: 0, shares: 0 }
+        const daily = dailyMap[a.id] || { views: 0, likes: 0, comments: 0, shares: 0 }
         return {
-          id: a.id as string,
-          nickname: (a.nickname as string) || '未命名',
-          avatar: (a.avatar as string) || '',
-          platform: a.platform as string,
+          id: a.id,
+          nickname: a.nickname || '未命名',
+          avatar: a.avatar || '',
+          platform: a.platform,
           groupName:
-            (a.group as { name?: string })?.name ||
-            groups[a.groupId as string] ||
+            (a as Account & { group?: { name?: string } }).group?.name ||
+            groups[(a as Account & { groupId?: string }).groupId || ''] ||
+            a.groupName ||
             '',
-          followers: (a.followers as number) || 0,
+          followers: a.followers || 0,
           views: daily.views,
           likes: daily.likes,
           comments: daily.comments,
           shares: daily.shares,
-          postCount: (a._count as { posts?: number })?.posts || 0,
-          hasCookies: a.hasCookies as boolean,
+          postCount: (a as Account & { _count?: { posts?: number } })._count?.posts || 0,
+          hasCookies: (a as Account & { hasCookies?: boolean }).hasCookies || false,
           tokenStatus:
-            (a.tokenStatus as string) || ((a.hasCookies as boolean) ? 'valid' : 'unknown'),
+            (a as Account & { tokenStatus?: string; hasCookies?: boolean }).tokenStatus ||
+            ((a as Account & { hasCookies?: boolean }).hasCookies ? 'valid' : 'unknown'),
         }
       })
 
@@ -164,11 +176,11 @@ export function useDashboard() {
         totalLikes: accounts.reduce((s, a) => s + a.likes, 0),
       }))
 
-      const byPlatform = ov.accounts?.byPlatform || {}
+      const byPlatform: Record<string, number> = ov.accounts?.byPlatform || {}
       platformDistribution.value = Object.entries(byPlatform)
-        .filter(([, count]) => (count as number) > 0)
+        .filter(([, count]) => count > 0)
         .map(([key, count]) => ({
-          value: count as number,
+          value: count,
           name: getPlatformLabel(key),
           itemStyle: { color: getPlatformColor(key) },
         }))
@@ -184,7 +196,7 @@ export function useDashboard() {
   async function loadFollowerTrend() {
     try {
       const res = await analyticsApi.getFollowerTrend({ days: trendDays.value })
-      followerTrendData.value = (res.data || []).map((d: any) => d.value || 0)
+      followerTrendData.value = (res.data || []).map((d: { value?: number }) => d.value || 0)
     } catch {
       followerTrendData.value = []
     }

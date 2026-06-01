@@ -156,6 +156,7 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS } from '@/types'
+import { useDataTable } from '@/composables/useDataTable'
 
 const days = ref(30)
 const platform = ref('')
@@ -234,8 +235,11 @@ const trendLabel = computed(() => {
   return '粉丝增长'
 })
 
-// Platform
-const platformStats = ref<any[]>([])
+// Platform stats — now uses shared useDataTable composable
+const { data: platformStats, refresh: refreshPlatformStats } = useDataTable<any>(async () => {
+  const res = await analyticsApi.getPlatformStats()
+  return (res.data || []) as any[]
+})
 
 // Ranking
 const viewsRanking = ref<any[]>([])
@@ -294,12 +298,7 @@ async function loadTrend() {
 }
 
 async function loadPlatformStats() {
-  try {
-    const res = await analyticsApi.getPlatformStats()
-    platformStats.value = (res.data || []) as any[]
-  } catch {
-    platformStats.value = []
-  }
+  await refreshPlatformStats()
 }
 
 async function loadRanking() {

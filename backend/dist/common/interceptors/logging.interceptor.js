@@ -38,15 +38,16 @@ let LoggingInterceptor = class LoggingInterceptor {
         const url = sanitizeUrl(request.url);
         const userAgent = request.get('user-agent') || '';
         const userId = request.user?.id || 'anonymous';
+        const traceId = request['traceId'] || 'no-trace';
         const now = Date.now();
         return next.handle().pipe((0, operators_1.tap)(() => {
             const response = context.switchToHttp().getResponse();
             const { statusCode } = response;
             const contentLength = response.get('content-length');
-            this.logger.log(`${method} ${url} ${statusCode} ${contentLength || 0}B - ${Date.now() - now}ms - ${ip} - user:${userId} - ${userAgent}`);
+            this.logger.log(`[${traceId}] ${method} ${url} ${statusCode} ${contentLength || 0}B - ${Date.now() - now}ms - ${ip} - user:${userId} - ${userAgent}`);
         }), (0, operators_1.catchError)((error) => {
             const statusCode = error.getStatus?.() || 500;
-            this.logger.warn(`${method} ${url} ${statusCode} ERROR - ${Date.now() - now}ms - ${ip} - user:${userId} - ${error.message}`);
+            this.logger.warn(`[${traceId}] ${method} ${url} ${statusCode} ERROR - ${Date.now() - now}ms - ${ip} - user:${userId} - ${error.message}`);
             return (0, rxjs_1.throwError)(() => error);
         }));
     }

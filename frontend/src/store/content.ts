@@ -1,7 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { contentApi } from '@/api/content'
-import type { Content, PublishTask, ContentForm } from '@/types'
+import type { Content, PublishTask, ContentForm, PaginatedResponse } from '@/types'
+
+/** Extract items from PaginatedResponse with backward compat for legacy field names. */
+function extractItems<T>(
+  data: PaginatedResponse<T> & { posts?: T[]; list?: T[] },
+): T[] {
+  return data.items || data.posts || data.list || []
+}
 
 export const useContentStore = defineStore('content', () => {
   const contents = ref<Content[]>([])
@@ -14,8 +21,8 @@ export const useContentStore = defineStore('content', () => {
     loading.value = true
     try {
       const res = await contentApi.getList(params)
-      const data = res.data as any
-      contents.value = data.posts || []
+      const data = res.data
+      contents.value = extractItems(data)
       total.value = data.total || 0
     } finally {
       loading.value = false
@@ -57,7 +64,8 @@ export const useContentStore = defineStore('content', () => {
 
   async function fetchPublishTasks(params?: Record<string, unknown>) {
     const res = await contentApi.getPublishTasks(params)
-    publishTasks.value = (res as any).data || []
+    const data = res.data as PaginatedResponse<PublishTask> & { items?: PublishTask[] }
+    publishTasks.value = data.items || (data as unknown as PublishTask[]) || []
   }
 
   async function cancelPublish(taskId: string) {

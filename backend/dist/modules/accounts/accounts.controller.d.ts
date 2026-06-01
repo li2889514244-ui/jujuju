@@ -19,6 +19,9 @@ export declare class AccountsController {
         cookies: string;
     }>;
     update(id: string, dto: UpdateAccountDto, userId: string): Promise<any>;
+    moveToGroup(id: string, body: {
+        groupId: string | null;
+    }, userId: string): Promise<any>;
     remove(id: string, userId: string): Promise<{
         success: boolean;
     }>;

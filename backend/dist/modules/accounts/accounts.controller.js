@@ -43,6 +43,9 @@ let AccountsController = class AccountsController {
     async update(id, dto, userId) {
         return this.accountsService.update(id, dto, userId);
     }
+    async moveToGroup(id, body, userId) {
+        return this.accountsService.moveToGroup(id, body.groupId, userId);
+    }
     async remove(id, userId) {
         return this.accountsService.remove(id, userId);
     }
@@ -96,6 +99,16 @@ __decorate([
     __metadata("design:paramtypes", [String, update_account_dto_1.UpdateAccountDto, String]),
     __metadata("design:returntype", Promise)
 ], AccountsController.prototype, "update", null);
+__decorate([
+    (0, common_1.Put)(':id/move-to-group'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('id')),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object, String]),
+    __metadata("design:returntype", Promise)
+], AccountsController.prototype, "moveToGroup", null);
 __decorate([
     (0, common_1.Delete)(':id'),
     (0, common_1.HttpCode)(common_1.HttpStatus.OK),

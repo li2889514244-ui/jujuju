@@ -22,6 +22,18 @@
         </a>
       </el-tooltip>
 
+      <!-- AI Assistant -->
+      <router-link to="/ai" class="topbar__action" title="AI 助手">
+        <el-icon :size="18"><MagicStick /></el-icon>
+        <span>AI 助手</span>
+      </router-link>
+
+      <!-- MCP Query -->
+      <router-link to="/mcp" class="topbar__action" title="MCP 数据查询">
+        <el-icon :size="18"><ChatDotRound /></el-icon>
+        <span>MCP 查询</span>
+      </router-link>
+
       <!-- Team Switcher -->
       <el-dropdown trigger="click" @command="handleTeamSwitch">
         <div class="topbar__team">
@@ -121,7 +133,8 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useTeamStore } from '@/store/team'
 import { notificationApi, type Notification } from '@/api/notifications'
-import { WarningFilled, SuccessFilled, InfoFilled } from '@element-plus/icons-vue'
+import { WarningFilled, SuccessFilled, InfoFilled, MagicStick, ChatDotRound } from '@element-plus/icons-vue'
+import { getNotificationColor } from '@/composables/usePlatform'
 import type { Team } from '@/types'
 
 const route = useRoute()
@@ -183,13 +196,8 @@ function getNotifIcon(type: string) {
   }
 }
 
-function getNotifColor(type: string) {
-  switch (type) {
-    case 'PUBLISH_FAILED': case 'ACCOUNT_EXPIRED': return '#d4534a'
-    case 'PUBLISH_SUCCESS': return '#6b9e6c'
-    case 'FOLLOWER_ALERT': return '#e0a030'
-    default: return '#8a8078'
-  }
+function getNotifColor(type: string): string {
+  return getNotificationColor(type)
 }
 
 function formatTime(dateStr: string) {

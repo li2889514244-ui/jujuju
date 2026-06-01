@@ -94,7 +94,18 @@ export declare class AnalyticsController {
         collectedAt: Date;
         postId: string;
     })[]>;
-    getPlatformComparison(userId: string): Promise<Record<string, any>>;
+    getPlatformComparison(userId: string): Promise<{
+        platform: string;
+        accounts: number;
+        followers: number;
+        likes: number;
+        publishes: number;
+        views: number;
+        comments: number;
+        shares: number;
+        saves: number;
+        engagementRate: number;
+    }[]>;
     getReport(userId: string, startDate?: string, endDate?: string, platform?: string): Promise<{
         period: {
             start: Date;
@@ -169,6 +180,7 @@ export declare class AnalyticsController {
             likes: number;
             comments: number;
             shares: number;
+            saves: number;
             publishedAt: Date;
         }[];
         dailyTrend: ({
@@ -413,6 +425,7 @@ export declare class AnalyticsController {
             likes: number;
             comments: number;
             shares: number;
+            saves: number;
             publishedAt: Date;
         }[];
         dailyTrend: ({

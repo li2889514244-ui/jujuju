@@ -64,7 +64,7 @@ export function createMockConfigService(overrides: Record<string, string> = {}):
  * 生成测试用的 Bcrypt 密码哈希
  */
 export async function hashTestPassword(password: string = 'Test123456'): Promise<string> {
-  return bcrypt.hash(password, 10);
+  return bcrypt.hash(password, 12);
 }
 
 /**

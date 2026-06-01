@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.McpController = void 0;
 const common_1 = require("@nestjs/common");
 const mcp_service_1 = require("./mcp.service");
+const public_decorator_1 = require("../../common/decorators/public.decorator");
 let McpController = McpController_1 = class McpController {
     constructor(mcpService) {
         this.mcpService = mcpService;
@@ -34,6 +35,7 @@ let McpController = McpController_1 = class McpController {
 };
 exports.McpController = McpController;
 __decorate([
+    (0, public_decorator_1.Public)(),
     (0, common_1.Post)('query'),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -41,13 +43,14 @@ __decorate([
     __metadata("design:returntype", Promise)
 ], McpController.prototype, "query", null);
 __decorate([
+    (0, public_decorator_1.Public)(),
     (0, common_1.Get)('tools'),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", void 0)
 ], McpController.prototype, "getTools", null);
 exports.McpController = McpController = McpController_1 = __decorate([
-    (0, common_1.Controller)('api/mcp'),
+    (0, common_1.Controller)('mcp'),
     __metadata("design:paramtypes", [mcp_service_1.McpService])
 ], McpController);
 //# sourceMappingURL=mcp.controller.js.map

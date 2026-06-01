@@ -57,7 +57,7 @@ const props = withDefaults(
   {
     trend: null,
     trendLabel: '较上周',
-    accentColor: '#E60012',
+    accentColor: 'var(--color-bronze)',
     animated: true,
     delay: 0,
     size: 'md',
@@ -122,12 +122,12 @@ const displayValue = computed(() =>
     gap: 2px;
     padding: 2px 8px;
     border-radius: $radius-full;
-    background: rgba(#30d158, 0.1);
-    color: #30d158;
+    background: rgba($color-sage, 0.1);
+    color: $color-sage;
 
     &--down {
-      background: rgba(#ff453a, 0.1);
-      color: #ff453a;
+      background: rgba($color-rust, 0.1);
+      color: $color-rust;
     }
   }
 

@@ -28,6 +28,7 @@ from queue import Queue, Empty
 
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
+from functools import wraps
 from conf import BASE_DIR
 from myUtils.login import douyin_cookie_gen, get_tencent_cookie, get_ks_cookie, xiaohongshu_cookie_gen
 
@@ -45,6 +46,22 @@ CORS(app, origins=[
 ])
 
 app.config['MAX_CONTENT_LENGTH'] = 160 * 1024 * 1024
+
+# ── Companion shared secret for scan-bind auth ──
+COMPANION_TOKEN = os.environ.get('COMPANION_TOKEN', 'pixing-companion-secret-2024')
+app.config['COMPANION_TOKEN'] = COMPANION_TOKEN
+
+
+# ── Auth decorator ──
+def require_token(f):
+    """Decorator: require ?token= query parameter matching COMPANION_TOKEN."""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.args.get('token', '')
+        if not token or token != app.config.get('COMPANION_TOKEN', ''):
+            return jsonify({'error': 'Unauthorized', 'code': 401}), 401
+        return f(*args, **kwargs)
+    return decorated
 
 # ---------------------------------------------------------------------------
 # Platform registry
@@ -89,6 +106,7 @@ def find_latest_cookie() -> str | None:
 # SSE endpoint — 核心：扫码 → 提取Cookie → 上传云端
 # ---------------------------------------------------------------------------
 @app.route('/api/scan-bind/start')
+@require_token
 def scan_bind_start():
     platform = request.args.get('platform', 'douyin')
     token    = request.args.get('token', '')

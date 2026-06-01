@@ -3,7 +3,7 @@
  * 提供标准化的测试数据，用于各测试用例
  */
 
-import { Platform, Role, PostStatus, AccountStatus, UserStatus } from '@prisma/client';
+import { Platform, Role, PostStatus, AccountStatus } from '@prisma/client';
 
 // ==================== 用户 Fixtures ====================
 
@@ -16,7 +16,7 @@ export const mockUsers = {
     name: '测试用户',
     phone: '13800138000',
     role: Role.MEMBER,
-    status: UserStatus.ACTIVE,
+    status: 'ACTIVE',
     organizationId: 'org-001',
     avatar: null,
     lastLoginAt: new Date('2024-01-15T10:00:00Z'),
@@ -32,7 +32,7 @@ export const mockUsers = {
     name: '管理员',
     phone: '13800138001',
     role: Role.ADMIN,
-    status: UserStatus.ACTIVE,
+    status: 'ACTIVE',
     organizationId: 'org-001',
     avatar: null,
     lastLoginAt: new Date('2024-01-15T10:00:00Z'),
@@ -48,7 +48,7 @@ export const mockUsers = {
     name: '组织所有者',
     phone: '13800138002',
     role: Role.OWNER,
-    status: UserStatus.ACTIVE,
+    status: 'ACTIVE',
     organizationId: 'org-001',
     avatar: null,
     lastLoginAt: new Date('2024-01-15T10:00:00Z'),
@@ -64,7 +64,7 @@ export const mockUsers = {
     name: '被禁用用户',
     phone: '13800138003',
     role: Role.MEMBER,
-    status: UserStatus.SUSPENDED,
+    status: 'SUSPENDED',
     organizationId: null,
     avatar: null,
     lastLoginAt: null,
@@ -80,7 +80,7 @@ export const mockUsers = {
     name: '无组织用户',
     phone: '13800138004',
     role: Role.MEMBER,
-    status: UserStatus.ACTIVE,
+    status: 'ACTIVE',
     organizationId: null,
     avatar: null,
     lastLoginAt: null,
@@ -183,7 +183,7 @@ export const mockAccounts = {
     bio: null,
     followers: 0,
     following: 0,
-    status: AccountStatus.BANNED,
+    status: AccountStatus.DISABLED,
     cookies: null,
     proxyConfig: null,
     metadata: null,

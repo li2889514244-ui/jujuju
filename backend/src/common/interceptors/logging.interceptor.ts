@@ -39,6 +39,7 @@ export class LoggingInterceptor implements NestInterceptor {
     const url = sanitizeUrl(request.url);
     const userAgent = request.get('user-agent') || '';
     const userId = (request as any).user?.id || 'anonymous';
+    const traceId = (request as any)['traceId'] || 'no-trace';
     const now = Date.now();
 
     return next.handle().pipe(
@@ -47,13 +48,13 @@ export class LoggingInterceptor implements NestInterceptor {
         const { statusCode } = response;
         const contentLength = response.get('content-length');
         this.logger.log(
-          `${method} ${url} ${statusCode} ${contentLength || 0}B - ${Date.now() - now}ms - ${ip} - user:${userId} - ${userAgent}`,
+          `[${traceId}] ${method} ${url} ${statusCode} ${contentLength || 0}B - ${Date.now() - now}ms - ${ip} - user:${userId} - ${userAgent}`,
         );
       }),
       catchError((error) => {
         const statusCode = error.getStatus?.() || 500;
         this.logger.warn(
-          `${method} ${url} ${statusCode} ERROR - ${Date.now() - now}ms - ${ip} - user:${userId} - ${error.message}`,
+          `[${traceId}] ${method} ${url} ${statusCode} ERROR - ${Date.now() - now}ms - ${ip} - user:${userId} - ${error.message}`,
         );
         return throwError(() => error);
       }),

@@ -1,6 +1,7 @@
 import { get, post } from './request'
 import service from './request'
 import type { AnalyticsOverview, TrendData, PlatformStats, PublishEffect } from '@/types'
+import { getCompanionUrl } from '@/composables/useCompanionUrl'
 
 export const analyticsApi = {
   getOverview(teamId?: string) {
@@ -98,10 +99,14 @@ export const analyticsApi = {
     return post('/analytics/monetization/manual', data)
   },
 
-  // 触发桌面伴侣采集真实数据（伴侣在本地 localhost:5409 运行）
+  // 触发桌面伴侣采集真实数据（伴侣URL通过环境变量或健康检查自动探测）
   async triggerRealDataCollection() {
+    const companionUrl = await getCompanionUrl()
+    if (!companionUrl) {
+      throw new Error('桌面伴侣未启动，请先打开桌面伴侣')
+    }
     try {
-      const resp = await fetch('http://localhost:5409/api/data-collection/trigger', {
+      const resp = await fetch(`${companionUrl}/api/data-collection/trigger`, {
         method: 'POST',
       })
       const json = await resp.json()

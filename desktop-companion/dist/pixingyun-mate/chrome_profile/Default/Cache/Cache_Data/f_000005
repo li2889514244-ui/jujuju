@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>披星云伴侣</title>
+<style>
+:root{--sidebar-w:220px;--sidebar-bg:#141829;--sidebar-hover:#1e2640;--sidebar-active:#2a3558;--accent:#4f6ef7;--accent-hover:#3d5bd9;--danger:#e05050;--success:#34c759;--text:#1d1d1f;--text2:#6e6e73;--border:#e5e5ea;--bg:#f2f2f7;--card-bg:#ffffff;--radius:6px}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden}
+body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px;user-select:none;-webkit-user-select:none;display:flex}
+
+/* ── Sidebar ── */
+.sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--sidebar-bg);color:#b0b8d0;display:flex;flex-direction:column;overflow:hidden}
+.sidebar-logo{display:flex;align-items:center;gap:10px;padding:20px 18px;border-bottom:1px solid rgba(255,255,255,.06)}
+.sidebar-logo .logo-icon{width:32px;height:32px;border-radius:var(--radius);background:linear-gradient(135deg,#4f6ef7,#7c5cfc);display:flex;align-items:center;justify-content:center;font-size:16px;color:#fff;flex-shrink:0}
+.sidebar-logo .logo-text{font-size:15px;font-weight:600;color:#e8ecf4;letter-spacing:.5px}
+.sidebar-logo .logo-ver{font-size:10px;color:#6b7394;margin-left:auto}
+
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px}
+.sidebar-nav .nav-section{font-size:10px;text-transform:uppercase;color:#5b6388;padding:12px 10px 6px;letter-spacing:1px;font-weight:600}
+.sidebar-nav .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);cursor:pointer;transition:all .12s;margin-bottom:2px;font-size:13px}
+.sidebar-nav .nav-item:hover{background:var(--sidebar-hover);color:#d0d6ee}
+.sidebar-nav .nav-item.active{background:var(--sidebar-active);color:#fff;font-weight:500}
+.sidebar-nav .nav-item .plat-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+.sidebar-nav .nav-item .plat-name{flex:1}
+.sidebar-nav .nav-item .plat-badge{font-size:10px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:10px}
+
+.sidebar-bottom{padding:12px;border-top:1px solid rgba(255,255,255,.06)}
+.sidebar-status{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius);font-size:11px;color:#8890b0}
+.sidebar-status .ind{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.sidebar-status .ind.on{background:var(--success);box-shadow:0 0 6px rgba(52,199,89,.5)}
+.sidebar-status .ind.off{background:#ff9500}
+.sidebar-footer-btns{display:flex;gap:6px;margin-top:8px}
+.sidebar-footer-btns button{flex:1;padding:6px 0;border:none;border-radius:var(--radius);font-size:11px;cursor:pointer;transition:.12s}
+.btn-collect{background:rgba(79,110,247,.15);color:#8ba4ff}
+.btn-collect:hover{background:rgba(79,110,247,.25)}
+.btn-pw{background:rgba(255,149,0,.12);color:#ffb84d}
+.btn-pw:hover{background:rgba(255,149,0,.2)}
+
+/* ── Content Area ── */
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.content-toolbar{display:flex;align-items:center;gap:12px;padding:14px 24px;background:var(--card-bg);border-bottom:1px solid var(--border);min-height:52px}
+.content-toolbar h2{font-size:15px;font-weight:600;color:var(--text)}
+.content-toolbar .online-dot{width:7px;height:7px;border-radius:50%;margin-left:auto}
+.content-body{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;align-items:center;justify-content:center}
+
+/* ── Login Panel (centered) ── */
+.login-wrapper{display:flex;align-items:center;justify-content:center;width:100%;height:100%}
+.login-card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:40px;width:380px;box-shadow:0 2px 20px rgba(0,0,0,.06)}
+.login-card .login-logo{text-align:center;margin-bottom:28px}
+.login-card .login-logo .li{font-size:36px;margin-bottom:8px}
+.login-card .login-logo h1{font-size:20px;font-weight:600;color:var(--text)}
+.login-card .login-logo p{font-size:12px;color:var(--text2);margin-top:4px}
+.login-card .field{margin-bottom:16px}
+.login-card .field label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;text-transform:uppercase;letter-spacing:.5px}
+.login-card .field input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;outline:none;transition:.12s;font-family:inherit;background:#fafafa}
+.login-card .field input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,110,247,.12);background:#fff}
+.login-card .field-check{display:flex;align-items:center;gap:8px;margin-bottom:20px;font-size:12px;color:var(--text2);cursor:pointer}
+.login-card .field-check input{width:15px;height:15px;accent-color:var(--accent)}
+.login-card .login-btn{width:100%;padding:11px;border:none;border-radius:var(--radius);background:var(--accent);color:#fff;font-size:14px;font-weight:500;cursor:pointer;transition:.12s;font-family:inherit}
+.login-card .login-btn:hover{background:var(--accent-hover)}
+.login-card .login-btn:disabled{opacity:.6;cursor:default}
+.login-card .login-err{color:var(--danger);font-size:12px;margin-top:10px;text-align:center}
+
+/* ── Main Workspace ── */
+.workspace{width:100%;max-width:640px}
+.workspace-empty{text-align:center;padding:60px 20px;color:var(--text2)}
+.workspace-empty .empty-icon{font-size:48px;margin-bottom:16px;opacity:.4}
+.workspace-empty h3{font-size:16px;color:var(--text);margin-bottom:8px}
+.workspace-empty p{font-size:13px;line-height:1.7}
+
+/* ── Status States ── */
+.scan-card{background:var(--card-bg);border:1px solid var(--border);border-radius:10px;padding:32px;text-align:center}
+.scan-card .scan-title{font-size:15px;font-weight:600;margin-bottom:20px;color:var(--text)}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;margin:0 auto 16px}
+@keyframes spin{to{transform:rotate(360deg)}}
+.progress-bar{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin:12px 0}
+.progress-bar .fill{height:100%;background:var(--accent);border-radius:2px;transition:width .4s}
+.step-list{text-align:left;display:inline-block}
+.step-row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:13px;color:var(--text2)}
+.step-num{width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.result-ok{font-size:40px;margin-bottom:12px}
+.result-ok.success{color:var(--success)}
+.result-msg{font-size:14px;margin-bottom:6px}
+.result-sub{font-size:12px;color:var(--text2)}
+.result-err{color:var(--danger);font-size:14px;margin-bottom:12px}
+
+.btn{display:inline-block;padding:9px 22px;border:none;border-radius:var(--radius);font-size:13px;font-weight:500;cursor:pointer;transition:.12s;font-family:inherit}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-hover)}
+.btn-success{background:var(--success);color:#fff}
+.btn-success:hover{background:#2db84e}
+.btn-secondary{background:#e5e5ea;color:var(--text)}
+.btn-secondary:hover{background:#d5d5da}
+.btn-sm{padding:5px 12px;font-size:11px}
+.mt12{margin-top:12px}.mt8{margin-top:8px}
+
+/* ── Account List ── */
+.acct-list{margin-top:20px}
+.acct-list h4{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.acct-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #f0f0f3;font-size:12px}
+.acct-row .acct-platform{background:var(--accent);color:#fff;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:500;flex-shrink:0}
+.acct-row .acct-name{flex:1;color:var(--text);font-weight:500}
+.acct-row .acct-time{color:var(--text2);font-size:11px;flex-shrink:0}
+.acct-row .acct-del{color:var(--danger);font-size:11px;cursor:pointer;flex-shrink:0;padding:2px 6px;border-radius:3px}
+.acct-row .acct-del:hover{background:rgba(224,80,80,.1)}
+
+/* ── Cookie Alerts ── */
+.cookie-alert{display:flex;align-items:center;gap:8px;padding:6px 10px;background:#fff8e1;border-radius:var(--radius);margin-top:6px;font-size:11px}
+.cookie-alert.warn{background:#fff3f3}
+</style></head><body>
+
+<!-- ═══ SIDEBAR ═══ -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">&#10025;</div>
+    <span class="logo-text">披星云</span>
+    <span class="logo-ver">v3.1</span>
+  </div>
+
+  <!-- Platform navigation -->
+  <nav class="sidebar-nav" v-if="configured">
+    <div class="nav-section">平台</div>
+    <div class="nav-item" v-for="p in platforms" :key="p.id" :class="{active:selected===p.id}" @click="selectPlatform(p.id)">
+      <span class="plat-icon">{{p.icon}}</span>
+      <span class="plat-name">{{p.name}}</span>
+    </div>
+  </nav>
+
+  <!-- Bottom status + actions -->
+  <div class="sidebar-bottom" v-if="configured">
+    <div class="sidebar-status">
+      <span class="ind" :class="siteConnected?'on':'off'"></span>
+      <span>{{siteConnected?'已连接 MatrixFlow':'等待连接...'}}</span>
+    </div>
+    <div class="sidebar-footer-btns">
+      <button class="btn-collect" @click="triggerCollect" :disabled="collecting">{{collecting?'采集中...':'触发采集'}}</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ═══ CONTENT ═══ -->
+<main class="content">
+
+  <!-- Toolbar -->
+  <header class="content-toolbar" v-if="configured">
+    <h2>{{selectedPlatform?selectedPlatform.name+' - 扫码绑定':'选择左侧平台开始操作'}}</h2>
+    <div class="online-dot" :style="{background:siteConnected?var(--success):'#ff9500'}"></div>
+  </header>
+
+  <div class="content-body">
+
+    <!-- ── Login Screen ── -->
+    <div class="login-wrapper" v-if="!configured">
+      <div class="login-card">
+        <div class="login-logo">
+          <div class="li">&#10025;</div>
+          <h1>披星云伴侣</h1>
+          <p>多平台矩阵账号管理桌面工具</p>
+        </div>
+        <div class="field"><label>邮箱</label><input v-model="loginEmail" placeholder="输入邮箱" @keyup.enter="doLogin"></div>
+        <div class="field"><label>密码</label><input v-model="loginPass" type="password" placeholder="输入密码" @keyup.enter="doLogin"></div>
+        <label class="field-check"><input type="checkbox" v-model="rememberPwd">记住密码（自动登录）</label>
+        <div class="login-err" v-if="loginError">{{loginError}}</div>
+        <button class="login-btn" @click="doLogin" :disabled="loginLoading">{{loginLoading?'登录中...':'登 录'}}</button>
+      </div>
+    </div>
+
+    <!-- ── Workspace (after login) ── -->
+    <div class="workspace" v-if="configured">
+
+      <!-- Empty / idle state -->
+      <div class="workspace-empty" v-if="status==='idle'&&!selected">
+        <div class="empty-icon">&#8592;</div>
+        <h3>选择平台开始</h3>
+        <p>在左侧导航栏选择一个平台<br>Chrome 浏览器将自动打开对应平台的登录页</p>
+      </div>
+
+      <!-- Idle with platform selected -->
+      <div class="scan-card" v-if="status==='idle'&&selected">
+        <div class="scan-title">{{selectedPlatform.name}} 扫码绑定</div>
+        <div class="step-list">
+          <div class="step-row"><span class="step-num">1</span>打开 MatrixFlow 网站并登录</div>
+          <div class="step-row"><span class="step-num">2</span>点击"添加账号"按钮</div>
+          <div class="step-row"><span class="step-num">3</span>网站自动连接桌面伴侣</div>
+          <div class="step-row"><span class="step-num">4</span>Chrome 弹出 → 手机扫码登录</div>
+        </div>
+        <div style="margin-top:20px">
+          <button class="btn btn-primary" @click="selectPlatform(selected)">开始绑定</button>
+        </div>
+      </div>
+
+      <!-- Loading -->
+      <div class="scan-card" v-if="status==='loading'">
+        <div class="spinner"></div>
+        <p style="color:var(--text2);font-size:13px">正在启动浏览器...</p>
+        <div class="progress-bar"><div class="fill" :style="{width:progress+'%'}"></div></div>
+      </div>
+
+      <!-- Browser open -->
+      <div class="scan-card" v-if="status==='browser'">
+        <div class="result-ok success">&#10003;</div>
+        <p class="result-msg" style="font-weight:600">Chrome 浏览器已打开</p>
+        <p style="color:var(--text2);font-size:13px;margin:8px 0">请在 Chrome 窗口中完成扫码登录</p>
+        <button class="btn btn-success mt12" style="font-size:14px;padding:10px 28px" @click="confirmLogin">已完成登录，提取 Cookie</button>
+        <br><button class="btn btn-secondary btn-sm mt8" @click="cancelScan">取消</button>
+      </div>
+
+      <!-- Uploading -->
+      <div class="scan-card" v-if="status==='uploading'">
+        <div class="spinner"></div>
+        <p style="color:var(--text2);font-size:13px">正在上传 Cookie 到服务器...</p>
+      </div>
+
+      <!-- Done -->
+      <div class="scan-card" v-if="status==='done'">
+        <div class="result-ok success">&#10003;</div>
+        <p class="result-msg" style="font-weight:600">绑定成功</p>
+        <p class="result-sub">刷新 MatrixFlow 网页即可看到新账号</p>
+        <button class="btn btn-primary mt12" @click="reset">继续绑定其他平台</button>
+      </div>
+
+      <!-- Error -->
+      <div class="scan-card" v-if="status==='error'">
+        <p class="result-err">{{errorMsg}}</p>
+        <button class="btn btn-primary" @click="reset">重试</button>
+      </div>
+
+      <!-- Account list -->
+      <div class="acct-list" v-if="localAccounts.length">
+        <h4>已绑定账号 ({{localAccounts.length}})</h4>
+        <div class="acct-row" v-for="a in localAccounts" :key="a.id">
+          <span class="acct-platform">{{a.platform}}</span>
+          <span class="acct-name">{{a.nickname||a.platform_uid||a.id.slice(0,8)}}</span>
+          <span class="acct-time">{{a.last_collected_at?a.last_collected_at.slice(11,16):'待采集'}}</span>
+          <span class="acct-del" @click="removeLocalAccount(a.id)">删除</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script>
+const {createApp}=Vue
+createApp({data(){return{
+  platforms:[{id:'douyin',name:'抖音',icon:'🎵',hint:'扫码登录'},{id:'xiaohongshu',name:'小红书',icon:'📕',hint:'扫码登录'},{id:'kuaishou',name:'快手',icon:'🎬',hint:'扫码登录'},{id:'tencent',name:'视频号',icon:'📺',hint:'微信扫码'}],
+  selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
+  configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
+  cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,
+  pwRunning:false,pwCompleted:0,pwTask:'',
+  localAccounts:[],
+}},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
+methods:{
+  async fetchPixingStatus(){try{const r=await fetch('/api/pixing-worker/status');const j=await r.json();this.pwRunning=j.running;this.pwCompleted=j.completed;this.pwTask=j.current_task||''}catch(e){}},
+  async togglePixingWorker(){const url=this.pwRunning?'/api/pixing-worker/stop':'/api/pixing-worker/start';await fetch(url,{method:'POST'});await this.fetchPixingStatus()},
+  async triggerCollect(){this.collecting=true;try{await fetch('/api/data-collection/trigger',{method:'POST'});setTimeout(()=>this.collecting=false,3000)}catch(e){this.collecting=false}},
+  async loadCookieStatus(){
+    try{const r=await fetch('/api/cookie-status');const j=await r.json();
+      this.cookieStatus=j.by_platform;
+      this.cookieAlerts=[...j.expired.map(e=>({...e,expired:true})),...j.warnings.map(w=>({...w,expired:false}))];
+      if(!this.cookieAlerts.length&&j.by_platform){
+        const minH=Math.min(...Object.values(j.by_platform).filter(h=>h<900));
+        this.cookieFreshness=minH<1?Math.round(minH*60)+'分钟':Math.round(minH)+'小时';
+      }
+    }catch(e){}
+  },
+  async loadLocalAccounts(){
+    try{const r=await fetch('/api/local-accounts');const j=await r.json();
+      if(j.code===0){this.localAccounts=j.data||[]}
+    }catch(e){}
+  },
+  async removeLocalAccount(id){
+    if(!confirm('确定删除此账号绑定？'))return;
+    try{await fetch('/api/local-accounts/'+id,{method:'DELETE'});await this.loadLocalAccounts()}catch(e){}
+  },
+  async checkConfig(){
+    try{const r=await fetch('/api/config');const j=await r.json();this.configured=j.configured;if(j.saved_email){this.loginEmail=j.saved_email;this.rememberPwd=true}}catch(e){this.configured=false}
+  },
+  async tryAutoLogin(){
+    try{const r=await fetch('/api/auto-login',{method:'POST'});const j=await r.json();if(j.configured){this.configured=true}}catch(e){}
+  },
+  async doLogin(){
+    if(!this.loginEmail||!this.loginPass){this.loginError='请输入邮箱和密码';return}
+    this.loginLoading=true;this.loginError=''
+    try{
+      const r=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:this.loginEmail,password:this.loginPass,remember:this.rememberPwd})})
+      const j=await r.json()
+      if(j.error){this.loginError=j.error}
+      else{this.configured=true;this.loginEmail='';this.loginPass=''}
+    }catch(e){this.loginError='登录失败: '+e.message}
+    this.loginLoading=false
+  },
+  async selectPlatform(id){
+    if(this.status==='loading'||this.status==='browser'||this.status==='uploading')return
+    if(!id){this.errorMsg='请选择平台';return}
+    this.selected=id;this.errorMsg=''
+    let token=this.tokenFromUrl||this.getParam('token')
+    let apiUrl=this.apiFromUrl||this.getParam('api')||'https://ddddkiii.com/api/v1'
+    if(!token){
+      try{
+        const r=await fetch('/api/config');const j=await r.json()
+        if(j.token_set){
+          const tr=await fetch('/api/get-token');const tj=await tr.json()
+          token=tj.token;apiUrl=j.api_url
+        }
+      }catch(e){}
+    }
+    if(!token){this.errorMsg='请先登录披星云账号再扫码绑定';this.status='error';return}
+    this.startScan(token,apiUrl)
+  },
+  getParam(k){return new URLSearchParams(location.search).get(k)},
+  startScan(token,apiUrl){
+    this.status='loading';this.progress=0
+    this.timer=setInterval(()=>{if(this.progress<90)this.progress+=1},400)
+    const url=`/api/scan-bind/trigger?platform=${this.selected}&token=${encodeURIComponent(token)}&api_url=${encodeURIComponent(apiUrl)}`
+    fetch(url).then(r=>r.json()).then(j=>{
+      if(j.code===0){
+        this.sessionId=j.session_id
+        this.status='browser'
+        this.progress=50
+        clearInterval(this.timer)
+      }else{
+        this.status='error'
+        this.errorMsg=j.msg||'启动失败'
+        clearInterval(this.timer)
+      }
+    }).catch(e=>{
+      this.status='error'
+      this.errorMsg='通信失败: '+e.message
+      clearInterval(this.timer)
+    })
+  },
+  reset(){this.evtSource?.close();clearInterval(this.timer);this.status='idle';this.qrUrl='';this.errorMsg='';this.selected='';this.progress=0},
+confirmLogin(){
+  console.log('[UI] confirmLogin called, sessionId='+this.sessionId)
+  if(!this.sessionId){this.errorMsg='会话丢失，请重试';this.status='error';return}
+  this.status='uploading'
+  const sid=this.sessionId
+  fetch('/api/confirm-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:sid})}).then(r=>r.json()).then(j=>{
+    console.log('[UI] confirm-login response:',JSON.stringify(j))
+    if(j.code!==0){this.status='error';this.errorMsg='操作失败: '+j.msg;return}
+    let attempts=0
+    const poll=setInterval(()=>{
+      fetch('/api/scan-bind/poll/'+sid).then(r=>r.json()).then(s=>{
+        attempts++
+        if(s.status==='done'){this.status='done';this.progress=100;clearInterval(poll)}
+        else if(s.status==='error'){this.status='error';this.errorMsg='上传失败，请重试';clearInterval(poll)}
+        else if(attempts>30){this.status='done';this.progress=100;clearInterval(poll)}
+      }).catch(()=>{if(attempts>30){this.status='done';this.progress=100;clearInterval(poll)}})
+    },1000)
+  }).catch(e=>{console.log('[UI] confirm-login error:',e.message);this.status='error';this.errorMsg='通信失败: '+e.message})
+},
+cancelScan(){
+  if(this.sessionId){fetch('/api/cancel-scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({session_id:this.sessionId})})}
+  this.reset()
+}
+},
+mounted(){
+  this.checkConfig()
+  this.tryAutoLogin()
+  this.loadCookieStatus()
+  this.loadLocalAccounts()
+  this.fetchPixingStatus()
+  this.platformFromUrl=this.getParam('platform')
+  this.tokenFromUrl=this.getParam('token')
+  this.apiFromUrl=this.getParam('api')
+  if(this.platformFromUrl&&this.tokenFromUrl){this.selected=this.platformFromUrl}
+  setInterval(async()=>{try{const r=await fetch('/health');if(r.ok)this.siteConnected=true}catch{this.siteConnected=false}},3000)
+  setInterval(()=>{if(this.configured)this.loadCookieStatus()},60000)
+  setInterval(()=>{if(this.configured)this.loadLocalAccounts()},30000)
+  setInterval(()=>{if(this.configured)this.fetchPixingStatus()},10000)
+}}).mount('body')
+</script></body></html>

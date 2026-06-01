@@ -81,6 +81,16 @@ export class AccountsController {
     return this.accountsService.update(id, dto, userId);
   }
 
+  @Put(':id/move-to-group')
+  @HttpCode(HttpStatus.OK)
+  async moveToGroup(
+    @Param('id') id: string,
+    @Body() body: { groupId: string | null },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.accountsService.moveToGroup(id, body.groupId, userId);
+  }
+
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   async remove(

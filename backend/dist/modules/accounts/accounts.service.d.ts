@@ -28,6 +28,7 @@ export declare class AccountsService {
     remove(id: string, userId: string): Promise<{
         success: boolean;
     }>;
+    moveToGroup(accountId: string, groupId: string | null, userId: string): Promise<any>;
     getCookies(id: string, userId: string): Promise<{
         cookies: null;
     } | {

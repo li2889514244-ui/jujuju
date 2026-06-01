@@ -107,6 +107,7 @@ model Team {
 
   @@index([organizationId])
   members   TeamMember[]
+  permissions TeamPermission[]
 }
 
 // ==================== 平台账号 ====================
@@ -366,6 +367,23 @@ model TeamMember {
   @@unique([userId, teamId])
   @@index([teamId])
   @@index([userId])
+}
+
+// ==================== 权限管理 ====================
+
+model TeamPermission {
+  id           String   @id @default(cuid())
+  teamId       String
+  roleType     String   // "admin" or "member"
+  permissionId String   // e.g. "manage_accounts", "view_content"
+  enabled      Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, roleType, permissionId])
+  @@index([teamId])
 }
 
 model PixingVideoTask {

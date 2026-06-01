@@ -272,15 +272,10 @@ export interface ApiResponse<T = unknown> {
 }
 
 export interface PaginatedResponse<T> {
-  list: T[]
-  accounts?: T[]
-  posts?: T[]
-  items?: T[]
-  total: number
-  page?: number
-  pageSize?: number
-  skip?: number
-  take?: number
+  items: T[];
+  total: number;
+  skip?: number;
+  take?: number;
 }
 
 // ===== Account Posts & Analytics =====

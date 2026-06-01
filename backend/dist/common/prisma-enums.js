@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.NotificationType = exports.AccountStatus = exports.PostStatus = exports.Platform = exports.Role = void 0;
+exports.NotificationType = exports.EventType = exports.AccountStatus = exports.PostStatus = exports.Platform = exports.Role = void 0;
 exports.Role = {
     ADMIN: 'ADMIN', MEMBER: 'MEMBER', VIEWER: 'VIEWER', OWNER: 'OWNER', MANAGER: 'MANAGER',
 };
@@ -15,6 +15,9 @@ exports.PostStatus = {
 };
 exports.AccountStatus = {
     ACTIVE: 'ACTIVE', EXPIRED: 'EXPIRED', DISABLED: 'DISABLED',
+};
+exports.EventType = {
+    RECORDING: 'RECORDING', LIVESTREAM: 'LIVESTREAM', MEETING: 'MEETING', OTHER: 'OTHER',
 };
 exports.NotificationType = {
     SYSTEM: 'SYSTEM', ACCOUNT: 'ACCOUNT', CONTENT: 'CONTENT', REPORT: 'REPORT', PUBLISH_SUCCESS: 'PUBLISH_SUCCESS', PUBLISH_FAILED: 'PUBLISH_FAILED',

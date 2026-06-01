@@ -18,10 +18,16 @@ export const PostStatus = {
 } as const;
 export type PostStatus = (typeof PostStatus)[keyof typeof PostStatus];
 
+// Mirrors Prisma schema enum: AccountStatus (ACTIVE | EXPIRED | DISABLED)
 export const AccountStatus = {
   ACTIVE: 'ACTIVE', EXPIRED: 'EXPIRED', DISABLED: 'DISABLED',
 } as const;
 export type AccountStatus = (typeof AccountStatus)[keyof typeof AccountStatus];
+
+export const EventType = {
+  RECORDING: 'RECORDING', LIVESTREAM: 'LIVESTREAM', MEETING: 'MEETING', OTHER: 'OTHER',
+} as const;
+export type EventType = (typeof EventType)[keyof typeof EventType];
 
 export const NotificationType = {
   SYSTEM: 'SYSTEM', ACCOUNT: 'ACCOUNT', CONTENT: 'CONTENT', REPORT: 'REPORT', PUBLISH_SUCCESS: 'PUBLISH_SUCCESS', PUBLISH_FAILED: 'PUBLISH_FAILED',

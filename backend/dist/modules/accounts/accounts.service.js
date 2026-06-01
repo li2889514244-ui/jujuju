@@ -14,6 +14,7 @@ exports.AccountsService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const crypto = require("crypto");
+const ownership_helper_1 = require("../../common/utils/ownership.helper");
 let AccountsService = AccountsService_1 = class AccountsService {
     constructor(prisma) {
         this.prisma = prisma;
@@ -36,7 +37,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
     decryptCookie(text) {
         const parts = text.split(':');
         if (parts.length === 2) {
-            this.logger.warn('');
+            this.logger.warn('检测到旧版 CBC 加密格式，建议重新保存 Cookie 以迁移到 GCM');
             const [ivHex, encrypted] = parts;
             const iv = Buffer.from(ivHex, 'hex');
             const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
@@ -65,7 +66,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
             },
         });
         if (existing) {
-            throw new common_1.ConflictException('');
+            throw new common_1.ConflictException('平台账号已存在');
         }
         const encryptedCookies = dto.cookies
             ? this.encryptCookie(dto.cookies)
@@ -91,7 +92,7 @@ let AccountsService = AccountsService_1 = class AccountsService {
                 },
             },
         });
-        this.logger.log(`璐﹀彿鍒涘缓鎴愬姛: ${dto.platform} - ${dto.nickname} (${account.id})`);
+        this.logger.log(`账号创建成功: ${dto.platform} - ${dto.nickname} (${account.id})`);
         return this.sanitizeAccount(account);
     }
     async findAll(params) {
@@ -159,27 +160,19 @@ let AccountsService = AccountsService_1 = class AccountsService {
             },
         });
         if (!account) {
-            throw new common_1.NotFoundException('[garbled]');
+            throw new common_1.NotFoundException('账号不存在');
         }
-        if (userId && account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('[garbled]');
-            }
+        if (userId) {
+            await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
         }
         return this.sanitizeAccount(account);
     }
     async update(id, dto, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('[garbled]');
+            throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('[garbled]');
-            }
-        }
+        await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
         const updateData = { ...dto };
         if (dto.cookies) {
             updateData.cookies = this.encryptCookie(dto.cookies);
@@ -201,29 +194,45 @@ let AccountsService = AccountsService_1 = class AccountsService {
     async remove(id, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('[garbled]');
+            throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('[garbled]');
+        await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
+        await this.prisma.account.delete({ where: { id } });
+        this.logger.log(`账号已删除: ${id}`);
+        return { success: true };
+    }
+    async moveToGroup(accountId, groupId, userId) {
+        const account = await this.prisma.account.findUnique({ where: { id: accountId } });
+        if (!account) {
+            throw new common_1.NotFoundException('账号不存在');
+        }
+        await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
+        if (groupId) {
+            const group = await this.prisma.accountGroup.findFirst({
+                where: { id: groupId, userId },
+            });
+            if (!group) {
+                throw new common_1.NotFoundException('分组不存在或无权操作');
             }
         }
-        await this.prisma.account.delete({ where: { id } });
-        this.logger.log(`璐﹀彿宸插垹闄? ${id}`);
-        return { success: true };
+        const updated = await this.prisma.account.update({
+            where: { id: accountId },
+            data: { groupId },
+            include: {
+                owner: { select: { id: true, name: true, email: true } },
+                team: { select: { id: true, name: true } },
+                group: { select: { id: true, name: true, color: true } },
+            },
+        });
+        this.logger.log(`账号 ${account.nickname} 移动到分组 ${groupId ?? '未分组'}`);
+        return this.sanitizeAccount(updated);
     }
     async getCookies(id, userId) {
         const account = await this.prisma.account.findUnique({ where: { id } });
         if (!account) {
-            throw new common_1.NotFoundException('[garbled]');
+            throw new common_1.NotFoundException('账号不存在');
         }
-        if (account.userId !== userId) {
-            const user = await this.prisma.user.findUnique({ where: { id: userId } });
-            if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-                throw new common_1.ForbiddenException('');
-            }
-        }
+        await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
         if (!account.cookies) {
             return { cookies: null };
         }

@@ -3,6 +3,7 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import * as compression from 'compression';
 import * as express from 'express';
+import * as crypto from 'crypto';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
@@ -94,6 +95,13 @@ async function bootstrap() {
   // API 版本头
   app.use((_req: any, res: any, next: any) => {
     res.setHeader('X-API-Version', '1.0');
+    next();
+  });
+
+  // Trace ID middleware — injects X-Trace-Id header on every request
+  app.use((req: any, res: any, next: any) => {
+    req['traceId'] = req.headers['x-trace-id'] || crypto.randomUUID();
+    res.setHeader('X-Trace-Id', req['traceId']);
     next();
   });
 

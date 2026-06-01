@@ -1,0 +1,114 @@
+classDiagram
+    %% ===== 后端核心类型 =====
+    class AccountStatus {
+        <<enum>>
+        ACTIVE
+        EXPIRED
+        DISABLED
+    }
+    note for AccountStatus "T01: 确认与 Prisma schema 对齐"
+
+    class PaginatedResponse~T~ {
+        +items: T[]
+        +total: number
+        +skip?: number
+        +take?: number
+    }
+    note for PaginatedResponse "T01: 统一字段名为 items"
+
+    class BackendErrorContext {
+        +entity: string
+        +operation: string
+        +id?: string
+        +reason: string
+    }
+    note for BackendErrorContext "T02: 异常消息构造上下文"
+
+    class OwnershipHelper {
+        +assertOwnershipOrAdmin(prisma, userId, ownerId, entityName) void
+    }
+    note for OwnershipHelper "T02: 消除 5 处重复权限检查"
+
+    class LoggingInterceptor {
+        +intercept(context, next) Observable
+        -traceId: string
+    }
+    note for LoggingInterceptor "T05: 注入 X-Trace-Id"
+
+    %% ===== 前端核心类型 =====
+    class PlatformColorMap {
+        +douyin: string
+        +kuaishou: string
+        +xiaohongshu: string
+        +video_account: string
+        +bilibili: string
+        +weibo: string
+        +tiktok: string
+        +getNotificationColor(type) string
+    }
+    note for PlatformColorMap "T03: 集中管理所有颜色"
+
+    class CompanionConfig {
+        +api_url: string
+        +token: string
+        +refreshToken: string
+        +saved_email: string
+        +saved_password_encrypted: string
+    }
+    note for CompanionConfig "T05: 密码 AES-256-GCM 加密"
+
+    class UseCompanionUrl {
+        +baseUrl: string
+        +healthCheck() Promise~string|null~
+        +isAvailable: Ref~boolean~
+    }
+    note for UseCompanionUrl "T04: 动态检测本地伴侣"
+
+    class UseDataTable~T~ {
+        +loading: Ref~boolean~
+        +data: Ref~T[]~
+        +error: Ref~string|null~
+        +pagination: Ref
+        +refresh() Promise~void~
+        +handleError(e: Error) void
+        +exportData(format) void
+    }
+    note for UseDataTable "T04: 合并 Report/Analytics/DataCenter"
+
+    class UseDashboard {
+        +period: Ref~string~
+        +loading: Ref~boolean~
+        +accountRows: Ref~DashboardAccount[]~
+        +groupSummaryCards: ComputedRef
+        +refreshAll() Promise~void~
+        +loadFollowerTrend() Promise~void~
+    }
+    note for UseDashboard "T03: 消除 any 类型"
+
+    %% ===== 桌面端类型 =====
+    class ChromeManager {
+        +port: int
+        +profile_dir: str
+        -_process: Popen
+        -_pid: int
+        +start(headless) bool
+        +is_running() bool
+        +stop() void
+        +new_page() dict
+        +get_pages() list
+        +evaluate(page_id, expression) str
+    }
+    note for ChromeManager "T05: evaluate() WebSocket CDP"
+
+    class TokenAuthMiddleware {
+        +verify_token(token) bool
+        +before_request() void
+    }
+    note for TokenAuthMiddleware "T05: sau_backend.py 新增"
+
+    %% ===== 关系 =====
+    OwnershipHelper ..> BackendErrorContext : 抛出时使用
+    UseDataTable ..> PaginatedResponse : 消费
+    UseDashboard ..> PaginatedResponse : 消费
+    CompanionConfig ..> PlatformColorMap : 无关
+    TokenAuthMiddleware ..> CompanionConfig : 验证 token

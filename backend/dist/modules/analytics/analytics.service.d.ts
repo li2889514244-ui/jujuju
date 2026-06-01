@@ -126,7 +126,18 @@ export declare class AnalyticsService {
             avgCompletionRate: number;
         };
     }>;
-    getPlatformComparison(userId: string): Promise<Record<string, any>>;
+    getPlatformComparison(userId: string): Promise<{
+        platform: string;
+        accounts: number;
+        followers: number;
+        likes: number;
+        publishes: number;
+        views: number;
+        comments: number;
+        shares: number;
+        saves: number;
+        engagementRate: number;
+    }[]>;
     generateReport(userId: string, params: {
         startDate?: Date;
         endDate?: Date;
@@ -205,6 +216,7 @@ export declare class AnalyticsService {
             likes: number;
             comments: number;
             shares: number;
+            saves: number;
             publishedAt: Date;
         }[];
         dailyTrend: ({
@@ -422,6 +434,7 @@ export declare class AnalyticsService {
             likes: number;
             comments: number;
             shares: number;
+            saves: number;
             publishedAt: Date;
         }[];
         dailyTrend: ({

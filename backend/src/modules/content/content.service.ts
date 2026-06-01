@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContentDto } from './dto/create-content.dto';
 import { PostStatus, Prisma } from '@prisma/client';
+import { OwnershipHelper } from '../../common/utils/ownership.helper';
 
 @Injectable()
 export class ContentService {
@@ -19,8 +20,8 @@ export class ContentService {
 
   async create(dto: CreateContentDto, userId: string) {
     const account = await this.prisma.account.findUnique({ where: { id: dto.accountId } });
-    if (!account) throw new NotFoundException('');
-    if (account.userId !== userId) throw new ForbiddenException('');
+    if (!account) throw new NotFoundException('账号不存在');
+    if (account.userId !== userId) throw new ForbiddenException('无权操作该内容');
 
     return this.prisma.post.create({
       data: {
@@ -52,19 +53,18 @@ export class ContentService {
 
   async findById(id: string, userId?: string) {
     const post = await this.prisma.post.findUnique({ where: { id }, include: { account: { select: { id: true, platform: true, nickname: true, avatar: true, userId: true } }, stats: true } });
-    if (!post) throw new NotFoundException('');
-    if (userId && post.account.userId !== userId) {
-      const user = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (!user || !['OWNER', 'ADMIN'].includes(user.role)) throw new ForbiddenException('');
+    if (!post) throw new NotFoundException('内容不存在');
+    if (userId) {
+      await OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, post.account.userId, '内容');
     }
     return post;
   }
 
   async update(id: string, data: Partial<CreateContentDto>, userId: string) {
     const post = await this.prisma.post.findUnique({ where: { id }, include: { account: true } });
-    if (!post) throw new NotFoundException('');
-    if (!['DRAFT', 'SCHEDULED'].includes(post.status)) throw new BadRequestException('');
-    if (post.account.userId !== userId) throw new ForbiddenException('');
+    if (!post) throw new NotFoundException('内容不存在');
+    if (!['DRAFT', 'SCHEDULED'].includes(post.status)) throw new BadRequestException('仅草稿和定时内容可编辑');
+    if (post.account.userId !== userId) throw new ForbiddenException('无权操作该内容');
 
     const updateData: Prisma.PostUpdateInput = {};
     if (data.title !== undefined) updateData.title = data.title;
@@ -78,17 +78,17 @@ export class ContentService {
 
   async remove(id: string, userId: string) {
     const post = await this.prisma.post.findUnique({ where: { id }, include: { account: true } });
-    if (!post) throw new NotFoundException('');
-    if (post.account.userId !== userId) throw new ForbiddenException('');
-    if (post.status === 'PUBLISHING') throw new BadRequestException('');
+    if (!post) throw new NotFoundException('内容不存在');
+    if (post.account.userId !== userId) throw new ForbiddenException('无权操作该内容');
+    if (post.status === 'PUBLISHING') throw new BadRequestException('发布中的内容无法删除');
     await this.prisma.post.delete({ where: { id } });
     return { success: true };
   }
 
   async publish(contentId: string, userId: string) {
     const post = await this.prisma.post.findUnique({ where: { id: contentId }, include: { account: true } });
-    if (!post) throw new NotFoundException('');
-    if (post.account.userId !== userId) throw new ForbiddenException('');
+    if (!post) throw new NotFoundException('内容不存在');
+    if (post.account.userId !== userId) throw new ForbiddenException('无权操作该内容');
     if (!['DRAFT', 'SCHEDULED', 'FAILED'].includes(post.status)) throw new BadRequestException(`当前状态 ${post.status} 不允许发布`);
 
     return this.prisma.post.update({ where: { id: contentId }, data: { status: 'PUBLISHING' } });
@@ -109,10 +109,10 @@ export class ContentService {
 
   async batchPublish(dto: { title: string; content: string; mediaUrls?: string[]; tags?: string[]; accountIds: string[]; publishAt?: string }, userId: string) {
     const { accountIds, ...contentData } = dto;
-    if (!accountIds || accountIds.length === 0) throw new BadRequestException('');
+    if (!accountIds || accountIds.length === 0) throw new BadRequestException('请至少选择一个发布账号');
 
     const accounts = await this.prisma.account.findMany({ where: { id: { in: accountIds }, userId }, select: { id: true, platform: true, nickname: true } });
-    if (accounts.length !== accountIds.length) throw new ForbiddenException('');
+    if (accounts.length !== accountIds.length) throw new ForbiddenException('部分发布账号不存在或无权操作');
 
     const posts = await Promise.all(accounts.map((account) =>
       this.prisma.post.create({

@@ -17,6 +17,7 @@ const config_1 = require("@nestjs/config");
 const bcrypt = require("bcryptjs");
 const prisma_service_1 = require("../../prisma/prisma.service");
 const redis_service_1 = require("../../redis/redis.service");
+const BCRYPT_ROUNDS = 12;
 let AuthService = AuthService_1 = class AuthService {
     constructor(prisma, jwtService, configService, redis) {
         this.prisma = prisma;
@@ -42,7 +43,7 @@ let AuthService = AuthService_1 = class AuthService {
             throw new common_1.ConflictException('该邮箱已被注册');
         }
         this.validatePassword(dto.password);
-        const hashedPassword = await bcrypt.hash(dto.password, 12);
+        const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
         const user = await this.prisma.user.create({
             data: {
                 email: dto.email,

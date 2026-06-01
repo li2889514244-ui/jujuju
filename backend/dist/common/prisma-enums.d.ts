@@ -34,6 +34,13 @@ export declare const AccountStatus: {
     readonly DISABLED: "DISABLED";
 };
 export type AccountStatus = (typeof AccountStatus)[keyof typeof AccountStatus];
+export declare const EventType: {
+    readonly RECORDING: "RECORDING";
+    readonly LIVESTREAM: "LIVESTREAM";
+    readonly MEETING: "MEETING";
+    readonly OTHER: "OTHER";
+};
+export type EventType = (typeof EventType)[keyof typeof EventType];
 export declare const NotificationType: {
     readonly SYSTEM: "SYSTEM";
     readonly ACCOUNT: "ACCOUNT";

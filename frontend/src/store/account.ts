@@ -1,7 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { accountsApi } from '@/api/accounts'
-import type { Account, AccountFilter, AccountGroup } from '@/types'
+import type { Account, AccountFilter, AccountGroup, PaginatedResponse } from '@/types'
+
+/** Extract items from PaginatedResponse with backward compat for legacy field names. */
+function extractItems<T>(
+  data: PaginatedResponse<T> & { accounts?: T[]; list?: T[] },
+): T[] {
+  return data.items || data.accounts || data.list || []
+}
 
 export const useAccountStore = defineStore('account', () => {
   const accounts = ref<Account[]>([])
@@ -21,8 +28,8 @@ export const useAccountStore = defineStore('account', () => {
     loading.value = true
     try {
       const res = await accountsApi.getList(filter.value)
-      const data = res.data as any
-      accounts.value = data.accounts || []
+      const data = res.data
+      accounts.value = extractItems(data)
       total.value = data.total || 0
     } finally {
       loading.value = false

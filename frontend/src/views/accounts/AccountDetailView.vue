@@ -248,17 +248,6 @@ function exportAccountData() {
   ElMessage.success('导出成功')
 }
 
-async function handleCheckCookie() {
-  const result = await accountStore.checkCookieStatus(accountId)
-  ElMessage.success(`Cookie状态: ${result.status}`)
-}
-
-async function handleRefreshCookie() {
-  ElMessage.info('正在刷新Cookie...')
-  await accountsApi.refreshCookie(accountId)
-  ElMessage.success('Cookie已刷新')
-}
-
 async function handleDelete() {
   await ElMessageBox.confirm('确定删除该账号？此操作不可恢复。', '警告', { type: 'warning' })
   await accountStore.deleteAccount(accountId)

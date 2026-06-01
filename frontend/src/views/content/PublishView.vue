@@ -209,6 +209,12 @@
           <span>{{ r.nickname }}</span>
           <span v-if="r.error" style="color: #d4534a; font-size: 13px">{{ r.error }}</span>
         </div>
+        <!-- Retry failed items -->
+        <div v-if="hasFailedItems" style="margin-top: 12px; text-align: center;">
+          <el-button type="warning" :loading="retrying" @click="retryFailed">
+            重试失败项目 ({{ failedCount }})
+          </el-button>
+        </div>
       </el-card>
     </div>
   </div>
@@ -229,7 +235,15 @@ import { useContentStore } from '@/store/content'
 import { useAccountStore } from '@/store/account'
 import { contentApi } from '@/api/content'
 import { PLATFORM_LABELS as _PL } from '@/types'
+import type { Content, Account, PublishTask } from '@/types'
 const PLATFORM_LABELS: Record<string, string> = _PL
+
+interface PublishResultItem {
+  accountId: string
+  status: string
+  nickname: string
+  error?: string | null
+}
 
 const contentStore = useContentStore()
 const accountStore = useAccountStore()
@@ -239,19 +253,20 @@ const publishMode = ref<'now' | 'scheduled'>('now')
 const scheduledAt = ref('')
 const contentMode = ref<'existing' | 'new'>('existing')
 const publishing = ref(false)
+const retrying = ref(false)
 const activePlatforms = ref<string[]>([])
 const customTitles = reactive<Record<string, string>>({})
 
 const contentForm = reactive({ title: '', description: '', tags: [] as string[] })
-const publishResults = ref<any[]>([])
+const publishResults = ref<PublishResultItem[]>([])
 const selectedContentId = ref('')
-const selectedContent = ref<any>(null)
+const selectedContent = ref<Content | null>(null)
 
 const platformOrder = ['DOUYIN', 'KUAISHOU', 'XIAOHONGSHU', 'WECHAT_VIDEO', 'BILIBILI', 'WEIBO']
 
 const platforms = computed(() => {
   const accs = accountStore.accounts
-  const byPlatform: Record<string, any[]> = {}
+  const byPlatform: Record<string, Account[]> = {}
   for (const a of accs) {
     if (!byPlatform[a.platform]) byPlatform[a.platform] = []
     byPlatform[a.platform].push(a)
@@ -271,23 +286,26 @@ const totalSelectedAccounts = computed(() => {
   return platforms.value.reduce((sum, p) => sum + (p.selected ? p.selectedAccounts.length : 0), 0)
 })
 
+const hasFailedItems = computed(() => publishResults.value.some((r) => r.status === 'failed'))
+const failedCount = computed(() => publishResults.value.filter((r) => r.status === 'failed').length)
+
 const selectedAccountDetails = computed(() => {
-  const result: any[] = []
+  const result: Account[] = []
   for (const p of platforms.value) {
     for (const aid of p.selectedAccounts) {
-      const acc = p.accounts.find((a: any) => a.id === aid)
+      const acc = p.accounts.find((a) => a.id === aid)
       if (acc) result.push(acc)
     }
   }
   return result
 })
 
-function selectContent(row: any) {
+function selectContent(row: Content | null) {
   selectedContentId.value = row?.id || ''
   selectedContent.value = row
 }
 
-function removeAccount(acc: any) {
+function removeAccount(acc: Account) {
   const p = platforms.value.find((g) => g.key === acc.platform)
   if (p) p.selectedAccounts = p.selectedAccounts.filter((id: string) => id !== acc.id)
 }
@@ -302,17 +320,17 @@ async function doPublish() {
   publishResults.value = []
   try {
     const accountIds = platforms.value.flatMap((p) => p.selectedAccounts)
-    const res = (await contentApi.publish({
+    const res = await contentApi.publish({
       title: contentForm.title || selectedContent.value?.title || '新内容',
       content: contentForm.description || selectedContent.value?.description || '',
       accountIds,
       tags: contentForm.tags,
       publishAt: publishMode.value === 'scheduled' ? scheduledAt.value : undefined,
-    })) as any
+    })
 
-    const data = res.data || res
+    const data: PublishTask[] = res.data
     if (Array.isArray(data)) {
-      publishResults.value = data.map((r: any) => ({
+      publishResults.value = data.map((r) => ({
         accountId: r.accountId,
         status: r.status || 'success',
         nickname: r.accountNickname || '',
@@ -320,16 +338,63 @@ async function doPublish() {
       }))
     } else {
       publishResults.value = accountIds.map((aid: string) => {
-        const acc = selectedAccountDetails.value.find((a: any) => a.id === aid)
+        const acc = selectedAccountDetails.value.find((a) => a.id === aid)
         return { accountId: aid, status: 'success', nickname: acc?.nickname || aid }
       })
     }
     ElMessage.success('发布完成')
-  } catch (e: any) {
-    ElMessage.error('发布失败: ' + (e.message || '未知错误'))
-    publishResults.value = [{ accountId: '', status: 'failed', nickname: '', error: e.message }]
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '未知错误'
+    ElMessage.error('发布失败: ' + msg)
+    publishResults.value = [{ accountId: '', status: 'failed', nickname: '', error: msg }]
+  } finally {
+    publishing.value = false
   }
-  publishing.value = false
+}
+
+async function retryFailed() {
+  const failedItems = publishResults.value.filter((r) => r.status === 'failed')
+  const failedIds = failedItems.map((r) => r.accountId).filter(Boolean)
+  if (failedIds.length === 0) return
+
+  // Remove failed items from results before retrying
+  publishResults.value = publishResults.value.filter((r) => r.status !== 'failed')
+  retrying.value = true
+
+  try {
+    const res = await contentApi.publish({
+      title: contentForm.title || selectedContent.value?.title || '新内容',
+      content: contentForm.description || selectedContent.value?.description || '',
+      accountIds: failedIds,
+      tags: contentForm.tags,
+      publishAt: publishMode.value === 'scheduled' ? scheduledAt.value : undefined,
+    })
+
+    const data: PublishTask[] = res.data
+    if (Array.isArray(data)) {
+      const newResults = data.map((r) => ({
+        accountId: r.accountId,
+        status: r.status || 'success',
+        nickname: r.accountNickname || '',
+        error: r.errorMessage,
+      }))
+      publishResults.value = [...publishResults.value, ...newResults]
+    } else {
+      const retryResults = failedIds.map((aid: string) => {
+        const acc = selectedAccountDetails.value.find((a) => a.id === aid)
+        return { accountId: aid, status: 'success', nickname: acc?.nickname || aid }
+      })
+      publishResults.value = [...publishResults.value, ...retryResults]
+    }
+    ElMessage.success(`重试完成：${failedIds.length} 个项目`)
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : '未知错误'
+    ElMessage.error('重试失败: ' + msg)
+    // Restore failed items on error
+    publishResults.value = [...publishResults.value, ...failedItems]
+  } finally {
+    retrying.value = false
+  }
 }
 
 onMounted(() => {

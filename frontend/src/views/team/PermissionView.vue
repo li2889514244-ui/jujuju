@@ -46,58 +46,38 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useTeamStore } from '@/store/team'
-import type { Permission } from '@/types'
+import { permissionsApi } from '@/api/permissions'
 
 const teamStore = useTeamStore()
 const activeRole = ref('admin')
+const loading = ref(false)
+const saving = ref(false)
 
-// Admin permissions with always-enabled flags
-const adminPermissions = ref<(Permission & { alwaysEnabled?: boolean })[]>([
+interface PermEntry {
+  id: string
+  name: string
+  description: string
+  enabled: boolean
+  alwaysEnabled?: boolean
+}
+
+// 内置默认值（作为 API 返回为空时的 fallback）
+const ADMIN_DEFAULTS: PermEntry[] = [
   { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: true },
-  {
-    id: 'view_content',
-    name: '查看内容',
-    description: '查看团队内所有内容',
-    enabled: true,
-    alwaysEnabled: true,
-  },
-  {
-    id: 'create_content',
-    name: '创建内容',
-    description: '创建和编辑内容',
-    enabled: true,
-    alwaysEnabled: true,
-  },
+  { id: 'view_content', name: '查看内容', description: '查看团队内所有内容', enabled: true, alwaysEnabled: true },
+  { id: 'create_content', name: '创建内容', description: '创建和编辑内容', enabled: true, alwaysEnabled: true },
   { id: 'publish_content', name: '发布内容', description: '发布内容到各平台', enabled: true },
-  {
-    id: 'view_analytics',
-    name: '查看数据',
-    description: '查看数据分析报告',
-    enabled: true,
-    alwaysEnabled: true,
-  },
+  { id: 'view_analytics', name: '查看数据', description: '查看数据分析报告', enabled: true, alwaysEnabled: true },
   { id: 'export_data', name: '导出数据', description: '导出分析报告和数据', enabled: true },
   { id: 'manage_browser', name: '管理浏览器', description: '管理内置浏览器会话', enabled: true },
   { id: 'manage_team', name: '管理团队', description: '邀请/移除成员、修改角色', enabled: true },
   { id: 'manage_permissions', name: '管理权限', description: '修改团队权限设置', enabled: false },
-])
+]
 
-const memberPermissions = ref<(Permission & { alwaysEnabled?: boolean })[]>([
-  {
-    id: 'view_accounts',
-    name: '查看账号',
-    description: '查看团队内所有账号信息',
-    enabled: true,
-    alwaysEnabled: true,
-  },
+const MEMBER_DEFAULTS: PermEntry[] = [
+  { id: 'view_accounts', name: '查看账号', description: '查看团队内所有账号信息', enabled: true, alwaysEnabled: true },
   { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: false },
-  {
-    id: 'view_content',
-    name: '查看内容',
-    description: '查看团队内所有内容',
-    enabled: true,
-    alwaysEnabled: true,
-  },
+  { id: 'view_content', name: '查看内容', description: '查看团队内所有内容', enabled: true, alwaysEnabled: true },
   { id: 'create_content', name: '创建内容', description: '创建和编辑内容', enabled: true },
   { id: 'publish_content', name: '发布内容', description: '发布内容到各平台', enabled: false },
   { id: 'view_analytics', name: '查看数据', description: '查看数据分析报告', enabled: true },
@@ -105,56 +85,97 @@ const memberPermissions = ref<(Permission & { alwaysEnabled?: boolean })[]>([
   { id: 'manage_browser', name: '管理浏览器', description: '管理内置浏览器会话', enabled: false },
   { id: 'manage_team', name: '管理团队', description: '邀请/移除成员、修改角色', enabled: false },
   { id: 'manage_permissions', name: '管理权限', description: '修改团队权限设置', enabled: false },
-])
+]
+
+const adminPermissions = ref<PermEntry[]>(structuredClone(ADMIN_DEFAULTS))
+const memberPermissions = ref<PermEntry[]>(structuredClone(MEMBER_DEFAULTS))
 
 const filteredPermissions = computed(() =>
   activeRole.value === 'admin' ? adminPermissions.value : memberPermissions.value,
 )
 
-function handlePermissionChange(_perm: Permission & { alwaysEnabled?: boolean }) {
+function handlePermissionChange(_perm: PermEntry) {
   // 本地标记变更，保存时统一提交
 }
 
-function handleSave() {
-  const data = {
-    admin: adminPermissions.value.map((p) => ({ id: p.id, enabled: p.enabled })),
-    member: memberPermissions.value.map((p) => ({ id: p.id, enabled: p.enabled })),
-  }
-  localStorage.setItem('matrixflow_permissions', JSON.stringify(data))
-  ElMessage.success('权限设置已保存到本地')
-}
+async function loadPermissions() {
+  const teamId = teamStore.currentTeam?.id
+  if (!teamId) return
 
-function handleReset() {
-  localStorage.removeItem('matrixflow_permissions')
-  // Rebuild default permissions
-  const admins = adminPermissions.value.map((p) => ({ ...p, enabled: true }))
-  const members = memberPermissions.value.map((p) => ({ ...p, enabled: true }))
-  adminPermissions.value = admins
-  memberPermissions.value = members
-  ElMessage.info('已恢复默认设置')
-}
-
-onMounted(() => {
-  teamStore.fetchTeams()
-  // Restore saved permissions
-  const saved = localStorage.getItem('matrixflow_permissions')
-  if (saved) {
-    try {
-      const data = JSON.parse(saved)
-      if (data.admin)
-        adminPermissions.value = adminPermissions.value.map((p) => {
-          const s = data.admin.find((x: any) => x.id === p.id)
-          return s ? { ...p, enabled: s.enabled } : p
-        })
-      if (data.member)
-        memberPermissions.value = memberPermissions.value.map((p) => {
-          const s = data.member.find((x: any) => x.id === p.id)
-          return s ? { ...p, enabled: s.enabled } : p
-        })
-    } catch {
-      /* ignore corrupt data */
+  loading.value = true
+  try {
+    const res = await permissionsApi.getPermissions(teamId)
+    if (res.data?.admin) {
+      adminPermissions.value = ADMIN_DEFAULTS.map((def) => {
+        const server = res.data.admin.find((p) => p.id === def.id)
+        return server ? { ...def, enabled: server.enabled } : def
+      })
     }
+    if (res.data?.member) {
+      memberPermissions.value = MEMBER_DEFAULTS.map((def) => {
+        const server = res.data.member.find((p) => p.id === def.id)
+        return server ? { ...def, enabled: server.enabled } : def
+      })
+    }
+  } catch {
+    ElMessage.warning('无法加载权限配置，使用本地默认值')
+  } finally {
+    loading.value = false
   }
+}
+
+async function handleSave() {
+  const teamId = teamStore.currentTeam?.id
+  if (!teamId) {
+    ElMessage.warning('未选择团队')
+    return
+  }
+
+  saving.value = true
+  try {
+    const data = {
+      teamId,
+      admin: adminPermissions.value.map((p) => ({ id: p.id, enabled: p.enabled })),
+      member: memberPermissions.value.map((p) => ({ id: p.id, enabled: p.enabled })),
+    }
+    await permissionsApi.updatePermissions(data)
+    ElMessage.success('权限设置已保存')
+  } catch {
+    ElMessage.error('保存失败，请重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function handleReset() {
+  const teamId = teamStore.currentTeam?.id
+  if (!teamId) return
+
+  saving.value = true
+  try {
+    const data = {
+      teamId,
+      admin: ADMIN_DEFAULTS.map((p) => ({ id: p.id, enabled: p.enabled })),
+      member: MEMBER_DEFAULTS.map((p) => ({ id: p.id, enabled: p.enabled })),
+    }
+    await permissionsApi.updatePermissions(data)
+    adminPermissions.value = structuredClone(ADMIN_DEFAULTS)
+    memberPermissions.value = structuredClone(MEMBER_DEFAULTS)
+    ElMessage.success('已恢复默认设置')
+  } catch {
+    ElMessage.error('恢复默认失败，请重试')
+  } finally {
+    saving.value = false
+  }
+}
+
+onMounted(async () => {
+  await teamStore.fetchTeams()
+  // 如果 fetchTeams 没有设置 currentTeam，取第一个
+  if (!teamStore.currentTeam && teamStore.teams.length > 0) {
+    teamStore.currentTeam = teamStore.teams[0]
+  }
+  await loadPermissions()
 })
 </script>
 

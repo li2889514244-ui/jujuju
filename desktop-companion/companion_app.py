@@ -9,6 +9,48 @@ from flask import Flask, request, jsonify, Response, make_response, send_from_di
 from pixing_worker import start_worker, stop_worker, get_status as get_worker_status
 from chrome_cdp import ChromeCDP
 
+# ── AES-256-GCM encryption helpers ─────────────────────────────
+try:
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+    _HAS_CRYPTO = True
+except ImportError:
+    _HAS_CRYPTO = False
+
+
+def _get_encryption_key() -> bytes:
+    """Retrieve the AES-256 encryption key (32 bytes) from env or config file."""
+    from conf import ENCRYPTION_KEY as CONF_KEY
+    key_str = CONF_KEY
+    if not key_str:
+        # Fallback: try reading _key from companion_config.json directly
+        try:
+            config_path = BASE_DIR / 'companion_config.json'
+            if config_path.exists():
+                cfg = json.loads(config_path.read_text(encoding='utf-8'))
+                key_str = cfg.get('_key', '')
+        except Exception:
+            pass
+    if not key_str:
+        raise RuntimeError("ENCRYPTION_KEY not set. Ensure launcher.py has been run at least once.")
+    # key_str is a base64-encoded 32-byte key
+    return base64.b64decode(key_str)
+
+
+def _encrypt_password(plaintext: str, key: bytes) -> str:
+    """Encrypt password using AES-256-GCM. Returns 'nonce_b64:ciphertext_b64'."""
+    aesgcm = AESGCM(key)
+    nonce = os.urandom(12)
+    ct = aesgcm.encrypt(nonce, plaintext.encode('utf-8'), None)
+    return base64.b64encode(nonce).decode('ascii') + ':' + base64.b64encode(ct).decode('ascii')
+
+
+def _decrypt_password(ciphertext: str, key: bytes) -> str:
+    """Decrypt password encrypted with AES-256-GCM. Input format: 'nonce_b64:ciphertext_b64'."""
+    nonce_b64, ct_b64 = ciphertext.split(':', 1)
+    aesgcm = AESGCM(key)
+    pt = aesgcm.decrypt(base64.b64decode(nonce_b64), base64.b64decode(ct_b64), None)
+    return pt.decode('utf-8')
+
 app = Flask(__name__, static_folder='static')
 # Use EXE directory or script directory for persistent config
 if getattr(sys, 'frozen', False):
@@ -495,6 +537,13 @@ def _load_config() -> dict:
     if CONFIG_FILE.exists():
         try:
             cfg = json.loads(CONFIG_FILE.read_text(encoding='utf-8'))
+            # Decrypt saved_password if encrypted (format: nonce:ciphertext)
+            if cfg.get('saved_password') and ':' in cfg['saved_password'] and _HAS_CRYPTO:
+                try:
+                    key = _get_encryption_key()
+                    cfg['saved_password'] = _decrypt_password(cfg['saved_password'], key)
+                except Exception:
+                    pass  # Legacy plaintext or wrong key — keep as-is
             return cfg
         except Exception:
             pass
@@ -506,7 +555,15 @@ def _load_config() -> dict:
 
 
 def _save_config(cfg: dict):
-    CONFIG_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2),
+    # Encrypt sensitive fields before writing to disk
+    safe_cfg = dict(cfg)
+    if safe_cfg.get('saved_password') and ':' not in safe_cfg['saved_password'] and _HAS_CRYPTO:
+        try:
+            key = _get_encryption_key()
+            safe_cfg['saved_password'] = _encrypt_password(safe_cfg['saved_password'], key)
+        except Exception:
+            pass  # Can't encrypt — save plaintext as last resort
+    CONFIG_FILE.write_text(json.dumps(safe_cfg, ensure_ascii=False, indent=2),
                            encoding='utf-8')
 
 

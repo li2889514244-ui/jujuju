@@ -1,5 +1,52 @@
 <template>
   <div class="analytics">
+    <!-- Loading Skeleton -->
+    <template v-if="loadingCharts && platformStats.length === 0 && followerTrend.length === 0">
+      <div class="analytics__skeleton">
+        <!-- Filter bar skeleton -->
+        <el-card shadow="hover" class="analytics__filter">
+          <el-skeleton :rows="1" animated style="width: 70%;" />
+        </el-card>
+        <!-- Chart row 1 -->
+        <el-row :gutter="20" class="analytics__charts">
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover">
+              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <el-skeleton :rows="12" animated />
+            </el-card>
+          </el-col>
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover">
+              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <el-skeleton :rows="12" animated />
+            </el-card>
+          </el-col>
+        </el-row>
+        <!-- Chart row 2 -->
+        <el-row :gutter="20" class="analytics__charts">
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover">
+              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <el-skeleton :rows="12" animated />
+            </el-card>
+          </el-col>
+          <el-col :xs="24" :lg="12">
+            <el-card shadow="hover">
+              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <el-skeleton :rows="12" animated />
+            </el-card>
+          </el-col>
+        </el-row>
+        <!-- Table skeleton -->
+        <el-card shadow="hover">
+          <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+          <el-skeleton :rows="6" animated />
+        </el-card>
+      </div>
+    </template>
+
+    <!-- Actual content -->
+    <template v-else>
     <el-card shadow="hover" class="analytics__filter">
       <el-form :inline="true">
         <el-form-item label="时间范围">
@@ -152,6 +199,7 @@
     </el-card>
 
     <PostDetailDrawer ref="detailDrawerRef" />
+    </template>
   </div>
 </template>
 
@@ -453,6 +501,14 @@ onMounted(() => {
   }
   &__ranking {
     margin-top: 20px;
+  }
+
+  &__skeleton {
+    // Skeleton mimics the real layout for smooth transition
+    .analytics__filter,
+    .analytics__charts {
+      opacity: 0.7;
+    }
   }
 }
 .comparison-card {

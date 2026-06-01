@@ -24,7 +24,7 @@ let UploaderService = UploaderService_1 = class UploaderService {
     }
     registerUploader(uploader) {
         this.uploaders.set(uploader.platform, uploader);
-        this.logger.log(`Uploader 宸叉敞鍐? ${uploader.name} (${uploader.platform})`);
+        this.logger.log(`Uploader 已注册: ${uploader.name} (${uploader.platform})`);
     }
     getRegisteredPlatforms() {
         return Array.from(this.uploaders.keys());
@@ -34,7 +34,7 @@ let UploaderService = UploaderService_1 = class UploaderService {
         if (!uploader) {
             const result = {
                 success: false,
-                errorMsg: `骞冲彴 ${task.platform} 鏆傛湭鏀寔鑷姩鍙戝竷`,
+                errorMsg: `平台 ${task.platform} 暂未支持自动发布`,
             };
             await this.contentService.updatePublishStatus(task.contentId, 'FAILED', undefined, result.errorMsg);
             return result;
@@ -43,7 +43,7 @@ let UploaderService = UploaderService_1 = class UploaderService {
         if (!cookies) {
             const result = {
                 success: false,
-                errorMsg: '',
+                errorMsg: 'Cookie 加载失败',
             };
             await this.contentService.updatePublishStatus(task.contentId, 'FAILED', undefined, result.errorMsg);
             return result;
@@ -52,28 +52,28 @@ let UploaderService = UploaderService_1 = class UploaderService {
         if (loginStatus === base_uploader_1.LoginStatus.EXPIRED) {
             const result = {
                 success: false,
-                errorMsg: '',
+                errorMsg: 'Cookie 已过期',
             };
             await this.contentService.updatePublishStatus(task.contentId, 'FAILED', undefined, result.errorMsg);
             return result;
         }
         try {
-            this.logger.log(`寮€濮嬪彂甯? ${task.contentId} 鈫?${task.platform}`);
+            this.logger.log(`开始发布: ${task.contentId} → ${task.platform}`);
             const result = await uploader.publish(task, cookies);
             if (result.success) {
                 await this.contentService.updatePublishStatus(task.contentId, 'PUBLISHED', result.platformUrl);
-                this.logger.log(`鍙戝竷鎴愬姛: ${task.contentId} 鈫?${result.platformUrl}`);
+                this.logger.log(`发布成功: ${task.contentId} → ${result.platformUrl}`);
             }
             else {
                 await this.contentService.updatePublishStatus(task.contentId, 'FAILED', undefined, result.errorMsg);
-                this.logger.warn(`鍙戝竷澶辫触: ${task.contentId} 鈥?${result.errorMsg}`);
+                this.logger.warn(`发布失败: ${task.contentId} — ${result.errorMsg}`);
             }
             return result;
         }
         catch (error) {
-            const errorMsg = error.message || '[garbled]';
+            const errorMsg = error.message || '发布异常';
             await this.contentService.updatePublishStatus(task.contentId, 'FAILED', undefined, errorMsg);
-            this.logger.error(`鍙戝竷寮傚父: ${task.contentId}`, error.stack);
+            this.logger.error(`发布异常: ${task.contentId}`, error.stack);
             return { success: false, errorMsg };
         }
     }

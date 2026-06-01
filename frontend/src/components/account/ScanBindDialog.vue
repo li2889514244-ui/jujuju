@@ -85,6 +85,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
 import { useUserStore } from '@/store/user'
+import { getCompanionUrl } from '@/composables/useCompanionUrl'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{
@@ -174,9 +175,21 @@ function startScan() {
     api_url: apiUrl,
   })
 
-  const url = `http://localhost:5409/api/scan-bind/start?${params.toString()}`
+  // Resolve companion URL dynamically (env var → health check fallback)
+  getCompanionUrl().then((companionUrl) => {
+    if (!companionUrl) {
+      errorMessage.value = '无法连接本地扫码服务，请确认已运行 start-win.bat'
+      step.value = 'error'
+      return
+    }
+    const url = `${companionUrl}/api/scan-bind/start?${params.toString()}`
+    eventSource = new EventSource(url)
+    attachEventHandlers()
+  })
+}
 
-  eventSource = new EventSource(url)
+function attachEventHandlers() {
+  if (!eventSource) return
 
   eventSource.onmessage = (event) => {
     try {

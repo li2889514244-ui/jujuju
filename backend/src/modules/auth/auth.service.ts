@@ -10,6 +10,9 @@ import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RedisService } from '../../redis/redis.service';
+
+/** Cost factor for bcrypt password hashing */
+const BCRYPT_ROUNDS = 12;
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -57,7 +60,7 @@ export class AuthService implements OnModuleInit {
     // Enforce password policy
     this.validatePassword(dto.password);
 
-    const hashedPassword = await bcrypt.hash(dto.password, 12);
+    const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
 
     const user = await this.prisma.user.create({
       data: {

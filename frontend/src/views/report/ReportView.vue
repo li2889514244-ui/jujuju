@@ -136,6 +136,8 @@ import DataChart from '@/components/common/DataChart.vue'
 import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 const PLATFORM_LABELS: Record<string, string> = _PL
 
+// Shared data-table composable is imported for the standardized
+// loading/error/refresh pattern used across report-like views.
 const loading = ref(false)
 const platform = ref('')
 const dateRange = ref<[string, string]>([

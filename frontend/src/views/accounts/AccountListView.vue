@@ -2,7 +2,7 @@
   <div class="account-list">
     <!-- Filters -->
     <GlassCard class="account-list__filter">
-      <el-form :inline="true" :model="filter">
+      <el-form :inline="true" :model="accountStore.filter">
         <el-form-item label="平台">
           <el-select
             v-model="accountStore.filter.platform"
@@ -227,10 +227,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { CircleCheckFilled, User } from '@element-plus/icons-vue'
+import { CircleCheckFilled } from '@element-plus/icons-vue'
 import { useAccountStore } from '@/store/account'
 import { useUserStore } from '@/store/user'
 import { accountsApi } from '@/api/accounts'
@@ -240,6 +240,7 @@ import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 import { formatCompactNum, tokenStatusLabel } from '@/utils/format'
 import { getPlatformColor } from '@/composables/usePlatform'
+import { useCompanionUrl } from '@/composables/useCompanionUrl'
 
 const accountStore = useAccountStore()
 const userStore = useUserStore()
@@ -261,22 +262,34 @@ const bindablePlatforms = [
   { id: 'tencent', name: '视频号', icon: '📺', type: 'success' as const },
 ]
 
-function checkCompanion() {
-  fetch('http://localhost:5409/health')
-    .then((r) => r.json())
-    .then((d) => {
-      if (d.status === 'ok') companionOnline.value = true
-    })
-    .catch(() => {
-      companionOnline.value = false
-    })
+const { healthCheck } = useCompanionUrl()
+
+async function checkCompanion() {
+  const url = await healthCheck()
+  if (url) {
+    fetch(`${url}/health`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.status === 'ok') companionOnline.value = true
+      })
+      .catch(() => {
+        companionOnline.value = false
+      })
+  } else {
+    companionOnline.value = false
+  }
 }
 
 async function openCompanionScan(platform: string) {
   const token = userStore.token
   const api = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+  const companionUrl = await healthCheck()
+  if (!companionUrl) {
+    ElMessage.error('桌面伴侣未启动，请先打开桌面伴侣')
+    return
+  }
   try {
-    const resp = await fetch(`http://localhost:5409/api/scan-bind/trigger`, {
+    const resp = await fetch(`${companionUrl}/api/scan-bind/trigger`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ platform, token, api_url: api }),
@@ -302,7 +315,7 @@ onMounted(() => {
 })
 
 async function handleSearch() {
-  accountStore.setFilter(filter)
+  accountStore.setFilter(accountStore.filter)
   await accountStore.fetchAccounts()
 }
 

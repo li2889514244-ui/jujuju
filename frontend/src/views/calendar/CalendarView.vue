@@ -133,40 +133,31 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { ArrowLeft, ArrowRight } from '@element-plus/icons-vue'
-
-interface CalEvent {
-  id: string
-  title: string
-  startTime: string
-  endTime: string
-  allDay: boolean
-  color: string
-  description: string
-}
-
-const STORAGE_KEY = 'matrixflow_calendar_events'
-
-function loadEvents(): CalEvent[] {
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-  } catch {
-    return []
-  }
-}
-function saveEvents(events: CalEvent[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(events))
-}
+import { calendarApi, type CalendarEvent } from '@/api/calendar'
 
 const viewMode = ref<'month' | 'week'>('month')
 const currentDate = ref(dayjs())
-const events = ref<CalEvent[]>(loadEvents())
+const events = ref<CalendarEvent[]>([])
+
+onMounted(() => {
+  fetchEvents()
+})
+
+async function fetchEvents() {
+  try {
+    const res = await calendarApi.getEvents()
+    events.value = res.data || []
+  } catch {
+    /* 加载失败保持空列表 */
+  }
+}
 const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
-const editingEvent = ref<CalEvent | null>(null)
+const editingEvent = ref<CalendarEvent | null>(null)
 const form = ref({ title: '', allDay: false, color: '#d49b50', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
@@ -234,7 +225,7 @@ function openAddDialog() {
   dialogVisible.value = true
 }
 
-function openEditDialog(evt: CalEvent) {
+function openEditDialog(evt: CalendarEvent) {
   editingEvent.value = evt
   form.value = {
     title: evt.title,
@@ -248,7 +239,7 @@ function openEditDialog(evt: CalEvent) {
   dialogVisible.value = true
 }
 
-function saveEvent() {
+async function saveEvent() {
   if (!form.value.title.trim() || !formDate.value) return
   const dateStr = dayjs(formDate.value).format('YYYY-MM-DD')
   const startTime = form.value.allDay
@@ -262,26 +253,37 @@ function saveEvent() {
       'T' +
       (formTime.value?.[1] ? dayjs(formTime.value[1]).format('HH:mm:ss') : '23:59:59')
 
-  if (editingEvent.value) {
-    const idx = events.value.findIndex((e) => e.id === editingEvent.value!.id)
-    if (idx >= 0) events.value[idx] = { ...editingEvent.value, ...form.value, startTime, endTime }
-  } else {
-    events.value.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
-      ...form.value,
-      startTime,
-      endTime,
-    })
+  const payload = {
+    title: form.value.title,
+    startTime,
+    endTime,
+    allDay: form.value.allDay,
+    color: form.value.color,
+    description: form.value.description,
   }
-  saveEvents(events.value)
-  dialogVisible.value = false
+
+  try {
+    if (editingEvent.value) {
+      await calendarApi.updateEvent(editingEvent.value.id, payload)
+    } else {
+      await calendarApi.createEvent(payload)
+    }
+    dialogVisible.value = false
+    await fetchEvents()
+  } catch {
+    /* 错误由响应拦截器统一处理 */
+  }
 }
 
-function deleteEvent() {
+async function deleteEvent() {
   if (!editingEvent.value) return
-  events.value = events.value.filter((e) => e.id !== editingEvent.value!.id)
-  saveEvents(events.value)
-  dialogVisible.value = false
+  try {
+    await calendarApi.deleteEvent(editingEvent.value.id)
+    dialogVisible.value = false
+    await fetchEvents()
+  } catch {
+    /* 错误由响应拦截器统一处理 */
+  }
 }
 </script>
 

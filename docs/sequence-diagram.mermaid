@@ -1,0 +1,98 @@
+sequenceDiagram
+    title 后端异常消息修复后流程 (T02)
+
+    participant C as Controller
+    participant S as Service
+    participant P as PrismaService
+    participant OH as OwnershipHelper
+
+    C->>S: findById(id, userId)
+    S->>P: findUnique({ where: { id } })
+    P-->>S: null
+    S-->>C: throw NotFoundException('内容不存在: id=' + id)
+
+    C->>S: create(dto, userId)
+    S->>P: findUnique(account)
+    P-->>S: { id, userId: 'other' }
+    S->>OH: assertOwnershipOrAdmin(userId, 'other', prisma, '账号')
+    OH->>P: findUnique(user)
+    P-->>OH: { role: 'MEMBER' }
+    OH-->>S: throw ForbiddenException('无权操作该账号')
+
+---
+
+sequenceDiagram
+    title 前端发布重试流程 (T03+T04)
+
+    participant V as PublishView
+    participant API as contentApi
+    participant B as Backend
+
+    V->>V: publishing = true
+    V->>API: publish({...accountIds})
+    API->>B: POST /api/v1/content/batch-publish
+    B-->>API: { success, posts, failedIds? }
+
+    alt 全部成功
+        API-->>V: { success: true }
+        V->>V: ElMessage.success('发布完成')
+    else 部分失败
+        API-->>V: { success: false, failedIds: [...] }
+        V->>V: ElMessage.warning('N 个账号失败')
+        V->>V: showRetryButton = true
+    end
+
+    Note over V: publishing = false (finally)
+
+    opt 用户点击重试
+        V->>API: retryPublish({ failedAccountIds })
+        API->>B: POST /api/v1/content/batch-publish
+        B-->>API: results
+        API-->>V: results
+    end
+
+---
+
+sequenceDiagram
+    title 桌面端认证流程 (T05)
+
+    participant F as Frontend
+    participant SB as sau_backend.py
+    participant PW as Playwright
+    participant C as Cloud API
+
+    F->>SB: GET /api/scan-bind/start?token=JWT&platform=douyin
+    SB->>SB: verify_token(token)
+
+    alt Token 无效
+        SB-->>F: 401 {"code":401,"msg":"未授权"}
+    else Token 有效
+        SB->>PW: 启动浏览器扫码登录
+        PW-->>SB: QR URL
+        SB-->>F: SSE: {type:"qr_code", data:"..."}
+        PW-->>SB: 200 (扫码成功)
+        SB-->>F: SSE: {type:"status", data:"扫码成功，正在上传..."}
+        SB->>C: POST /accounts (Bearer JWT)
+        C-->>SB: { account }
+        SB-->>F: SSE: {type:"success", data:{...}}
+    end
+
+---
+
+sequenceDiagram
+    title chrome_mgr CDP WebSocket 流程 (T05)
+
+    participant Caller
+    participant CM as ChromeManager
+    participant WS as WebSocket Client
+    participant CDP as Chrome DevTools
+
+    Caller->>CM: evaluate(page_id, "document.title")
+    CM->>CM: get_pages() → find webSocketDebuggerUrl
+    CM->>WS: connect(ws_url)
+    WS->>CDP: {"id":1, "method":"Runtime.evaluate", "params":{...}}
+    CDP-->>WS: {"id":1, "result":{...}}
+    WS-->>CM: result value
+    CM-->>Caller: "页面标题"
+
+    Note over CM: 替代原来的 HTTP urllib 请求
