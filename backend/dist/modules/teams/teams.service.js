@@ -75,6 +75,7 @@ let TeamsService = TeamsService_1 = class TeamsService {
                         nickname: true,
                         avatar: true,
                         followers: true,
+                        likes: true,
                         status: true,
                         owner: {
                             select: { id: true, name: true, email: true },

@@ -16,6 +16,7 @@ export declare class ContentService {
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -37,9 +38,9 @@ export declare class ContentService {
         posts: ({
             account: {
                 id: string;
+                avatar: string | null;
                 platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
-                avatar: string | null;
             };
             stats: {
                 id: string;
@@ -48,6 +49,14 @@ export declare class ContentService {
                 comments: number;
                 shares: number;
                 saves: number;
+                completionRate: number;
+                fiveSecCompletionRate: number;
+                coverClickRate: number;
+                avgPlayDuration: number;
+                videoDuration: number;
+                danmakuCount: number;
+                dislikes: number;
+                followsFromPost: number;
                 collectedAt: Date;
                 postId: string;
             } | null;
@@ -56,6 +65,7 @@ export declare class ContentService {
             title: string | null;
             content: string | null;
             mediaUrls: string | null;
+            coverUrl: string | null;
             tags: string | null;
             publishAt: Date | null;
             status: import(".prisma/client").$Enums.PostStatus;
@@ -73,10 +83,10 @@ export declare class ContentService {
     findById(id: string, userId?: string): Promise<{
         account: {
             id: string;
-            userId: string;
+            avatar: string | null;
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
-            avatar: string | null;
+            userId: string;
         };
         stats: {
             id: string;
@@ -85,6 +95,14 @@ export declare class ContentService {
             comments: number;
             shares: number;
             saves: number;
+            completionRate: number;
+            fiveSecCompletionRate: number;
+            coverClickRate: number;
+            avgPlayDuration: number;
+            videoDuration: number;
+            danmakuCount: number;
+            dislikes: number;
+            followsFromPost: number;
             collectedAt: Date;
             postId: string;
         } | null;
@@ -93,6 +111,7 @@ export declare class ContentService {
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -114,6 +133,7 @@ export declare class ContentService {
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -132,6 +152,7 @@ export declare class ContentService {
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -147,6 +168,7 @@ export declare class ContentService {
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -160,15 +182,16 @@ export declare class ContentService {
     getScheduledPosts(): Promise<({
         account: {
             id: string;
-            userId: string;
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
+            userId: string;
         };
     } & {
         id: string;
         title: string | null;
         content: string | null;
         mediaUrls: string | null;
+        coverUrl: string | null;
         tags: string | null;
         publishAt: Date | null;
         status: import(".prisma/client").$Enums.PostStatus;
@@ -201,6 +224,7 @@ export declare class ContentService {
             title: string | null;
             content: string | null;
             mediaUrls: string | null;
+            coverUrl: string | null;
             tags: string | null;
             publishAt: Date | null;
             status: import(".prisma/client").$Enums.PostStatus;

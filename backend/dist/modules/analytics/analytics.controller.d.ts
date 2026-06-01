@@ -16,6 +16,7 @@ export declare class AnalyticsController {
             active: number;
             byPlatform: Record<string, number>;
             totalFollowers: number;
+            totalLikes: number;
         };
         posts: {
             total: number;
@@ -28,6 +29,8 @@ export declare class AnalyticsController {
             totalComments: number;
             totalShares: number;
             totalSaves: number;
+            totalDanmaku: number;
+            avgCompletionRate: number;
         };
     }>;
     getDailyStats(dto: QueryAnalyticsDto, userId: string, userRole: string): Promise<({
@@ -52,19 +55,25 @@ export declare class AnalyticsController {
         buyerCount: number;
         productCount: number;
         avgOrderValue: number;
+        followersIncrement: number;
+        viewsIncrement: number;
+        likesIncrement: number;
+        commentsIncrement: number;
+        sharesIncrement: number;
+        unfollows: number;
         createdAt: Date;
         accountId: string;
     })[]>;
     getPostStats(dto: QueryAnalyticsDto, userId: string, userRole: string): Promise<({
         post: {
-            id: string;
-            status: import(".prisma/client").$Enums.PostStatus;
             account: {
                 id: string;
                 platform: import(".prisma/client").$Enums.PlatformEnum;
                 nickname: string;
             };
             title: string | null;
+            id: string;
+            status: import(".prisma/client").$Enums.PostStatus;
             platformUrl: string | null;
         };
     } & {
@@ -74,6 +83,14 @@ export declare class AnalyticsController {
         comments: number;
         shares: number;
         saves: number;
+        completionRate: number;
+        fiveSecCompletionRate: number;
+        coverClickRate: number;
+        avgPlayDuration: number;
+        videoDuration: number;
+        danmakuCount: number;
+        dislikes: number;
+        followsFromPost: number;
         collectedAt: Date;
         postId: string;
     })[]>;
@@ -89,6 +106,7 @@ export declare class AnalyticsController {
                 active: number;
                 byPlatform: Record<string, number>;
                 totalFollowers: number;
+                totalLikes: number;
             };
             posts: {
                 total: number;
@@ -101,6 +119,8 @@ export declare class AnalyticsController {
                 totalComments: number;
                 totalShares: number;
                 totalSaves: number;
+                totalDanmaku: number;
+                avgCompletionRate: number;
             };
         };
         accounts: {
@@ -125,6 +145,12 @@ export declare class AnalyticsController {
                 buyerCount: number;
                 productCount: number;
                 avgOrderValue: number;
+                followersIncrement: number;
+                viewsIncrement: number;
+                likesIncrement: number;
+                commentsIncrement: number;
+                sharesIncrement: number;
+                unfollows: number;
                 createdAt: Date;
                 accountId: string;
             })[];
@@ -132,6 +158,7 @@ export declare class AnalyticsController {
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
+            likes: number;
         }[];
         topPosts: {
             id: string;
@@ -165,6 +192,12 @@ export declare class AnalyticsController {
             buyerCount: number;
             productCount: number;
             avgOrderValue: number;
+            followersIncrement: number;
+            viewsIncrement: number;
+            likesIncrement: number;
+            commentsIncrement: number;
+            sharesIncrement: number;
+            unfollows: number;
             createdAt: Date;
             accountId: string;
         })[];
@@ -253,6 +286,12 @@ export declare class AnalyticsController {
         buyerCount: number;
         productCount: number;
         avgOrderValue: number;
+        followersIncrement: number;
+        viewsIncrement: number;
+        likesIncrement: number;
+        commentsIncrement: number;
+        sharesIncrement: number;
+        unfollows: number;
         createdAt: Date;
         accountId: string;
     }>;
@@ -268,6 +307,8 @@ export declare class AnalyticsController {
             likes: number;
             comments: number;
             shares: number;
+            completionRate: number;
+            avgPlayDuration: number;
             publishedAt: Date;
         }[];
         total: number;
@@ -287,6 +328,11 @@ export declare class AnalyticsController {
         likes: number;
         comments: number;
         shares: number;
+        saves: number;
+        completionRate: number;
+        avgPlayDuration: number;
+        danmakuCount: number;
+        followsFromPost: number;
         publishedAt: Date;
     }[]>;
     getEngagementRate(userId: string, days?: number, platform?: string): Promise<{
@@ -304,6 +350,7 @@ export declare class AnalyticsController {
                 active: number;
                 byPlatform: Record<string, number>;
                 totalFollowers: number;
+                totalLikes: number;
             };
             posts: {
                 total: number;
@@ -316,6 +363,8 @@ export declare class AnalyticsController {
                 totalComments: number;
                 totalShares: number;
                 totalSaves: number;
+                totalDanmaku: number;
+                avgCompletionRate: number;
             };
         };
         accounts: {
@@ -340,6 +389,12 @@ export declare class AnalyticsController {
                 buyerCount: number;
                 productCount: number;
                 avgOrderValue: number;
+                followersIncrement: number;
+                viewsIncrement: number;
+                likesIncrement: number;
+                commentsIncrement: number;
+                sharesIncrement: number;
+                unfollows: number;
                 createdAt: Date;
                 accountId: string;
             })[];
@@ -347,6 +402,7 @@ export declare class AnalyticsController {
             platform: import(".prisma/client").$Enums.PlatformEnum;
             nickname: string;
             followers: number;
+            likes: number;
         }[];
         topPosts: {
             id: string;
@@ -380,6 +436,12 @@ export declare class AnalyticsController {
             buyerCount: number;
             productCount: number;
             avgOrderValue: number;
+            followersIncrement: number;
+            viewsIncrement: number;
+            likesIncrement: number;
+            commentsIncrement: number;
+            sharesIncrement: number;
+            unfollows: number;
             createdAt: Date;
             accountId: string;
         })[];
@@ -400,6 +462,9 @@ export declare class AnalyticsController {
         totalComments: number;
         totalShares: number;
         totalSaves: number;
+        totalDanmaku: number;
+        totalFollowsFromPost: number;
+        avgCompletionRate: number;
         totalPosts: number;
         avgEngagementRate: number;
     }>;
@@ -416,6 +481,10 @@ export declare class AnalyticsController {
             comments: number;
             shares: number;
             saves: number;
+            completionRate: number;
+            avgPlayDuration: number;
+            danmakuCount: number;
+            followsFromPost: number;
             engagementRate: number;
         }[];
         total: number;

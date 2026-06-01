@@ -60,12 +60,6 @@ class ReportMetricsDto {
 }
 exports.ReportMetricsDto = ReportMetricsDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: '平台类型 (可选，由账号ID自动推断)' }),
-    (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsString)(),
-    __metadata("design:type", String)
-], ReportMetricsDto.prototype, "platform", void 0);
-__decorate([
     (0, swagger_1.ApiProperty)({ description: '账号ID' }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
@@ -110,6 +104,57 @@ __decorate([
     (0, class_validator_1.IsOptional)(),
     __metadata("design:type", Number)
 ], ReportPostStatItem.prototype, "shares", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '收藏数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "saves", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '完播率(%)' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "completionRate", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '5秒完播率(%)' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "fiveSecCompletionRate", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '封面点击率(%)' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "coverClickRate", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '平均播放时长(秒)' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "avgPlayDuration", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '视频时长(秒)' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "videoDuration", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '弹幕数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "danmakuCount", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '不喜欢数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "dislikes", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '涨粉数' }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Number)
+], ReportPostStatItem.prototype, "followsFromPost", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '封面图URL' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportPostStatItem.prototype, "coverUrl", void 0);
 class ReportPostStatsDto {
 }
 exports.ReportPostStatsDto = ReportPostStatsDto;

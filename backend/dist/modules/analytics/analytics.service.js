@@ -141,7 +141,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     async getOverview(userId) {
         const accounts = await this.prisma.account.findMany({
             where: { userId },
-            select: { id: true, platform: true, followers: true, status: true },
+            select: { id: true, platform: true, followers: true, likes: true, status: true },
         });
         const accountIds = accounts.map((a) => a.id);
         const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
@@ -161,6 +161,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 comments: true,
                 shares: true,
                 saves: true,
+                danmakuCount: true,
+            },
+            _avg: {
+                completionRate: true,
             },
         });
         const platformCounts = {};
@@ -168,12 +172,14 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1;
         });
         const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
+        const totalLikes = accounts.reduce((sum, a) => sum + a.likes, 0);
         return {
             accounts: {
                 total: accounts.length,
                 active: accounts.filter((a) => a.status === 'ACTIVE').length,
                 byPlatform: platformCounts,
                 totalFollowers,
+                totalLikes,
             },
             posts: {
                 total: totalPosts,
@@ -186,6 +192,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 totalComments: statsAgg._sum.comments || 0,
                 totalShares: statsAgg._sum.shares || 0,
                 totalSaves: statsAgg._sum.saves || 0,
+                totalDanmaku: statsAgg._sum.danmakuCount || 0,
+                avgCompletionRate: statsAgg._avg.completionRate
+                    ? Math.round(statsAgg._avg.completionRate * 100) / 100
+                    : 0,
             },
         };
     }
@@ -232,7 +242,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 userId,
                 ...(platform ? { platform: platform } : {}),
             },
-            select: { id: true, platform: true, nickname: true, followers: true },
+            select: { id: true, platform: true, nickname: true, followers: true, likes: true },
         });
         const accountIds = accounts.map((a) => a.id);
         const dailyStats = await this.prisma.dailyStats.findMany({
@@ -366,6 +376,8 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 likes: p.stats?.likes || 0,
                 comments: p.stats?.comments || 0,
                 shares: p.stats?.shares || 0,
+                completionRate: p.stats?.completionRate || 0,
+                avgPlayDuration: p.stats?.avgPlayDuration || 0,
                 publishedAt: p.updatedAt,
             })),
             total: posts.length,
@@ -493,6 +505,11 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             likes: p.stats?.likes || 0,
             comments: p.stats?.comments || 0,
             shares: p.stats?.shares || 0,
+            saves: p.stats?.saves || 0,
+            completionRate: p.stats?.completionRate || 0,
+            avgPlayDuration: p.stats?.avgPlayDuration || 0,
+            danmakuCount: p.stats?.danmakuCount || 0,
+            followsFromPost: p.stats?.followsFromPost || 0,
             publishedAt: p.publishAt || p.createdAt,
         }));
     }
@@ -527,7 +544,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             endDate: endDate ? new Date(endDate) : undefined,
         });
         if (format === 'csv') {
-            const headers = 'date,platform,account,views,likes,comments,shares,followers';
+            const headers = 'date,platform,account,views,likes,comments,shares,followers,completionRate,danmakuCount,avgPlayDuration';
             const rows = (report.dailyTrend || []).map((d) => `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`);
             return [headers, ...rows].join('\n');
         }
@@ -602,7 +619,8 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             }),
             this.prisma.postStats.aggregate({
                 where: { post: { accountId } },
-                _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
+                _sum: { views: true, likes: true, comments: true, shares: true, saves: true, danmakuCount: true, followsFromPost: true },
+                _avg: { completionRate: true },
             }),
             this.prisma.post.count({ where: { accountId } }),
         ]);
@@ -617,6 +635,11 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             totalComments: statsAgg._sum.comments || 0,
             totalShares: statsAgg._sum.shares || 0,
             totalSaves: statsAgg._sum.saves || 0,
+            totalDanmaku: statsAgg._sum.danmakuCount || 0,
+            totalFollowsFromPost: statsAgg._sum.followsFromPost || 0,
+            avgCompletionRate: statsAgg._avg.completionRate
+                ? Math.round(statsAgg._avg.completionRate * 100) / 100
+                : 0,
             totalPosts: postCount,
             avgEngagementRate,
         };
@@ -626,7 +649,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const skip = (page - 1) * pageSize;
         const where = { accountId };
         const orderBy = {};
-        const statsFields = ['views', 'likes', 'comments', 'shares', 'saves'];
+        const statsFields = ['views', 'likes', 'comments', 'shares', 'saves', 'completionRate', 'followsFromPost', 'danmakuCount'];
         if (statsFields.includes(sortBy)) {
             orderBy.stats = { [sortBy]: sortOrder };
         }
@@ -663,6 +686,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 comments,
                 shares,
                 saves: p.stats?.saves || 0,
+                completionRate: p.stats?.completionRate || 0,
+                avgPlayDuration: p.stats?.avgPlayDuration || 0,
+                danmakuCount: p.stats?.danmakuCount || 0,
+                followsFromPost: p.stats?.followsFromPost || 0,
                 engagementRate,
             };
         });

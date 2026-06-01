@@ -59,6 +59,12 @@ __decorate([
     __metadata("design:type", Number)
 ], UpdateAccountDto.prototype, "followers", void 0);
 __decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '获赞数' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    __metadata("design:type", Number)
+], UpdateAccountDto.prototype, "likes", void 0);
+__decorate([
     (0, swagger_1.ApiPropertyOptional)({ description: '关注数' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsInt)(),

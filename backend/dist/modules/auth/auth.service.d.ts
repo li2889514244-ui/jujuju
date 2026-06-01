@@ -22,12 +22,12 @@ export declare class AuthService implements OnModuleInit {
         refreshToken: string;
         user: {
             name: string;
-            id: string;
-            createdAt: Date;
-            status: import(".prisma/client").$Enums.AccountStatus;
             email: string;
             phone: string | null;
+            id: string;
             role: import(".prisma/client").$Enums.UserRole;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            createdAt: Date;
         };
     }>;
     login(dto: LoginDto): Promise<{
@@ -66,14 +66,14 @@ export declare class AuthService implements OnModuleInit {
     private validatePassword;
     getProfile(userId: string): Promise<{
         name: string;
-        id: string;
-        createdAt: Date;
-        avatar: string | null;
-        status: import(".prisma/client").$Enums.AccountStatus;
         email: string;
         phone: string | null;
+        id: string;
+        avatar: string | null;
         role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
+        createdAt: Date;
     }>;
     updateProfile(userId: string, data: {
         name?: string;
@@ -81,13 +81,13 @@ export declare class AuthService implements OnModuleInit {
         phone?: string;
     }): Promise<{
         name: string;
-        id: string;
-        createdAt: Date;
-        avatar: string | null;
-        status: import(".prisma/client").$Enums.AccountStatus;
         email: string;
         phone: string | null;
+        id: string;
+        avatar: string | null;
         role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
+        createdAt: Date;
     }>;
 }

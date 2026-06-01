@@ -20,6 +20,7 @@ import { ContentReviewModule } from './modules/content-review/content-review.mod
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { PixingVideoModule } from './modules/pixing-video/pixing-video.module';
 import { McpModule } from './modules/mcp/mcp.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
@@ -55,6 +56,7 @@ import databaseConfig from './config/database.config';
     NotificationsModule,
     PixingVideoModule,
     McpModule,
+    CalendarModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

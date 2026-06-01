@@ -282,6 +282,7 @@ let McpService = McpService_1 = class McpService {
                 platform: true,
                 avatar: true,
                 followers: true,
+                likes: true,
                 following: true,
             },
         });
@@ -323,6 +324,12 @@ let McpService = McpService_1 = class McpService {
                     likes: s.likes,
                     comments: s.comments,
                     shares: s.shares,
+                    followersIncrement: s.followersIncrement,
+                    viewsIncrement: s.viewsIncrement,
+                    likesIncrement: s.likesIncrement,
+                    commentsIncrement: s.commentsIncrement,
+                    sharesIncrement: s.sharesIncrement,
+                    unfollows: s.unfollows,
                     revenue: s.revenue,
                     gmv: s.gmv,
                     orders: s.orders,
@@ -349,7 +356,7 @@ let McpService = McpService_1 = class McpService {
         }
         const allAccounts = await this.prisma.account.findMany({
             where: { status: 'ACTIVE' },
-            select: { id: true, nickname: true, platform: true, avatar: true, followers: true },
+            select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
         });
         if (metric === 'followers') {
             const sorted = allAccounts
@@ -413,7 +420,7 @@ let McpService = McpService_1 = class McpService {
             where: {
                 nickname: { in: accountNames },
             },
-            select: { id: true, nickname: true, platform: true, followers: true },
+            select: { id: true, nickname: true, platform: true, followers: true, likes: true },
         });
         if (accounts.length === 0) {
             return { message: '未找到匹配的账号', accounts: [] };
@@ -464,7 +471,7 @@ let McpService = McpService_1 = class McpService {
             : { status: 'ACTIVE' };
         const accounts = await this.prisma.account.findMany({
             where: accountWhere,
-            select: { id: true, nickname: true, platform: true, avatar: true, followers: true },
+            select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
         });
         if (accounts.length === 0) {
             return { message: '没有找到匹配的账号', report: null };
@@ -515,6 +522,9 @@ let McpService = McpService_1 = class McpService {
             title: p.title,
             views: p.stats?.views || 0,
             likes: p.stats?.likes || 0,
+            completionRate: p.stats?.completionRate || 0,
+            danmakuCount: p.stats?.danmakuCount || 0,
+            avgPlayDuration: p.stats?.avgPlayDuration || 0,
             publishedAt: p.publishAt,
         }));
         return {
@@ -570,6 +580,12 @@ let McpService = McpService_1 = class McpService {
                 likes: s.likes,
                 comments: s.comments,
                 shares: s.shares,
+                followersIncrement: s.followersIncrement,
+                viewsIncrement: s.viewsIncrement,
+                likesIncrement: s.likesIncrement,
+                commentsIncrement: s.commentsIncrement,
+                sharesIncrement: s.sharesIncrement,
+                unfollows: s.unfollows,
                 revenue: s.revenue,
                 gmv: s.gmv,
                 orders: s.orders,
@@ -597,6 +613,12 @@ let McpService = McpService_1 = class McpService {
                 'likes',
                 'comments',
                 'shares',
+                'followersIncrement',
+                'viewsIncrement',
+                'likesIncrement',
+                'commentsIncrement',
+                'sharesIncrement',
+                'unfollows',
                 'revenue',
                 'gmv',
                 'orders',

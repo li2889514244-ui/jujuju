@@ -177,6 +177,8 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             const accountUpdates = {};
             if (metrics.followers && metrics.followers > 0)
                 accountUpdates.followers = metrics.followers;
+            if (metrics.likes && metrics.likes > 0)
+                accountUpdates.likes = metrics.likes;
             if (metrics.following !== undefined)
                 accountUpdates.following = metrics.following;
             const nickname = metrics._nickname;
@@ -219,6 +221,12 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 let post;
                 if (existing) {
                     post = existing;
+                    if (p.coverUrl) {
+                        post = await this.prisma.post.update({
+                            where: { id: existing.id },
+                            data: { coverUrl: p.coverUrl },
+                        });
+                    }
                     updated++;
                 }
                 else {
@@ -227,6 +235,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                             accountId,
                             title,
                             status: 'PUBLISHED',
+                            coverUrl: p.coverUrl,
                         },
                     });
                     created++;
@@ -238,6 +247,15 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                         likes: p.likes || 0,
                         comments: p.comments || 0,
                         shares: p.shares || 0,
+                        saves: p.saves || 0,
+                        completionRate: p.completionRate || 0,
+                        fiveSecCompletionRate: p.fiveSecCompletionRate || 0,
+                        coverClickRate: p.coverClickRate || 0,
+                        avgPlayDuration: p.avgPlayDuration || 0,
+                        videoDuration: p.videoDuration || 0,
+                        danmakuCount: p.danmakuCount || 0,
+                        dislikes: p.dislikes || 0,
+                        followsFromPost: p.followsFromPost || 0,
                         collectedAt: new Date(),
                     },
                     create: {
@@ -246,6 +264,15 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                         likes: p.likes || 0,
                         comments: p.comments || 0,
                         shares: p.shares || 0,
+                        saves: p.saves || 0,
+                        completionRate: p.completionRate || 0,
+                        fiveSecCompletionRate: p.fiveSecCompletionRate || 0,
+                        coverClickRate: p.coverClickRate || 0,
+                        avgPlayDuration: p.avgPlayDuration || 0,
+                        videoDuration: p.videoDuration || 0,
+                        danmakuCount: p.danmakuCount || 0,
+                        dislikes: p.dislikes || 0,
+                        followsFromPost: p.followsFromPost || 0,
                     },
                 });
             }
@@ -284,6 +311,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                     avatar: true,
                     bio: true,
                     followers: true,
+                    likes: true,
                     following: true,
                     status: true,
                     lastActiveAt: true,

@@ -11,7 +11,6 @@ export declare class BatchCollectDto {
     type?: 'account' | 'content' | 'daily';
 }
 export declare class ReportMetricsDto {
-    platform?: string;
     accountId: string;
     metrics: Record<string, any>;
     date?: string;
@@ -22,6 +21,16 @@ export declare class ReportPostStatItem {
     likes?: number;
     comments?: number;
     shares?: number;
+    saves?: number;
+    completionRate?: number;
+    fiveSecCompletionRate?: number;
+    coverClickRate?: number;
+    avgPlayDuration?: number;
+    videoDuration?: number;
+    danmakuCount?: number;
+    dislikes?: number;
+    followsFromPost?: number;
+    coverUrl?: string;
 }
 export declare class ReportPostStatsDto {
     accountId: string;

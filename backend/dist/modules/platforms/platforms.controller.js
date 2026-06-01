@@ -52,12 +52,6 @@ let PlatformsController = class PlatformsController {
     async batchCollectData(dto) {
         return this.platformsService.batchCollectData(dto.accountIds, dto.type || 'daily');
     }
-    async reportMetrics(dto) {
-        return this.platformsService.reportMetrics(dto);
-    }
-    async reportPostStats(dto) {
-        return this.platformsService.reportPostStats(dto);
-    }
     async refreshToken(accountId) {
         const success = await this.platformsService.refreshToken(accountId);
         return {
@@ -133,22 +127,6 @@ __decorate([
     __metadata("design:paramtypes", [platform_dto_1.BatchCollectDto]),
     __metadata("design:returntype", Promise)
 ], PlatformsController.prototype, "batchCollectData", null);
-__decorate([
-    (0, common_1.Post)('report-metrics'),
-    (0, swagger_1.ApiOperation)({ summary: '接收桌面伴侣上报的账号指标' }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [platform_dto_1.ReportMetricsDto]),
-    __metadata("design:returntype", Promise)
-], PlatformsController.prototype, "reportMetrics", null);
-__decorate([
-    (0, common_1.Post)('report-post-stats'),
-    (0, swagger_1.ApiOperation)({ summary: '接收桌面伴侣上报的视频/帖子数据' }),
-    __param(0, (0, common_1.Body)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [platform_dto_1.ReportPostStatsDto]),
-    __metadata("design:returntype", Promise)
-], PlatformsController.prototype, "reportPostStats", null);
 __decorate([
     (0, common_1.Post)(':accountId/refresh-token'),
     (0, swagger_1.ApiOperation)({ summary: '刷新平台Token' }),

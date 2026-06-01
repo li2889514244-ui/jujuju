@@ -7,6 +7,7 @@ export declare class UpdateAccountDto {
     proxyConfig?: Record<string, any>;
     status?: AccountStatus;
     followers?: number;
+    likes?: number;
     following?: number;
     teamId?: string;
 }

@@ -71,6 +71,7 @@ let UsersService = UsersService_1 = class UsersService {
                         nickname: true,
                         avatar: true,
                         followers: true,
+                        likes: true,
                         status: true,
                     },
                 },

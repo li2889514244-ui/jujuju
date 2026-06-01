@@ -19,16 +19,16 @@ export declare class TeamsService {
         updatedAt: Date;
     }>;
     findAll(organizationId?: string): Promise<({
-        accounts: {
-            id: string;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            status: import(".prisma/client").$Enums.AccountStatus;
-        }[];
         organization: {
             name: string;
             id: string;
         };
+        accounts: {
+            id: string;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+        }[];
     } & {
         id: string;
         name: string;
@@ -37,24 +37,25 @@ export declare class TeamsService {
         updatedAt: Date;
     })[]>;
     findById(id: string): Promise<{
-        accounts: {
-            id: string;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
-            nickname: string;
-            avatar: string | null;
-            followers: number;
-            status: import(".prisma/client").$Enums.AccountStatus;
-            owner: {
-                name: string;
-                id: string;
-                email: string;
-            };
-        }[];
         organization: {
             name: string;
             id: string;
             plan: string;
         };
+        accounts: {
+            id: string;
+            avatar: string | null;
+            status: import(".prisma/client").$Enums.AccountStatus;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            nickname: string;
+            followers: number;
+            likes: number;
+            owner: {
+                name: string;
+                email: string;
+                id: string;
+            };
+        }[];
     } & {
         id: string;
         name: string;
@@ -63,19 +64,19 @@ export declare class TeamsService {
         updatedAt: Date;
     }>;
     inviteMember(dto: InviteMemberDto, inviterId: string): Promise<{
-        name: string;
-        id: string;
-        email: string;
-        role: import(".prisma/client").$Enums.UserRole;
         organization: {
             name: string;
             id: string;
         } | null;
+        name: string;
+        email: string;
+        id: string;
+        role: import(".prisma/client").$Enums.UserRole;
     }>;
     updateMemberRole(organizationId: string, memberId: string, newRole: Role, operatorId: string): Promise<{
         name: string;
-        id: string;
         email: string;
+        id: string;
         role: import(".prisma/client").$Enums.UserRole;
     }>;
     removeMember(organizationId: string, memberId: string, operatorId: string): Promise<{
@@ -94,12 +95,12 @@ export declare class TeamsService {
     }>;
     getMembers(organizationId: string): Promise<{
         name: string;
-        id: string;
-        createdAt: Date;
-        avatar: string | null;
-        status: import(".prisma/client").$Enums.AccountStatus;
         email: string;
+        id: string;
+        avatar: string | null;
         role: import(".prisma/client").$Enums.UserRole;
+        status: import(".prisma/client").$Enums.AccountStatus;
         lastLoginAt: Date | null;
+        createdAt: Date;
     }[]>;
 }
