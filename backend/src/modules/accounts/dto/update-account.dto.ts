@@ -38,6 +38,11 @@ export class UpdateAccountDto {
   @IsInt()
   followers?: number;
 
+  @ApiPropertyOptional({ description: '获赞数' })
+  @IsOptional()
+  @IsInt()
+  likes?: number;
+
   @ApiPropertyOptional({ description: '关注数' })
   @IsOptional()
   @IsInt()

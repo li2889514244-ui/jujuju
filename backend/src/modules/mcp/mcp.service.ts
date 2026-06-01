@@ -333,6 +333,7 @@ export class McpService {
         platform: true,
         avatar: true,
         followers: true,
+        likes: true,
         following: true,
       },
     });
@@ -412,7 +413,7 @@ export class McpService {
 
     const allAccounts = await this.prisma.account.findMany({
       where: { status: 'ACTIVE' },
-      select: { id: true, nickname: true, platform: true, avatar: true, followers: true },
+      select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
     });
 
     if (metric === 'followers') {
@@ -488,7 +489,7 @@ export class McpService {
       where: {
         nickname: { in: accountNames },
       },
-      select: { id: true, nickname: true, platform: true, followers: true },
+      select: { id: true, nickname: true, platform: true, followers: true, likes: true },
     });
 
     if (accounts.length === 0) {
@@ -556,7 +557,7 @@ export class McpService {
 
     const accounts = await this.prisma.account.findMany({
       where: accountWhere,
-      select: { id: true, nickname: true, platform: true, avatar: true, followers: true },
+      select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
     });
 
     if (accounts.length === 0) {

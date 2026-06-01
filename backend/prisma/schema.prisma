@@ -119,6 +119,7 @@ model Account {
   avatar         String?
   bio            String?
   followers      Int           @default(0)
+  likes          Int           @default(0)
   following      Int           @default(0)
   status         AccountStatus @default(ACTIVE)
   cookies        String?

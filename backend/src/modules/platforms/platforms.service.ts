@@ -255,6 +255,7 @@ export class PlatformsService {
       // Update Account fields
       const accountUpdates: any = {};
       if (metrics.followers && metrics.followers > 0) accountUpdates.followers = metrics.followers;
+      if (metrics.likes && metrics.likes > 0) accountUpdates.likes = metrics.likes;
       if (metrics.following !== undefined) accountUpdates.following = metrics.following;
       const nickname = metrics._nickname;
       if (nickname && typeof nickname === 'string' && nickname.length >= 2) accountUpdates.nickname = nickname;
@@ -391,6 +392,7 @@ export class PlatformsService {
           avatar: true,
           bio: true,
           followers: true,
+          likes: true,
           following: true,
           status: true,
           lastActiveAt: true,

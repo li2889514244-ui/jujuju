@@ -269,7 +269,7 @@ export class DataSyncScheduler {
     // 鍚屾椂鏇存柊 Account 琛ㄧ殑鏈€鏂扮矇涓濇暟
     await this.prisma.account.update({
       where: { id: accountId },
-      data: { followers: metrics.followers },
+      data: { followers: metrics.followers, likes: metrics.likes },
     });
   }
 

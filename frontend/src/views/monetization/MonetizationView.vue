@@ -186,6 +186,7 @@ const kpiCards = computed(() => {
     { label: '成交买家', value: formatNum(d.totalBuyerCount || 0) },
     { label: '客单价', value: '¥' + formatNum(d.totalAvgOrderValue || 0) },
     { label: '总佣金', value: '¥' + formatNum(d.totalCommission || 0) },
+    { label: '商品数量', value: formatNum(d.totalProductCount || 0) },
   ]
 })
 

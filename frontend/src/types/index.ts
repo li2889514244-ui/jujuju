@@ -70,6 +70,9 @@ export interface Account {
   followers: number
   following: number
   likes: number
+  saves: number
+  bio: string | null
+  productCount: number | null
   storeScore: number | null
   storeDiagnosis: string | null
   createdAt: string

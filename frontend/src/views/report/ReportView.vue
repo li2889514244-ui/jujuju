@@ -80,6 +80,9 @@
         <el-table-column prop="shares" label="分享" width="80">
           <template #default="{ row }">{{ row.shares?.toLocaleString() }}</template>
         </el-table-column>
+        <el-table-column prop="saves" label="收藏" width="80">
+          <template #default="{ row }">{{ row.saves?.toLocaleString() }}</template>
+        </el-table-column>
       </el-table>
     </el-card>
 
@@ -108,6 +111,7 @@
           <el-table-column prop="likes" label="点赞" width="80" sortable />
           <el-table-column prop="comments" label="评论" width="80" sortable />
           <el-table-column prop="shares" label="分享" width="80" sortable />
+          <el-table-column prop="saves" label="收藏" width="80" sortable />
         </el-table>
       </div>
     </el-card>
@@ -233,7 +237,7 @@ async function exportExcel() {
 
     // Sheet 2: Top Posts
     const postRows = [
-      ['标题', '平台', '账号', '播放', '点赞', '评论', '分享'],
+      ['标题', '平台', '账号', '播放', '点赞', '评论', '分享', '收藏'],
       ...reportData.value.topPosts.map((p: any) => [
         p.title,
         PLATFORM_LABELS[p.platform] || p.platform,
@@ -242,6 +246,7 @@ async function exportExcel() {
         p.likes,
         p.comments,
         p.shares,
+        p.saves,
       ]),
     ]
     const ws2 = XLSX.utils.aoa_to_sheet(postRows)

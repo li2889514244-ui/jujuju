@@ -52,7 +52,7 @@ const routes: RouteRecordRaw[] = [
         path: 'analytics',
         name: 'Analytics',
         component: () => import('@/views/analytics/AnalyticsView.vue'),
-        meta: { title: '数据分析', icon: 'DataAnalysis', hidden: true },
+        meta: { title: '数据分析', icon: 'DataAnalysis' },
       },
       {
         path: 'data-center',
@@ -64,13 +64,13 @@ const routes: RouteRecordRaw[] = [
         path: 'monetization',
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
-        meta: { title: '变现中心', icon: 'Money', hidden: true },
+        meta: { title: '变现中心', icon: 'Money' },
       },
       {
         path: 'report',
         name: 'Report',
         component: () => import('@/views/report/ReportView.vue'),
-        meta: { title: '数据报表', icon: 'Document', hidden: true },
+        meta: { title: '数据报表', icon: 'Document' },
       },
       {
         path: 'team',

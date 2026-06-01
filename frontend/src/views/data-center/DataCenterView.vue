@@ -97,6 +97,9 @@
             <el-table-column prop="shares" label="分享" width="80">
               <template #default="{ row }">{{ formatNum(row.shares) }}</template>
             </el-table-column>
+            <el-table-column prop="saves" label="收藏" width="80">
+              <template #default="{ row }">{{ formatNum(row.saves) }}</template>
+            </el-table-column>
           </el-table>
         </el-card>
       </el-col>

@@ -35,6 +35,9 @@
             <el-descriptions-item label="关注数">{{
               account.following?.toLocaleString()
             }}</el-descriptions-item>
+            <el-descriptions-item label="简介">{{
+              account.bio || '暂无简介'
+            }}</el-descriptions-item>
             <el-descriptions-item label="获赞数">{{
               account.likes?.toLocaleString()
             }}</el-descriptions-item>
@@ -103,6 +106,9 @@
             <el-table-column prop="shares" label="分享" width="80" sortable="custom">
               <template #default="{ row }">{{ formatNum(row.shares) }}</template>
             </el-table-column>
+            <el-table-column prop="saves" label="收藏" width="80" sortable="custom">
+              <template #default="{ row }">{{ formatNum(row.saves) }}</template>
+            </el-table-column>
             <el-table-column prop="engagementRate" label="互动率" width="80">
               <template #default="{ row }">{{ row.engagementRate }}%</template>
             </el-table-column>
@@ -158,6 +164,7 @@ const analyticsCards = computed(() => {
     { label: '总点赞', value: formatNum(a.totalLikes) },
     { label: '总评论', value: formatNum(a.totalComments) },
     { label: '总分享', value: formatNum(a.totalShares) },
+    { label: '总收藏', value: formatNum(a.totalSaves) },
     { label: '发布内容', value: a.totalPosts.toString() },
     { label: '平均互动率', value: a.avgEngagementRate + '%' },
   ]
@@ -217,9 +224,10 @@ function exportAccountData() {
     likes: p.likes,
     comments: p.comments,
     shares: p.shares,
+    saves: p.saves,
     engagementRate: p.engagementRate + '%',
   }))
-  const header = '标题,状态,发布时间,播放量,点赞,评论,分享,互动率'
+  const header = '标题,状态,发布时间,播放量,点赞,评论,分享,收藏,互动率'
   const csv = [header, ...rows.map((r: any) => Object.values(r).join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)

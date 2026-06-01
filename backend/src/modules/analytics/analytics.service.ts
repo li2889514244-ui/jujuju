@@ -153,7 +153,7 @@ export class AnalyticsService {
     // 鑾峰彇鐢ㄦ埛鐨勬墍鏈夎处鍙?
     const accounts = await this.prisma.account.findMany({
       where: { userId },
-      select: { id: true, platform: true, followers: true, status: true },
+      select: { id: true, platform: true, followers: true, likes: true, status: true },
     });
 
     const accountIds = accounts.map((a) => a.id);
@@ -189,6 +189,7 @@ export class AnalyticsService {
 
     // 鎬荤矇涓濇暟
     const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
+    const totalLikes = accounts.reduce((sum, a) => sum + a.likes, 0);
 
     return {
       accounts: {
@@ -196,6 +197,7 @@ export class AnalyticsService {
         active: accounts.filter((a) => a.status === 'ACTIVE').length,
         byPlatform: platformCounts,
         totalFollowers,
+        totalLikes,
       },
       posts: {
         total: totalPosts,
@@ -274,7 +276,7 @@ export class AnalyticsService {
         userId,
         ...(platform ? { platform: platform as Platform } : {}),
       },
-      select: { id: true, platform: true, nickname: true, followers: true },
+      select: { id: true, platform: true, nickname: true, followers: true, likes: true },
     });
 
     const accountIds = accounts.map((a) => a.id);
