@@ -47,11 +47,10 @@ export function useDashboard() {
     ]
   })
 
-  // 时间维度对比卡片：优先使用 API 返回的真实数据，失败时回退到 mock
+  // 时间维度对比卡片 — 仅使用真实 API 数据，无数据时显示 0
   const timeComparisonCards = computed<SummaryCardData[]>(() => {
     const cd = comparisonData.value
 
-    // 安全提取播放量：any 类型可能是数字或 { views: number } 对象
     const extractViews = (val: any): number | null => {
       if (val == null) return null
       if (typeof val === 'number') return val
@@ -64,15 +63,9 @@ export function useDashboard() {
     const weekChange = cd ? (typeof cd.weekOverWeek?.change === 'number' ? cd.weekOverWeek.change : null) : null
     const monthChange = cd ? (typeof cd.monthOverMonth?.change === 'number' ? cd.monthOverMonth.change : null) : null
 
-    // mock fallback
-    const rows = filteredRows.value
-    const totalViews = rows.reduce((s, r) => s + r.views, 0)
-
     return [
-      { label: '今日播放', rawValue: Math.round(totalViews * 0.12), trend: 5.2, color: '#d49b50' },
-      { label: '昨日播放', rawValue: Math.round(totalViews * 0.10), trend: -2.1, color: '#c88540' },
-      { label: '本周播放', rawValue: weekViews ?? Math.round(totalViews * 0.45), trend: weekChange ?? 8.7, color: '#e0a030' },
-      { label: '本月播放', rawValue: monthViews ?? Math.round(totalViews * 0.78), trend: monthChange ?? 12.3, color: '#6b9e6c' },
+      { label: '本周播放', rawValue: weekViews ?? 0, trend: weekChange, color: '#e0a030' },
+      { label: '本月播放', rawValue: monthViews ?? 0, trend: monthChange, color: '#6b9e6c' },
     ]
   })
 

@@ -34,7 +34,7 @@
         :value="card.rawValue"
         :formatter="formatLargeNum"
         :trend="card.trend"
-        :trend-label="card.label.startsWith('今日') ? '较昨日' : card.label.startsWith('昨日') ? '较前日' : card.label.startsWith('本周') ? '较上周' : '较上月'"
+        :trend-label="card.label.startsWith('本周') ? '较上周' : '较上月'"
         :accent-color="card.color"
         :animated="false"
         :delay="idx * 80"
@@ -178,7 +178,7 @@ function exportCSV() {
   }
   &__time-cards {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(2, 1fr);
     gap: $space-md;
     position: relative;
     z-index: 1;
