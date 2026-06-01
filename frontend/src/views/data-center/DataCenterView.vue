@@ -116,7 +116,7 @@
               </el-radio-group>
             </div>
           </template>
-          <el-table :data="viewsRanking" stripe v-loading="rankingLoading" max-height="420">
+          <el-table :data="viewsRanking" stripe v-loading="rankingLoading" max-height="420" @row-click="handleRowClick">
             <template #empty><el-empty description="暂无排行数据" /></template>
             <el-table-column label="#" width="50">
               <template #default="{ row }">
@@ -141,6 +141,8 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <PostDetailDrawer ref="detailDrawerRef" />
   </div>
 </template>
 
@@ -151,6 +153,7 @@ import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS } from '@/types'
 
@@ -243,6 +246,12 @@ const rankingPeriod = ref('week')
 
 // Comparison
 const comparisonData = ref<any>(null)
+
+const detailDrawerRef = ref()
+
+function handleRowClick(row: any) {
+  detailDrawerRef.value?.open(row)
+}
 
 function formatNum(n: any): string {
   if (n == null || n === 0) return '0'

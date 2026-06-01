@@ -25,6 +25,22 @@
       </div>
     </div>
 
+    <!-- 时间维度对比卡片 -->
+    <div class="dashboard__time-cards" v-if="accountRows.length > 0">
+      <StatCard
+        v-for="(card, idx) in timeComparisonCards"
+        :key="card.label"
+        :label="card.label"
+        :value="card.rawValue"
+        :formatter="formatLargeNum"
+        :trend="card.trend"
+        :trend-label="card.label.startsWith('今日') ? '较昨日' : card.label.startsWith('昨日') ? '较前日' : card.label.startsWith('本周') ? '较上周' : '较上月'"
+        :accent-color="card.color"
+        :animated="false"
+        :delay="idx * 80"
+      />
+    </div>
+
     <!-- 分组切换 -->
     <div class="dashboard__groups" v-if="accountGroups.length > 0">
       <el-select v-model="selectedGroup" size="small" @change="onGroupChange" style="width:120px">
@@ -103,12 +119,13 @@ import dayjs from 'dayjs'
 import { Refresh, ArrowRight } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
+import StatCard from '@/components/common/StatCard.vue'
 import { useDashboard } from '@/composables/useDashboard'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
 
 const {
   period, loading, trendDays, selectedGroup,
-  accountRows, accountGroups, displayAccounts, groupSummaryCards,
+  accountRows, accountGroups, displayAccounts, groupSummaryCards, timeComparisonCards,
   refreshAll, loadFollowerTrend, onPeriodChange, onGroupChange,
   followerChartOption, platformChartOption,
 } = useDashboard()
@@ -158,6 +175,14 @@ function exportCSV() {
     justify-content: center;
     position: relative;
     z-index: 1;
+  }
+  &__time-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: $space-md;
+    position: relative;
+    z-index: 1;
+    padding: 0 $space-lg;
   }
   &__charts {
     display: grid;

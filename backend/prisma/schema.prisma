@@ -154,6 +154,7 @@ model Post {
   title       String?
   content     String?
   mediaUrls   String? // JSON 字符串
+  coverUrl    String? // 封面图URL
   tags        String? // JSON 字符串，逗号分隔
   publishAt   DateTime?
   status      PostStatus @default(DRAFT)
@@ -176,13 +177,21 @@ model Post {
 // ==================== 互动统计 ====================
 
 model PostStats {
-  id          String   @id @default(cuid())
-  views       Int      @default(0)
-  likes       Int      @default(0)
-  comments    Int      @default(0)
-  shares      Int      @default(0)
-  saves       Int      @default(0)
-  collectedAt DateTime @default(now())
+  id                    String   @id @default(cuid())
+  views                 Int      @default(0)
+  likes                 Int      @default(0)
+  comments              Int      @default(0)
+  shares                Int      @default(0)
+  saves                 Int      @default(0)
+  completionRate        Float    @default(0) // 完播率(%)
+  fiveSecCompletionRate Float    @default(0) // 5秒完播率(%)
+  coverClickRate        Float    @default(0) // 封面点击率(%)
+  avgPlayDuration       Float    @default(0) // 平均播放时长(秒)
+  videoDuration         Int      @default(0) // 视频时长(秒)
+  danmakuCount          Int      @default(0) // 弹幕数
+  dislikes              Int      @default(0) // 不喜欢数
+  followsFromPost       Int      @default(0) // 涨粉数
+  collectedAt           DateTime @default(now())
 
   post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId String @unique
@@ -198,15 +207,22 @@ model DailyStats {
   views     Int          @default(0)
   likes     Int          @default(0)
   comments  Int          @default(0)
-  shares     Int          @default(0)
-  revenue    Int          @default(0)
-  gmv        Int          @default(0)
-  orders     Int          @default(0)
-  commission Int          @default(0)
-  buyerCount Int          @default(0)
-  productCount Int        @default(0)
-  avgOrderValue Int       @default(0)
-  createdAt  DateTime     @default(now())
+  shares         Int          @default(0)
+  revenue        Int          @default(0)
+  gmv            Int          @default(0)
+  orders         Int          @default(0)
+  commission     Int          @default(0)
+  buyerCount     Int          @default(0)
+  productCount   Int          @default(0)
+  avgOrderValue  Int          @default(0)
+  // 增量字段（当日较前日变化）
+  followersIncrement Int     @default(0)
+  viewsIncrement     Int     @default(0)
+  likesIncrement     Int     @default(0)
+  commentsIncrement  Int     @default(0)
+  sharesIncrement    Int     @default(0)
+  unfollows          Int     @default(0)
+  createdAt      DateTime     @default(now())
 
   account   Account @relation(fields: [accountId], references: [id])
   accountId String

@@ -41,6 +41,23 @@ export function useDashboard() {
     ]
   })
 
+  // 时间维度对比卡片（mock 数据，待后端接口完善后替换）
+  const timeComparisonCards = computed<SummaryCardData[]>(() => {
+    const rows = filteredRows.value
+    const totalViews = rows.reduce((s, r) => s + r.views, 0)
+    // 使用总播放量模拟各时间段数据（占总播放的比例）
+    const todayViews = Math.round(totalViews * 0.12)
+    const yesterdayViews = Math.round(totalViews * 0.10)
+    const weekViews = Math.round(totalViews * 0.45)
+    const monthViews = Math.round(totalViews * 0.78)
+    return [
+      { label: '今日播放', rawValue: todayViews, trend: 5.2, color: '#d49b50' },
+      { label: '昨日播放', rawValue: yesterdayViews, trend: -2.1, color: '#c88540' },
+      { label: '本周播放', rawValue: weekViews, trend: 8.7, color: '#e0a030' },
+      { label: '本月播放', rawValue: monthViews, trend: 12.3, color: '#6b9e6c' },
+    ]
+  })
+
   async function refreshAll() {
     loading.value = true
     try {
@@ -266,6 +283,7 @@ export function useDashboard() {
     displayAccounts,
     filteredRows,
     groupSummaryCards,
+    timeComparisonCards,
     refreshAll,
     loadFollowerTrend,
     onPeriodChange,

@@ -81,7 +81,7 @@
               <el-button size="small" @click="exportAccountData">导出数据</el-button>
             </div>
           </template>
-          <el-table :data="posts" stripe v-loading="postsLoading" @sort-change="handleSortChange">
+          <el-table :data="posts" stripe v-loading="postsLoading" @sort-change="handleSortChange" @row-click="handleRowClick">
             <template #empty><el-empty description="暂无发布内容" /></template>
             <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
             <el-table-column prop="status" label="状态" width="80">
@@ -125,6 +125,8 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <PostDetailDrawer ref="detailDrawerRef" />
   </div>
 </template>
 
@@ -138,6 +140,7 @@ import { accountsApi } from '@/api/accounts'
 import type { AccountAnalytics } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
+import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -207,12 +210,18 @@ async function loadPosts() {
   postsLoading.value = false
 }
 
+const detailDrawerRef = ref()
+
 function handleSortChange({ prop, order }: any) {
   if (!prop) return
   postSortBy.value = prop
   postSortOrder.value = order === 'ascending' ? 'asc' : 'desc'
   postPage.value = 1
   loadPosts()
+}
+
+function handleRowClick(row: any) {
+  detailDrawerRef.value?.open(row)
 }
 
 function exportAccountData() {

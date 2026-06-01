@@ -179,6 +179,8 @@ export interface AnalyticsOverview {
     totalComments: number
     totalShares: number
     totalSaves: number
+    totalDanmaku?: number
+    avgCompletionRate?: number
   }
 }
 
@@ -295,6 +297,15 @@ export interface PostWithStats {
   shares: number
   saves: number
   engagementRate: number
+  // 深度指标
+  completionRate?: number
+  fiveSecCompletionRate?: number
+  coverClickRate?: number
+  avgPlayDuration?: number
+  videoDuration?: number
+  danmakuCount?: number
+  dislikes?: number
+  followsFromPost?: number
 }
 
 // ===== Dashboard =====

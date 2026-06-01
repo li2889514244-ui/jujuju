@@ -72,6 +72,47 @@ export class ReportPostStatItem {
   @ApiPropertyOptional({ description: '分享数' })
   @IsOptional()
   shares?: number;
+
+  @ApiPropertyOptional({ description: '收藏数' })
+  @IsOptional()
+  saves?: number;
+
+  @ApiPropertyOptional({ description: '完播率(%)' })
+  @IsOptional()
+  completionRate?: number;
+
+  @ApiPropertyOptional({ description: '5秒完播率(%)' })
+  @IsOptional()
+  fiveSecCompletionRate?: number;
+
+  @ApiPropertyOptional({ description: '封面点击率(%)' })
+  @IsOptional()
+  coverClickRate?: number;
+
+  @ApiPropertyOptional({ description: '平均播放时长(秒)' })
+  @IsOptional()
+  avgPlayDuration?: number;
+
+  @ApiPropertyOptional({ description: '视频时长(秒)' })
+  @IsOptional()
+  videoDuration?: number;
+
+  @ApiPropertyOptional({ description: '弹幕数' })
+  @IsOptional()
+  danmakuCount?: number;
+
+  @ApiPropertyOptional({ description: '不喜欢数' })
+  @IsOptional()
+  dislikes?: number;
+
+  @ApiPropertyOptional({ description: '涨粉数' })
+  @IsOptional()
+  followsFromPost?: number;
+
+  @ApiPropertyOptional({ description: '封面图URL' })
+  @IsOptional()
+  @IsString()
+  coverUrl?: string;
 }
 
 export class ReportPostStatsDto {

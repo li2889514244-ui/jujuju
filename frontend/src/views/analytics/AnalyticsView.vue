@@ -129,7 +129,7 @@
           </el-radio-group>
         </div>
       </template>
-      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe
+      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe @row-click="handleRowClick"
         ><template #empty><el-empty description="暂无排行数据" /></template>
         <el-table-column label="排名" width="70">
           <template #default="{ row }">
@@ -150,6 +150,8 @@
         </el-table-column>
       </el-table>
     </el-card>
+
+    <PostDetailDrawer ref="detailDrawerRef" />
   </div>
 </template>
 
@@ -159,6 +161,7 @@ import dayjs from 'dayjs'
 import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS } from '@/types'
 
@@ -373,6 +376,12 @@ async function loadRanking() {
     viewsRanking.value = r.data?.ranking || []
   } catch {}
   rankingLoading.value = false
+}
+
+const detailDrawerRef = ref()
+
+function handleRowClick(row: any) {
+  detailDrawerRef.value?.open(row)
 }
 
 function formatNum(n: any): string {

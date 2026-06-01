@@ -10,6 +10,8 @@ interface AccountMetrics {
   likes: number;
   views: number;
   comments: number;
+  shares?: number;
+  unfollows?: number;
 }
 
 /**
@@ -247,6 +249,30 @@ export class DataSyncScheduler {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    // 查询昨日数据用于计算增量
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStats = await this.prisma.dailyStats.findUnique({
+      where: { accountId_date: { accountId, date: yesterday } },
+      select: { followers: true, views: true, likes: true, comments: true, shares: true },
+    });
+
+    const followersIncrement = yesterdayStats
+      ? Math.max(0, metrics.followers - yesterdayStats.followers)
+      : 0;
+    const viewsIncrement = yesterdayStats
+      ? Math.max(0, metrics.views - yesterdayStats.views)
+      : 0;
+    const likesIncrement = yesterdayStats
+      ? Math.max(0, metrics.likes - yesterdayStats.likes)
+      : 0;
+    const commentsIncrement = yesterdayStats
+      ? Math.max(0, metrics.comments - yesterdayStats.comments)
+      : 0;
+    const sharesIncrement = yesterdayStats
+      ? Math.max(0, (metrics.shares || 0) - yesterdayStats.shares)
+      : 0;
+
     await this.prisma.dailyStats.upsert({
       where: { accountId_date: { accountId, date: today } },
       update: {
@@ -254,6 +280,13 @@ export class DataSyncScheduler {
         likes: metrics.likes,
         views: metrics.views,
         comments: metrics.comments,
+        shares: metrics.shares || 0,
+        followersIncrement,
+        viewsIncrement,
+        likesIncrement,
+        commentsIncrement,
+        sharesIncrement,
+        unfollows: metrics.unfollows || 0,
       },
       create: {
         accountId,
@@ -263,6 +296,13 @@ export class DataSyncScheduler {
         likes: metrics.likes,
         views: metrics.views,
         comments: metrics.comments,
+        shares: metrics.shares || 0,
+        followersIncrement,
+        viewsIncrement,
+        likesIncrement,
+        commentsIncrement,
+        sharesIncrement,
+        unfollows: metrics.unfollows || 0,
       },
     });
 

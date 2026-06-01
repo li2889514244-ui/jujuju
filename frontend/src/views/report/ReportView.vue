@@ -60,7 +60,7 @@
     <!-- Top Posts -->
     <el-card shadow="hover" v-if="reportData" class="report__section">
       <template #header>内容表现 Top 10</template>
-      <el-table :data="reportData.topPosts" stripe>
+      <el-table :data="reportData.topPosts" stripe @row-click="handleRowClick">
         <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
         <el-table-column label="平台" width="100">
           <template #default="{ row }">
@@ -121,6 +121,8 @@
       <template #header>每日数据趋势</template>
       <DataChart :option="trendChart" :height="350" />
     </el-card>
+
+    <PostDetailDrawer ref="detailDrawerRef" />
   </div>
 </template>
 
@@ -131,6 +133,7 @@ import { ElMessage } from 'element-plus'
 import { analyticsApi } from '@/api/analytics'
 import { PLATFORM_LABELS as _PL } from '@/types'
 import DataChart from '@/components/common/DataChart.vue'
+import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 const PLATFORM_LABELS: Record<string, string> = _PL
 
 const loading = ref(false)
@@ -147,6 +150,8 @@ const dateShortcuts = [
   { text: '近90天', value: () => [dayjs().subtract(90, 'day').toDate(), new Date()] },
 ]
 
+const detailDrawerRef = ref()
+
 async function loadReport() {
   loading.value = true
   try {
@@ -161,6 +166,10 @@ async function loadReport() {
   } finally {
     loading.value = false
   }
+}
+
+function handleRowClick(row: any) {
+  detailDrawerRef.value?.open(row)
 }
 
 const crossPlatformItems = computed(() => {

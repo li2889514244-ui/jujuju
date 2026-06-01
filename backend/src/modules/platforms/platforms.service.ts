@@ -305,6 +305,13 @@ export class PlatformsService {
         let post;
         if (existing) {
           post = existing;
+          // Update coverUrl if provided
+          if (p.coverUrl) {
+            post = await this.prisma.post.update({
+              where: { id: existing.id },
+              data: { coverUrl: p.coverUrl },
+            });
+          }
           updated++;
         } else {
           post = await this.prisma.post.create({
@@ -312,12 +319,13 @@ export class PlatformsService {
               accountId,
               title,
               status: 'PUBLISHED',
+              coverUrl: p.coverUrl,
             },
           });
           created++;
         }
 
-        // Upsert PostStats
+        // Upsert PostStats — 写入全部 13 个 PostStats 字段
         await this.prisma.postStats.upsert({
           where: { postId: post.id },
           update: {
@@ -325,6 +333,15 @@ export class PlatformsService {
             likes: p.likes || 0,
             comments: p.comments || 0,
             shares: p.shares || 0,
+            saves: p.saves || 0,
+            completionRate: p.completionRate || 0,
+            fiveSecCompletionRate: p.fiveSecCompletionRate || 0,
+            coverClickRate: p.coverClickRate || 0,
+            avgPlayDuration: p.avgPlayDuration || 0,
+            videoDuration: p.videoDuration || 0,
+            danmakuCount: p.danmakuCount || 0,
+            dislikes: p.dislikes || 0,
+            followsFromPost: p.followsFromPost || 0,
             collectedAt: new Date(),
           },
           create: {
@@ -333,6 +350,15 @@ export class PlatformsService {
             likes: p.likes || 0,
             comments: p.comments || 0,
             shares: p.shares || 0,
+            saves: p.saves || 0,
+            completionRate: p.completionRate || 0,
+            fiveSecCompletionRate: p.fiveSecCompletionRate || 0,
+            coverClickRate: p.coverClickRate || 0,
+            avgPlayDuration: p.avgPlayDuration || 0,
+            videoDuration: p.videoDuration || 0,
+            danmakuCount: p.danmakuCount || 0,
+            dislikes: p.dislikes || 0,
+            followsFromPost: p.followsFromPost || 0,
           },
         });
       } catch (e: any) {

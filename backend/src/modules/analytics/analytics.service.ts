@@ -178,6 +178,10 @@ export class AnalyticsService {
         comments: true,
         shares: true,
         saves: true,
+        danmakuCount: true,
+      },
+      _avg: {
+        completionRate: true,
       },
     });
 
@@ -210,6 +214,10 @@ export class AnalyticsService {
         totalComments: statsAgg._sum.comments || 0,
         totalShares: statsAgg._sum.shares || 0,
         totalSaves: statsAgg._sum.saves || 0,
+        totalDanmaku: statsAgg._sum.danmakuCount || 0,
+        avgCompletionRate: statsAgg._avg.completionRate
+          ? Math.round(statsAgg._avg.completionRate * 100) / 100
+          : 0,
       },
     };
   }
@@ -444,6 +452,8 @@ export class AnalyticsService {
         likes: p.stats?.likes || 0,
         comments: p.stats?.comments || 0,
         shares: p.stats?.shares || 0,
+        completionRate: p.stats?.completionRate || 0,
+        avgPlayDuration: p.stats?.avgPlayDuration || 0,
         publishedAt: p.updatedAt,
       })),
       total: posts.length,
@@ -598,6 +608,11 @@ export class AnalyticsService {
       likes: p.stats?.likes || 0,
       comments: p.stats?.comments || 0,
       shares: p.stats?.shares || 0,
+      saves: p.stats?.saves || 0,
+      completionRate: p.stats?.completionRate || 0,
+      avgPlayDuration: p.stats?.avgPlayDuration || 0,
+      danmakuCount: p.stats?.danmakuCount || 0,
+      followsFromPost: p.stats?.followsFromPost || 0,
       publishedAt: p.publishAt || p.createdAt,
     }));
   }
@@ -642,7 +657,7 @@ export class AnalyticsService {
     });
 
     if (format === 'csv') {
-      const headers = 'date,platform,account,views,likes,comments,shares,followers';
+      const headers = 'date,platform,account,views,likes,comments,shares,followers,completionRate,danmakuCount,avgPlayDuration';
       const rows = (report.dailyTrend || []).map(
         (d: any) =>
           `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`,
@@ -725,7 +740,8 @@ export class AnalyticsService {
       }),
       this.prisma.postStats.aggregate({
         where: { post: { accountId } },
-        _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
+        _sum: { views: true, likes: true, comments: true, shares: true, saves: true, danmakuCount: true, followsFromPost: true },
+        _avg: { completionRate: true },
       }),
       this.prisma.post.count({ where: { accountId } }),
     ]);
@@ -743,6 +759,11 @@ export class AnalyticsService {
       totalComments: statsAgg._sum.comments || 0,
       totalShares: statsAgg._sum.shares || 0,
       totalSaves: statsAgg._sum.saves || 0,
+      totalDanmaku: statsAgg._sum.danmakuCount || 0,
+      totalFollowsFromPost: statsAgg._sum.followsFromPost || 0,
+      avgCompletionRate: statsAgg._avg.completionRate
+        ? Math.round(statsAgg._avg.completionRate * 100) / 100
+        : 0,
       totalPosts: postCount,
       avgEngagementRate,
     };
@@ -757,7 +778,7 @@ export class AnalyticsService {
 
     const where = { accountId };
     const orderBy: any = {};
-    const statsFields = ['views', 'likes', 'comments', 'shares', 'saves'];
+    const statsFields = ['views', 'likes', 'comments', 'shares', 'saves', 'completionRate', 'followsFromPost', 'danmakuCount'];
     if (statsFields.includes(sortBy)) {
       orderBy.stats = { [sortBy]: sortOrder };
     } else {
@@ -796,6 +817,10 @@ export class AnalyticsService {
         comments,
         shares,
         saves: p.stats?.saves || 0,
+        completionRate: p.stats?.completionRate || 0,
+        avgPlayDuration: p.stats?.avgPlayDuration || 0,
+        danmakuCount: p.stats?.danmakuCount || 0,
+        followsFromPost: p.stats?.followsFromPost || 0,
         engagementRate,
       };
     });
