@@ -352,4 +352,7 @@ export interface AccountAnalytics {
   totalSaves: number
   totalPosts: number
   avgEngagementRate: number
+  totalDanmaku?: number
+  totalFollowsFromPost?: number
+  avgCompletionRate?: number
 }

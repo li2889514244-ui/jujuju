@@ -20,6 +20,12 @@ export function useDashboard() {
   )
   const followerTrendData = ref<number[]>([])
 
+  const comparisonData = ref<{
+    weekOverWeek: { current: any; previous: any; change: any }
+    monthOverMonth: { current: any; previous: any; change: any }
+    yearOverYear: { current: any; previous: any; change: any }
+  } | null>(null)
+
   const displayAccounts = computed(() => accountRows.value.slice(0, 8))
 
   const filteredRows = computed(() => {
@@ -41,20 +47,32 @@ export function useDashboard() {
     ]
   })
 
-  // 时间维度对比卡片（mock 数据，待后端接口完善后替换）
+  // 时间维度对比卡片：优先使用 API 返回的真实数据，失败时回退到 mock
   const timeComparisonCards = computed<SummaryCardData[]>(() => {
+    const cd = comparisonData.value
+
+    // 安全提取播放量：any 类型可能是数字或 { views: number } 对象
+    const extractViews = (val: any): number | null => {
+      if (val == null) return null
+      if (typeof val === 'number') return val
+      if (typeof val === 'object' && typeof val.views === 'number') return val.views
+      return null
+    }
+
+    const weekViews = cd ? extractViews(cd.weekOverWeek?.current) : null
+    const monthViews = cd ? extractViews(cd.monthOverMonth?.current) : null
+    const weekChange = cd ? (typeof cd.weekOverWeek?.change === 'number' ? cd.weekOverWeek.change : null) : null
+    const monthChange = cd ? (typeof cd.monthOverMonth?.change === 'number' ? cd.monthOverMonth.change : null) : null
+
+    // mock fallback
     const rows = filteredRows.value
     const totalViews = rows.reduce((s, r) => s + r.views, 0)
-    // 使用总播放量模拟各时间段数据（占总播放的比例）
-    const todayViews = Math.round(totalViews * 0.12)
-    const yesterdayViews = Math.round(totalViews * 0.10)
-    const weekViews = Math.round(totalViews * 0.45)
-    const monthViews = Math.round(totalViews * 0.78)
+
     return [
-      { label: '今日播放', rawValue: todayViews, trend: 5.2, color: '#d49b50' },
-      { label: '昨日播放', rawValue: yesterdayViews, trend: -2.1, color: '#c88540' },
-      { label: '本周播放', rawValue: weekViews, trend: 8.7, color: '#e0a030' },
-      { label: '本月播放', rawValue: monthViews, trend: 12.3, color: '#6b9e6c' },
+      { label: '今日播放', rawValue: Math.round(totalViews * 0.12), trend: 5.2, color: '#d49b50' },
+      { label: '昨日播放', rawValue: Math.round(totalViews * 0.10), trend: -2.1, color: '#c88540' },
+      { label: '本周播放', rawValue: weekViews ?? Math.round(totalViews * 0.45), trend: weekChange ?? 8.7, color: '#e0a030' },
+      { label: '本月播放', rawValue: monthViews ?? Math.round(totalViews * 0.78), trend: monthChange ?? 12.3, color: '#6b9e6c' },
     ]
   })
 
@@ -70,13 +88,13 @@ export function useDashboard() {
       ])
       const ov = overviewRes.data
       const comp = compRes?.data
-      const wowChange = comp?.weekOverWeek?.change
+      comparisonData.value = comp || null
 
       const [accRes, groupsRes] = await Promise.all([
-        accountsApi.getList({ pageSize: 100, page: 1 }),
+        accountsApi.getList({ pageSize: 100, page: 1, platform: '', group: '', keyword: '' }),
         accountsApi.getGroups().catch(() => ({ data: [] as Array<{ id: string; name: string }> })),
       ])
-      const accData = accRes.data as {
+      const accData = accRes.data as unknown as {
         accounts?: Array<Record<string, unknown>>
         list?: Array<Record<string, unknown>>
       }
@@ -184,8 +202,6 @@ export function useDashboard() {
   }
   function onGroupChange() {}
 
-  const warmColors = ['#d49b50', '#c88540', '#e0a030', '#d4534a', '#6b9e6c', '#8a8078']
-
   const followerChartOption = computed(() => ({
     backgroundColor: 'transparent',
     tooltip: {
@@ -256,7 +272,7 @@ export function useDashboard() {
       },
       label: { show: false },
       emphasis: {
-        label: { show: true, fontSize: 14, fontWeight: 'bold', color: '#f0ece4' },
+        label: { show: true, fontSize: 14, fontWeight: 'bold' as const, color: '#f0ece4' },
       },
       data:
         platformDistribution.value.length > 0

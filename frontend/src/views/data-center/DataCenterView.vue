@@ -160,8 +160,6 @@ import { PLATFORM_LABELS } from '@/types'
 const days = ref(30)
 const platform = ref('')
 const loading = ref(false)
-const collecting = ref(false)
-
 // Overview
 const overview = ref<any>(null)
 const overviewCards = computed(() => {
@@ -274,8 +272,7 @@ async function loadTrend() {
     const d = days.value
     let res
     if (trendMetric.value === 'views') {
-      res = await analyticsApi.getLikesTrend({ days: d, platform: p })
-      // Actually get views trend - use daily stats aggregation from publish effect
+      // Use daily stats aggregation from publish effect
       res = await analyticsApi.getPublishEffect({ days: d })
       const byDate: Record<string, number> = {}
       for (const item of res.data || []) {
@@ -339,21 +336,6 @@ async function refreshAll() {
     loadComparison(),
   ])
   loading.value = false
-}
-
-async function handleCollect() {
-  collecting.value = true
-  try {
-    const res = await analyticsApi.triggerRealDataCollection()
-    ElMessage.success(
-      res?.status === 'started' ? '数据采集已启动，正在从各平台获取真实数据...' : '采集指令已发送',
-    )
-    // 等 10 秒后刷新（给伴侣时间去采集）
-    setTimeout(() => refreshAll(), 10000)
-  } catch (e: any) {
-    ElMessage.warning(e.message || '请先启动桌面伴侣，然后重试')
-  }
-  collecting.value = false
 }
 
 onMounted(() => {

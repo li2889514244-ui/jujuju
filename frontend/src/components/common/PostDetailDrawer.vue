@@ -12,7 +12,7 @@
       <div class="detail-header">
         <h2 class="detail-header__title">{{ post.title || '无标题' }}</h2>
         <div class="detail-header__meta">
-          <el-tag size="small" type="warning">{{ PLATFORM_LABELS[post.platform] || post.platform }}</el-tag>
+          <el-tag size="small" type="warning">{{ PLATFORM_LABELS[post.platform as keyof typeof PLATFORM_LABELS] || post.platform }}</el-tag>
           <span class="detail-header__time">{{ formatTime(post.publishAt || post.createdAt) }}</span>
         </div>
         <el-divider style="margin: 16px 0" />
@@ -91,9 +91,6 @@
           <el-descriptions-item label="视频时长">
             {{ formatDuration(post.videoDuration) }}
           </el-descriptions-item>
-          <el-descriptions-item label="评论数">{{ formatNum(post.comments) }}</el-descriptions-item>
-          <el-descriptions-item label="分享数">{{ formatNum(post.shares) }}</el-descriptions-item>
-          <el-descriptions-item label="收藏数">{{ formatNum(post.saves) }}</el-descriptions-item>
         </el-descriptions>
       </div>
     </template>
