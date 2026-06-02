@@ -74,7 +74,7 @@ export class WechatStoreService implements OnModuleInit {
     const list = details.filter((d: any) => d.errcode === 0).map((d: any) => {
       const a = d.after_sale_order || {}
       const pid = a.product_info?.product_id || ''
-      return { id: a.after_sale_order_id, type: a.type, status: a.status, amount: a.refund_info?.amount || 0, reason: a.reason_text || '', product: productMap[String(pid)] || `商品${pid}` }
+      return { id: a.after_sale_order_id, type: a.type, status: a.status, amount: a.refund_info?.amount || 0, reason: a.reason_text || '', product: productMap[String(pid)] || `商品${pid}`, complete_time: a.complete_time || 0, create_time: a.create_time || 0 }
     })
     const totalAmount = list.reduce((s: number, a: any) => s + a.amount, 0)
     return { errcode: 0, errmsg: 'ok', list, total: list.length, totalAmount }

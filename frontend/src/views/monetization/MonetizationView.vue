@@ -249,8 +249,13 @@ async function loadStoreData() {
     if (ordRes.data?.errcode === 0) orders.value = ordRes.data.order_list || []
     if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
     if (afterRes?.data?.errcode === 0) {
-      aftersaleList.value = afterRes.data.list || []
-      const newCount = afterRes.data.total || 0
+      const raw = (afterRes.data.list || [])
+      const filtered = raw.filter((a: any) => {
+        if (a.complete_time && a.create_time && (a.complete_time - a.create_time) < 60) return false
+        return true
+      })
+      aftersaleList.value = filtered
+      const newCount = filtered.length
       if (prevAftersaleCount > 0 && newCount > prevAftersaleCount) {
         const added = newCount - prevAftersaleCount
         const detail = afterRes.data.list?.[0]
@@ -262,7 +267,7 @@ async function loadStoreData() {
       }
       prevAftersaleCount = newCount
       aftersaleCount.value = newCount
-      aftersaleTotal.value = afterRes.data.totalAmount || 0
+      aftersaleTotal.value = filtered.reduce((s: number, a: any) => s + (a.amount || 0), 0)
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
   } catch { /* silent */ }
