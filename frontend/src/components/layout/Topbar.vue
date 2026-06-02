@@ -10,8 +10,38 @@
     </div>
 
     <div class="topbar__right">
-      <!-- Desktop Download -->
-      <el-tooltip content="下载桌面伴侣" placement="bottom">
+      <!-- Mobile: "More" menu -->
+      <el-dropdown trigger="click" class="topbar__more">
+        <el-icon :size="20" class="topbar__icon-btn" role="button" aria-label="更多">
+          <MoreFilled />
+        </el-icon>
+        <template #dropdown>
+          <el-dropdown-menu>
+            <el-dropdown-item>
+              <a
+                href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+                target="_blank"
+                class="topbar__more-link"
+              >
+                <el-icon :size="16"><Download /></el-icon> 桌面端
+              </a>
+            </el-dropdown-item>
+            <el-dropdown-item>
+              <router-link to="/ai" class="topbar__more-link">
+                <el-icon :size="16"><MagicStick /></el-icon> AI 助手
+              </router-link>
+            </el-dropdown-item>
+            <el-dropdown-item>
+              <router-link to="/mcp" class="topbar__more-link">
+                <el-icon :size="16"><ChatDotRound /></el-icon> MCP 查询
+              </router-link>
+            </el-dropdown-item>
+          </el-dropdown-menu>
+        </template>
+      </el-dropdown>
+
+      <!-- Desktop: action items -->
+      <el-tooltip content="下载桌面伴侣" placement="bottom" class="topbar__desktop">
         <a
           href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
           target="_blank"
@@ -22,23 +52,21 @@
         </a>
       </el-tooltip>
 
-      <!-- AI Assistant -->
-      <router-link to="/ai" class="topbar__action" title="AI 助手">
+      <router-link to="/ai" class="topbar__action topbar__desktop" title="AI 助手">
         <el-icon :size="18"><MagicStick /></el-icon>
         <span>AI 助手</span>
       </router-link>
 
-      <!-- MCP Query -->
-      <router-link to="/mcp" class="topbar__action" title="MCP 数据查询">
+      <router-link to="/mcp" class="topbar__action topbar__desktop" title="MCP 数据查询">
         <el-icon :size="18"><ChatDotRound /></el-icon>
         <span>MCP 查询</span>
       </router-link>
 
       <!-- Team Switcher -->
-      <el-dropdown trigger="click" @command="handleTeamSwitch">
+      <el-dropdown trigger="click" class="topbar__team-wrap" @command="handleTeamSwitch">
         <div class="topbar__team">
           <el-icon :size="16"><OfficeBuilding /></el-icon>
-          <span>{{ teamStore.currentTeam?.name || '选择团队' }}</span>
+          <span class="topbar__team-name">{{ teamStore.currentTeam?.name || '选择团队' }}</span>
           <el-icon :size="12"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
@@ -64,7 +92,13 @@
       >
         <template #reference>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="topbar__notification">
-            <el-icon :size="19" class="topbar__icon-btn" role="button" aria-label="通知" tabindex="0">
+            <el-icon
+              :size="19"
+              class="topbar__icon-btn"
+              role="button"
+              aria-label="通知"
+              tabindex="0"
+            >
               <Bell />
             </el-icon>
           </el-badge>
@@ -73,12 +107,15 @@
           <div class="notification-panel__header">
             <span>通知</span>
             <el-button
-              link type="primary" size="small"
-              @click="handleMarkAllRead"
+              link
+              type="primary"
+              size="small"
               :disabled="unreadCount === 0"
-            >全部已读</el-button>
+              @click="handleMarkAllRead"
+              >全部已读</el-button
+            >
           </div>
-          <div class="notification-panel__body" v-loading="notifLoading">
+          <div v-loading="notifLoading" class="notification-panel__body">
             <div v-if="notifications.length === 0" class="notification-panel__empty">暂无通知</div>
             <div
               v-for="item in notifications"
@@ -107,7 +144,7 @@
           <el-avatar :size="30" :src="userStore.avatar">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
-          <span class="topbar__username">{{ userStore.username }}</span>
+          <span class="topbar__username topbar__desktop">{{ userStore.username }}</span>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -133,7 +170,14 @@ import { useRoute } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { useTeamStore } from '@/store/team'
 import { notificationApi, type Notification } from '@/api/notifications'
-import { WarningFilled, SuccessFilled, InfoFilled, MagicStick, ChatDotRound } from '@element-plus/icons-vue'
+import {
+  WarningFilled,
+  SuccessFilled,
+  InfoFilled,
+  MagicStick,
+  ChatDotRound,
+  MoreFilled,
+} from '@element-plus/icons-vue'
 import { getNotificationColor } from '@/composables/usePlatform'
 import type { Team } from '@/types'
 
@@ -161,7 +205,9 @@ async function fetchUnreadCount() {
   try {
     const res = await notificationApi.getUnreadCount()
     unreadCount.value = res.data.unreadCount
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
 }
 
 async function fetchNotifications() {
@@ -170,7 +216,9 @@ async function fetchNotifications() {
     const res = await notificationApi.getAll({ limit: 10 })
     notifications.value = res.data.notifications
     unreadCount.value = res.data.unreadCount
-  } catch { /* silent */ }
+  } catch {
+    /* silent */
+  }
   notifLoading.value = false
 }
 
@@ -190,9 +238,13 @@ async function handleNotifClick(item: Notification) {
 
 function getNotifIcon(type: string) {
   switch (type) {
-    case 'PUBLISH_FAILED': case 'ACCOUNT_EXPIRED': return WarningFilled
-    case 'PUBLISH_SUCCESS': return SuccessFilled
-    default: return InfoFilled
+    case 'PUBLISH_FAILED':
+    case 'ACCOUNT_EXPIRED':
+      return WarningFilled
+    case 'PUBLISH_SUCCESS':
+      return SuccessFilled
+    default:
+      return InfoFilled
   }
 }
 
@@ -221,8 +273,12 @@ function handleTeamSwitch(team: Team) {
 
 function handleUserCommand(command: string) {
   switch (command) {
-    case 'logout': userStore.logout(); break
-    case 'profile': case 'password': break
+    case 'logout':
+      userStore.logout()
+      break
+    case 'profile':
+    case 'password':
+      break
   }
 }
 </script>
@@ -242,9 +298,17 @@ function handleUserCommand(command: string) {
   &__left {
     :deep(.el-breadcrumb) {
       font-size: 13px;
-      .el-breadcrumb__item { color: $color-text-tertiary; }
-      .el-breadcrumb__inner { color: $color-text-secondary; font-weight: 400; }
-      .el-breadcrumb__separator { color: $color-text-tertiary; margin: 0 6px; }
+      .el-breadcrumb__item {
+        color: $color-text-tertiary;
+      }
+      .el-breadcrumb__inner {
+        color: $color-text-secondary;
+        font-weight: 400;
+      }
+      .el-breadcrumb__separator {
+        color: $color-text-tertiary;
+        margin: 0 6px;
+      }
     }
   }
 
@@ -252,6 +316,31 @@ function handleUserCommand(command: string) {
     display: flex;
     align-items: center;
     gap: 20px;
+  }
+
+  &__more {
+    display: none;
+  }
+
+  &__desktop {
+    display: flex;
+  }
+
+  &__more-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: $color-text-secondary;
+    text-decoration: none;
+    &:hover {
+      color: $color-bronze;
+    }
+  }
+
+  &__team-wrap {
+    &:deep(.topbar__team-name) {
+      display: inline;
+    }
   }
 
   &__action {
@@ -264,7 +353,10 @@ function handleUserCommand(command: string) {
     padding: 5px 10px;
     border-radius: 6px;
     transition: all 0.2s;
-    &:hover { background: rgba(212, 155, 80, 0.06); color: $color-bronze; }
+    &:hover {
+      background: rgba(212, 155, 80, 0.06);
+      color: $color-bronze;
+    }
   }
 
   &__team {
@@ -277,13 +369,18 @@ function handleUserCommand(command: string) {
     padding: 6px 12px;
     border-radius: 6px;
     transition: all 0.2s;
-    &:hover { background: rgba(212, 155, 80, 0.06); }
+    &:hover {
+      background: rgba(212, 155, 80, 0.06);
+    }
   }
 
   &__notification {
     cursor: pointer;
     :deep(.el-badge__content) {
-      font-size: 10px; height: 16px; line-height: 16px; padding: 0 4px;
+      font-size: 10px;
+      height: 16px;
+      line-height: 16px;
+      padding: 0 4px;
     }
   }
 
@@ -291,7 +388,9 @@ function handleUserCommand(command: string) {
     color: $color-text-secondary;
     cursor: pointer;
     transition: color 0.2s;
-    &:hover { color: $color-bronze; }
+    &:hover {
+      color: $color-bronze;
+    }
   }
 
   &__user {
@@ -302,7 +401,9 @@ function handleUserCommand(command: string) {
     padding: 4px 8px 4px 4px;
     border-radius: 9999px;
     transition: background 0.2s;
-    &:hover { background: rgba(212, 155, 80, 0.06); }
+    &:hover {
+      background: rgba(212, 155, 80, 0.06);
+    }
   }
   &__username {
     font-size: 13px;
@@ -343,10 +444,19 @@ function handleUserCommand(command: string) {
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.15s;
-  &:hover { background: rgba(212, 155, 80, 0.05); }
-  &--unread { background: rgba(212, 155, 80, 0.06); }
-  &__icon { padding-top: 1px; }
-  &__content { flex: 1; min-width: 0; }
+  &:hover {
+    background: rgba(212, 155, 80, 0.05);
+  }
+  &--unread {
+    background: rgba(212, 155, 80, 0.06);
+  }
+  &__icon {
+    padding-top: 1px;
+  }
+  &__content {
+    flex: 1;
+    min-width: 0;
+  }
   &__title {
     font-size: 13px;
     color: $color-text-primary;
@@ -359,6 +469,40 @@ function handleUserCommand(command: string) {
     font-size: 12px;
     color: $color-text-tertiary;
     margin-top: 2px;
+  }
+}
+
+// Mobile: compact topbar
+@media (max-width: 768px) {
+  .topbar {
+    padding: 0 12px;
+    &__right {
+      gap: 8px;
+    }
+    &__more {
+      display: flex;
+    }
+    &__desktop {
+      display: none !important;
+    }
+    &__team-name {
+      display: none !important;
+    }
+    &__team {
+      padding: 6px 8px;
+    }
+    &__user {
+      padding: 2px;
+    }
+    &__left {
+      padding-left: 48px; // make room for sidebar hamburger
+      :deep(.el-breadcrumb__item:first-child .el-breadcrumb__inner) {
+        display: none;
+      }
+      :deep(.el-breadcrumb__separator:first-of-type) {
+        display: none;
+      }
+    }
   }
 }
 </style>
