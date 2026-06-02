@@ -49,10 +49,18 @@
     </div>
 
     <!-- Order Status -->
-    <div class="monetization__kpi" style="grid-template-columns: repeat(5, 1fr)">
+    <div class="monetization__kpi" style="grid-template-columns: repeat(6, 1fr)">
       <div v-for="s in statusBreakdown" :key="s.label" class="kpi-card kpi-card--sm">
         <div class="kpi-card__label">{{ s.label }}</div>
         <div class="kpi-card__value kpi-card__value--sm">{{ s.count }}</div>
+      </div>
+    </div>
+
+    <!-- Aftersale -->
+    <div class="card" style="margin-bottom: 24px;" v-if="aftersaleCount > 0">
+      <div class="card__header">
+        <span>售后 / 退款</span>
+        <span class="card__count">近24小时 {{ aftersaleCount }} 条</span>
       </div>
     </div>
 
@@ -148,10 +156,13 @@ const productStats = computed(() => ({
 }))
 
 const statusBreakdown = computed(() => {
-  const labels: Record<number, string> = { 10: '待付款', 20: '待发货', 30: '待收货', 100: '已完成', 250: '已取消' }
+  const labels: Record<number, string> = { 10: '待付款', 20: '待发货', 30: '已发货', 100: '已完成', 250: '已取消' }
   const groups: Record<number, number> = {}
   orders.value.forEach((o) => { groups[o.status] = (groups[o.status] || 0) + 1 })
-  return [10, 20, 30, 100, 250].map((k) => ({ label: labels[k], count: groups[k] || 0 }))
+  return [
+    ...([10, 20, 30, 100, 250] as const).map((k) => ({ label: labels[k], count: groups[k] || 0 })),
+    { label: '退货/售后', count: aftersaleCount.value },
+  ]
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
