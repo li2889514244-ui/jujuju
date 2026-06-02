@@ -24,7 +24,7 @@
     </div>
 
     <!-- KPI -->
-    <div class="monetization__kpi">
+    <div class="monetization__kpi" style="grid-template-columns: repeat(3, 1fr)">
       <div class="kpi-card">
         <div class="kpi-card__label">{{ viewMode === 'today' ? '今天销售额' : '近7天销售额' }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
@@ -39,16 +39,6 @@
         <div class="kpi-card__label">售后退款</div>
         <div class="kpi-card__value">{{ aftersaleCount }}</div>
         <div class="kpi-card__sub">近 24 小时申请</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-card__label">在售商品</div>
-        <div class="kpi-card__value">{{ productStats.inStock }} / {{ productStats.total }}</div>
-        <div class="kpi-card__sub">全部已售 {{ fmtNum(productStats.totalSales) }}</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-card__label">总库存</div>
-        <div class="kpi-card__value">{{ fmtNum(productStats.totalStock) }}</div>
-        <div class="kpi-card__sub">件</div>
       </div>
     </div>
 
@@ -193,13 +183,7 @@ const orderStats = computed(() => {
   return { gmv, count, avg: count > 0 ? gmv / count : 0 }
 })
 
-const productStats = computed(() => ({
-  total: products.value.length,
-  inStock: products.value.filter((p) => p.status !== 2 && p.stock > 0).length,
-  totalSales: products.value.reduce((s, p) => s + p.sales, 0),
-  totalStock: products.value.reduce((s, p) => s + p.stock, 0),
-}))
-
+const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
 const statusBreakdown = computed(() => {
   const labels: Record<number, string> = { 10: '待付款', 20: '待发货', 30: '已发货', 100: '已完成', 250: '已取消' }
   const groups: Record<number, number> = {}
