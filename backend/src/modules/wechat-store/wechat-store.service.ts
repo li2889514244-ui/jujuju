@@ -58,10 +58,23 @@ export class WechatStoreService implements OnModuleInit {
     if (res.errcode !== 0) return res
     const ids: string[] = res.after_sale_order_id_list || []
     if (ids.length === 0) return { errcode: 0, errmsg: 'ok', list: [], total: 0 }
+
+    // Get product list for title mapping
+    const prodRes: any = await this.getProductList(storeId, { page_size: 200 })
+    const productMap: Record<string, string> = {}
+    if (prodRes.errcode === 0 && prodRes.product_ids) {
+      const prodDetails = await Promise.all(prodRes.product_ids.map((id: string) => this.request(storeId, '/channels/ec/product/get', { product_id: String(id) })))
+      prodDetails.filter((d: any) => d.errcode === 0).forEach((d: any) => {
+        const p = d.product || d
+        if (p.product_id) productMap[String(p.product_id)] = p.title || ''
+      })
+    }
+
     const details = await Promise.all(ids.map((id: string) => this.getAftersaleDetail(storeId, id)))
     const list = details.filter((d: any) => d.errcode === 0).map((d: any) => {
       const a = d.after_sale_order || {}
-      return { id: a.after_sale_order_id, type: a.type, status: a.status, amount: a.refund_info?.amount || 0, reason: a.reason_text || '', product: a.product_info?.title || '' }
+      const pid = a.product_info?.product_id || ''
+      return { id: a.after_sale_order_id, type: a.type, status: a.status, amount: a.refund_info?.amount || 0, reason: a.reason_text || '', product: productMap[String(pid)] || `商品${pid}` }
     })
     const totalAmount = list.reduce((s: number, a: any) => s + a.amount, 0)
     return { errcode: 0, errmsg: 'ok', list, total: list.length, totalAmount }
