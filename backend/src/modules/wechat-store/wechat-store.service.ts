@@ -97,7 +97,8 @@ export class WechatStoreService implements OnModuleInit {
     const details = await Promise.all(ids.map((id: string) => this.getOrderDetail(storeId, id)))
     const order_list = details.filter((d: any) => d.errcode === 0).map((d: any) => {
       const o = d.order || {}; const info = o.order_detail?.product_infos?.[0] || {}
-      return { order_id: o.order_id, product_id: info.product_id || '', sku_id: info.sku_id || '', status: o.status || 0, pay_amount: o.order_detail?.price_info?.order_price || 0, create_time: o.create_time || 0, settle_time: o.settle_time || 0, product_title: info.title || '', product_img: info.thumb_img || '', commission: 0, commission_rate: 0 }
+      const dlv = o.order_detail?.delivery_info
+      return { order_id: o.order_id, product_id: info.product_id || '', sku_id: info.sku_id || '', status: o.status || 0, pay_amount: o.order_detail?.price_info?.order_price || 0, create_time: o.create_time || 0, settle_time: o.settle_time || 0, product_title: info.title || '', product_img: info.thumb_img || '', ship_time: dlv?.ship_done_time || 0, delivery_list: dlv?.delivery_product_info || [], commission: 0, commission_rate: 0 }
     })
     return { errcode: 0, errmsg: 'ok', order_list, total_num: res.total_num || order_list.length }
   }

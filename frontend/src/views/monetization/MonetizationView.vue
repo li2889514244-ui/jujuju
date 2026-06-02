@@ -100,17 +100,27 @@
       <div class="card">
         <div class="card__header">
           <span>最近订单</span>
-          <span class="card__count">{{ orders.length }} 条</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <el-input
+              v-model="orderSearch"
+              placeholder="搜索订单…"
+              size="small"
+              style="width:160px"
+              clearable
+            />
+            <span class="card__count">{{ filteredOrderCount }} 条</span>
+          </div>
         </div>
         <div v-loading="loading" class="order-list">
-          <div v-if="orders.length === 0" class="empty-hint">暂无订单</div>
-          <div v-for="order in orders.slice(0, 20)" :key="order.order_id" class="order-item">
+          <div v-if="filteredOrders.length === 0" class="empty-hint">{{ orderSearch ? '无匹配订单' : '暂无订单' }}</div>
+          <div v-for="order in filteredOrders.slice(0, 20)" :key="order.order_id" class="order-item">
             <img v-if="order.product_img" :src="order.product_img" class="order-item__img" @error="hideImg" />
             <div class="order-item__info">
               <div class="order-item__title">{{ order.product_title || '未知商品' }}</div>
               <div class="order-item__meta">
                 <span class="order-item__time">{{ fmtTime(order.create_time) }}</span>
                 <span class="order-item__status" :class="statusClass(order.status)">{{ statusLabel(order.status) }}</span>
+                <span v-if="order.ship_time" style="font-size:10px;color:#5b8ed4">已发货</span>
               </div>
             </div>
             <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount) }}</div>
@@ -161,6 +171,7 @@ const aftersaleList = ref<any[]>([])
 const aftersaleTotal = ref(0)
 const showAftersale = ref(false)
 let prevAftersaleCount = 0
+const orderSearch = ref('')
 const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -200,6 +211,13 @@ const statusBreakdown = computed(() => {
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
+
+const filteredOrders = computed(() => {
+  if (!orderSearch.value) return displayOrders.value
+  const kw = orderSearch.value.toLowerCase()
+  return displayOrders.value.filter((o) => (o.product_title || '').toLowerCase().includes(kw) || o.order_id.includes(kw))
+})
+const filteredOrderCount = computed(() => filteredOrders.value.length)
 
 const trendOption = computed(() => {
   const dailyMap: Record<string, { gmv: number; orders: number }> = {}
