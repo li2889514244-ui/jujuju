@@ -64,7 +64,7 @@ const routes: RouteRecordRaw[] = [
         path: 'monetization',
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
-        meta: { title: '变现中心', icon: 'Money' },
+        meta: { title: '微信小店', icon: 'Money' },
       },
       {
         path: 'report',
