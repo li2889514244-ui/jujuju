@@ -19,6 +19,7 @@ const platforms_service_1 = require("./platforms.service");
 const oauth_service_1 = require("./oauth/oauth.service");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
+const public_decorator_1 = require("../../common/decorators/public.decorator");
 const platform_dto_1 = require("./dto/platform.dto");
 let PlatformsController = class PlatformsController {
     constructor(platformsService, oauthService) {
@@ -51,6 +52,12 @@ let PlatformsController = class PlatformsController {
     }
     async batchCollectData(dto) {
         return this.platformsService.batchCollectData(dto.accountIds, dto.type || 'daily');
+    }
+    async reportMetrics(dto) {
+        return this.platformsService.reportMetrics(dto);
+    }
+    async reportPostStats(dto) {
+        return this.platformsService.reportPostStats(dto);
     }
     async refreshToken(accountId) {
         const success = await this.platformsService.refreshToken(accountId);
@@ -127,6 +134,26 @@ __decorate([
     __metadata("design:paramtypes", [platform_dto_1.BatchCollectDto]),
     __metadata("design:returntype", Promise)
 ], PlatformsController.prototype, "batchCollectData", null);
+__decorate([
+    (0, common_1.Post)('report-metrics'),
+    (0, public_decorator_1.Public)(),
+    (0, swagger_1.ApiOperation)({ summary: '桌面伴侣上报账号指标' }),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [platform_dto_1.ReportMetricsDto]),
+    __metadata("design:returntype", Promise)
+], PlatformsController.prototype, "reportMetrics", null);
+__decorate([
+    (0, common_1.Post)('report-post-stats'),
+    (0, public_decorator_1.Public)(),
+    (0, swagger_1.ApiOperation)({ summary: '桌面伴侣上报视频/帖子数据' }),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [platform_dto_1.ReportPostStatsDto]),
+    __metadata("design:returntype", Promise)
+], PlatformsController.prototype, "reportPostStats", null);
 __decorate([
     (0, common_1.Post)(':accountId/refresh-token'),
     (0, swagger_1.ApiOperation)({ summary: '刷新平台Token' }),

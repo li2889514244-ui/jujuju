@@ -31,6 +31,7 @@ const pixing_video_module_1 = require("./modules/pixing-video/pixing-video.modul
 const mcp_module_1 = require("./modules/mcp/mcp.module");
 const calendar_module_1 = require("./modules/calendar/calendar.module");
 const scan_bind_module_1 = require("./modules/scan-bind/scan-bind.module");
+const wechat_store_module_1 = require("./modules/wechat-store/wechat-store.module");
 const jwt_auth_guard_1 = require("./modules/auth/guards/jwt-auth.guard");
 const roles_guard_1 = require("./modules/auth/guards/roles.guard");
 const jwt_config_1 = require("./config/jwt.config");
@@ -72,6 +73,7 @@ exports.AppModule = AppModule = __decorate([
             mcp_module_1.McpModule,
             calendar_module_1.CalendarModule,
             scan_bind_module_1.ScanBindModule,
+            wechat_store_module_1.WechatStoreModule,
         ],
         providers: [
             { provide: core_1.APP_GUARD, useClass: jwt_auth_guard_1.JwtAuthGuard },
