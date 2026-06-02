@@ -49,6 +49,20 @@ export const wechatStoreApi = {
   getProducts(storeId: string, params?: { page_size?: number; next_key?: string }) {
     return get<any>('/wechat-store/shop/products', { store_id: storeId, ...params })
   },
+
+  // ── 售后 ──
+
+  /** 售后单列表 */
+  getAftersaleCount(storeId: string) {
+    return get<any>('/wechat-store/shop/aftersale', { store_id: storeId })
+  },
+
+  // ── 店铺 ──
+
+  /** 店铺基本信息 */
+  getShopInfo(storeId: string) {
+    return get<any>('/wechat-store/shop/info', { store_id: storeId })
+  },
 }
 
 // ── 兼容旧类型 ──
