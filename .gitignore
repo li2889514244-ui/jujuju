@@ -105,6 +105,10 @@ deploy-pixing.js
 deploy-pixing-master.js
 deploy-backend-build.js
 build-backend.js
+scripts/deploy-backend.sh
+scripts/deploy-quick.sh
+scripts/ecs-run.js
+scripts/test-wechat-api.sh
 
 # 自动生成文件
 frontend/src/auto-imports.d.ts
