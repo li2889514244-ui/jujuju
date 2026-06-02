@@ -1,456 +1,378 @@
 <template>
   <div class="monetization">
-    <!-- Filters -->
-    <el-card shadow="hover" class="monetization__filter">
-      <el-form :inline="true">
-        <el-form-item label="时间范围">
-          <el-select v-model="days" style="width: 140px" @change="refreshAll">
-            <el-option label="近7天" :value="7" />
-            <el-option label="近30天" :value="30" />
-            <el-option label="近90天" :value="90" />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" @click="refreshAll">查询</el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="success" @click="openManualDialog">手动录入</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
-
-    <!-- 手动录入弹窗 -->
-    <el-dialog v-model="manualDialogVisible" title="手动录入变现数据" width="500px">
-      <el-form :model="manualForm" label-width="80px">
-        <el-form-item label="日期" required>
-          <el-date-picker
-            v-model="manualForm.date"
-            type="date"
-            placeholder="选择日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="平台" required>
-          <el-select v-model="manualForm.platform" placeholder="选择平台" style="width: 100%">
-            <el-option
-              v-for="(label, key) in PLATFORM_LABELS"
-              :key="key"
-              :label="label"
-              :value="key"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="收入(¥)">
-          <el-input v-model.number="manualForm.revenue" type="number" placeholder="0" />
-        </el-form-item>
-        <el-form-item label="GMV(¥)">
-          <el-input v-model.number="manualForm.gmv" type="number" placeholder="0" />
-        </el-form-item>
-        <el-form-item label="订单数">
-          <el-input v-model.number="manualForm.orders" type="number" placeholder="0" />
-        </el-form-item>
-        <el-form-item label="买家数">
-          <el-input v-model.number="manualForm.buyerCount" type="number" placeholder="0" />
-        </el-form-item>
-        <el-form-item label="佣金(¥)">
-          <el-input v-model.number="manualForm.commission" type="number" placeholder="0" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="manualDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="manualSubmitting" @click="submitManual">提交</el-button>
-      </template>
-    </el-dialog>
+    <!-- Header -->
+    <div class="monetization__header">
+      <h2 class="monetization__title">变现中心</h2>
+      <div class="monetization__actions">
+        <el-radio-group v-model="days" size="small" @change="loadAll">
+          <el-radio-button :value="7">近7天</el-radio-button>
+          <el-radio-button :value="30">近30天</el-radio-button>
+          <el-radio-button :value="90">近90天</el-radio-button>
+        </el-radio-group>
+        <el-button :icon="Refresh" circle size="small" :loading="loading" @click="loadAll" />
+      </div>
+    </div>
 
     <!-- KPI Cards -->
-    <el-row :gutter="20" class="monetization__overview">
-      <el-col v-for="card in kpiCards" :key="card.label" :xs="12" :sm="8" :md="4">
-        <el-card shadow="hover" class="overview-card">
-          <div class="overview-card__label">{{ card.label }}</div>
-          <div class="overview-card__value">{{ card.value }}</div>
-        </el-card>
-      </el-col>
-    </el-row>
+    <div class="monetization__kpi">
+      <div v-for="card in kpiCards" :key="card.label" class="kpi-card">
+        <div class="kpi-card__label">{{ card.label }}</div>
+        <div class="kpi-card__value">{{ card.value }}</div>
+        <div v-if="card.sub" class="kpi-card__sub">{{ card.sub }}</div>
+      </div>
+    </div>
 
     <!-- Trend Chart -->
-    <el-card shadow="hover" class="monetization__chart">
-      <template #header>
-        <div class="chart-header">
-          <span>变现趋势</span>
-          <el-radio-group v-model="trendMetric" size="small">
-            <el-radio-button value="revenue">收入</el-radio-button>
-            <el-radio-button value="gmv">GMV</el-radio-button>
-            <el-radio-button value="orders">订单</el-radio-button>
-            <el-radio-button value="buyerCount">买家</el-radio-button>
-            <el-radio-button value="commission">佣金</el-radio-button>
-          </el-radio-group>
+    <div class="monetization__chart card">
+      <div class="card__header">
+        <span>佣金趋势</span>
+        <el-radio-group v-model="trendMetric" size="small">
+          <el-radio-button value="commission">佣金</el-radio-button>
+          <el-radio-button value="gmv">GMV</el-radio-button>
+          <el-radio-button value="orders">订单数</el-radio-button>
+        </el-radio-group>
+      </div>
+      <DataChart :option="trendOption" :height="300" />
+    </div>
+
+    <!-- Orders + Products -->
+    <div class="monetization__grid">
+      <!-- Commission Orders -->
+      <div class="card">
+        <div class="card__header">
+          <span>最近佣金单</span>
+          <el-tag size="small" type="warning">微信小店达人端</el-tag>
         </div>
-      </template>
-      <DataChart :option="trendChartOption" :height="360" />
-    </el-card>
-
-    <!-- Platform Breakdown -->
-    <el-row :gutter="20" class="monetization__body">
-      <el-col :span="24">
-        <el-card shadow="hover">
-          <template #header>平台变现明细</template>
-          <el-table :data="byPlatform" stripe>
-            <template #empty>
-              <el-empty description="暂无变现数据，伴侣将在下次采集时自动获取" />
-            </template>
-            <el-table-column label="平台" width="120">
-              <template #default="{ row }">
-                <PlatformIcon :platform="row.platform" show-label />
-              </template>
-            </el-table-column>
-            <el-table-column label="收入" width="140">
-              <template #default="{ row }">¥{{ formatNum(row.revenue) }}</template>
-            </el-table-column>
-            <el-table-column label="GMV" width="140">
-              <template #default="{ row }">¥{{ formatNum(row.gmv) }}</template>
-            </el-table-column>
-            <el-table-column label="订单数" width="120">
-              <template #default="{ row }">{{ formatNum(row.orders) }}</template>
-            </el-table-column>
-            <el-table-column label="买家" width="100">
-              <template #default="{ row }">{{ formatNum(row.buyerCount) }}</template>
-            </el-table-column>
-            <el-table-column label="佣金" width="140">
-              <template #default="{ row }">¥{{ formatNum(row.commission) }}</template>
-            </el-table-column>
-            <el-table-column label="客单价" width="100">
-              <template #default="{ row }">¥{{ formatNum(row.avgOrderValue) }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 微信小店实时数据 -->
-    <el-row :gutter="20" class="monetization__body">
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="chart-header">
-              <span>微信小店 · 最近佣金单</span>
-              <el-tag size="small" type="warning">达人端</el-tag>
+        <div class="order-list" v-loading="loading">
+          <div v-if="filteredOrders.length === 0" class="empty-hint">暂无佣金数据</div>
+          <div
+            v-for="order in filteredOrders"
+            :key="order.order_id"
+            class="order-item"
+          >
+            <img
+              v-if="order.product_img"
+              :src="order.product_img"
+              class="order-item__img"
+              @error="($event.target as HTMLImageElement).style.display='none'"
+            />
+            <div class="order-item__info">
+              <div class="order-item__title">{{ order.product_title || '未知商品' }}</div>
+              <div class="order-item__meta">
+                <span class="order-item__time">{{ fmtTime(order.create_time) }}</span>
+                <span
+                  class="order-item__status"
+                  :class="statusClass(order.status)"
+                >{{ statusLabel(order.status) }}</span>
+              </div>
             </div>
-          </template>
-          <el-table v-loading="wxLoading" :data="wechatOrders" stripe size="small">
-            <template #empty>
-              <el-empty description="暂无佣金数据，请确认带货助手已绑定" />
-            </template>
-            <el-table-column label="商品" min-width="140">
-              <template #default="{ row }">
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <el-avatar
-                    v-if="row.product_img"
-                    :src="row.product_img"
-                    size="small"
-                    shape="square"
-                  />
-                  <span
-                    style="
-                      white-space: nowrap;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      max-width: 120px;
-                    "
-                    >{{ row.product_title }}</span
-                  >
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="金额" width="90">
-              <template #default="{ row }">¥{{ (row.pay_amount / 100).toFixed(2) }}</template>
-            </el-table-column>
-            <el-table-column label="佣金" width="100">
-              <template #default="{ row }">
-                <span style="color: #f59e0b">¥{{ (row.commission / 100).toFixed(2) }}</span>
-                <br />
-                <span style="font-size: 11px; color: #999"
-                  >{{ (row.commission_rate / 100).toFixed(1) }}%</span
-                >
-              </template>
-            </el-table-column>
-            <el-table-column label="时间" width="100">
-              <template #default="{ row }">{{ formatTime(row.create_time) }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-
-      <el-col :span="12">
-        <el-card shadow="hover">
-          <template #header>
-            <div class="chart-header">
-              <span>微信小店 · 橱窗商品</span>
-              <el-button size="small" type="primary" link @click="refreshWechatStore"
-                >刷新</el-button
-              >
+            <div class="order-item__money">
+              <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount) }}</div>
+              <div class="order-item__commission">
+                +&yen;{{ centToYuan(order.commission) }}
+                <span class="order-item__rate">{{ rateToPct(order.commission_rate) }}%</span>
+              </div>
             </div>
-          </template>
-          <el-table v-loading="wxLoading" :data="wechatProducts" stripe size="small">
-            <template #empty>
-              <el-empty description="暂无橱窗商品" />
-            </template>
-            <el-table-column label="商品" min-width="140">
-              <template #default="{ row }">
-                <div style="display: flex; align-items: center; gap: 8px">
-                  <el-avatar v-if="row.img_url" :src="row.img_url" size="small" shape="square" />
-                  <span
-                    style="
-                      white-space: nowrap;
-                      overflow: hidden;
-                      text-overflow: ellipsis;
-                      max-width: 120px;
-                    "
-                    >{{ row.title }}</span
-                  >
-                </div>
-              </template>
-            </el-table-column>
-            <el-table-column label="售价" width="80">
-              <template #default="{ row }">¥{{ (row.selling_price / 100).toFixed(0) }}</template>
-            </el-table-column>
-            <el-table-column label="已售" width="70">
-              <template #default="{ row }">{{ row.sales }}</template>
-            </el-table-column>
-            <el-table-column label="库存" width="70">
-              <template #default="{ row }">{{ row.stock }}</template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-      </el-col>
-    </el-row>
+          </div>
+        </div>
+      </div>
+
+      <!-- Product Showcase -->
+      <div class="card">
+        <div class="card__header">
+          <span>橱窗商品</span>
+          <span class="card__count">{{ sortedProducts.length }} 件</span>
+        </div>
+        <div class="product-grid" v-loading="loading">
+          <div v-if="sortedProducts.length === 0" class="empty-hint">暂无橱窗商品</div>
+          <div
+            v-for="prod in sortedProducts"
+            :key="prod.product_id"
+            class="product-card"
+          >
+            <img
+              v-if="prod.img_url"
+              :src="prod.img_url"
+              class="product-card__img"
+              @error="($event.target as HTMLImageElement).style.display='none'"
+            />
+            <div class="product-card__info">
+              <div class="product-card__title">{{ prod.title }}</div>
+              <div class="product-card__stats">
+                <span class="product-card__price">&yen;{{ centToYuan(prod.selling_price) }}</span>
+                <span class="product-card__sales">已售 {{ fmtNum(prod.sales) }}</span>
+              </div>
+              <div class="product-card__rate">佣金 {{ rateToPct(prod.commission_rate) }}%</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual Entry (collapsed) -->
+    <div class="card">
+      <div class="card__header clickable" @click="showManual = !showManual">
+        <span>手动录入</span>
+        <span class="card__toggle">{{ showManual ? '收起' : '展开' }}</span>
+      </div>
+      <div v-if="showManual" class="manual-form">
+        <el-form :inline="true" size="small">
+          <el-form-item label="日期">
+            <el-date-picker v-model="manual.date" type="date" placeholder="选择日期" />
+          </el-form-item>
+          <el-form-item label="平台">
+            <el-select v-model="manual.platform" placeholder="选择平台" style="width:120px">
+              <el-option v-for="(l,k) in PLATFORM_LABELS" :key="k" :label="l" :value="k" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="收入">
+            <el-input v-model.number="manual.revenue" placeholder="0" style="width:100px" />
+          </el-form-item>
+          <el-form-item label="GMV">
+            <el-input v-model.number="manual.gmv" placeholder="0" style="width:100px" />
+          </el-form-item>
+          <el-form-item label="订单">
+            <el-input v-model.number="manual.orders" placeholder="0" style="width:80px" />
+          </el-form-item>
+          <el-form-item label="佣金">
+            <el-input v-model.number="manual.commission" placeholder="0" style="width:100px" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="manualSubmitting" @click="submitManual">提交</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
-import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import { wechatStoreApi, type WechatOrder, type WechatProduct, type WechatStore } from '@/api/wechat-store'
 import { analyticsApi } from '@/api/analytics'
-import { wechatStoreApi, type WechatOrder, type WechatProduct } from '@/api/wechat-store'
-import { PLATFORM_LABELS, type Platform } from '@/types'
+import { PLATFORM_LABELS } from '@/types'
 import dayjs from 'dayjs'
 
 const days = ref(30)
 const loading = ref(false)
-const trendMetric = ref('revenue')
-const data = ref<any>(null)
+const trendMetric = ref('commission')
+const showManual = ref(false)
 
-// Manual entry dialog
-const manualDialogVisible = ref(false)
+// Data
+const orders = ref<WechatOrder[]>([])
+const products = ref<WechatProduct[]>([])
+
+// Manual entry
+const manual = ref({ date: '', platform: '', revenue: null as number | null, gmv: null as number | null, orders: null as number | null, commission: null as number | null })
 const manualSubmitting = ref(false)
-const manualForm = ref({
-  date: '',
-  platform: '',
-  revenue: null as number | null,
-  gmv: null as number | null,
-  orders: null as number | null,
-  buyerCount: null as number | null,
-  commission: null as number | null,
+
+// ── Computed ──
+
+const filteredOrders = computed(() => {
+  const cutoff = Date.now() - days.value * 86400000
+  return orders.value.filter(o => o.create_time * 1000 >= cutoff)
 })
 
-function openManualDialog() {
-  manualForm.value = {
-    date: '',
-    platform: '',
-    revenue: null,
-    gmv: null,
-    orders: null,
-    buyerCount: null,
-    commission: null,
-  }
-  manualDialogVisible.value = true
-}
-
-async function submitManual() {
-  if (!manualForm.value.date || !manualForm.value.platform) {
-    ElMessage.warning('请填写日期和平台')
-    return
-  }
-  manualSubmitting.value = true
-  try {
-    await analyticsApi.createManualMonetization({
-      date: dayjs(manualForm.value.date).format('YYYY-MM-DD'),
-      platform: manualForm.value.platform,
-      ...(manualForm.value.revenue !== null && { revenue: manualForm.value.revenue }),
-      ...(manualForm.value.gmv !== null && { gmv: manualForm.value.gmv }),
-      ...(manualForm.value.orders !== null && { orders: manualForm.value.orders }),
-      ...(manualForm.value.buyerCount !== null && { buyerCount: manualForm.value.buyerCount }),
-      ...(manualForm.value.commission !== null && { commission: manualForm.value.commission }),
-    })
-    ElMessage.success('录入成功')
-    manualDialogVisible.value = false
-    refreshAll()
-  } catch (e: any) {
-    ElMessage.error(e?.message || '录入失败')
-  } finally {
-    manualSubmitting.value = false
-  }
-}
-
 const kpiCards = computed(() => {
-  const d = data.value
-  if (!d) return []
+  const list = filteredOrders.value
+  const totalGmv = list.reduce((s, o) => s + o.pay_amount, 0)
+  const totalCommission = list.reduce((s, o) => s + o.commission, 0)
+  const count = list.length
+  const avgOrder = count > 0 ? totalGmv / count : 0
   return [
-    { label: '累计收入', value: '¥' + formatNum(d.totalRevenue || 0) },
-    { label: '总 GMV', value: '¥' + formatNum(d.totalGmv || 0) },
-    { label: '总订单', value: formatNum(d.totalOrders || 0) },
-    { label: '成交买家', value: formatNum(d.totalBuyerCount || 0) },
-    { label: '客单价', value: '¥' + formatNum(d.totalAvgOrderValue || 0) },
-    { label: '总佣金', value: '¥' + formatNum(d.totalCommission || 0) },
-    { label: '商品数量', value: formatNum(d.totalProductCount || 0) },
+    { label: '总佣金', value: `\u00a5${centToYuan(totalCommission)}`, sub: `${count} 单` },
+    { label: '总 GMV', value: `\u00a5${centToYuan(totalGmv)}` },
+    { label: '客单价', value: `\u00a5${centToYuan(avgOrder)}` },
+    { label: '在售商品', value: `${products.value.filter(p => p.status === 0).length}` },
+    { label: '累计已售', value: fmtNum(products.value.reduce((s, p) => s + p.sales, 0)) },
   ]
 })
 
-const byPlatform = computed(() => {
-  return (data.value?.byPlatform || []).map((p: any) => ({
-    ...p,
-    platformLabel: PLATFORM_LABELS[p.platform as Platform] || p.platform,
-  }))
-})
+const sortedProducts = computed(() =>
+  [...products.value].sort((a, b) => b.sales - a.sales)
+)
 
-const trendChartOption = computed(() => {
-  const trend = data.value?.dailyTrend || []
-  const labelMap: Record<string, string> = {
-    revenue: '收入',
-    gmv: 'GMV',
-    orders: '订单',
-    buyerCount: '买家',
-    commission: '佣金',
-  }
+const trendOption = computed(() => {
+  const list = filteredOrders.value
+  const dailyMap: Record<string, { commission: number; gmv: number; orders: number }> = {}
+  list.forEach(o => {
+    const d = dayjs.unix(o.create_time).format('MM-DD')
+    if (!dailyMap[d]) dailyMap[d] = { commission: 0, gmv: 0, orders: 0 }
+    dailyMap[d].commission += o.commission
+    dailyMap[d].gmv += o.pay_amount
+    dailyMap[d].orders += 1
+  })
+  const entries = Object.entries(dailyMap).sort()
+  const labels: Record<string, string> = { commission: '佣金(元)', gmv: 'GMV(元)', orders: '订单数' }
   return {
     tooltip: { trigger: 'axis' as const },
-    legend: { data: [labelMap[trendMetric.value]] },
-    grid: { left: 60, right: 20, top: 40, bottom: 30 },
-    xAxis: {
-      type: 'category' as const,
-      data: trend.map((d: any) => dayjs(d.date).format('MM-DD')),
-    },
+    grid: { left: 50, right: 20, top: 30, bottom: 30 },
+    xAxis: { type: 'category' as const, data: entries.map(e => e[0]) },
     yAxis: { type: 'value' as const },
-    series: [
-      {
-        name: labelMap[trendMetric.value],
-        type: 'line' as const,
-        smooth: true,
-        areaStyle: { opacity: 0.2 },
-        data: trend.map((d: any) => d[trendMetric.value] || 0),
-      },
-    ],
-    graphic:
-      trend.length === 0
-        ? [
-            {
-              type: 'text',
-              left: 'center',
-              top: 'center',
-              style: { text: '暂无数据', fontSize: 16, fill: '#AEAEB2' },
-            },
-          ]
-        : undefined,
+    series: [{
+      name: labels[trendMetric.value],
+      type: 'line' as const,
+      smooth: true,
+      areaStyle: { opacity: 0.15 },
+      data: entries.map(e => (trendMetric.value === 'orders' ? e[1].orders : e[1][trendMetric.value as 'commission' | 'gmv'] / 100)),
+    }],
+    graphic: entries.length === 0 ? [{ type: 'text' as const, left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 14, fill: '#8c8c8c' } }] : undefined,
   }
 })
 
-function formatNum(n: any): string {
-  if (n == null || n === 0) return '0'
+// ── Helpers ──
+
+function centToYuan(c: number) { return (c / 100).toFixed(2) }
+function rateToPct(r: number) { return (r / 100).toFixed(1) }
+function fmtNum(n: number): string {
   if (n >= 10000) return (n / 10000).toFixed(1) + '万'
-  return Number(n).toLocaleString()
+  return n.toLocaleString()
+}
+function fmtTime(ts: number) { return ts ? dayjs.unix(ts).format('MM-DD HH:mm') : '-' }
+function statusLabel(s: number) {
+  const m: Record<number, string> = { 0: '待付款', 1: '已付款', 2: '已结算', 3: '已退款' }
+  return m[s] || `状态${s}`
+}
+function statusClass(s: number) {
+  return { 'is-settled': s === 2, 'is-paid': s === 1, 'is-refund': s === 3 }
 }
 
-async function loadData() {
-  try {
-    const res = await analyticsApi.getMonetization(days.value)
-    data.value = res.data
-  } catch {
-    ElMessage.error('变现数据加载失败')
-  }
-}
+// ── API ──
 
-async function refreshAll() {
+async function loadAll() {
   loading.value = true
-  await loadData()
-  loading.value = false
-}
-
-// ── 微信小店数据 ──
-const wxLoading = ref(false)
-const wechatOrders = ref<WechatOrder[]>([])
-const wechatProducts = ref<WechatProduct[]>([])
-
-function formatTime(ts: number) {
-  if (!ts) return '-'
-  return dayjs.unix(ts).format('MM-DD HH:mm')
-}
-
-async function loadWechatStore() {
-  wxLoading.value = true
   try {
     const [ordRes, prodRes] = await Promise.all([
-      wechatStoreApi.getOrders({ page_size: 10 }),
-      wechatStoreApi.getProducts({ page_size: 20 }),
+      wechatStoreApi.getOrders({ page_size: 100 }),
+      wechatStoreApi.getProducts({ page_size: 50 }),
     ])
-    if (ordRes.data?.errcode === 0) {
-      wechatOrders.value = ordRes.data.order_list || []
-    }
-    if (prodRes.data?.errcode === 0) {
-      wechatProducts.value = prodRes.data.products || []
-    }
-  } catch {
-    // 微信小店 API 调用失败，静默处理
-  } finally {
-    wxLoading.value = false
-  }
+    if (ordRes.data?.errcode === 0) orders.value = ordRes.data.order_list || []
+    if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
+  } catch { /* silent */ }
+  finally { loading.value = false }
 }
 
-async function refreshWechatStore() {
-  await loadWechatStore()
-  ElMessage.success('微信小店数据已刷新')
+async function submitManual() {
+  if (!manual.value.date || !manual.value.platform) { ElMessage.warning('请填写日期和平台'); return }
+  manualSubmitting.value = true
+  try {
+    await analyticsApi.createManualMonetization({
+      date: dayjs(manual.value.date).format('YYYY-MM-DD'),
+      platform: manual.value.platform,
+      ...(manual.value.revenue != null && { revenue: manual.value.revenue }),
+      ...(manual.value.gmv != null && { gmv: manual.value.gmv }),
+      ...(manual.value.orders != null && { orders: manual.value.orders }),
+      ...(manual.value.commission != null && { commission: manual.value.commission }),
+    })
+    ElMessage.success('录入成功')
+    manual.value = { date: '', platform: '', revenue: null, gmv: null, orders: null, commission: null }
+  } catch (e: any) { ElMessage.error(e?.message || '录入失败') }
+  finally { manualSubmitting.value = false }
 }
 
-onMounted(() => {
-  loadData()
-  loadWechatStore()
-})
+onMounted(loadAll)
 </script>
 
 <style lang="scss" scoped>
 .monetization {
-  &__filter {
-    margin-bottom: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 40px;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
   }
-  &__overview {
-    margin-bottom: 20px;
-  }
-  &__chart {
-    margin-bottom: 20px;
-  }
-  &__body {
+  &__title { font-size: 22px; font-weight: 700; color: #f0ece4; margin: 0; }
+  &__actions { display: flex; gap: 8px; align-items: center; }
+
+  &__kpi { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
+  &__chart { margin-bottom: 24px; }
+  &__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+
+  @media (max-width: 960px) {
+    &__kpi { grid-template-columns: repeat(3, 1fr); }
+    &__grid { grid-template-columns: 1fr; }
   }
 }
 
-.overview-card {
+// KPI Card
+.kpi-card {
+  background: linear-gradient(135deg, #252220 0%, #1e1c1a 100%);
+  border: 1px solid #3a3530;
+  border-radius: 12px;
+  padding: 20px;
   text-align: center;
-  &__label {
-    font-size: 13px;
-    color: var(--el-text-color-placeholder);
-    margin-bottom: 8px;
-  }
-  &__value {
-    font-size: 28px;
-    font-weight: 700;
-    color: #f0ece4;
-    font-feature-settings: 'tnum';
-  }
+  &__label { font-size: 13px; color: #8c8c8c; margin-bottom: 8px; }
+  &__value { font-size: 26px; font-weight: 700; color: #f0ece4; font-feature-settings: 'tnum'; }
+  &__sub { font-size: 12px; color: #6b6b6b; margin-top: 4px; }
 }
 
-.chart-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
+// Card
+.card {
+  background: #1e1c1a;
+  border: 1px solid #2e2a26;
+  border-radius: 12px;
+  overflow: hidden;
+  &__header {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px; border-bottom: 1px solid #2e2a26;
+    font-size: 15px; font-weight: 600; color: #e8e0d0;
+    &.clickable { cursor: pointer; user-select: none; &:hover { background: #252220; } }
+  }
+  &__count { font-size: 12px; color: #6b6b6b; font-weight: 400; }
+  &__toggle { font-size: 12px; color: #8c8c8c; }
 }
+
+.empty-hint { padding: 40px; text-align: center; color: #6b6b6b; font-size: 14px; }
+
+// Order List
+.order-list { padding: 12px 20px; max-height: 480px; overflow-y: auto; }
+.order-item {
+  display: flex; align-items: center; gap: 12px; padding: 12px 0;
+  border-bottom: 1px solid #252220;
+  &:last-child { border-bottom: none; }
+  &__img { width: 40px; height: 40px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  &__info { flex: 1; min-width: 0; }
+  &__title { font-size: 13px; color: #d4cfc4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px; }
+  &__meta { display: flex; gap: 8px; align-items: center; }
+  &__time { font-size: 11px; color: #6b6b6b; }
+  &__status { font-size: 11px; padding: 0 6px; border-radius: 4px; }
+  &__status.is-settled { color: #6b9e6c; background: rgba(107,158,108,.15); }
+  &__status.is-paid { color: #e0a030; background: rgba(224,160,48,.15); }
+  &__status.is-refund { color: #d4534a; background: rgba(212,83,74,.15); }
+  &__money { text-align: right; flex-shrink: 0; }
+  &__price { font-size: 14px; font-weight: 600; color: #f0ece4; font-feature-settings: 'tnum'; }
+  &__commission { font-size: 12px; color: #d49b50; font-feature-settings: 'tnum'; }
+  &__rate { color: #6b6b6b; font-size: 11px; }
+}
+
+// Product Grid
+.monetization__grid .product-grid {
+  padding: 12px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+  max-height: 480px;
+  overflow-y: auto;
+}
+.product-card {
+  display: flex; gap: 10px; padding: 12px;
+  background: #252220; border-radius: 8px; border: 1px solid #2e2a26;
+  &__img { width: 48px; height: 48px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
+  &__info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
+  &__title { font-size: 12px; color: #d4cfc4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  &__stats { display: flex; gap: 8px; align-items: baseline; margin-top: 4px; }
+  &__price { font-size: 14px; font-weight: 600; color: #f0ece4; font-feature-settings: 'tnum'; }
+  &__sales { font-size: 11px; color: #6b6b6b; }
+  &__rate { font-size: 11px; color: #d49b50; margin-top: 2px; }
+}
+
+// Manual
+.manual-form { padding: 16px 20px; }
 </style>

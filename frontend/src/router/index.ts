@@ -91,12 +91,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '平台管理', icon: 'Connection' },
       },
       {
-        path: 'competitors',
-        name: 'Competitors',
-        component: () => import('@/views/competitors/CompetitorView.vue'),
-        meta: { title: '竞对监测', icon: 'Aim', hidden: true },
-      },
-      {
         path: 'calendar',
         name: 'Calendar',
         component: () => import('@/views/calendar/CalendarView.vue'),
