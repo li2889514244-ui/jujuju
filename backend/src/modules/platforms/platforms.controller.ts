@@ -13,24 +13,20 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { PlatformsService } from './platforms.service';
-import { OAuthService } from './oauth/oauth.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+} from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { PlatformsService } from './platforms.service'
+import { OAuthService } from './oauth/oauth.service'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import {
   AuthorizePlatformDto,
   CollectDataDto,
   BatchCollectDto,
   PlatformFilterDto,
-} from './dto/platform.dto';
+  ReportMetricsDto,
+  ReportPostStatsDto,
+} from './dto/platform.dto'
 
 @ApiTags('platforms')
 @ApiBearerAuth('access-token')
@@ -47,29 +43,22 @@ export class PlatformsController {
   @Get()
   @ApiOperation({ summary: '获取支持的平台列表' })
   async getSupportedPlatforms() {
-    return this.platformsService.getSupportedPlatforms();
+    return this.platformsService.getSupportedPlatforms()
   }
 
   @Get(':platform/info')
   @ApiOperation({ summary: '获取平台详细信息' })
   async getPlatformInfo(@Param('platform') platform: string) {
-    return this.platformsService.getPlatformInfo(platform);
+    return this.platformsService.getPlatformInfo(platform)
   }
 
   // ==================== OAuth授权 ====================
 
   @Post('authorize')
   @ApiOperation({ summary: '获取平台OAuth授权URL' })
-  async getAuthorizeUrl(
-    @Body() dto: AuthorizePlatformDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    const url = this.platformsService.getAuthorizeUrl(
-      dto.platform,
-      userId,
-      dto.teamId,
-    );
-    return { url, platform: dto.platform };
+  async getAuthorizeUrl(@Body() dto: AuthorizePlatformDto, @CurrentUser('id') userId: string) {
+    const url = this.platformsService.getAuthorizeUrl(dto.platform, userId, dto.teamId)
+    return { url, platform: dto.platform }
   }
 
   @Delete(':accountId/revoke')
@@ -79,8 +68,8 @@ export class PlatformsController {
     @Param('accountId') accountId: string,
     @CurrentUser('id') userId: string,
   ) {
-    await this.platformsService.revokeAuthorization(accountId, userId);
-    return { success: true, message: '授权已解除' };
+    await this.platformsService.revokeAuthorization(accountId, userId)
+    return { success: true, message: '授权已解除' }
   }
 
   // ==================== 已授权账号 ====================
@@ -99,29 +88,37 @@ export class PlatformsController {
       userId,
       ...filter,
       skip: filter.skip || 0,
-    });
+    })
   }
 
   // ==================== 数据采集 ====================
 
   @Post('collect')
   @ApiOperation({ summary: '采集单个账号数据' })
-  async collectAccountData(
-    @Body() dto: CollectDataDto,
-  ) {
-    return this.platformsService.collectAccountData(
-      dto.accountId,
-      dto.type || 'daily',
-    );
+  async collectAccountData(@Body() dto: CollectDataDto) {
+    return this.platformsService.collectAccountData(dto.accountId, dto.type || 'daily')
   }
 
   @Post('collect/batch')
   @ApiOperation({ summary: '批量采集数据' })
   async batchCollectData(@Body() dto: BatchCollectDto) {
-    return this.platformsService.batchCollectData(
-      dto.accountIds,
-      dto.type || 'daily',
-    );
+    return this.platformsService.batchCollectData(dto.accountIds, dto.type || 'daily')
+  }
+
+  // ==================== 伴侣数据上报 ====================
+
+  @Post('report-metrics')
+  @ApiOperation({ summary: '桌面伴侣上报账号指标' })
+  @HttpCode(HttpStatus.OK)
+  async reportMetrics(@Body() dto: ReportMetricsDto) {
+    return this.platformsService.reportMetrics(dto)
+  }
+
+  @Post('report-post-stats')
+  @ApiOperation({ summary: '桌面伴侣上报视频/帖子数据' })
+  @HttpCode(HttpStatus.OK)
+  async reportPostStats(@Body() dto: ReportPostStatsDto) {
+    return this.platformsService.reportPostStats(dto)
   }
 
   // ==================== Token管理 ====================
@@ -130,16 +127,16 @@ export class PlatformsController {
   @ApiOperation({ summary: '刷新平台Token' })
   @HttpCode(HttpStatus.OK)
   async refreshToken(@Param('accountId') accountId: string) {
-    const success = await this.platformsService.refreshToken(accountId);
+    const success = await this.platformsService.refreshToken(accountId)
     return {
       success,
       message: success ? 'Token刷新成功' : 'Token刷新失败',
-    };
+    }
   }
 
   @Post('refresh-expiring-tokens')
   @ApiOperation({ summary: '批量刷新即将过期的Token' })
   async refreshExpiringTokens() {
-    return this.platformsService.refreshExpiringTokens();
+    return this.platformsService.refreshExpiringTokens()
   }
 }
