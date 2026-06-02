@@ -77,6 +77,7 @@ export interface WechatOrder {
   commission_rate: number
   create_time: number
   settle_time: number
+  ship_time?: number
   product_title: string
   product_img: string
 }
