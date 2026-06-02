@@ -194,8 +194,6 @@ const statusBreakdown = computed(() => {
   ]
 })
 
-const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
-
 const filteredOrders = computed(() => {
   if (!orderSearch.value) return displayOrders.value
   const kw = orderSearch.value.toLowerCase()
