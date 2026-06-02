@@ -24,16 +24,11 @@
     </div>
 
     <!-- KPI -->
-    <div class="monetization__kpi" style="grid-template-columns: repeat(3, 1fr)">
+    <div class="monetization__kpi" style="grid-template-columns: repeat(2, 1fr)">
       <div class="kpi-card">
         <div class="kpi-card__label">{{ viewMode === 'today' ? '今天销售额' : '近7天销售额' }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
         <div class="kpi-card__sub">{{ orderStats.count }} 笔订单</div>
-      </div>
-      <div class="kpi-card">
-        <div class="kpi-card__label">{{ viewMode === 'today' ? '今天客单价' : '平均客单价' }}</div>
-        <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.avg) }}</div>
-        <div class="kpi-card__sub">每笔订单平均金额</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">售后退款</div>
@@ -76,7 +71,7 @@
     <!-- Trend -->
     <div class="monetization__chart card">
       <div class="card__header">
-        <span>{{ viewMode === 'today' ? '今天销售趋势' : '近7天销售趋势' }}</span>
+        <span>销售趋势</span>
         <el-radio-group v-model="trendMetric" size="small">
           <el-radio-button value="gmv">销售额</el-radio-button>
           <el-radio-button value="orders">订单数</el-radio-button>
@@ -203,7 +198,7 @@ const filteredOrderCount = computed(() => filteredOrders.value.length)
 
 const trendOption = computed(() => {
   const dailyMap: Record<string, { gmv: number; orders: number }> = {}
-  displayOrders.value.forEach((o) => {
+  orders.value.forEach((o) => {
     const d = dayjs.unix(o.create_time).format('MM-DD')
     if (!dailyMap[d]) dailyMap[d] = { gmv: 0, orders: 0 }
     dailyMap[d].gmv += o.pay_amount; dailyMap[d].orders += 1
