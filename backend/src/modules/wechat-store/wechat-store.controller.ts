@@ -1,14 +1,15 @@
 import { Controller, Get, Param, Query } from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
+import { ApiTags, ApiOperation } from '@nestjs/swagger'
+import { Public } from '../../common/decorators/public.decorator'
 import { WechatStoreService } from './wechat-store.service'
 
 @ApiTags('wechat-store')
 @Controller('wechat-store')
-@ApiBearerAuth('access-token')
 export class WechatStoreController {
   constructor(private readonly wechatStoreService: WechatStoreService) {}
 
   @Get('orders')
+  @Public()
   @ApiOperation({ summary: '获取佣金单列表' })
   async getOrderList(
     @Query('page_size') page_size?: number,
@@ -19,6 +20,7 @@ export class WechatStoreController {
   }
 
   @Get('orders/:orderId')
+  @Public()
   @ApiOperation({ summary: '获取佣金单详情' })
   async getOrderDetail(
     @Param('orderId') orderId: string,
@@ -29,6 +31,7 @@ export class WechatStoreController {
   }
 
   @Get('products')
+  @Public()
   @ApiOperation({ summary: '获取橱窗商品列表' })
   async getProductList(
     @Query('page_size') page_size?: number,
@@ -39,6 +42,7 @@ export class WechatStoreController {
   }
 
   @Get('products/:productId')
+  @Public()
   @ApiOperation({ summary: '获取橱窗商品详情' })
   async getProductDetail(@Param('productId') productId: string) {
     return this.wechatStoreService.getProductDetail(productId)
