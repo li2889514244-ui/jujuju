@@ -108,12 +108,6 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/mcp/MCPAssistantView.vue'),
         meta: { title: 'MCP 查询', icon: 'ChatDotSquare', hidden: true },
       },
-      {
-        path: 'pixing-video',
-        name: 'PixingVideo',
-        component: () => import('@/views/pixing-video/PixingVideoView.vue'),
-        meta: { title: '数字人视频', icon: 'VideoCamera', hidden: true },
-      },
     ],
   },
   {
