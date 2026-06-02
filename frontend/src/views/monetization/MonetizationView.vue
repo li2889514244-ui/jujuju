@@ -11,7 +11,7 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="refreshAll" :loading="loading">查询</el-button>
+          <el-button type="primary" :loading="loading" @click="refreshAll">查询</el-button>
         </el-form-item>
         <el-form-item>
           <el-button type="success" @click="openManualDialog">手动录入</el-button>
@@ -23,11 +23,21 @@
     <el-dialog v-model="manualDialogVisible" title="手动录入变现数据" width="500px">
       <el-form :model="manualForm" label-width="80px">
         <el-form-item label="日期" required>
-          <el-date-picker v-model="manualForm.date" type="date" placeholder="选择日期" style="width:100%" />
+          <el-date-picker
+            v-model="manualForm.date"
+            type="date"
+            placeholder="选择日期"
+            style="width: 100%"
+          />
         </el-form-item>
         <el-form-item label="平台" required>
-          <el-select v-model="manualForm.platform" placeholder="选择平台" style="width:100%">
-            <el-option v-for="(label, key) in PLATFORM_LABELS" :key="key" :label="label" :value="key" />
+          <el-select v-model="manualForm.platform" placeholder="选择平台" style="width: 100%">
+            <el-option
+              v-for="(label, key) in PLATFORM_LABELS"
+              :key="key"
+              :label="label"
+              :value="key"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="收入(¥)">
@@ -54,7 +64,7 @@
 
     <!-- KPI Cards -->
     <el-row :gutter="20" class="monetization__overview">
-      <el-col :xs="12" :sm="8" :md="4" v-for="card in kpiCards" :key="card.label">
+      <el-col v-for="card in kpiCards" :key="card.label" :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="overview-card">
           <div class="overview-card__label">{{ card.label }}</div>
           <div class="overview-card__value">{{ card.value }}</div>
@@ -115,6 +125,104 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 微信小店实时数据 -->
+    <el-row :gutter="20" class="monetization__body">
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <div class="chart-header">
+              <span>微信小店 · 最近佣金单</span>
+              <el-tag size="small" type="warning">达人端</el-tag>
+            </div>
+          </template>
+          <el-table v-loading="wxLoading" :data="wechatOrders" stripe size="small">
+            <template #empty>
+              <el-empty description="暂无佣金数据，请确认带货助手已绑定" />
+            </template>
+            <el-table-column label="商品" min-width="140">
+              <template #default="{ row }">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <el-avatar
+                    v-if="row.product_img"
+                    :src="row.product_img"
+                    size="small"
+                    shape="square"
+                  />
+                  <span
+                    style="
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      max-width: 120px;
+                    "
+                    >{{ row.product_title }}</span
+                  >
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="金额" width="90">
+              <template #default="{ row }">¥{{ (row.pay_amount / 100).toFixed(2) }}</template>
+            </el-table-column>
+            <el-table-column label="佣金" width="100">
+              <template #default="{ row }">
+                <span style="color: #f59e0b">¥{{ (row.commission / 100).toFixed(2) }}</span>
+                <br />
+                <span style="font-size: 11px; color: #999"
+                  >{{ (row.commission_rate / 100).toFixed(1) }}%</span
+                >
+              </template>
+            </el-table-column>
+            <el-table-column label="时间" width="100">
+              <template #default="{ row }">{{ formatTime(row.create_time) }}</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+
+      <el-col :span="12">
+        <el-card shadow="hover">
+          <template #header>
+            <div class="chart-header">
+              <span>微信小店 · 橱窗商品</span>
+              <el-button size="small" type="primary" link @click="refreshWechatStore"
+                >刷新</el-button
+              >
+            </div>
+          </template>
+          <el-table v-loading="wxLoading" :data="wechatProducts" stripe size="small">
+            <template #empty>
+              <el-empty description="暂无橱窗商品" />
+            </template>
+            <el-table-column label="商品" min-width="140">
+              <template #default="{ row }">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <el-avatar v-if="row.img_url" :src="row.img_url" size="small" shape="square" />
+                  <span
+                    style="
+                      white-space: nowrap;
+                      overflow: hidden;
+                      text-overflow: ellipsis;
+                      max-width: 120px;
+                    "
+                    >{{ row.title }}</span
+                  >
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="售价" width="80">
+              <template #default="{ row }">¥{{ (row.selling_price / 100).toFixed(0) }}</template>
+            </el-table-column>
+            <el-table-column label="已售" width="70">
+              <template #default="{ row }">{{ row.sales }}</template>
+            </el-table-column>
+            <el-table-column label="库存" width="70">
+              <template #default="{ row }">{{ row.stock }}</template>
+            </el-table-column>
+          </el-table>
+        </el-card>
+      </el-col>
+    </el-row>
   </div>
 </template>
 
@@ -124,6 +232,7 @@ import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import { analyticsApi } from '@/api/analytics'
+import { wechatStoreApi, type WechatOrder, type WechatProduct } from '@/api/wechat-store'
 import { PLATFORM_LABELS, type Platform } from '@/types'
 import dayjs from 'dayjs'
 
@@ -146,7 +255,15 @@ const manualForm = ref({
 })
 
 function openManualDialog() {
-  manualForm.value = { date: '', platform: '', revenue: null, gmv: null, orders: null, buyerCount: null, commission: null }
+  manualForm.value = {
+    date: '',
+    platform: '',
+    revenue: null,
+    gmv: null,
+    orders: null,
+    buyerCount: null,
+    commission: null,
+  }
   manualDialogVisible.value = true
 }
 
@@ -259,8 +376,44 @@ async function refreshAll() {
   loading.value = false
 }
 
+// ── 微信小店数据 ──
+const wxLoading = ref(false)
+const wechatOrders = ref<WechatOrder[]>([])
+const wechatProducts = ref<WechatProduct[]>([])
+
+function formatTime(ts: number) {
+  if (!ts) return '-'
+  return dayjs.unix(ts).format('MM-DD HH:mm')
+}
+
+async function loadWechatStore() {
+  wxLoading.value = true
+  try {
+    const [ordRes, prodRes] = await Promise.all([
+      wechatStoreApi.getOrders({ page_size: 10 }),
+      wechatStoreApi.getProducts({ page_size: 20 }),
+    ])
+    if (ordRes.data?.errcode === 0) {
+      wechatOrders.value = ordRes.data.order_list || []
+    }
+    if (prodRes.data?.errcode === 0) {
+      wechatProducts.value = prodRes.data.products || []
+    }
+  } catch {
+    // 微信小店 API 调用失败，静默处理
+  } finally {
+    wxLoading.value = false
+  }
+}
+
+async function refreshWechatStore() {
+  await loadWechatStore()
+  ElMessage.success('微信小店数据已刷新')
+}
+
 onMounted(() => {
   loadData()
+  loadWechatStore()
 })
 </script>
 
