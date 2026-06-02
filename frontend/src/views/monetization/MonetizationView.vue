@@ -3,6 +3,10 @@
     <div class="monetization__header">
       <h2 class="monetization__title">微信小店</h2>
       <div class="monetization__actions">
+        <el-radio-group v-model="viewMode" size="small" @change="loadStoreData">
+          <el-radio-button value="today">今天</el-radio-button>
+          <el-radio-button value="week">近7天</el-radio-button>
+        </el-radio-group>
         <el-select v-model="activeStoreId" placeholder="选择店铺" size="small" style="width:160px" @change="loadStoreData">
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
@@ -22,12 +26,12 @@
     <!-- KPI -->
     <div class="monetization__kpi">
       <div class="kpi-card">
-        <div class="kpi-card__label">近7天销售额</div>
+        <div class="kpi-card__label">{{ viewMode === 'today' ? '今天销售额' : '近7天销售额' }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
         <div class="kpi-card__sub">{{ orderStats.count }} 笔订单</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-card__label">平均客单价</div>
+        <div class="kpi-card__label">{{ viewMode === 'today' ? '今天客单价' : '平均客单价' }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.avg) }}</div>
         <div class="kpi-card__sub">每笔订单平均金额</div>
       </div>
@@ -67,7 +71,7 @@
     <!-- Trend -->
     <div class="monetization__chart card">
       <div class="card__header">
-        <span>近7天销售趋势</span>
+        <span>{{ viewMode === 'today' ? '今天销售趋势' : '近7天销售趋势' }}</span>
         <el-radio-group v-model="trendMetric" size="small">
           <el-radio-button value="gmv">销售额</el-radio-button>
           <el-radio-button value="orders">订单数</el-radio-button>
@@ -132,6 +136,7 @@ import dayjs from 'dayjs'
 
 const loading = ref(false)
 const trendMetric = ref('gmv')
+const viewMode = ref<'today' | 'week'>('today')
 const stores = ref<WechatStore[]>([])
 const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
@@ -142,9 +147,17 @@ let timer: ReturnType<typeof setInterval> | null = null
 
 // ── Stats ──
 
+const displayOrders = computed(() => {
+  if (viewMode.value === 'today') {
+    const start = dayjs().startOf('day').unix()
+    const end = dayjs().endOf('day').unix()
+    return orders.value.filter((o) => o.create_time >= start && o.create_time <= end)
+  }
+  return orders.value
+})
+
 const orderStats = computed(() => {
-  const gmv = orders.value.reduce((s, o) => s + o.pay_amount, 0)
-  const c = orders.value.length
+  const list = displayOrders.value
   return { gmv, count: c, avg: c > 0 ? gmv / c : 0 }
 })
 
@@ -158,7 +171,7 @@ const productStats = computed(() => ({
 const statusBreakdown = computed(() => {
   const labels: Record<number, string> = { 10: '待付款', 20: '待发货', 30: '已发货', 100: '已完成', 250: '已取消' }
   const groups: Record<number, number> = {}
-  orders.value.forEach((o) => { groups[o.status] = (groups[o.status] || 0) + 1 })
+  displayOrders.value.forEach((o) => { groups[o.status] = (groups[o.status] || 0) + 1 })
   return [
     ...([10, 20, 30, 100, 250] as const).map((k) => ({ label: labels[k], count: groups[k] || 0 })),
     { label: '退货/售后', count: aftersaleCount.value },
@@ -169,7 +182,7 @@ const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales
 
 const trendOption = computed(() => {
   const dailyMap: Record<string, { gmv: number; orders: number }> = {}
-  orders.value.forEach((o) => {
+  displayOrders.value.forEach((o) => {
     const d = dayjs.unix(o.create_time).format('MM-DD')
     if (!dailyMap[d]) dailyMap[d] = { gmv: 0, orders: 0 }
     dailyMap[d].gmv += o.pay_amount; dailyMap[d].orders += 1
