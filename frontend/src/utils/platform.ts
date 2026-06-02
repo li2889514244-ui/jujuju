@@ -7,6 +7,7 @@ const FRONTEND_TO_BACKEND: Record<string, string> = {
   weibo: 'WEIBO',
   video_account: 'WECHAT_VIDEO',
   wechat_video: 'WECHAT_VIDEO',
+  tencent: 'WECHAT_VIDEO',
   tiktok: 'TIKTOK',
 }
 
