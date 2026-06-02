@@ -160,6 +160,7 @@ const aftersaleCount = ref(0)
 const aftersaleList = ref<any[]>([])
 const aftersaleTotal = ref(0)
 const showAftersale = ref(false)
+let prevAftersaleCount = 0
 const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -254,7 +255,18 @@ async function loadStoreData() {
     if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
     if (afterRes?.data?.errcode === 0) {
       aftersaleList.value = afterRes.data.list || []
-      aftersaleCount.value = afterRes.data.total || 0
+      const newCount = afterRes.data.total || 0
+      if (prevAftersaleCount > 0 && newCount > prevAftersaleCount) {
+        const added = newCount - prevAftersaleCount
+        const detail = afterRes.data.list?.[0]
+        const msg = detail ? `「${detail.product || '商品'}」${detail.reason}` : `${added} 条新退款`
+        if (Notification.permission === 'granted') {
+          new Notification('新售后提醒', { body: msg, icon: aftersaleList.value[0] ? undefined : undefined })
+        }
+        showAftersale.value = true
+      }
+      prevAftersaleCount = newCount
+      aftersaleCount.value = newCount
       aftersaleTotal.value = afterRes.data.totalAmount || 0
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
@@ -263,6 +275,9 @@ async function loadStoreData() {
 }
 
 onMounted(async () => {
+  if ('Notification' in window && Notification.permission === 'default') {
+    Notification.requestPermission()
+  }
   await loadStores()
   await loadStoreData()
   timer = setInterval(loadStoreData, 60000)
