@@ -60,19 +60,22 @@
       </div>
     </div>
 
-    <!-- Aftersale -->
-    <div class="card" style="margin-bottom: 24px;" v-if="aftersaleList.length > 0">
-      <div class="card__header">
-        <span>近24小时售后（退款）</span>
-        <span class="card__count">{{ aftersaleList.length }} 条，合计 &yen;{{ centToYuan(aftersaleTotal) }}</span>
+    <!-- Aftersale (collapsible) -->
+    <div class="card" style="margin-bottom: 24px;">
+      <div class="card__header clickable" @click="showAftersale = !showAftersale">
+        <span>售后/退款</span>
+        <span class="card__count" style="display:flex;align-items:center;gap:12px">
+          {{ aftersaleCount > 0 ? `${aftersaleCount} 条，合计 ¥${centToYuan(aftersaleTotal)}` : '近24小时无售后' }}
+          <span class="card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
+        </span>
       </div>
-      <div class="order-list">
+      <div v-if="showAftersale && aftersaleList.length > 0" class="order-list">
         <div v-for="a in aftersaleList" :key="a.id" class="order-item">
           <div class="order-item__info">
-            <div class="order-item__title">{{ a.reason || '售后' }}</div>
+            <div class="order-item__title">{{ a.product || '未知商品' }}</div>
             <div class="order-item__meta">
-              <span class="order-item__time">{{ a.product }}</span>
-              <span class="order-item__status" :class="a.status === 'MERCHANT_REFUND_SUCCESS' ? 'is-done' : 'is-pending'">{{ aftersaleStatus(a.status) }}</span>
+              <span>{{ a.reason || '售后' }}</span>
+              <span class="order-item__status is-done">{{ aftersaleStatus(a.status) }}</span>
             </div>
           </div>
           <div class="order-item__price" style="color:#d4534a">-&yen;{{ centToYuan(a.amount) }}</div>
@@ -156,6 +159,7 @@ const products = ref<WechatProduct[]>([])
 const aftersaleCount = ref(0)
 const aftersaleList = ref<any[]>([])
 const aftersaleTotal = ref(0)
+const showAftersale = ref(false)
 const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 
