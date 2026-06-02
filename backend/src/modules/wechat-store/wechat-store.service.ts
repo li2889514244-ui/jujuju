@@ -83,8 +83,10 @@ export class WechatStoreService implements OnModuleInit {
     storeId: string,
     params: { page_size?: number; next_key?: string; status?: number },
   ) {
+    const now = Math.floor(Date.now() / 1000)
     return this.request(storeId, '/channels/ec/order/list/get', {
       page_size: params.page_size || 10,
+      create_time_range: { start_time: now - 90 * 86400, end_time: now },
       ...(params.next_key && { next_key: params.next_key }),
       ...(params.status !== undefined && { status: params.status }),
     })
