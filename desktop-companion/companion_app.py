@@ -51,12 +51,14 @@ def _decrypt_password(ciphertext: str, key: bytes) -> str:
     pt = aesgcm.decrypt(base64.b64decode(nonce_b64), base64.b64decode(ct_b64), None)
     return pt.decode('utf-8')
 
-app = Flask(__name__, static_folder='static')
 # Use EXE directory or script directory for persistent config
 if getattr(sys, 'frozen', False):
     BASE_DIR = Path(sys.executable).parent.resolve()
+    STATIC_DIR = str(BASE_DIR / '_internal' / 'static')
 else:
     BASE_DIR = Path(__file__).parent.resolve()
+    STATIC_DIR = 'static'
+app = Flask(__name__, static_folder=STATIC_DIR)
 
 # ── 平台配置 ──────────────────────────────────────────────────
 PLATFORMS = {
@@ -610,6 +612,7 @@ PLATFORM_DASHBOARDS = {
         'domain': '.weixin.qq.com',
         'data_center': 'https://channels.weixin.qq.com/platform/data-center',
         'video_list': 'https://channels.weixin.qq.com/platform/post/list',
+        'monetization': 'https://channels.weixin.qq.com/platform/statistic/cargo/transcation',
     },
 }
 
@@ -942,13 +945,55 @@ def _parse_metric_num(s: str) -> int:
         return 0
 
 
+async def _get_page_text(page) -> str:
+    """Extract full page text, penetrating wujie-app shadow DOM if present.
+    WeChat Video (channels.weixin.qq.com) uses <wujie-app> micro-frontend
+    that renders content inside shadowRoot — document.body.innerText alone
+    only gets sidebar text (~967 chars), missing the actual page content."""
+    try:
+        text = await page.evaluate('''() => {
+            const w = document.querySelector('wujie-app');
+            if (w && w.shadowRoot) {
+                const body = w.shadowRoot.querySelector('body');
+                if (body) return body.innerText;
+            }
+            return document.body.innerText;
+        }''')
+        return text
+    except:
+        return await page.evaluate('() => document.body.innerText')
+
+
+async def _wujie_click_text(page, text_match: str) -> bool:
+    """Click an element inside wujie-app shadow DOM by exact text match.
+    Returns True if click succeeded, False otherwise."""
+    try:
+        result = await page.evaluate('''(target) => {
+            const w = document.querySelector('wujie-app');
+            if (!w || !w.shadowRoot) return false;
+            const body = w.shadowRoot.querySelector('body');
+            if (!body) return false;
+            const el = Array.from(body.querySelectorAll('a,button,li,span,div,p'))
+                .find(e => e.textContent.trim() === target);
+            if (el) { el.click(); return true; }
+            return false;
+        }''', text_match)
+        return result
+    except:
+        return False
+
+
 async def _scrape_dashboard(page) -> dict:
-    text = await page.evaluate('() => document.body.innerText')
+    text = await _get_page_text(page)
+    # Strip "关于腾讯" footer
+    idx = text.find('关于腾讯')
+    if idx > 0:
+        text = text[:idx]
     metrics = {}
 
-    # Only search the first 2000 chars (profile section) for followers/following/likes
-    # to avoid matching nav items and recommendation cards further down
     profile_section = text[:8000] if len(text) > 8000 else text
+    
+    # Core metrics from profile section
     for key in ['followers', 'following', 'likes', 'comments', 'shares']:
         for pat in _METRIC_PATTERNS.get(key, []):
             m = pat.search(profile_section)
@@ -956,7 +1001,12 @@ async def _scrape_dashboard(page) -> dict:
                 metrics[key] = _parse_metric_num(m.group(1))
                 break
 
-    # Views: try to click into data center if not in main text
+    # Video count - broader match
+    m_v = re.search(r'视频\s*(\d{2,})', profile_section[:2000])
+    if m_v:
+        metrics['videos'] = int(m_v.group(1))
+
+    # Views
     views_val = None
     for pat in _METRIC_PATTERNS.get('views', []):
         m = pat.search(text[:4000])
@@ -967,7 +1017,6 @@ async def _scrape_dashboard(page) -> dict:
                 break
     if not views_val:
         try:
-            # Try clicking into 数据中心 / Data Center tab
             dc_link = await page.query_selector('text=数据中心')
             if not dc_link:
                 dc_link = await page.query_selector('[class*="data-center"]')
@@ -987,20 +1036,41 @@ async def _scrape_dashboard(page) -> dict:
     if views_val:
         metrics['views'] = views_val
 
-    # Extract real nickname — try multiple strategies per platform
-    _NAV_NAMES = {'内容管理','互动管理','数据中心','变现中心','创作中心','首页','活动管理','作品管理','合集管理','共创中心','原创保护中心','评论管理','私信消息'}
+    # ── 昨日数据 (Yesterday's metrics) ──
+    yd_start = text.find('昨日数据')
+    if yd_start > 0:
+        yd = text[yd_start:yd_start+800]
+        # 净增关注: exact match
+        m = re.search(r'净增关注\s*([\d,.]+[万wW]?)', yd)
+        if m: metrics['newFollowers'] = _parse_metric_num(m.group(1))
+        # 新增播放: only from 昨日 section
+        m = re.search(r'新增播放\s*([\d,.]+[万wW]?)', yd)
+        if m: metrics['newViews'] = _parse_metric_num(m.group(1))
+        # 新增评论
+        m = re.search(r'新增评论\s*([\d,.]+[万wW]?)', yd)
+        if m: metrics['newComments'] = _parse_metric_num(m.group(1))
+        # 新增分享
+        m = re.search(r'新增分享\s*([\d,.]+[万wW]?)', yd)
+        if m: metrics['newShares'] = _parse_metric_num(m.group(1))
+        # 新增 (standalone, after 新增评论 and 新增分享 check — treat as likes)
+        m = re.search(r'新增\s*([\d,.]+[万wW]?)\s*(?:\n|$)', yd)
+        if m: metrics['newLikes'] = _parse_metric_num(m.group(1))
+
+    # ── Nickname & Avatar ──
     try:
         info = await page.evaluate('''() => {
             const result = { nickname: null, avatar: null };
-            const text = document.body.innerText;
+            // Penetrate wujie-app shadow DOM for 视频号
+            const w = document.querySelector('wujie-app');
+            const root = (w && w.shadowRoot) ? w.shadowRoot : document;
+            const body = root.querySelector('body') || document.body;
+            const text = body.innerText;
             const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
 
             // Strategy 1: Find real display name (line before 抖音号/快手号/小红书号 label)
-            // NOT the account ID itself — that's an identifier, not the nickname
             for (let i = 0; i < Math.min(lines.length, 50); i++) {
                 const line = lines[i];
                 if (line.match(/^(抖音号|快手号|小红书号|账号ID)/)) {
-                    // Look at lines above this for the actual display name
                     for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
                         const candidate = lines[j];
                         if (candidate.length >= 2 && candidate.length <= 30 &&
@@ -1013,7 +1083,7 @@ async def _scrape_dashboard(page) -> dict:
                 }
             }
 
-            // Strategy 2: Try page title (often contains account name)
+            // Strategy 2: Try page title
             if (!result.nickname) {
                 const title = document.title || '';
                 const clean = title.replace(/[\\-|–—].*$/, '').replace(/创作者中心|创作服务平台|数据平台|抖音|快手|小红书|视频号助手|腾讯视频号/g, '').trim();
@@ -1023,14 +1093,14 @@ async def _scrape_dashboard(page) -> dict:
                 }
             }
 
-            // Strategy 3: Look for profile name in header area via DOM selectors
+            // Strategy 3: DOM selectors (penetrate shadow DOM)
             if (!result.nickname) {
                 const selectors = [
                     '[class*="account-name"]', '[class*="nickname"]', '[class*="profile-name"]',
                     '[class*="user-name"]', 'h1', '[class*="creator-name"]',
                 ];
                 for (const sel of selectors) {
-                    const el = document.querySelector(sel);
+                    const el = root.querySelector(sel);
                     if (el) {
                         const txt = el.innerText.trim();
                         if (txt.length >= 2 && txt.length <= 30 && !/^\\d{5,}$/.test(txt)) {
@@ -1040,21 +1110,21 @@ async def _scrape_dashboard(page) -> dict:
                 }
             }
 
-            // Strategy 4: Fallback — first short line near top that looks like a name
+            // Strategy 4: Fallback
             if (!result.nickname) {
                 for (let i = 0; i < Math.min(lines.length, 15); i++) {
                     const candidate = lines[i];
                     if (candidate.length >= 2 && candidate.length <= 20 &&
                         !/^\\d{5,}$/.test(candidate) &&
                         !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞|账号|平台)/.test(candidate) &&
-                        !/[\u4e00-\u9fa5]{6,}/.test(candidate)) {  // skip long Chinese phrases
+                        !/[\u4e00-\u9fa5]{6,}/.test(candidate)) {
                         result.nickname = candidate; break;
                     }
                 }
             }
 
             // Try avatar
-            const imgs = document.querySelectorAll('img');
+            const imgs = root.querySelectorAll('img');
             for (const el of imgs) {
                 const src = el.src || '';
                 if (src.includes('douyin') || src.includes('byteimg') || src.includes('pstatp') ||
@@ -1083,7 +1153,7 @@ async def _scrape_data_center(page, platform: str) -> dict:
     history = []
 
     # --- Step 1: Full page text for metric extraction ---
-    text = await page.evaluate('() => document.body.innerText')
+    text = await _get_page_text(page)
 
     # Try to find yesterday's data section first (most reliable)
     yd_match = re.search(r'昨日数据([\s\S]*?)(?:近7天|近30天|$)', text[:8000])
@@ -1106,16 +1176,16 @@ async def _scrape_data_center(page, platform: str) -> dict:
     # --- Step 2: Try to extract historical data table (7-day / 30-day tables) ---
     try:
         table_data = await page.evaluate('''() => {
-            // Try to find tabular historical data
-            // Douyin data center uses tables with date + metric columns
             const result = [];
-            const allTables = document.querySelectorAll('table');
+            // Penetrate wujie-app shadow DOM for 视频号
+            const w = document.querySelector('wujie-app');
+            const root = (w && w.shadowRoot) ? w.shadowRoot : document;
+            const allTables = root.querySelectorAll('table');
             for (const table of allTables) {
                 const headers = [];
                 table.querySelectorAll('thead th, thead td, tr:first-child th, tr:first-child td').forEach(th => {
                     headers.push((th.innerText || '').trim());
                 });
-                // Skip if no date-like header
                 if (!headers.some(h => h.includes('日期') || h.includes('时间') || /\\d{4}[-/]\\d{2}/.test(h))) {
                     continue;
                 }
@@ -1130,7 +1200,10 @@ async def _scrape_data_center(page, platform: str) -> dict:
             }
             // Fallback: find date-prefixed lines in the full text
             if (result.length === 0) {
-                const fullText = document.body.innerText;
+                const body = (w && w.shadowRoot)
+                    ? w.shadowRoot.querySelector('body')
+                    : document.body;
+                const fullText = body ? body.innerText : document.body.innerText;
                 const lines = fullText.split('\\n');
                 const datePattern = /^(\\d{4}[-/.]\\d{1,2}[-/.]\\d{1,2})/;
                 const numPattern = /[\\d,.]+[万wW]?/g;
@@ -1243,58 +1316,133 @@ async def _scrape_data_center(page, platform: str) -> dict:
     except:
         pass
 
+    # Try clicking data center tabs for more data
+    tab_selectors = {
+        '视频数据': '[class*=tab]:has-text("视频数据"), span:has-text("视频数据"), a:has-text("视频数据")',
+        '粉丝数据': '[class*=tab]:has-text("粉丝数据"), span:has-text("粉丝数据"), a:has-text("粉丝数据")',
+        '直播数据': '[class*=tab]:has-text("直播数据"), span:has-text("直播数据"), a:has-text("直播数据")',
+    }
+    for tab_name, selector in tab_selectors.items():
+        try:
+            tab = await page.query_selector(selector)
+            if tab:
+                await tab.click()
+                await page.wait_for_timeout(3000)
+                tab_text = await page.evaluate('() => document.body.innerText')
+
+                # Extract metrics from tab
+                for key in ['followers', 'likes', 'views', 'comments', 'shares']:
+                    if key not in result or result.get(key, 0) == 0:
+                        for pat in _METRIC_PATTERNS.get(key, []):
+                            m = pat.search(tab_text[:6000])
+                            if m:
+                                val = _parse_metric_num(m.group(1))
+                                if val > 0:
+                                    result[key] = val
+                                    break
+
+                # Live metrics
+                for label, key in [('观看人数', 'liveViews'), ('最高在线', 'liveMaxOnline'),
+                                   ('新增粉丝', 'liveFollowers'), ('直播收入', 'liveRevenue')]:
+                    m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', tab_text[:3000])
+                    if m:
+                        result[key] = _parse_metric_num(m.group(1))
+        except Exception:
+            pass
+
     result['_history'] = history
     return result
 
 
 async def _scrape_video_list(page, platform: str) -> list:
-    """Extract per-video stats from video list page"""
-    video_data = await page.evaluate('''() => {
-        const videos = [];
-        // Try common selectors for video/post list items
-        const items = document.querySelectorAll(
-            '[class*="post-item"], [class*="video-item"], [class*="list-item"], ' +
-            'tr[class*="row"], [class*="card"], [class*="work-item"], ' +
-            'table tbody tr, [class*="article-item"], [class*="content-item"]'
-        );
-        items.forEach(el => {
-            const text = (el.innerText || '').trim();
-            if (text.length > 20 && text.length < 2000) {
-                // Extract numbers from text
-                const numbers = text.match(/[\\d,.]+[万wW]?/g) || [];
-                const title = text.split('\\n')[0]?.trim()?.substring(0, 60) || '';
-                videos.push({
-                    title: title,
-                    text: text.substring(0, 300),
-                    numbers: numbers.slice(0, 6)
-                });
+    """从视频号作品列表页提取每条视频的播放/点赞/评论。
+    穿透 wujie-app shadow DOM，遍历全部页（最多 9 页，每页 20 条）。"""
+    import hashlib
+    
+    await page.wait_for_timeout(6000)
+    
+    all_videos = []
+    seen_titles = set()
+    
+    for page_num in range(1, 10):  # 最多 9 页
+        # Wait for content to load
+        await page.wait_for_timeout(3000 if page_num == 1 else 2500)
+        
+        # Extract from shadow DOM body text
+        videos = await page.evaluate('''() => {
+            const w = document.querySelector('wujie-app');
+            if (!w || !w.shadowRoot) return [];
+            const body = w.shadowRoot.querySelector('body');
+            if (!body) return [];
+            const text = body.innerText || '';
+            if (text.length < 200) return [];  // page didn't load
+            
+            const lines = text.split('\\n').filter(l => l.trim());
+            const results = [];
+            // Pattern: title line -> date line (YYYY年MM月DD日) -> numbers
+            for (let i = 0; i < lines.length; i++) {
+                if (/\\d{4}年\\d{2}月\\d{2}日/.test(lines[i]) &&
+                    i > 0 && lines[i-1].length > 5) {
+                    const title = lines[i-1].trim().substring(0, 80);
+                    const date = lines[i].trim();
+                    // Collect numbers from next 1-4 lines (play count, likes, etc.)
+                    const numbers = [];
+                    for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                        const nums = lines[j].match(/[\\d,.]+[万wW]?/g);
+                        if (nums) numbers.push(...nums);
+                    }
+                    if (title && !title.includes('下一页') && !title.includes('上一页')) {
+                        results.push({ title, date, numbers: numbers.slice(0, 5) });
+                    }
+                }
             }
-        });
-        // Limit to 20 items
-        return videos.slice(0, 20);
-    }''')
-
-    result = []
-    for v in video_data:
-        nums = [_parse_metric_num(n) for n in v['numbers']]
-        nums_sorted = sorted([n for n in nums if n > 0], reverse=True)
-        if len(nums_sorted) < 2:
-            continue
-        stat = {
-            'title': v['title'],
-            'views': nums_sorted[0] if len(nums_sorted) > 0 else 0,
-            'likes': nums_sorted[1] if len(nums_sorted) > 1 else 0,
-            'comments': nums_sorted[2] if len(nums_sorted) > 2 else 0,
-            'shares': nums_sorted[3] if len(nums_sorted) > 3 else 0,
-        }
-        # Filter out navbar items and obviously wrong data
-        skip_words = ['管理', '设置', '登录', '退出', '首页', '数据中心', '内容', '互动', '平台', '运营', '变现', '服务']
-        if any(w in stat['title'] for w in skip_words):
-            continue
-        if stat['views'] > 0:
-            result.append(stat)
-
-    return result[:10]
+            return results;
+        }''')
+        
+        skip = ['管理','设置','登录','退出','首页','数据中心','内容','互动',
+                '运营','变现','服务','通知','帮助','咨询','规范','协议',
+                '帮上热门','昨日数据','关注者','视频号ID','Tencent','©',
+                '草稿','主页','活动','直播','图文','音乐','音频','关于腾讯',
+                '视频号助手','公众号','微信','扫码','确认','刷新','过期',
+                '平台','创作者','原创','声明','原创声明','声明原创']
+        
+        page_videos = 0
+        for v in videos:
+            t = (v.get('title') or '').strip()
+            if not t or len(t) < 3 or any(w in t for w in skip):
+                continue
+            norm = t.lower().replace(' ', '')
+            if norm in seen_titles:
+                continue
+            seen_titles.add(norm)
+            
+            nums = sorted([_parse_metric_num(n) for n in v.get('numbers', [])
+                          if _parse_metric_num(n) > 0], reverse=True)
+            if len(nums) < 1:
+                continue
+            
+            all_videos.append({
+                'id': hashlib.md5(t.encode()).hexdigest()[:12],
+                'title': t,
+                'date': v.get('date', ''),
+                'views': nums[0] if len(nums) > 0 else 0,
+                'likes': nums[1] if len(nums) > 1 else 0,
+                'comments': nums[2] if len(nums) > 2 else 0,
+                'shares': nums[3] if len(nums) > 3 else 0,
+            })
+            page_videos += 1
+        
+        if page_videos == 0 and page_num > 1:
+            # No more pages
+            break
+        
+        # Click "下一页" inside wujie-app shadow DOM
+        clicked = await _wujie_click_text(page, '下一页')
+        if not clicked:
+            break
+    
+    # Trim to top 50 to avoid overwhelming local DB (162 videos is a lot)
+    return all_videos[:50]
 
 
 async def _scrape_monetization(page) -> dict:
@@ -1368,7 +1516,7 @@ async def _scrape_store_dashboard(page, platform: str) -> dict:
               'storeScore': None, 'storeDiagnosis': None, '_storeName': None}
 
     try:
-        text = await page.evaluate('() => document.body.innerText')
+        text = await _get_page_text(page)
         search_text = text[:10000]
 
         # 1. Basic monetization (reuse existing patterns)
@@ -1490,7 +1638,10 @@ async def _scrape_account_pages(context, platform: str) -> dict:
     try:
         # 1. Dashboard
         await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-        await page.wait_for_timeout(8000)
+        try:
+            await page.wait_for_selector('[class*=content], [class*=main], [role=main], main', timeout=15000)
+        except:
+            await page.wait_for_timeout(15000)
 
         # Check if we landed on a login page (cookie expired / invalid)
         current_url = page.url.lower()
@@ -1513,7 +1664,10 @@ async def _scrape_account_pages(context, platform: str) -> dict:
         if data_center_url:
             try:
                 await page.goto(data_center_url, wait_until='domcontentloaded', timeout=30000)
-                await page.wait_for_timeout(6000)
+                try:
+                    await page.wait_for_selector('[class*=content], [class*=main], [role=main], main', timeout=15000)
+                except:
+                    await page.wait_for_timeout(15000)
                 dc = await _scrape_data_center(page, platform)
                 for k, v in dc.items():
                     if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
@@ -1592,115 +1746,94 @@ async def _safe_close_ctx(ctx):
         pass
 
 
+async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: Path, nickname: str = '') -> dict:
+    """采集单个账号：连伴侣 Chrome + storage_state 加载该账号 cookie"""
+    entry = PLATFORM_DASHBOARDS.get(platform)
+    if not entry:
+        return {'accountId': account_id, 'metrics': {}, 'videoStats': []}
+
+    state_json = profile_dir / 'state.json'
+    if not state_json.exists():
+        print(f'[DC] No state.json for {nickname or account_id[:12]}, skipping')
+        return {'accountId': account_id, 'metrics': {}, 'videoStats': []}
+
+    context = None
+    try:
+        browser = None
+        try:
+            browser = await pw.chromium.connect_over_cdp(_CDP_URL)
+        except Exception:
+            pass
+
+        if browser and browser.contexts:
+            # ── 直接复用伴侣 Chrome 已有 context（cookie 在里面不会秒过期）──
+            context = browser.contexts[0]
+        else:
+            launch_kw = {
+                'user_data_dir': str(profile_dir), 'headless': True,
+                'viewport': {'width': 1280, 'height': 800}, 'locale': 'zh-CN',
+                'args': ['--disable-blink-features=AutomationControlled', '--no-sandbox'],
+            }
+            if _BROWSER_PATH: launch_kw['executable_path'] = _BROWSER_PATH
+            elif _BROWSER_CHANNEL: launch_kw['channel'] = _BROWSER_CHANNEL
+            context = await pw.chromium.launch_persistent_context(**launch_kw)
+            try:
+                import json as _json
+                state = _json.loads(state_json.read_text('utf-8'))
+                if state.get('cookies'): await context.add_cookies(state['cookies'])
+            except Exception: pass
+
+        label = nickname or account_id[:12]
+        print(f'[DC] Scraping {label} ({platform})...')
+        result = await _scrape_account_pages(context, platform)
+        # After successful scrape, mark cookie as fresh
+        if result.get('metrics') or result.get('video_stats'):
+            try:
+                from local_db import update_collection_time
+                update_collection_time(account_id)
+            except Exception:
+                pass
+        else:
+            # Login redirect / cookie expired
+            print(f'[DC] Cookie expired for {label}, needs re-scan')
+        return {'accountId': account_id, 'metrics': result['metrics'], 'videoStats': result['video_stats']}
+    except Exception as e:
+        print(f'[DC] scrape error {platform}/{account_id}: {str(e)[:120]}')
+        return {'accountId': account_id, 'metrics': {}, 'videoStats': []}
+    finally:
+        if context:
+            try:
+                # 不要关闭伴侣 Chrome 的 context（会导致整个浏览器崩掉）
+                if not (browser and browser.contexts and context == browser.contexts[0]):
+                    await context.close()
+            except: pass
+
+
 async def _scrape_all(accounts: list) -> list:
-    """CDP 模式采集：独立 headless CDP Chrome（真 Chrome 指纹，零可见窗口）"""
+    """多账号采集：每个账号独立 Chrome 实例，用自己的 Profile（1账号=1实例=1cookie）"""
     from playwright.async_api import async_playwright
     from local_db import get_profile_path
-    import subprocess, urllib.request as urlreq
 
     results = []
-    dc_proc = None
-    cdp_browser = None
 
     async with async_playwright() as pw:
-        _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+        for acc in accounts:
+            aid = (acc.get('id') or '').strip()
+            platform = (acc.get('platform') or '').strip().upper()
+            if not aid or not platform:
+                continue
+            if platform not in PLATFORM_DASHBOARDS:
+                continue
+            profile_dir = get_profile_path(aid)
+            if not profile_dir:
+                print(f'[DC] No local profile for {aid}, skipping')
+                continue
 
-        # 启动独立的 headless CDP Chrome（不影响用户可见窗口）
-        cdp_port = 9223
-        dc_profile = _PROFILE_ROOT / 'dc-headless'
-        dc_profile.mkdir(parents=True, exist_ok=True)
-        if not (dc_profile / 'First Run').exists():
-            (dc_profile / 'First Run').touch()
-
-        headless_args = [
-            str(_BROWSER_PATH or 'chrome'),
-            f'--remote-debugging-port={cdp_port}',
-            f'--user-data-dir={str(dc_profile)}',
-            '--headless=new', '--no-first-run', '--no-default-browser-check',
-            '--disable-extensions', '--disable-background-networking',
-            '--disable-sync', '--disable-component-update',
-            '--safebrowsing-disable-auto-update', 'about:blank',
-        ]
-
-        try:
-            # 先清理 9223 端口残留（上次异常退出可能留僵尸 Chrome）
-            try:
-                urlreq.urlopen(f'http://127.0.0.1:{cdp_port}/json/version', timeout=2)
-                # 端口被占用，杀掉僵尸进程
-                out = subprocess.check_output(f'netstat -ano | findstr :{cdp_port}', shell=True, text=True)
-                for line in out.strip().split('\n'):
-                    parts = line.split()
-                    if parts and parts[-1].isdigit():
-                        subprocess.run(['taskkill', '/F', '/PID', parts[-1]], capture_output=True)
-                        print(f'[DC] 已清理端口 {cdp_port} 残留进程 PID={parts[-1]}')
-                        break
-                time.sleep(1)
-            except Exception:
-                pass  # 端口空闲，正常
-
-            dc_proc = subprocess.Popen(headless_args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            deadline = time.time() + 30
-            while time.time() < deadline:
-                try:
-                    urlreq.urlopen(f'http://127.0.0.1:{cdp_port}/json/version', timeout=2)
-                    break
-                except Exception:
-                    time.sleep(0.5)
-            else:
-                raise RuntimeError('Headless CDP Chrome 启动超时')
-
-            cdp_browser = await pw.chromium.connect_over_cdp(f'http://127.0.0.1:{cdp_port}')
-            print(f'[DC] Connected to headless CDP Chrome on port {cdp_port}')
-
-            for acc in accounts:
-                aid = (acc.get('id') or '').strip()
-                platform = (acc.get('platform') or '').strip().upper()
-                if not aid or not platform:
-                    continue
-                entry = PLATFORM_DASHBOARDS.get(platform)
-                if not entry:
-                    continue
-                profile_dir = get_profile_path(aid)
-                if not profile_dir:
-                    print(f'[DC] No local profile for {aid}, skipping')
-                    continue
-
-                profile_dir.mkdir(parents=True, exist_ok=True)
-                state_json = profile_dir / 'state.json'
-
-                try:
-                    ctx = await cdp_browser.new_context(
-                        storage_state=str(state_json) if state_json.exists() else None,
-                        viewport={'width': 1280, 'height': 800}, locale='zh-CN',
-                    )
-                except Exception as e:
-                    print(f'[DC] Failed to create context for {aid}: {str(e)[:120]}')
-                    continue
-
-                try:
-                    result = await _scrape_account_pages(ctx, platform)
-                except Exception as e:
-                    print(f'[DC] scrape error {platform}/{aid}: {str(e)[:120]}')
-                    result = {'metrics': {}, 'video_stats': []}
-
-                results.append({'accountId': aid, 'metrics': result['metrics'], 'videoStats': result['video_stats']})
-                await _safe_close_ctx(ctx)
-
-        except Exception as e:
-            print(f'[DC] Headless CDP error: {e}')
-        finally:
-            if cdp_browser:
-                try: await cdp_browser.close()
-                except: pass
-            if dc_proc:
-                try:
-                    dc_proc.terminate()
-                    dc_proc.wait(timeout=5)
-                except Exception:
-                    try:
-                        dc_proc.kill()
-                    except Exception:
-                        pass
+            result = await _scrape_one_account(
+                pw, aid, platform, profile_dir,
+                nickname=acc.get('nickname', ''),
+            )
+            results.append(result)
 
     return results
 
@@ -1717,10 +1850,10 @@ def _run_collection_once():
         token = cfg.get('token', '')
 
         if not api_url or not token:
-            _collector_last_error = 'Not configured: api_url or token missing'
-            return
+            _collector_last_error = 'Token expired, running local-only collection'
+            # Don't return — allow collection to run locally even without valid token
 
-        from local_db import get_all_accounts, update_collection_time
+        from local_db import get_all_accounts, update_collection_time, get_profile_path
         import requests
 
         # 从本地 DB 获取所有绑定的账号
@@ -1733,10 +1866,27 @@ def _run_collection_once():
         # 构造采集列表（本地 DB 里的账号 + 后端平台类型）
         accounts = []
         for acc in local_accounts:
+            aid = acc['id']
+            nickname = acc.get('nickname', '')
+            # Check cookie freshness before scraping
+            try:
+                prof_dir = get_profile_path(aid)
+                if prof_dir:
+                    ci_path = prof_dir / 'cookie_info.json'
+                    if ci_path.exists():
+                        info = json.loads(ci_path.read_text())
+                        last = info.get('last_cookie_refresh', '')
+                        if last:
+                            age = time.time() - time.mktime(time.strptime(last, '%Y-%m-%d %H:%M:%S'))
+                            if age > 600:  # 10 minutes
+                                print(f'[DC] Cookie too old ({age:.0f}s), skipping {nickname}')
+                                continue
+            except Exception:
+                pass
             accounts.append({
-                'id': acc['id'],
+                'id': aid,
                 'platform': acc['platform'],
-                'nickname': acc.get('nickname', ''),
+                'nickname': nickname,
             })
 
         print(f'[DC] Scraping {len(accounts)} accounts from local profiles')
@@ -1753,6 +1903,17 @@ def _run_collection_once():
             metrics = item['metrics']
             # Extract historical data before cleaning up
             history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
+
+            # ── ALWAYS save to local DB first (even if backend is down) ──
+            try:
+                from local_db import update_metrics, save_contents
+                update_metrics(item['accountId'], metrics)
+                vstats = item.get('videoStats') or []
+                if vstats:
+                    save_contents(item['accountId'], vstats)
+                update_collection_time(item['accountId'])
+            except Exception as e:
+                print(f'[DC] Local save error {item["accountId"]}: {e}')
 
             if metrics and any(v for v in metrics.values() if isinstance(v, (int, float))):
                 payload = {'accountId': item['accountId'],
@@ -2043,135 +2204,168 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     platform_uid = real_id if real_id else f"{platform}_{int(time.time())}"
                     platform_key = info['key']  # DOUYIN / WECHAT_VIDEO etc.
 
-                    # ── 核心：先在后端创建账号（不传 cookies），再存本地 DB ──
+                    # ── 后端注册（尽力而为，失败不阻断本地流程）──
                     import requests as req
-                    check_resp = req.get(
-                        f"{api_url.rstrip('/')}/accounts",
-                        headers={'Authorization': f'Bearer {token}'},
-                        timeout=15,
-                    )
                     existing_id = None
+                    data = {'code': -1, 'message': 'Backend unavailable'}  # default: backend failed
                     try:
-                        for acc in ((check_resp.json().get('data') or {}).get('accounts') or []):
-                            if acc.get('platformUserId') == platform_uid or (acc.get('nickname') == nickname and acc.get('platform') == platform_key):
-                                existing_id = acc.get('id')
-                                break
-                    except: pass
+                        check_resp = req.get(
+                            f"{api_url.rstrip('/')}/accounts",
+                            headers={'Authorization': f'Bearer {token}'},
+                            timeout=10,
+                        )
+                        if check_resp.status_code == 200:
+                            for acc in ((check_resp.json().get('data') or {}).get('accounts') or []):
+                                if acc.get('platformUserId') == platform_uid or (acc.get('nickname') == nickname and acc.get('platform') == platform_key):
+                                    existing_id = acc.get('id')
+                                    break
+                    except Exception:
+                        pass  # Backend unreachable — proceed with local-only
 
                     account_id = existing_id
                     if existing_id:
-                        # 更新已有账号（不传 cookies）
-                        resp = req.put(
-                            f"{api_url.rstrip('/')}/accounts/{existing_id}",
-                            json={'nickname': nickname, 'cookies': ''},
-                            headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
-                            timeout=30,
-                        )
+                        try:
+                            resp = req.put(
+                                f"{api_url.rstrip('/')}/accounts/{existing_id}",
+                                json={'nickname': nickname, 'cookies': ''},
+                                headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
+                                timeout=15,
+                            )
+                            if resp.status_code == 200:
+                                account_id = (resp.json().get('data') or {}).get('id') or existing_id
+                        except Exception:
+                            pass
                     else:
-                        # 创建新账号（不传 cookies）
-                        resp = req.post(
-                            f"{api_url.rstrip('/')}/accounts",
-                            json={
-                                'platform': platform_key,
-                                'platformUserId': platform_uid,
-                                'nickname': nickname,
-                                'cookies': '',  # 空字符串，cookie 留本地
-                            },
-                            headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
-                            timeout=30,
-                        )
-                    data = resp.json()
-                    account_id = (data.get('data') or {}).get('id') or existing_id
-                    if not account_id:
-                        check2 = req.get(f"{api_url.rstrip('/')}/accounts", headers={'Authorization': f'Bearer {token}'}, timeout=15)
-                        for acc in ((check2.json().get('data') or {}).get('accounts') or []):
-                            if acc.get('platformUserId') == platform_uid:
-                                account_id = acc.get('id'); break
+                        try:
+                            resp = req.post(
+                                f"{api_url.rstrip('/')}/accounts",
+                                json={'platform': platform_key, 'platformUserId': platform_uid,
+                                      'nickname': nickname, 'cookies': ''},
+                                headers={'Authorization': f'Bearer {token}','Content-Type': 'application/json'},
+                                timeout=15,
+                            )
+                            if resp.status_code in (200, 201):
+                                account_id = (resp.json().get('data') or {}).get('id')
+                        except Exception:
+                            pass
 
                     # ── 存入本地 DB + 保存 Profile 状态 ──
-                    if account_id:
-                        profile_dir = get_or_create_profile_dir(account_id, platform_key)
-                        add_account(account_id, platform_key, profile_dir.name,
-                                    platform_uid=platform_uid, nickname=nickname)
-                        # CDP 模式：保存 storage_state 到 Profile 目录，供 _scrape_all 使用
-                        target_profile = str(profile_dir)
-                        Path(target_profile).mkdir(parents=True, exist_ok=True)
-                        state_path = Path(target_profile) / 'state.json'
-                        await context.storage_state(path=str(state_path))
-                        print(f'[Worker] Storage state saved: {state_path}')
+                    #  即使后端注册失败，本地也要保存（矩阵管理是离线优先架构）
+                    if not account_id:
+                        import uuid as _uuid
+                        account_id = f'local_{_uuid.uuid4().hex[:16]}'
+                        print(f'[Worker] Backend unreachable, using local ID: {account_id}')
+                    
+                    # Always save locally (regardless of backend status)
+                    profile_dir = get_or_create_profile_dir(account_id, platform_key)
+                    add_account(account_id, platform_key, profile_dir.name,
+                            platform_uid=platform_uid, nickname=nickname)
+                    # CDP 模式：保存 storage_state 到 Profile 目录，供 _scrape_all 使用
+                    target_profile = str(profile_dir)
+                    Path(target_profile).mkdir(parents=True, exist_ok=True)
+                    state_path = Path(target_profile) / 'state.json'
+                    await context.storage_state(path=str(state_path))
+                    print(f'[Worker] Storage state saved: {state_path}')
 
-                        # 立即采集初始数据
-                        metrics = {}
-                        # 判断是否已在仪表盘（有数据内容就行，不依赖URL判断）
-                        has_dashboard = any(kw in page_text[:2000]
-                            for kw in ['关注者', '粉丝', '数据中心', 'dashboard', '粉丝数'])
-                        if has_dashboard:
+                    # Save cookie freshness info alongside state.json
+                    try:
+                        cookie_info = {
+                            'last_cookie_refresh': time.strftime('%Y-%m-%d %H:%M:%S'),
+                            'cookie_age_seconds': 0,
+                        }
+                        cookie_info_path = Path(target_profile) / 'cookie_info.json'
+                        cookie_info_path.write_text(json.dumps(cookie_info, ensure_ascii=False))
+                    except Exception as e:
+                        print(f'[Worker] Cookie info save warning: {e}')
+
+                    # ── Cookie 已在 state.json 中持久化，无需额外固化步骤 ──
+                    # state.json 可供 _scrape_one_account 通过 storage_state 加载
+
+                    # 立即采集初始数据
+                    metrics = {}
+                    # 判断是否已在仪表盘（有数据内容就行，不依赖URL判断）
+                    has_dashboard = any(kw in page_text[:2000]
+                        for kw in ['关注者', '粉丝', '数据中心', 'dashboard', '粉丝数'])
+                    if has_dashboard:
+                        try:
+                            m_f = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
+                            if m_f: metrics['followers'] = _parse_metric_num(m_f.group(1))
+                            m_f2 = re.search(r'粉丝\s*(?:\n\s*)?([\d,.]+[万wW]?)', page_text[:3000])
+                            if m_f2 and 'followers' not in metrics:
+                                metrics['followers'] = _parse_metric_num(m_f2.group(1))
+
+                            yd_start = page_text.find('昨日数据')
+                            if yd_start > 0:
+                                yd = page_text[yd_start:yd_start+500]
+                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
+                                    m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
+                                    if m: metrics[key] = _parse_metric_num(m.group(1))
+
+                            # Deep scrape
+                            extra = {}
                             try:
-                                m_f = re.search(r'关注者\s*(\d[\d,.]*)', page_text)
-                                if m_f: metrics['followers'] = _parse_metric_num(m_f.group(1))
-                                m_f2 = re.search(r'粉丝\s*(?:\n\s*)?([\d,.]+[万wW]?)', page_text[:3000])
-                                if m_f2 and 'followers' not in metrics:
-                                    metrics['followers'] = _parse_metric_num(m_f2.group(1))
+                                extra = await _scrape_account_pages(context, platform_key)
+                            except Exception as e:
+                                print(f'[DC] deep scrape error {platform_key}: {e}')
+                            for k, v in extra.get('metrics', {}).items():
+                                if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
+                                    metrics[k] = v
 
-                                yd_start = page_text.find('昨日数据')
-                                if yd_start > 0:
-                                    yd = page_text[yd_start:yd_start+500]
-                                    for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
-                                        m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
-                                        if m: metrics[key] = _parse_metric_num(m.group(1))
-
-                                # Deep scrape
-                                extra = {}
+                            # Save deep scrape results to local DB immediately
+                            extra_metrics = extra.get('metrics', {})
+                            if extra_metrics or extra.get('video_stats'):
                                 try:
-                                    extra = await _scrape_account_pages(context, platform_key)
+                                    from local_db import update_metrics, save_contents, update_collection_time
+                                    update_metrics(account_id, extra_metrics)
+                                    vstats = extra.get('video_stats') or []
+                                    if vstats:
+                                        save_contents(account_id, vstats)
+                                    update_collection_time(account_id)
                                 except Exception as e:
-                                    print(f'[DC] deep scrape error {platform_key}: {e}')
-                                for k, v in extra.get('metrics', {}).items():
-                                    if v is not None and (k not in metrics or metrics.get(k, 0) == 0):
-                                        metrics[k] = v
+                                    print(f'[DC] Local DB save error {account_id}: {e}')
 
-                                # Extract historical data before reporting
-                                history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
+                            # Extract historical data before reporting
+                            history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
 
-                                if metrics:
-                                    req.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
-                                        json={'accountId': account_id, 'metrics': metrics},
-                                        headers={'Authorization': f'Bearer {token}'}, timeout=30)
+                            if metrics:
+                                req.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
+                                    json={'accountId': account_id, 'metrics': metrics},
+                                    headers={'Authorization': f'Bearer {token}'}, timeout=30)
 
-                                # Report historical data (7-day / 30-day)
-                                if history:
-                                    for hist_entry in history:
-                                        hist_date = hist_entry.pop('date', None)
-                                        if not hist_date:
-                                            continue
-                                        try:
-                                            req.post(
-                                                f'{api_url}/platforms/report-metrics',
-                                                json={'accountId': account_id, 'metrics': hist_entry, 'date': hist_date},
-                                                headers={'Authorization': f'Bearer {token}'}, timeout=30,
-                                            )
-                                        except Exception:
-                                            pass
-
-                                vstats = extra.get('video_stats') or []
-                                if vstats and account_id:
+                            # Report historical data (7-day / 30-day)
+                            if history:
+                                for hist_entry in history:
+                                    hist_date = hist_entry.pop('date', None)
+                                    if not hist_date:
+                                        continue
                                     try:
                                         req.post(
-                                            f'{api_url}/platforms/report-post-stats',
-                                            json={'accountId': account_id, 'posts': vstats},
+                                            f'{api_url}/platforms/report-metrics',
+                                            json={'accountId': account_id, 'metrics': hist_entry, 'date': hist_date},
                                             headers={'Authorization': f'Bearer {token}'}, timeout=30,
                                         )
                                     except Exception:
                                         pass
 
-                                if use_sse:
-                                    f_count = metrics.get('followers', '?')
-                                    v_count = metrics.get('views', '?')
-                                    p_count = len(vstats)
-                                    queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count} 视频{p_count}条'}))
-                            except Exception as e:
-                                if use_sse:
-                                    queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
+                            vstats = extra.get('video_stats') or []
+                            if vstats and account_id:
+                                try:
+                                    req.post(
+                                        f'{api_url}/platforms/report-post-stats',
+                                        json={'accountId': account_id, 'posts': vstats},
+                                        headers={'Authorization': f'Bearer {token}'}, timeout=30,
+                                    )
+                                except Exception:
+                                    pass
+
+                            if use_sse:
+                                f_count = metrics.get('followers', '?')
+                                v_count = metrics.get('views', '?')
+                                p_count = len(vstats)
+                                queue.put(json.dumps({'type':'status','data':f'数据已采集: 粉丝{f_count} 播放{v_count} 视频{p_count}条'}))
+                        except Exception as e:
+                            if use_sse:
+                                queue.put(json.dumps({'type':'status','data':f'数据采集失败: {str(e)[:80]}'}))
 
                     if data.get('code') == 0:
                         _record_scan_time(platform)
@@ -2393,6 +2587,18 @@ if __name__ == '__main__':
         _CDP_URL = None
 
     # ── 3. 等待用户关闭 ──
+    # Auto-start background collector loop (after a short delay for auto-login)
+    def _auto_start_collector():
+        global _collector_loop_started
+        time.sleep(15)  # Wait for auto-login to complete
+        if not _collector_loop_started:
+            _collector_loop_started = True
+            print('[Main] Auto-starting background collector (every 30min day / 2h night)')
+            # Run first collection immediately, then loop
+            threading.Thread(target=_run_collection_once, daemon=True).start()
+            threading.Thread(target=_data_collector_loop, daemon=True).start()
+    threading.Thread(target=_auto_start_collector, daemon=True).start()
+
     try:
         while _cdp.is_running:
             time.sleep(1)
