@@ -158,7 +158,9 @@ const displayOrders = computed(() => {
 
 const orderStats = computed(() => {
   const list = displayOrders.value
-  return { gmv, count: c, avg: c > 0 ? gmv / c : 0 }
+  const gmv = list.reduce((s, o) => s + o.pay_amount, 0)
+  const count = list.length
+  return { gmv, count, avg: count > 0 ? gmv / count : 0 }
 })
 
 const productStats = computed(() => ({
