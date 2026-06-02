@@ -52,6 +52,20 @@ export class WechatStoreService implements OnModuleInit {
     const now = Math.floor(Date.now() / 1000)
     return this.request(storeId, '/channels/ec/aftersale/getaftersalelist', { begin_create_time: params.begin_create_time || now - 24 * 3600, end_create_time: params.end_create_time || now, ...(params.next_key && { next_key: params.next_key }) })
   }
+  async getAftersaleDetail(storeId: string, afterSaleOrderId: string) { return this.request(storeId, '/channels/ec/aftersale/getaftersaleorder', { after_sale_order_id: afterSaleOrderId }) }
+  async getAftersaleListAggregated(storeId: string) {
+    const res: any = await this.getAftersaleList(storeId, {})
+    if (res.errcode !== 0) return res
+    const ids: string[] = res.after_sale_order_id_list || []
+    if (ids.length === 0) return { errcode: 0, errmsg: 'ok', list: [], total: 0 }
+    const details = await Promise.all(ids.map((id: string) => this.getAftersaleDetail(storeId, id)))
+    const list = details.filter((d: any) => d.errcode === 0).map((d: any) => {
+      const a = d.after_sale_order || {}
+      return { id: a.after_sale_order_id, type: a.type, status: a.status, amount: a.refund_info?.amount || 0, reason: a.reason_text || '', product: a.product_info?.title || '' }
+    })
+    const totalAmount = list.reduce((s: number, a: any) => s + a.amount, 0)
+    return { errcode: 0, errmsg: 'ok', list, total: list.length, totalAmount }
+  }
   async getShopInfo(storeId: string) {
     const token = await this.getStoreToken(storeId)
     const url = `${this.baseUrl}/channels/ec/basics/info/get?access_token=${token}`

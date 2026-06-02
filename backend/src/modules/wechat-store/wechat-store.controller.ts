@@ -12,6 +12,6 @@ export class WechatStoreController {
   @Get('shop/orders') @Public() async getOrderList(@Query('store_id') storeId: string, @Query('page_size') page_size?: number) { return this.wechatStoreService.getOrderListAggregated(storeId, { page_size }) }
   @Get('shop/orders/:orderId') @Public() async getOrderDetail(@Query('store_id') storeId: string, @Param('orderId') orderId: string) { return this.wechatStoreService.getOrderDetail(storeId, orderId) }
   @Get('shop/products') @Public() async getProductList(@Query('store_id') storeId: string, @Query('page_size') page_size?: number) { return this.wechatStoreService.getProductListAggregated(storeId, { page_size }) }
-  @Get('shop/aftersale') @Public() async getAftersaleList(@Query('store_id') storeId: string) { return this.wechatStoreService.getAftersaleList(storeId, {}) }
+  @Get('shop/aftersale') @Public() async getAftersaleList(@Query('store_id') storeId: string) { return this.wechatStoreService.getAftersaleListAggregated(storeId) }
   @Get('shop/info') @Public() async getShopInfo(@Query('store_id') storeId: string) { return this.wechatStoreService.getShopInfo(storeId) }
 }

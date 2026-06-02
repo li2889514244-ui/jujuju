@@ -61,10 +61,22 @@
     </div>
 
     <!-- Aftersale -->
-    <div class="card" style="margin-bottom: 24px;" v-if="aftersaleCount > 0">
+    <div class="card" style="margin-bottom: 24px;" v-if="aftersaleList.length > 0">
       <div class="card__header">
-        <span>售后 / 退款</span>
-        <span class="card__count">近24小时 {{ aftersaleCount }} 条</span>
+        <span>近24小时售后（退款）</span>
+        <span class="card__count">{{ aftersaleList.length }} 条，合计 &yen;{{ centToYuan(aftersaleTotal) }}</span>
+      </div>
+      <div class="order-list">
+        <div v-for="a in aftersaleList" :key="a.id" class="order-item">
+          <div class="order-item__info">
+            <div class="order-item__title">{{ a.reason || '售后' }}</div>
+            <div class="order-item__meta">
+              <span class="order-item__time">{{ a.product }}</span>
+              <span class="order-item__status" :class="a.status === 'MERCHANT_REFUND_SUCCESS' ? 'is-done' : 'is-pending'">{{ aftersaleStatus(a.status) }}</span>
+            </div>
+          </div>
+          <div class="order-item__price" style="color:#d4534a">-&yen;{{ centToYuan(a.amount) }}</div>
+        </div>
       </div>
     </div>
 
@@ -142,6 +154,8 @@ const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
 const products = ref<WechatProduct[]>([])
 const aftersaleCount = ref(0)
+const aftersaleList = ref<any[]>([])
+const aftersaleTotal = ref(0)
 const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -176,7 +190,7 @@ const statusBreakdown = computed(() => {
   displayOrders.value.forEach((o) => { groups[o.status] = (groups[o.status] || 0) + 1 })
   return [
     ...([10, 20, 30, 100, 250] as const).map((k) => ({ label: labels[k], count: groups[k] || 0 })),
-    { label: '退货/售后', count: aftersaleCount.value },
+    { label: '售后(24h)', count: aftersaleCount.value },
   ]
 })
 
@@ -212,6 +226,7 @@ function fmtTime(ts: number) { return ts ? dayjs.unix(ts).format('MM-DD HH:mm') 
 function statusLabel(s: number) { const m: Record<number, string> = { 10: '待付款', 12: '待收下', 20: '待发货', 21: '部分发货', 30: '待收货', 100: '已完成', 200: '全部退款', 250: '已取消' }; return m[s] || `状态${s}` }
 function statusClass(s: number) { if (s === 100) return 'is-done'; if (s >= 30) return 'is-shipping'; if (s >= 20) return 'is-paid'; if (s >= 10) return 'is-pending'; return 'is-cancel' }
 function hideImg(e: Event) { (e.target as HTMLImageElement).style.display = 'none' }
+function aftersaleStatus(s: string) { return s === 'MERCHANT_REFUND_SUCCESS' ? '已退款' : s === 'USER_WAIT_RETURN' ? '待退货' : s }
 
 // ── API ──
 
@@ -233,7 +248,11 @@ async function loadStoreData() {
     ])
     if (ordRes.data?.errcode === 0) orders.value = ordRes.data.order_list || []
     if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
-    if (afterRes?.data?.errcode === 0) aftersaleCount.value = afterRes.data.after_sale_order_id_list?.length || 0
+    if (afterRes?.data?.errcode === 0) {
+      aftersaleList.value = afterRes.data.list || []
+      aftersaleCount.value = afterRes.data.total || 0
+      aftersaleTotal.value = afterRes.data.totalAmount || 0
+    }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
   } catch { /* silent */ }
   finally { loading.value = false }
