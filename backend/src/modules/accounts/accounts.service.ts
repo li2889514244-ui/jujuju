@@ -132,7 +132,7 @@ export class AccountsService {
     const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params;
 
     const where: Prisma.AccountWhereInput = {};
-    if (userId) where.userId = userId;
+    /* shared mode: skip userId filtering */
     if (teamId) where.teamId = teamId;
     if (groupId) where.groupId = groupId;
     if (platform) where.platform = platform;

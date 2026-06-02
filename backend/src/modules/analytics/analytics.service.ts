@@ -16,7 +16,7 @@ export class AnalyticsService {
     startDate.setHours(0, 0, 0, 0);
 
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
     });
     const accountIds = accounts.map((a) => a.id);
@@ -55,7 +55,7 @@ export class AnalyticsService {
     avgOrderValue?: number;
   }) {
     const account = await this.prisma.account.findFirst({
-      where: { userId, platform: dto.platform as Platform },
+      where: { platform: dto.platform as Platform },
       select: { id: true },
     });
     if (!account) throw new Error('未找到该平台的账号');
@@ -152,7 +152,7 @@ export class AnalyticsService {
   async getOverview(userId: string) {
     // 鑾峰彇鐢ㄦ埛鐨勬墍鏈夎处鍙?
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: {},
       select: { id: true, platform: true, followers: true, likes: true, status: true },
     });
 
@@ -227,7 +227,7 @@ export class AnalyticsService {
    */
   async getPlatformComparison(userId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: {},
       select: { id: true, platform: true, followers: true, likes: true },
     });
 
@@ -368,7 +368,7 @@ export class AnalyticsService {
    */
   async getComparison(userId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: {},
       select: { id: true },
     });
     const accountIds = accounts.map((a) => a.id);
@@ -569,7 +569,7 @@ export class AnalyticsService {
 
   async getLikesTrend(userId: string, days: number = 7, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
     });
     const accountIds = accounts.map((a) => a.id);
@@ -598,7 +598,7 @@ export class AnalyticsService {
 
   async getPublishEffect(userId: string, days?: number, contentId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: {},
       select: { id: true },
     });
     const accountIds = accounts.map((a) => a.id);
@@ -640,7 +640,7 @@ export class AnalyticsService {
 
   async getEngagementRate(userId: string, days: number = 7, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
     });
     const accountIds = accounts.map((a) => a.id);
@@ -690,7 +690,7 @@ export class AnalyticsService {
 
   async getMonetization(userId: string, days: number = 30, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true, platform: true },
     });
     const accountIds = accounts.map((a) => a.id);

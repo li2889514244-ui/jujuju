@@ -96,7 +96,7 @@ export class CalendarService {
     },
   ) {
     const event = await this.prisma.calendarEvent.findFirst({
-      where: { id, userId },
+      where: { id },
     });
 
     if (!event) {
@@ -121,7 +121,7 @@ export class CalendarService {
    */
   async remove(id: string, userId: string) {
     const event = await this.prisma.calendarEvent.findFirst({
-      where: { id, userId },
+      where: { id },
     });
 
     if (!event) {
