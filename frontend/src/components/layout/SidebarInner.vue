@@ -1,12 +1,6 @@
 <template>
   <!-- Logo -->
-  <div
-    class="sidebar-inner__logo"
-    @click="
-      $router.push('/dashboard')
-      $emit('navigate')
-    "
-  >
+  <div class="sidebar-inner__logo" @click="onLogoClick">
     <div class="sidebar-inner__logo-mark">
       <svg viewBox="0 0 28 28" fill="none" width="20" height="20">
         <rect width="28" height="28" rx="5" fill="#00cc99" />
@@ -38,6 +32,14 @@
     <div class="sidebar-inner__status" :class="{ 'sidebar-inner__status--ok': backendOk }">
       <span class="sidebar-inner__status-dot"></span>
       <span v-if="!collapsed" class="sidebar-inner__status-text">{{ backendVersion }}</span>
+      <el-icon
+        v-if="!collapsed && !backendOk"
+        :size="13"
+        class="sidebar-inner__status-retry"
+        title="重试"
+        @click.stop="checkHealth"
+        ><Refresh
+      /></el-icon>
     </div>
     <div
       v-if="!collapsed"
@@ -68,17 +70,22 @@ import {
   Fold,
   Money,
   VideoCamera,
+  Refresh,
 } from '@element-plus/icons-vue'
 
 defineProps<{ collapsed: boolean }>()
-defineEmits<{ navigate: []; toggle: [] }>()
+const emit = defineEmits<{ navigate: []; toggle: [] }>()
 
 const route = useRoute()
 const router = useRouter()
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
 
-onMounted(async () => {
+onMounted(() => {
+  checkHealth()
+})
+
+async function checkHealth() {
   try {
     const base = (import.meta as any).env?.VITE_API_BASE_URL || ''
     const url = base ? base.replace(/\/api\/v1$/, '') + '/api/v1/health' : '/api/v1/health'
@@ -90,7 +97,12 @@ onMounted(async () => {
     backendVersion.value = '离线'
     backendOk.value = false
   }
-})
+}
+
+function onLogoClick() {
+  router.push('/dashboard')
+  emit('navigate')
+}
 
 const activeMenu = computed(() => route.path)
 
@@ -229,6 +241,14 @@ function getIcon(name: unknown): Component {
       font-size: $text-micro;
       color: $color-text-tertiary;
       font-family: $font-mono;
+    }
+    &-retry {
+      color: $color-text-tertiary;
+      cursor: pointer;
+      transition: color 0.15s;
+      &:hover {
+        color: $color-accent;
+      }
     }
   }
 

@@ -207,7 +207,7 @@
           <el-icon v-if="r.status === 'success'"><CircleCheckFilled /></el-icon>
           <el-icon v-else-if="r.status === 'failed'"><CircleCloseFilled /></el-icon>
           <span>{{ r.nickname }}</span>
-          <span v-if="r.error" style="color: #d4534a; font-size: 13px">{{ r.error }}</span>
+          <span v-if="r.error" style="color: #ef4444; font-size: 13px">{{ r.error }}</span>
         </div>
         <!-- Retry failed items -->
         <div v-if="hasFailedItems" style="margin-top: 12px; text-align: center">

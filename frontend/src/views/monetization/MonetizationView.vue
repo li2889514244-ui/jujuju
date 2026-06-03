@@ -115,7 +115,10 @@
         </div>
         <div v-loading="loading" class="order-list">
           <div v-if="filteredOrders.length === 0" class="empty-hint">
-            {{ orderSearch ? '无匹配订单' : '暂无订单' }}
+            <p>{{ orderSearch ? '无匹配订单' : '暂无订单' }}</p>
+            <el-button v-if="!orderSearch" size="small" text type="primary" @click="loadStoreData">
+              <el-icon><Refresh /></el-icon>刷新数据
+            </el-button>
           </div>
           <div
             v-for="order in filteredOrders.slice(0, 20)"
@@ -149,7 +152,12 @@
           <span class="section-card__meta">{{ products.length }} 件</span>
         </div>
         <div v-loading="loading" class="product-grid">
-          <div v-if="products.length === 0" class="empty-hint">暂无商品</div>
+          <div v-if="products.length === 0" class="empty-hint">
+            <p>暂无商品</p>
+            <el-button size="small" text type="primary" @click="loadStoreData">
+              <el-icon><Refresh /></el-icon>同步商品
+            </el-button>
+          </div>
           <div v-for="prod in sortedProducts" :key="prod.product_id" class="product-card">
             <img
               v-if="prod.img_url"
@@ -552,6 +560,9 @@ onUnmounted(() => {
   text-align: center;
   color: $color-text-tertiary;
   font-size: 14px;
+  p {
+    margin-bottom: 16px;
+  }
 }
 
 // Order list

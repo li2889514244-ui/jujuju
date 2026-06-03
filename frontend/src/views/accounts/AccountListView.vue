@@ -58,15 +58,24 @@
       <el-button @click="showGroupManage = true">
         <el-icon><Setting /></el-icon>管理分组
       </el-button>
-      <el-button :disabled="!selectedIds.length" @click="handleBatchMove">
-        <el-icon><FolderOpened /></el-icon>批量移动
-      </el-button>
-      <el-button type="danger" :disabled="!selectedIds.length" @click="handleBatchDelete">
-        <el-icon><Delete /></el-icon>批量删除
-      </el-button>
-      <el-button :disabled="enhancedAccounts.length === 0" class="ml-auto" @click="exportCSV">
-        <el-icon><Download /></el-icon>导出 CSV
-      </el-button>
+      <el-tooltip :content="selectedIds.length ? '移动到分组' : '请先选择账号'" placement="top">
+        <el-button :disabled="!selectedIds.length" @click="handleBatchMove">
+          <el-icon><FolderOpened /></el-icon>批量移动
+        </el-button>
+      </el-tooltip>
+      <el-tooltip :content="selectedIds.length ? '删除选中账号' : '请先选择账号'" placement="top">
+        <el-button type="danger" :disabled="!selectedIds.length" @click="handleBatchDelete">
+          <el-icon><Delete /></el-icon>批量删除
+        </el-button>
+      </el-tooltip>
+      <el-tooltip
+        :content="enhancedAccounts.length ? '导出为 CSV 文件' : '暂无账号数据'"
+        placement="top"
+      >
+        <el-button :disabled="enhancedAccounts.length === 0" class="ml-auto" @click="exportCSV">
+          <el-icon><Download /></el-icon>导出 CSV
+        </el-button>
+      </el-tooltip>
     </div>
 
     <!-- Account Card Grid -->
@@ -260,14 +269,7 @@
       </div>
       <template #footer>
         <el-button @click="showAddDialog = false">关闭</el-button>
-        <el-button
-          type="primary"
-          @click="
-            showManualDialog = true
-            showAddDialog = false
-          "
-          >手动输入 Cookie</el-button
-        >
+        <el-button type="primary" @click="openManualAdd">手动输入 Cookie</el-button>
       </template>
     </el-dialog>
     <!-- Manual Add Dialog -->
@@ -486,6 +488,11 @@ async function handleDeleteGroup(id: string) {
 function handleBindSuccess() {
   ElMessage.success('账号绑定成功')
   accountStore.fetchAccounts()
+}
+
+function openManualAdd() {
+  showManualDialog.value = true
+  showAddDialog.value = false
 }
 </script>
 

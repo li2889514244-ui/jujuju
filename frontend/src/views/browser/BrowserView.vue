@@ -8,9 +8,9 @@
       </template>
       <el-empty description="浏览器引擎功能已禁用">
         <template #image>
-          <el-icon :size="64" color="#48484a"><Monitor /></el-icon>
+          <el-icon :size="64" color="#6b7390"><Monitor /></el-icon>
         </template>
-        <p style="color: #6e6e73; font-size: 15px">
+        <p style="color: #9aa4b8; font-size: 15px">
           浏览器引擎（browser-engine）已从系统中移除。<br />
           如需此功能，请联系管理员。
         </p>

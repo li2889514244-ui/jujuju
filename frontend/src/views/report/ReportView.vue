@@ -33,7 +33,9 @@
         </el-form-item>
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="loadReport">生成报表</el-button>
-          <el-button :disabled="!reportData" @click="exportExcel">导出 Excel</el-button>
+          <el-tooltip :content="reportData ? '导出为 Excel 文件' : '请先生成报表'" placement="top">
+            <el-button :disabled="!reportData" @click="exportExcel">导出 Excel</el-button>
+          </el-tooltip>
         </el-form-item>
       </el-form>
     </el-card>

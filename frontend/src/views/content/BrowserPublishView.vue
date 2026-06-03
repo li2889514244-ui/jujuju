@@ -1,6 +1,6 @@
 <template>
   <div class="browser-publish">
-    <el-page-header @back="$router.back()" title="返回" class="browser-publish__header">
+    <el-page-header title="返回" class="browser-publish__header" @back="$router.back()">
       <template #content>
         <span>浏览器发布监控</span>
       </template>
@@ -9,9 +9,9 @@
     <el-card shadow="hover">
       <el-empty description="浏览器引擎功能已禁用">
         <template #image>
-          <el-icon :size="64" color="#48484a"><Monitor /></el-icon>
+          <el-icon :size="64" color="#6b7390"><Monitor /></el-icon>
         </template>
-        <p style="color: #b8b0a8; font-size: 15px">
+        <p style="color: #9aa4b8; font-size: 15px">
           浏览器引擎（browser-engine）已从系统中移除，浏览器发布功能不可用。<br />
           如需此功能，请联系管理员。
         </p>

@@ -11,7 +11,7 @@
           <el-button size="small" @click="prevPeriod"
             ><el-icon><ArrowLeft /></el-icon
           ></el-button>
-          <el-button size="small" disabled>{{ periodLabel }}</el-button>
+          <span class="cal-period-label">{{ periodLabel }}</span>
           <el-button size="small" @click="nextPeriod"
             ><el-icon><ArrowRight /></el-icon
           ></el-button>
@@ -45,6 +45,12 @@
             </div>
           </div>
         </div>
+      </div>
+      <div v-if="events.length === 0" class="cal-empty">
+        <p>暂无日程安排</p>
+        <el-button size="small" type="primary" @click="openAddDialog">
+          <el-icon><Plus /></el-icon>添加第一个日程
+        </el-button>
       </div>
     </div>
 
@@ -170,7 +176,7 @@ const predefineColors = [
   '#3b82f6',
   '#6366f1',
   '#9aa4b8',
-  '#6b6560',
+  '#6b7390',
 ]
 
 const periodLabel = computed(() => {
@@ -305,6 +311,31 @@ async function deleteEvent() {
     display: flex;
     align-items: center;
     gap: 12px;
+  }
+}
+
+.cal-period-label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: $color-text-primary;
+  background: $color-bg-tertiary;
+  border: 1px solid $color-border;
+  border-radius: $radius-sm;
+  white-space: nowrap;
+}
+
+.cal-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: $color-text-tertiary;
+  font-size: 14px;
+  p {
+    margin-bottom: 16px;
   }
 }
 
