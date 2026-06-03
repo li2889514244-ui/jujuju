@@ -17,8 +17,8 @@
               :data="contentStore.contents"
               stripe
               highlight-current-row
-              @current-change="selectContent"
               max-height="400"
+              @current-change="selectContent"
             >
               <el-table-column prop="title" label="标题" min-width="200" show-overflow-tooltip />
               <el-table-column prop="createdAt" label="创建时间" width="160">
@@ -71,8 +71,8 @@
         <el-button @click="$router.push('/content')">去完整编辑器</el-button>
         <el-button
           type="primary"
-          @click="step = 1"
           :disabled="!selectedContentId && contentMode === 'existing'"
+          @click="step = 1"
         >
           下一步 <el-icon><ArrowRight /></el-icon>
         </el-button>
@@ -96,12 +96,12 @@
           <el-collapse-item v-for="p in platforms" :key="p.key" :name="p.key">
             <template #title>
               <div class="platform-title">
-                <el-checkbox v-model="p.selected" @click.stop :indeterminate="false">
+                <el-checkbox v-model="p.selected" :indeterminate="false" @click.stop>
                   <span style="font-weight: 600">{{ p.label }}</span>
                 </el-checkbox>
               </div>
             </template>
-            <div class="account-list" v-if="p.accounts.length > 0">
+            <div v-if="p.accounts.length > 0" class="account-list">
               <el-checkbox-group v-model="p.selectedAccounts">
                 <div v-for="acc in p.accounts" :key="acc.id" class="account-item">
                   <el-checkbox :value="acc.id" :disabled="acc.cookieStatus !== 'valid'">
@@ -149,7 +149,7 @@
         <el-button @click="step = 0"
           ><el-icon><ArrowLeft /></el-icon> 上一步</el-button
         >
-        <el-button type="primary" @click="step = 2" :disabled="totalSelectedAccounts === 0">
+        <el-button type="primary" :disabled="totalSelectedAccounts === 0" @click="step = 2">
           下一步 <el-icon><ArrowRight /></el-icon>
         </el-button>
       </div>
@@ -178,8 +178,8 @@
             :key="acc.id"
             size="small"
             closable
-            @close="removeAccount(acc)"
             style="margin: 4px"
+            @close="removeAccount(acc)"
           >
             {{ acc.nickname }} ({{ PLATFORM_LABELS[acc.platform] || acc.platform }})
           </el-tag>
@@ -210,7 +210,7 @@
           <span v-if="r.error" style="color: #d4534a; font-size: 13px">{{ r.error }}</span>
         </div>
         <!-- Retry failed items -->
-        <div v-if="hasFailedItems" style="margin-top: 12px; text-align: center;">
+        <div v-if="hasFailedItems" style="margin-top: 12px; text-align: center">
           <el-button type="warning" :loading="retrying" @click="retryFailed">
             重试失败项目 ({{ failedCount }})
           </el-button>
@@ -441,49 +441,47 @@ onMounted(() => {
 .account-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 8px 0;
+  gap: $space-xs;
+  padding: $space-xs 0;
   &__empty {
-    padding: 16px;
+    padding: $space-md;
     text-align: center;
-    color: #b8b0a8;
+    color: $color-text-secondary;
   }
 }
 .account-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: $space-xs;
   padding: 4px 0;
   &__info {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: $space-xs;
   }
   &__followers {
     font-size: 13px;
-    color: #b8b0a8;
+    color: $color-text-secondary;
     margin-left: 4px;
   }
 }
-
 .review-desc {
-  margin-bottom: 16px;
+  margin-bottom: $space-md;
 }
 .review-accounts {
-  margin-top: 8px;
+  margin-top: $space-xs;
 }
-
 .result-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid #f0f0f0;
+  gap: $space-xs;
+  padding: $space-xs 0;
+  border-bottom: 1px solid $color-border;
   &.result-success {
-    color: #6b9e6c;
+    color: $color-success;
   }
   &.result-failed {
-    color: #d4534a;
+    color: $color-danger;
   }
 }
 </style>

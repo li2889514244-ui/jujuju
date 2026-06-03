@@ -28,11 +28,11 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="refreshAll" :loading="loading">查询</el-button>
+          <el-button type="primary" :loading="loading" @click="refreshAll">查询</el-button>
         </el-form-item>
         <el-form-item>
           <el-tooltip content="伴侣打开后每30分钟自动采集，点查询刷新即可" placement="bottom">
-            <el-button @click="refreshAll" :loading="loading" type="success">刷新数据</el-button>
+            <el-button :loading="loading" type="success" @click="refreshAll">刷新数据</el-button>
           </el-tooltip>
         </el-form-item>
       </el-form>
@@ -40,16 +40,17 @@
 
     <!-- Overview Cards -->
     <el-row :gutter="20" class="data-center__overview">
-      <el-col :xs="12" :sm="8" :md="4" v-for="card in overviewCards" :key="card.label">
+      <el-col v-for="card in overviewCards" :key="card.label" :xs="12" :sm="8" :md="4">
         <el-card shadow="hover" class="overview-card">
           <div class="overview-card__label">{{ card.label }}</div>
           <div class="overview-card__value">{{ card.value }}</div>
           <div
+            v-if="card.trend !== null"
             class="overview-card__change"
             :class="card.trend > 0 ? 'trend--up' : card.trend < 0 ? 'trend--down' : ''"
-            v-if="card.trend !== null"
           >
-            <el-icon :size="12"><CaretTop v-if="card.trend > 0" /><CaretBottom v-else /></el-icon> {{ Math.abs(card.trend) }}%
+            <el-icon :size="12"><CaretTop v-if="card.trend > 0" /><CaretBottom v-else /></el-icon>
+            {{ Math.abs(card.trend) }}%
           </div>
         </el-card>
       </el-col>
@@ -116,7 +117,13 @@
               </el-radio-group>
             </div>
           </template>
-          <el-table :data="viewsRanking" stripe v-loading="rankingLoading" max-height="420" @row-click="handleRowClick">
+          <el-table
+            v-loading="rankingLoading"
+            :data="viewsRanking"
+            stripe
+            max-height="420"
+            @row-click="handleRowClick"
+          >
             <template #empty><el-empty description="暂无排行数据" /></template>
             <el-table-column label="#" width="50">
               <template #default="{ row }">
@@ -223,7 +230,7 @@ const trendChartOption = computed(() => ({
             type: 'text',
             left: 'center',
             top: 'center',
-            style: { text: '暂无数据', fontSize: 16, fill: '#8a8078' },
+            style: { text: '暂无数据', fontSize: 16, fill: '#6b7390' },
           },
         ]
       : undefined,
@@ -380,8 +387,12 @@ onMounted(() => {
   }
 }
 
-.trend--up { color: $color-sage; }
-.trend--down { color: $color-rust; }
+.trend--up {
+  color: $color-success;
+}
+.trend--down {
+  color: $color-danger;
+}
 
 .chart-header {
   display: flex;
@@ -415,7 +426,13 @@ onMounted(() => {
   font-weight: bold;
   color: #fff;
 }
-.rank-1 { background: $color-gold; }
-.rank-2 { background: $color-text-tertiary; }
-.rank-3 { background: $color-copper; }
+.rank-1 {
+  background: $color-warning;
+}
+.rank-2 {
+  background: $color-text-tertiary;
+}
+.rank-3 {
+  background: $color-accent-alt;
+}
 </style>

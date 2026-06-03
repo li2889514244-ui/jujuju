@@ -1,19 +1,19 @@
 <template>
   <div
-    class="glass-card"
+    class="card"
     :class="[
-      `glass-card--${variant}`,
-      `glass-card--${padding}`,
-      { 'glass-card--hover': hoverable, 'glass-card--interactive': interactive },
+      `card--${variant}`,
+      `card--${padding}`,
+      { 'card--hover': hoverable, 'card--interactive': interactive },
     ]"
     @click="interactive ? $emit('click', $event) : undefined"
   >
-    <div v-if="$slots.header || title" class="glass-card__header">
+    <div v-if="$slots.header || title" class="card__header">
       <slot name="header">
-        <span class="glass-card__title">{{ title }}</span>
+        <span class="card__title">{{ title }}</span>
       </slot>
     </div>
-    <div class="glass-card__body">
+    <div class="card__body">
       <slot />
     </div>
   </div>
@@ -22,7 +22,7 @@
 <script setup lang="ts">
 defineProps<{
   title?: string
-  variant?: 'default' | 'elevated' | 'tinted'
+  variant?: 'default' | 'flat' | 'subtle'
   padding?: 'sm' | 'md' | 'lg'
   hoverable?: boolean
   interactive?: boolean
@@ -32,55 +32,56 @@ defineEmits<{ click: [e: MouseEvent] }>()
 </script>
 
 <style lang="scss" scoped>
-.glass-card {
+@import '@/assets/styles/variables';
+
+.card {
   border-radius: $radius-lg;
-  border: 1px solid $color-border;
-  transition: all 0.3s $ease-out;
+  transition: all 0.2s $ease-out;
 
   &--default {
-    @include panel;
-  }
-  &--elevated {
     background: $color-bg-elevated;
-    border-color: $color-border;
+    border: 1px solid $color-border;
+    box-shadow: $shadow-sm;
+  }
+  &--flat {
+    background: $color-bg-secondary;
+    border: 1px solid $color-border;
+  }
+  &--subtle {
+    background: rgba(59, 130, 246, 0.03);
+    border: 1px solid rgba(59, 130, 246, 0.06);
+  }
+
+  &--sm {
+    padding: $space-sm;
+  }
+  &--md {
+    padding: $space-lg;
+  }
+  &--lg {
+    padding: $space-xl;
+  }
+
+  &--hover:hover {
+    border-color: $color-border-hover;
     box-shadow: $shadow-md;
   }
-  &--tinted {
-    background: rgba(212, 155, 80, 0.04);
-    border-color: rgba(212, 155, 80, 0.1);
-    .glass-card__header {
-      border-bottom-color: rgba(212, 155, 80, 0.06);
+  &--interactive {
+    cursor: pointer;
+    &:active {
+      transform: scale(0.985);
     }
   }
 
-  &--sm { padding: $space-sm; }
-  &--md { padding: $space-lg; }
-  &--lg { padding: $space-xl; }
-
-  &--hover:hover {
-    border-color: rgba(212, 155, 80, 0.15);
-    box-shadow: $shadow-md;
-  }
-
-  &--interactive {
-    cursor: pointer;
-    &:active { transform: scale(0.98); }
-  }
-
   &__header {
-    padding-bottom: 12px;
-    margin-bottom: 12px;
+    padding-bottom: 14px;
+    margin-bottom: 14px;
     border-bottom: 1px solid $color-border;
   }
-
   &__title {
     font-size: $text-body;
-    font-weight: 500;
-    color: $color-text-secondary;
-  }
-
-  &__body {
-    // slot content
+    font-weight: 600;
+    color: $color-text-primary;
   }
 }
 </style>

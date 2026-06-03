@@ -7,7 +7,13 @@
           <el-radio-button value="today">今天</el-radio-button>
           <el-radio-button value="week">近7天</el-radio-button>
         </el-radio-group>
-        <el-select v-model="activeStoreId" placeholder="选择店铺" size="small" style="width:160px" @change="loadStoreData">
+        <el-select
+          v-model="activeStoreId"
+          placeholder="选择店铺"
+          size="small"
+          class="monetization__store-select"
+          @change="loadStoreData"
+        >
           <el-option v-for="s in stores" :key="s.id" :label="s.name" :value="s.id" />
         </el-select>
         <el-button :icon="Refresh" circle size="small" :loading="loading" @click="loadStoreData" />
@@ -15,8 +21,13 @@
     </div>
 
     <!-- Shop Info -->
-    <div class="shop-info" v-if="shopInfo">
-      <img v-if="shopInfo.headimg_url" :src="shopInfo.headimg_url" class="shop-info__avatar" @error="hideImg" />
+    <div v-if="shopInfo" class="shop-info">
+      <img
+        v-if="shopInfo.headimg_url"
+        :src="shopInfo.headimg_url"
+        class="shop-info__avatar"
+        @error="hideImg"
+      />
       <div>
         <div class="shop-info__name">{{ shopInfo.nickname }}</div>
         <div class="shop-info__meta">{{ shopInfo.subject_type }} · 已开通</div>
@@ -24,7 +35,7 @@
     </div>
 
     <!-- KPI -->
-    <div class="monetization__kpi" style="grid-template-columns: repeat(2, 1fr)">
+    <div class="monetization__kpi monetization__kpi--primary">
       <div class="kpi-card">
         <div class="kpi-card__label">{{ viewMode === 'today' ? '今天销售额' : '近7天销售额' }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
@@ -32,13 +43,13 @@
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">售后退款</div>
-        <div class="kpi-card__value">{{ aftersaleCount }}</div>
+        <div class="kpi-card__value kpi-card__value--danger">{{ aftersaleCount }}</div>
         <div class="kpi-card__sub">近 24 小时申请</div>
       </div>
     </div>
 
     <!-- Order Status -->
-    <div class="monetization__kpi" style="grid-template-columns: repeat(6, 1fr)">
+    <div class="monetization__kpi monetization__kpi--status">
       <div v-for="s in statusBreakdown" :key="s.label" class="kpi-card kpi-card--sm">
         <div class="kpi-card__label">{{ s.label }}</div>
         <div class="kpi-card__value kpi-card__value--sm">{{ s.count }}</div>
@@ -46,12 +57,16 @@
     </div>
 
     <!-- Aftersale (collapsible) -->
-    <div class="card" style="margin-bottom: 24px;">
-      <div class="card__header clickable" @click="showAftersale = !showAftersale">
+    <div class="section-card">
+      <div class="section-card__header" @click="showAftersale = !showAftersale">
         <span>售后/退款</span>
-        <span class="card__count" style="display:flex;align-items:center;gap:12px">
-          {{ aftersaleCount > 0 ? `${aftersaleCount} 条，合计 ¥${centToYuan(aftersaleTotal)}` : '近24小时无售后' }}
-          <span class="card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
+        <span class="section-card__meta">
+          {{
+            aftersaleCount > 0
+              ? `${aftersaleCount} 条，合计 ¥${centToYuan(aftersaleTotal)}`
+              : '近24小时无售后'
+          }}
+          <span class="section-card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
         </span>
       </div>
       <div v-if="showAftersale && aftersaleList.length > 0" class="order-list">
@@ -63,14 +78,16 @@
               <span class="order-item__status is-done">{{ aftersaleStatus(a.status) }}</span>
             </div>
           </div>
-          <div class="order-item__price" style="color:#d4534a">-&yen;{{ centToYuan(a.amount) }}</div>
+          <div class="order-item__price order-item__price--refund">
+            -&yen;{{ centToYuan(a.amount) }}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Trend -->
-    <div class="monetization__chart card">
-      <div class="card__header">
+    <div class="section-card monetization__chart">
+      <div class="section-card__header">
         <span>销售趋势</span>
         <el-radio-group v-model="trendMetric" size="small">
           <el-radio-button value="gmv">销售额</el-radio-button>
@@ -82,30 +99,43 @@
 
     <!-- Orders + Products -->
     <div class="monetization__grid">
-      <div class="card">
-        <div class="card__header">
+      <div class="section-card">
+        <div class="section-card__header">
           <span>最近订单</span>
-          <div style="display:flex;align-items:center;gap:8px">
+          <div class="section-card__header-right">
             <el-input
               v-model="orderSearch"
               placeholder="搜索订单…"
               size="small"
-              style="width:160px"
+              class="monetization__search-input"
               clearable
             />
-            <span class="card__count">{{ filteredOrderCount }} 条</span>
+            <span class="section-card__meta">{{ filteredOrderCount }} 条</span>
           </div>
         </div>
         <div v-loading="loading" class="order-list">
-          <div v-if="filteredOrders.length === 0" class="empty-hint">{{ orderSearch ? '无匹配订单' : '暂无订单' }}</div>
-          <div v-for="order in filteredOrders.slice(0, 20)" :key="order.order_id" class="order-item">
-            <img v-if="order.product_img" :src="order.product_img" class="order-item__img" @error="hideImg" />
+          <div v-if="filteredOrders.length === 0" class="empty-hint">
+            {{ orderSearch ? '无匹配订单' : '暂无订单' }}
+          </div>
+          <div
+            v-for="order in filteredOrders.slice(0, 20)"
+            :key="order.order_id"
+            class="order-item"
+          >
+            <img
+              v-if="order.product_img"
+              :src="order.product_img"
+              class="order-item__img"
+              @error="hideImg"
+            />
             <div class="order-item__info">
               <div class="order-item__title">{{ order.product_title || '未知商品' }}</div>
               <div class="order-item__meta">
                 <span class="order-item__time">{{ fmtTime(order.create_time) }}</span>
-                <span class="order-item__status" :class="statusClass(order.status)">{{ statusLabel(order.status) }}</span>
-                <span v-if="order.ship_time" style="font-size:10px;color:#5b8ed4">已发货</span>
+                <span class="order-item__status" :class="statusClass(order.status)">{{
+                  statusLabel(order.status)
+                }}</span>
+                <span v-if="order.ship_time" class="order-item__shipped">已发货</span>
               </div>
             </div>
             <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount) }}</div>
@@ -113,15 +143,20 @@
         </div>
       </div>
 
-      <div class="card">
-        <div class="card__header">
+      <div class="section-card">
+        <div class="section-card__header">
           <span>商品列表</span>
-          <span class="card__count">{{ products.length }} 件</span>
+          <span class="section-card__meta">{{ products.length }} 件</span>
         </div>
         <div v-loading="loading" class="product-grid">
           <div v-if="products.length === 0" class="empty-hint">暂无商品</div>
           <div v-for="prod in sortedProducts" :key="prod.product_id" class="product-card">
-            <img v-if="prod.img_url" :src="prod.img_url" class="product-card__img" @error="hideImg" />
+            <img
+              v-if="prod.img_url"
+              :src="prod.img_url"
+              class="product-card__img"
+              @error="hideImg"
+            />
             <div class="product-card__info">
               <div class="product-card__title">{{ prod.title }}</div>
               <div class="product-card__stats">
@@ -141,7 +176,12 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
-import { wechatStoreApi, type WechatOrder, type WechatProduct, type WechatStore } from '@/api/wechat-store'
+import {
+  wechatStoreApi,
+  type WechatOrder,
+  type WechatProduct,
+  type WechatStore,
+} from '@/api/wechat-store'
 import dayjs from 'dayjs'
 
 const loading = ref(false)
@@ -161,7 +201,6 @@ const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: stri
 let timer: ReturnType<typeof setInterval> | null = null
 
 // ── Stats ──
-
 const displayOrders = computed(() => {
   if (viewMode.value === 'today') {
     const start = dayjs().startOf('day').unix()
@@ -179,10 +218,19 @@ const orderStats = computed(() => {
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
+
 const statusBreakdown = computed(() => {
-  const labels: Record<number, string> = { 10: '待付款', 20: '待发货', 30: '已发货', 100: '已完成', 250: '已取消' }
+  const labels: Record<number, string> = {
+    10: '待付款',
+    20: '待发货',
+    30: '已发货',
+    100: '已完成',
+    250: '已取消',
+  }
   const groups: Record<number, number> = {}
-  displayOrders.value.forEach((o) => { groups[o.status] = (groups[o.status] || 0) + 1 })
+  displayOrders.value.forEach((o) => {
+    groups[o.status] = (groups[o.status] || 0) + 1
+  })
   return [
     ...([10, 20, 30, 100, 250] as const).map((k) => ({ label: labels[k], count: groups[k] || 0 })),
     { label: '售后(24h)', count: aftersaleCount.value },
@@ -192,7 +240,9 @@ const statusBreakdown = computed(() => {
 const filteredOrders = computed(() => {
   if (!orderSearch.value) return displayOrders.value
   const kw = orderSearch.value.toLowerCase()
-  return displayOrders.value.filter((o) => (o.product_title || '').toLowerCase().includes(kw) || o.order_id.includes(kw))
+  return displayOrders.value.filter(
+    (o) => (o.product_title || '').toLowerCase().includes(kw) || o.order_id.includes(kw),
+  )
 })
 const filteredOrderCount = computed(() => filteredOrders.value.length)
 
@@ -201,7 +251,8 @@ const trendOption = computed(() => {
   orders.value.forEach((o) => {
     const d = dayjs.unix(o.create_time).format('MM-DD')
     if (!dailyMap[d]) dailyMap[d] = { gmv: 0, orders: 0 }
-    dailyMap[d].gmv += o.pay_amount; dailyMap[d].orders += 1
+    dailyMap[d].gmv += o.pay_amount
+    dailyMap[d].orders += 1
   })
   const entries = Object.entries(dailyMap).sort()
   return {
@@ -209,27 +260,67 @@ const trendOption = computed(() => {
     grid: { left: 55, right: 20, top: 20, bottom: 20 },
     xAxis: { type: 'category' as const, data: entries.map((e) => e[0]) },
     yAxis: { type: 'value' as const },
-    series: [{
-      name: trendMetric.value === 'gmv' ? '销售额(元)' : '订单数',
-      type: 'line' as const, smooth: true, areaStyle: { opacity: 0.15 },
-      data: entries.map((e) => (trendMetric.value === 'orders' ? e[1].orders : e[1].gmv / 100)),
-    }],
-    graphic: entries.length === 0 ? [{ type: 'text' as const, left: 'center', top: 'center', style: { text: '暂无数据', fontSize: 14, fill: '#8c8c8c' } }] : undefined,
+    series: [
+      {
+        name: trendMetric.value === 'gmv' ? '销售额(元)' : '订单数',
+        type: 'line' as const,
+        smooth: true,
+        areaStyle: { opacity: 0.15 },
+        data: entries.map((e) => (trendMetric.value === 'orders' ? e[1].orders : e[1].gmv / 100)),
+      },
+    ],
+    graphic:
+      entries.length === 0
+        ? [
+            {
+              type: 'text' as const,
+              left: 'center',
+              top: 'center',
+              style: { text: '暂无数据', fontSize: 14, fill: '#6b7390' },
+            },
+          ]
+        : undefined,
   }
 })
 
 // ── Helpers ──
-
-function centToYuan(c: number) { return (c / 100).toFixed(2) }
-function fmtNum(n: number): string { return n >= 10000 ? (n / 10000).toFixed(1) + '万' : n.toLocaleString() }
-function fmtTime(ts: number) { return ts ? dayjs.unix(ts).format('MM-DD HH:mm') : '-' }
-function statusLabel(s: number) { const m: Record<number, string> = { 10: '待付款', 12: '待收下', 20: '待发货', 21: '部分发货', 30: '待收货', 100: '已完成', 200: '全部退款', 250: '已取消' }; return m[s] || `状态${s}` }
-function statusClass(s: number) { if (s === 100) return 'is-done'; if (s >= 30) return 'is-shipping'; if (s >= 20) return 'is-paid'; if (s >= 10) return 'is-pending'; return 'is-cancel' }
-function hideImg(e: Event) { (e.target as HTMLImageElement).style.display = 'none' }
-function aftersaleStatus(s: string) { return s === 'MERCHANT_REFUND_SUCCESS' ? '已退款' : s === 'USER_WAIT_RETURN' ? '待退货' : s }
+function centToYuan(c: number) {
+  return (c / 100).toFixed(2)
+}
+function fmtNum(n: number): string {
+  return n >= 10000 ? (n / 10000).toFixed(1) + '万' : n.toLocaleString()
+}
+function fmtTime(ts: number) {
+  return ts ? dayjs.unix(ts).format('MM-DD HH:mm') : '-'
+}
+function statusLabel(s: number) {
+  const m: Record<number, string> = {
+    10: '待付款',
+    12: '待收下',
+    20: '待发货',
+    21: '部分发货',
+    30: '待收货',
+    100: '已完成',
+    200: '全部退款',
+    250: '已取消',
+  }
+  return m[s] || `状态${s}`
+}
+function statusClass(s: number) {
+  if (s === 100) return 'is-done'
+  if (s >= 30) return 'is-shipping'
+  if (s >= 20) return 'is-paid'
+  if (s >= 10) return 'is-pending'
+  return 'is-cancel'
+}
+function hideImg(e: Event) {
+  ;(e.target as HTMLImageElement).style.display = 'none'
+}
+function aftersaleStatus(s: string) {
+  return s === 'MERCHANT_REFUND_SUCCESS' ? '已退款' : s === 'USER_WAIT_RETURN' ? '待退货' : s
+}
 
 // ── API ──
-
 async function loadStores() {
   const res = await wechatStoreApi.getStores()
   if (Array.isArray(res.data)) stores.value = res.data
@@ -249,9 +340,9 @@ async function loadStoreData() {
     if (ordRes.data?.errcode === 0) orders.value = ordRes.data.order_list || []
     if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
     if (afterRes?.data?.errcode === 0) {
-      const raw = (afterRes.data.list || [])
+      const raw = afterRes.data.list || []
       const filtered = raw.filter((a: any) => {
-        if (a.complete_time && a.create_time && (a.complete_time - a.create_time) < 60) return false
+        if (a.complete_time && a.create_time && a.complete_time - a.create_time < 60) return false
         return true
       })
       aftersaleList.value = filtered
@@ -261,7 +352,7 @@ async function loadStoreData() {
         const detail = afterRes.data.list?.[0]
         const msg = detail ? `「${detail.product || '商品'}」${detail.reason}` : `${added} 条新退款`
         if (Notification.permission === 'granted') {
-          new Notification('新售后提醒', { body: msg, icon: aftersaleList.value[0] ? undefined : undefined })
+          new Notification('新售后提醒', { body: msg })
         }
         showAftersale.value = true
       }
@@ -270,8 +361,11 @@ async function loadStoreData() {
       aftersaleTotal.value = filtered.reduce((s: number, a: any) => s + (a.amount || 0), 0)
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
-  } catch { /* silent */ }
-  finally { loading.value = false }
+  } catch {
+    /* silent */
+  } finally {
+    loading.value = false
+  }
 }
 
 onMounted(async () => {
@@ -283,72 +377,323 @@ onMounted(async () => {
   timer = setInterval(loadStoreData, 60000)
 })
 
-onUnmounted(() => { if (timer) clearInterval(timer) })
+onUnmounted(() => {
+  if (timer) clearInterval(timer)
+})
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .monetization {
-  max-width: 1200px; margin: 0 auto; padding-bottom: 40px;
-  &__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
-  &__title { font-size: 22px; font-weight: 700; color: #f0ece4; margin: 0; }
-  &__actions { display: flex; gap: 8px; align-items: center; }
-  &__kpi { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; margin-bottom: 24px; }
-  &__chart { margin-bottom: 24px; }
-  &__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
-  @media (max-width: 960px) { &__kpi { grid-template-columns: repeat(3, 1fr); } &__grid { grid-template-columns: 1fr; } }
-}
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-bottom: 40px;
 
-.shop-info {
-  display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
-  padding: 16px 20px; background: #1e1c1a; border: 1px solid #2e2a26; border-radius: 12px;
-  &__avatar { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; }
-  &__name { font-size: 16px; font-weight: 600; color: #f0ece4; }
-  &__meta { font-size: 12px; color: #6b6b6b; margin-top: 2px; }
-}
-
-.kpi-card {
-  background: linear-gradient(135deg, #252220 0%, #1e1c1a 100%); border: 1px solid #3a3530;
-  border-radius: 12px; padding: 18px 16px; text-align: center;
-  &--sm { padding: 12px; }
-  &__label { font-size: 12px; color: #8c8c8c; margin-bottom: 6px; }
-  &__value { font-size: 24px; font-weight: 700; color: #f0ece4; font-feature-settings: 'tnum'; &--sm { font-size: 18px; } }
-  &__sub { font-size: 11px; color: #6b6b6b; margin-top: 4px; }
-}
-
-.card {
-  background: #1e1c1a; border: 1px solid #2e2a26; border-radius: 12px; overflow: hidden;
-  &__header { display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; border-bottom: 1px solid #2e2a26; font-size: 14px; font-weight: 600; color: #e8e0d0; }
-  &__count { font-size: 12px; color: #6b6b6b; font-weight: 400; }
-}
-
-.empty-hint { padding: 40px; text-align: center; color: #6b6b6b; font-size: 14px; }
-
-.order-list { padding: 10px 20px; max-height: 450px; overflow-y: auto; }
-.order-item {
-  display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #252220;
-  &:last-child { border-bottom: none; }
-  &__img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-  &__info { flex: 1; min-width: 0; }
-  &__title { font-size: 13px; color: #d4cfc4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 3px; }
-  &__meta { display: flex; gap: 8px; align-items: center; }
-  &__time { font-size: 11px; color: #6b6b6b; }
-  &__status { font-size: 10px; padding: 1px 6px; border-radius: 3px;
-    &.is-done { color: #6b9e6c; background: rgba(107,158,108,.15); }
-    &.is-shipping { color: #5b8ed4; background: rgba(91,142,212,.15); }
-    &.is-paid { color: #e0a030; background: rgba(224,160,48,.15); }
-    &.is-pending { color: #8c8c8c; background: rgba(140,140,140,.15); }
-    &.is-cancel { color: #d4534a; background: rgba(212,83,74,.15); }
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: $space-lg;
   }
-  &__price { font-size: 14px; font-weight: 600; color: #f0ece4; font-feature-settings: 'tnum'; flex-shrink: 0; }
+  &__title {
+    font-size: $text-headline;
+    font-weight: 700;
+    color: $color-text-primary;
+    margin: 0;
+    font-family: $font-heading;
+  }
+  &__actions {
+    display: flex;
+    gap: $space-xs;
+    align-items: center;
+  }
+  &__store-select {
+    width: 160px;
+    flex-shrink: 0;
+  }
+  &__search-input {
+    width: 160px;
+    flex-shrink: 0;
+  }
+
+  &__kpi {
+    display: grid;
+    gap: $space-md;
+    margin-bottom: $space-lg;
+
+    &--primary {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    &--status {
+      grid-template-columns: repeat(6, 1fr);
+    }
+  }
+
+  &__chart {
+    margin-bottom: $space-lg;
+  }
+
+  &__grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: $space-lg;
+  }
+
+  @media (max-width: 960px) {
+    &__kpi--status {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    &__grid {
+      grid-template-columns: 1fr;
+    }
+  }
 }
 
-.product-grid { padding: 10px 20px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; max-height: 450px; overflow-y: auto; }
+// Shop info
+.shop-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: $space-lg;
+  padding: $space-md $space-lg;
+  @include card;
+  &__avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: $radius-md;
+    object-fit: cover;
+  }
+  &__name {
+    font-size: 16px;
+    font-weight: 600;
+    color: $color-text-primary;
+  }
+  &__meta {
+    font-size: 12px;
+    color: $color-text-tertiary;
+    margin-top: 2px;
+  }
+}
+
+// KPI cards
+.kpi-card {
+  @include card;
+  padding: $space-lg $space-md;
+  text-align: center;
+
+  &--sm {
+    padding: $space-sm;
+  }
+
+  &__label {
+    font-size: 12px;
+    color: $color-text-tertiary;
+    margin-bottom: 6px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  &__value {
+    font-size: 24px;
+    font-weight: 700;
+    color: $color-text-primary;
+    font-feature-settings: 'tnum';
+    font-family: $font-mono;
+    &--sm {
+      font-size: 18px;
+    }
+    &--danger {
+      color: $color-danger;
+    }
+  }
+  &__sub {
+    font-size: 11px;
+    color: $color-text-tertiary;
+    margin-top: 4px;
+  }
+}
+
+// Section cards (orders, products, chart containers)
+.section-card {
+  @include card;
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px $space-lg;
+    border-bottom: 1px solid $color-border;
+    font-size: 14px;
+    font-weight: 600;
+    color: $color-text-primary;
+  }
+  &__header-right {
+    display: flex;
+    align-items: center;
+    gap: $space-xs;
+  }
+  &__meta {
+    font-size: 12px;
+    color: $color-text-tertiary;
+    font-weight: 400;
+  }
+  &__toggle {
+    font-size: 12px;
+    color: $color-accent;
+    cursor: pointer;
+  }
+}
+
+// Empty state
+.empty-hint {
+  padding: 40px;
+  text-align: center;
+  color: $color-text-tertiary;
+  font-size: 14px;
+}
+
+// Order list
+.order-list {
+  padding: 10px $space-lg;
+  max-height: 450px;
+  overflow-y: auto;
+}
+.order-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid $color-border;
+  &:last-child {
+    border-bottom: none;
+  }
+  &__img {
+    width: 36px;
+    height: 36px;
+    border-radius: $radius-sm;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  &__info {
+    flex: 1;
+    min-width: 0;
+  }
+  &__title {
+    font-size: 13px;
+    color: $color-text-primary;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    margin-bottom: 3px;
+  }
+  &__meta {
+    display: flex;
+    gap: $space-xs;
+    align-items: center;
+  }
+  &__time {
+    font-size: 11px;
+    color: $color-text-tertiary;
+  }
+  &__status {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    &.is-done {
+      color: $color-success;
+      background: rgba($color-success, 0.12);
+    }
+    &.is-shipping {
+      color: $color-accent-alt;
+      background: rgba($color-accent-alt, 0.12);
+    }
+    &.is-paid {
+      color: $color-warning;
+      background: rgba($color-warning, 0.12);
+    }
+    &.is-pending {
+      color: $color-text-tertiary;
+      background: rgba($color-text-tertiary, 0.12);
+    }
+    &.is-cancel {
+      color: $color-danger;
+      background: rgba($color-danger, 0.12);
+    }
+  }
+  &__shipped {
+    font-size: 10px;
+    color: $color-accent-alt;
+  }
+  &__price {
+    font-size: 14px;
+    font-weight: 600;
+    color: $color-text-primary;
+    font-feature-settings: 'tnum';
+    flex-shrink: 0;
+    &--refund {
+      color: $color-danger;
+    }
+  }
+}
+
+// Product grid
+.product-grid {
+  padding: 10px $space-lg;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 10px;
+  max-height: 450px;
+  overflow-y: auto;
+}
 .product-card {
-  display: flex; gap: 10px; padding: 10px; background: #252220; border-radius: 8px; border: 1px solid #2e2a26;
-  &__img { width: 44px; height: 44px; border-radius: 6px; object-fit: cover; flex-shrink: 0; }
-  &__info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
-  &__title { font-size: 12px; color: #d4cfc4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  &__stats { display: flex; gap: 8px; align-items: baseline; margin-top: 4px; flex-wrap: wrap; font-size: 11px; color: #6b6b6b; }
-  &__price { font-size: 13px; font-weight: 600; color: #f0ece4; font-feature-settings: 'tnum'; }
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: $color-bg-tertiary;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  transition: border-color 0.2s;
+  &:hover {
+    border-color: $color-border-hover;
+  }
+  &__img {
+    width: 44px;
+    height: 44px;
+    border-radius: $radius-sm;
+    object-fit: cover;
+    flex-shrink: 0;
+  }
+  &__info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  &__title {
+    font-size: 12px;
+    color: $color-text-primary;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  &__stats {
+    display: flex;
+    gap: $space-xs;
+    align-items: baseline;
+    margin-top: 4px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: $color-text-tertiary;
+  }
+  &__price {
+    font-size: 13px;
+    font-weight: 600;
+    color: $color-text-primary;
+    font-feature-settings: 'tnum';
+  }
 }
 </style>

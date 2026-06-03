@@ -64,7 +64,7 @@
       <el-button type="danger" :disabled="!selectedIds.length" @click="handleBatchDelete">
         <el-icon><Delete /></el-icon>批量删除
       </el-button>
-      <el-button @click="exportCSV" :disabled="enhancedAccounts.length === 0" class="ml-auto">
+      <el-button :disabled="enhancedAccounts.length === 0" class="ml-auto" @click="exportCSV">
         <el-icon><Download /></el-icon>导出 CSV
       </el-button>
     </div>
@@ -79,12 +79,17 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon :size="20" v-if="selectedIds.includes(acc.id)" color="#d49b50"
+          <el-icon v-if="selectedIds.includes(acc.id)" :size="20" color="#00cc99"
             ><CircleCheckFilled
           /></el-icon>
           <span v-else class="account-card__check-empty" />
         </div>
-        <el-avatar :size="48" :src="acc.avatar" :style="{ background: acc.avatar ? '' : getPlatformColor(acc.platform), color: '#fff' }">{{ acc.nickname?.charAt(0) }}</el-avatar>
+        <el-avatar
+          :size="48"
+          :src="acc.avatar"
+          :style="{ background: acc.avatar ? '' : getPlatformColor(acc.platform), color: '#fff' }"
+          >{{ acc.nickname?.charAt(0) }}</el-avatar
+        >
         <div class="account-card__info">
           <span class="account-card__name">{{ acc.nickname }}</span>
           <PlatformBadge :platform="acc.platform" size="sm" />
@@ -93,7 +98,7 @@
           <span class="account-card__stat-value">{{ formatCompactNum(acc.followers || 0) }}</span>
           <span class="account-card__stat-label">粉丝</span>
         </div>
-        <span class="account-card__group" v-if="acc.groupName">{{ acc.groupName }}</span>
+        <span v-if="acc.groupName" class="account-card__group">{{ acc.groupName }}</span>
         <span class="account-card__status" :class="'status--' + (acc.tokenStatus || 'unknown')">
           {{ tokenStatusLabel(acc) }}
         </span>
@@ -113,21 +118,44 @@
     </div>
 
     <div v-if="enhancedAccounts.length === 0 && !loading" class="empty-state">
-      <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="12" width="48" height="40" rx="6" stroke="#d49b50" stroke-width="2" fill="none"/><circle cx="32" cy="30" r="8" stroke="#d49b50" stroke-width="2" fill="none"/><path d="M18 48c4-6 10-10 16-10s12 4 16 10" stroke="#d49b50" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <rect
+          x="8"
+          y="12"
+          width="48"
+          height="40"
+          rx="6"
+          stroke="#00cc99"
+          stroke-width="2"
+          fill="none"
+        />
+        <circle cx="32" cy="30" r="8" stroke="#00cc99" stroke-width="2" fill="none" />
+        <path
+          d="M18 48c4-6 10-10 16-10s12 4 16 10"
+          stroke="#00cc99"
+          stroke-width="2"
+          fill="none"
+          stroke-linecap="round"
+        />
+      </svg>
       <h3>连接你的第一个账号</h3>
       <p>绑定社交媒体账号，开始矩阵管理与数据分析</p>
     </div>
 
     <!-- 批量操作浮动栏 -->
-    <div class="float-bar" v-if="selectedIds.length > 0">
+    <div v-if="selectedIds.length > 0" class="float-bar">
       <span class="float-bar__count">已选 {{ selectedIds.length }} 个账号</span>
       <div class="float-bar__actions">
-        <el-button size="small" @click="handleBatchMove"><el-icon><FolderOpened /></el-icon>批量移动</el-button>
-        <el-button size="small" type="danger" @click="handleBatchDelete"><el-icon><Delete /></el-icon>批量删除</el-button>
+        <el-button size="small" @click="handleBatchMove"
+          ><el-icon><FolderOpened /></el-icon>批量移动</el-button
+        >
+        <el-button size="small" type="danger" @click="handleBatchDelete"
+          ><el-icon><Delete /></el-icon>批量删除</el-button
+        >
       </div>
     </div>
 
-    <div class="account-list__pagination" v-if="accountStore.total > accountStore.filter.pageSize">
+    <div v-if="accountStore.total > accountStore.filter.pageSize" class="account-list__pagination">
       <el-pagination
         v-model:current-page="accountStore.filter.page"
         v-model:page-size="accountStore.filter.pageSize"
@@ -199,11 +227,25 @@
           <p class="companion-online-box__status">已检测到桌面伴侣运行中</p>
           <p class="companion-online-box__hint">选择平台后，桌面伴侣会自动弹出浏览器窗口</p>
           <div class="companion-online-box__btns">
-            <el-button v-for="p in bindablePlatforms" :key="p.id" :type="p.type" size="small" @click="openCompanionScan(p.id)">{{ p.icon }} {{ p.name }}</el-button>
+            <el-button
+              v-for="p in bindablePlatforms"
+              :key="p.id"
+              :type="p.type"
+              size="small"
+              @click="openCompanionScan(p.id)"
+              >{{ p.icon }} {{ p.name }}</el-button
+            >
           </div>
         </div>
         <template v-else>
-          <el-button type="primary" size="large" class="download-btn" tag="a" href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip" target="_blank">
+          <el-button
+            type="primary"
+            size="large"
+            class="download-btn"
+            tag="a"
+            href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+            target="_blank"
+          >
             <el-icon><Download /></el-icon>下载桌面伴侣
           </el-button>
           <div class="companion-offline-box">
@@ -218,7 +260,14 @@
       </div>
       <template #footer>
         <el-button @click="showAddDialog = false">关闭</el-button>
-        <el-button type="primary" @click="showManualDialog = true; showAddDialog = false">手动输入 Cookie</el-button>
+        <el-button
+          type="primary"
+          @click="
+            showManualDialog = true
+            showAddDialog = false
+          "
+          >手动输入 Cookie</el-button
+        >
       </template>
     </el-dialog>
     <!-- Manual Add Dialog -->
@@ -498,8 +547,8 @@ function handleBindSuccess() {
   }
 
   &--selected {
-    border-color: #d49b50;
-    background: rgba(#d49b50, 0.06);
+    border-color: #00cc99;
+    background: rgba(#00cc99, 0.06);
   }
 
   &__check {
@@ -562,17 +611,17 @@ function handleBindSuccess() {
     padding: 2px 10px;
     border-radius: $radius-full;
     &.status--valid {
-      background: rgba(#6b9e6c, 0.1);
-      color: #6b9e6c;
+      background: rgba($color-success, 0.1);
+      color: $color-success;
     }
     &.status--expiring_soon {
-      background: rgba(224, 160, 48, 0.15);
-      color: #f0c060;
+      background: rgba($color-warning, 0.15);
+      color: $color-warning;
     }
     &.status--expired,
     &.status--unknown {
-      background: rgba(#d4534a, 0.1);
-      color: #d4534a;
+      background: rgba($color-danger, 0.1);
+      color: $color-danger;
     }
   }
   &__actions {
@@ -584,8 +633,12 @@ function handleBindSuccess() {
 
 // === Add dialog ===
 .add-dialog {
-  text-align: center; padding: $space-lg;
-  .add-dialog__title { font-size: $text-title; margin-bottom: $space-md; }
+  text-align: center;
+  padding: $space-lg;
+  .add-dialog__title {
+    font-size: $text-title;
+    margin-bottom: $space-md;
+  }
 }
 .companion-online-box {
   background: var(--el-fill-color-lighter);
@@ -593,9 +646,22 @@ function handleBindSuccess() {
   border-radius: $radius-sm;
   padding: $space-md;
   margin-bottom: $space-md;
-  .companion-online-box__status { color: #34C759; font-weight: 600; margin-bottom: $space-sm; }
-  .companion-online-box__hint { color: var(--el-text-color-secondary); font-size: $text-caption; margin-bottom: $space-sm; }
-  .companion-online-box__btns { display: flex; gap: $space-sm; flex-wrap: wrap; justify-content: center; }
+  .companion-online-box__status {
+    color: $color-success;
+    font-weight: 600;
+    margin-bottom: $space-sm;
+  }
+  .companion-online-box__hint {
+    color: var(--el-text-color-secondary);
+    font-size: $text-caption;
+    margin-bottom: $space-sm;
+  }
+  .companion-online-box__btns {
+    display: flex;
+    gap: $space-sm;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
 }
 .companion-offline-box {
   background: var(--el-fill-color-lighter);
@@ -603,22 +669,40 @@ function handleBindSuccess() {
   padding: $space-md;
   text-align: left;
   margin-bottom: $space-md;
-  p { margin: 4px 0; font-size: $text-caption; color: var(--el-text-color-secondary); }
+  p {
+    margin: 4px 0;
+    font-size: $text-caption;
+    color: var(--el-text-color-secondary);
+  }
 }
-.download-btn { margin-bottom: $space-md; }
+.download-btn {
+  margin-bottom: $space-md;
+}
 
 // === Float bar ===
 .float-bar {
-  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: $space-lg;
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: $space-lg;
   background: var(--el-bg-color);
   border: 1px solid var(--el-border-color);
   border-radius: $radius-lg;
   box-shadow: var(--el-box-shadow-dark);
   padding: $space-sm $space-lg;
   z-index: 100;
-  &__count { font-size: $text-body; font-weight: 600; color: var(--el-text-color-primary); }
-  &__actions { display: flex; gap: $space-sm; }
+  &__count {
+    font-size: $text-body;
+    font-weight: 600;
+    color: var(--el-text-color-primary);
+  }
+  &__actions {
+    display: flex;
+    gap: $space-sm;
+  }
 }
 
 // === Empty state ===

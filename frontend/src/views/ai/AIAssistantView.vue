@@ -301,7 +301,9 @@
                     :rows="4"
                     placeholder="输入JSON数组，如: [100, 120, 95, 500, 110]&#10;或点击下方按钮自动填充账号数据"
                   />
-                  <el-button size="small" style="margin-top:8px" @click="autoFillAnomalyData">使用我的账号数据</el-button>
+                  <el-button size="small" style="margin-top: 8px" @click="autoFillAnomalyData"
+                    >使用我的账号数据</el-button
+                  >
                 </el-form-item>
                 <el-form-item label="指标">
                   <el-input v-model="anomalyForm.metric" placeholder="如：粉丝数、播放量" />
@@ -720,11 +722,19 @@ async function autoFillAnomalyData() {
     const res = await analyticsApi.getOverview()
     const followers = res.data?.accounts?.totalFollowers
     if (followers) {
-      const sample = [followers, Math.round(followers * 1.05), Math.round(followers * 0.98), Math.round(followers * 1.12), Math.round(followers * 0.95)]
+      const sample = [
+        followers,
+        Math.round(followers * 1.05),
+        Math.round(followers * 0.98),
+        Math.round(followers * 1.12),
+        Math.round(followers * 0.95),
+      ]
       anomalyForm.value.dataset = JSON.stringify(sample)
       anomalyForm.value.metric = '粉丝数'
     }
-  } catch { ElMessage.warning('获取数据失败') }
+  } catch {
+    ElMessage.warning('获取数据失败')
+  }
 }
 
 async function handleAnomalyDetect() {
@@ -880,8 +890,8 @@ function copyContent() {
 }
 
 .time-slot.is-best {
-  border-color: $color-bronze;
-  background: rgba($color-bronze, 0.06);
+  border-color: $color-accent;
+  background: rgba($color-accent, 0.06);
 }
 
 .slot-rank {
@@ -901,7 +911,7 @@ function copyContent() {
   justify-content: center;
   gap: 8px;
   font-size: $text-caption;
-  color: $color-sage;
+  color: $color-success;
 }
 
 .slot-reason {
@@ -937,11 +947,11 @@ function copyContent() {
 }
 
 .text-success {
-  color: $color-sage;
+  color: $color-success;
 }
 
 .text-danger {
-  color: $color-rust;
+  color: $color-danger;
 }
 
 /* Insights */

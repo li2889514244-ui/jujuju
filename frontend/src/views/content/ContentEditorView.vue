@@ -90,7 +90,7 @@
                       : 'info'
                 "
                 size="small"
-                style="margin: 4px"
+                class="content-tag"
               >
                 {{ item.word }}
               </el-tag>
@@ -105,8 +105,8 @@
               v-for="tag in form.tags"
               :key="tag"
               closable
+              class="content-tag"
               @close="removeTag(tag)"
-              style="margin-right: 8px; margin-bottom: 8px"
             >
               {{ tag }}
             </el-tag>
@@ -115,7 +115,7 @@
               ref="tagInputRef"
               v-model="tagInputValue"
               size="small"
-              style="width: 120px"
+              class="content-tag-input"
               @keyup.enter="addTag"
               @blur="addTag"
             />
@@ -295,5 +295,12 @@ async function handleSaveAndPublish() {
     display: flex;
     flex-wrap: wrap;
   }
+}
+
+.content-tag {
+  margin: 4px;
+}
+.content-tag-input {
+  width: 120px;
 }
 </style>

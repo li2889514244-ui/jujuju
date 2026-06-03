@@ -12,8 +12,12 @@
       <div class="detail-header">
         <h2 class="detail-header__title">{{ post.title || '无标题' }}</h2>
         <div class="detail-header__meta">
-          <el-tag size="small" type="warning">{{ PLATFORM_LABELS[post.platform as keyof typeof PLATFORM_LABELS] || post.platform }}</el-tag>
-          <span class="detail-header__time">{{ formatTime(post.publishAt || post.createdAt) }}</span>
+          <el-tag size="small" type="warning">{{
+            PLATFORM_LABELS[post.platform as keyof typeof PLATFORM_LABELS] || post.platform
+          }}</el-tag>
+          <span class="detail-header__time">{{
+            formatTime(post.publishAt || post.createdAt)
+          }}</span>
         </div>
         <el-divider style="margin: 16px 0" />
       </div>
@@ -171,7 +175,7 @@ defineExpose({ open })
   &__title {
     font-size: 13px;
     font-weight: 500;
-    color: $color-bronze;
+    color: $color-accent;
     margin: 0 0 12px;
     text-transform: uppercase;
     letter-spacing: 0.06em;
@@ -198,8 +202,8 @@ defineExpose({ open })
   gap: 4px;
 
   &--highlight {
-    background: rgba($color-bronze, 0.08);
-    border-color: rgba($color-bronze, 0.18);
+    background: rgba($color-accent, 0.08);
+    border-color: rgba($color-accent, 0.18);
   }
 
   &__label {

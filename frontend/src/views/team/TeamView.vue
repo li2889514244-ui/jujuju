@@ -15,7 +15,7 @@
         </div>
       </template>
 
-      <el-table :data="teamStore.members" stripe v-loading="teamStore.loading">
+      <el-table v-loading="teamStore.loading" :data="teamStore.members" stripe>
         <el-table-column label="成员" min-width="200">
           <template #default="{ row }">
             <div class="team__member">
@@ -155,12 +155,11 @@ function formatTime(time: string) {
   &__member-name {
     font-size: $text-body;
     font-weight: 500;
-    color: #f0ece4;
+    color: $color-text-primary;
   }
-
   &__member-email {
     font-size: $text-caption;
-    color: #b8b0a8;
+    color: $color-text-secondary;
   }
 
   &__owner-label {
@@ -168,5 +167,8 @@ function formatTime(time: string) {
     color: var(--el-text-color-placeholder);
   }
 }
-.team__role-select { width: 100px; margin-right: $space-sm; }
+.team__role-select {
+  width: 100px;
+  margin-right: $space-sm;
+}
 </style>

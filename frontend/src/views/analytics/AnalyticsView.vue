@@ -5,19 +5,19 @@
       <div class="analytics__skeleton">
         <!-- Filter bar skeleton -->
         <el-card shadow="hover" class="analytics__filter">
-          <el-skeleton :rows="1" animated style="width: 70%;" />
+          <el-skeleton :rows="1" animated style="width: 70%" />
         </el-card>
         <!-- Chart row 1 -->
         <el-row :gutter="20" class="analytics__charts">
           <el-col :xs="24" :lg="12">
             <el-card shadow="hover">
-              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <template #header><el-skeleton :rows="1" animated style="width: 120px" /></template>
               <el-skeleton :rows="12" animated />
             </el-card>
           </el-col>
           <el-col :xs="24" :lg="12">
             <el-card shadow="hover">
-              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <template #header><el-skeleton :rows="1" animated style="width: 120px" /></template>
               <el-skeleton :rows="12" animated />
             </el-card>
           </el-col>
@@ -26,20 +26,20 @@
         <el-row :gutter="20" class="analytics__charts">
           <el-col :xs="24" :lg="12">
             <el-card shadow="hover">
-              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <template #header><el-skeleton :rows="1" animated style="width: 120px" /></template>
               <el-skeleton :rows="12" animated />
             </el-card>
           </el-col>
           <el-col :xs="24" :lg="12">
             <el-card shadow="hover">
-              <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+              <template #header><el-skeleton :rows="1" animated style="width: 120px" /></template>
               <el-skeleton :rows="12" animated />
             </el-card>
           </el-col>
         </el-row>
         <!-- Table skeleton -->
         <el-card shadow="hover">
-          <template #header><el-skeleton :rows="1" animated style="width: 120px;" /></template>
+          <template #header><el-skeleton :rows="1" animated style="width: 120px" /></template>
           <el-skeleton :rows="6" animated />
         </el-card>
       </div>
@@ -47,158 +47,160 @@
 
     <!-- Actual content -->
     <template v-else>
-    <el-card shadow="hover" class="analytics__filter">
-      <el-form :inline="true">
-        <el-form-item label="时间范围">
-          <el-select v-model="days" style="width: 140px" @change="refreshData">
-            <el-option label="近7天" :value="7" />
-            <el-option label="近30天" :value="30" />
-            <el-option label="近90天" :value="90" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="平台">
-          <el-select
-            v-model="platform"
-            placeholder="全部平台"
-            clearable
-            style="width: 140px"
-            @change="refreshData"
-          >
-            <el-option label="全部" value="" />
-            <el-option
-              v-for="(label, key) in PLATFORM_LABELS"
-              :key="key"
-              :label="label"
-              :value="key"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="refreshData" :loading="loadingCharts">查询</el-button>
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleCollect" :loading="collecting" type="success"
-            >手动采集真实数据</el-button
-          >
-        </el-form-item>
-        <el-form-item>
-          <el-button @click="handleExport">导出报表</el-button>
-        </el-form-item>
-      </el-form>
-    </el-card>
+      <el-card shadow="hover" class="analytics__filter">
+        <el-form :inline="true">
+          <el-form-item label="时间范围">
+            <el-select v-model="days" style="width: 140px" @change="refreshData">
+              <el-option label="近7天" :value="7" />
+              <el-option label="近30天" :value="30" />
+              <el-option label="近90天" :value="90" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="平台">
+            <el-select
+              v-model="platform"
+              placeholder="全部平台"
+              clearable
+              style="width: 140px"
+              @change="refreshData"
+            >
+              <el-option label="全部" value="" />
+              <el-option
+                v-for="(label, key) in PLATFORM_LABELS"
+                :key="key"
+                :label="label"
+                :value="key"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item>
+            <el-button type="primary" :loading="loadingCharts" @click="refreshData">查询</el-button>
+          </el-form-item>
+          <el-form-item>
+            <el-button :loading="collecting" type="success" @click="handleCollect"
+              >手动采集真实数据</el-button
+            >
+          </el-form-item>
+          <el-form-item>
+            <el-button @click="handleExport">导出报表</el-button>
+          </el-form-item>
+        </el-form>
+      </el-card>
 
-    <el-row :gutter="20" class="analytics__charts">
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>粉丝增长趋势</template>
-          <DataChart :option="followerChart" :height="350" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>互动率趋势</template>
-          <DataChart :option="engagementChart" :height="350" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="analytics__charts">
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>发布效果</template>
-          <DataChart :option="publishEffectChart" :height="350" />
-        </el-card>
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <el-card shadow="hover">
-          <template #header>平台对比</template>
-          <DataChart :option="platformCompareChart" :height="350" />
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-card shadow="hover">
-      <template #header>平台数据明细</template>
-      <el-table :data="platformStats" stripe
-        ><template #empty><el-empty description="暂无平台数据，请先添加账号" /></template>
-        <el-table-column label="平台" width="100">
-          <template #default="{ row }"
-            ><PlatformIcon :platform="row.platform" show-label
-          /></template>
-        </el-table-column>
-        <el-table-column prop="accounts" label="账号数" width="100" />
-        <el-table-column prop="followers" label="粉丝数" width="120">
-          <template #default="{ row }">{{ row.followers?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="likes" label="获赞数" width="120">
-          <template #default="{ row }">{{ row.likes?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="publishes" label="发布数" width="100" />
-        <el-table-column prop="engagementRate" label="互动率" width="100">
-          <template #default="{ row }">{{ row.engagementRate }}%</template>
-        </el-table-column>
-      </el-table>
-    </el-card>
-
-    <el-card shadow="hover" class="analytics__comparison">
-      <template #header>数据对比（同比/环比）</template>
-      <el-row :gutter="20">
-        <el-col :xs="24" :md="8" v-for="(item, key) in comparisonLabels" :key="key">
-          <div class="comparison-card">
-            <div class="comparison-card__title">{{ item.label }}</div>
-            <div class="comparison-card__metrics" v-if="comparison">
-              <div class="comparison-metric" v-for="metric in metricKeys" :key="metric">
-                <span class="comparison-metric__label">{{ metricLabels[metric] }}</span>
-                <span class="comparison-metric__value">{{
-                  formatNum(comparison[key]?.current?.[metric])
-                }}</span>
-                <span
-                  class="comparison-metric__change"
-                  :class="getChangeClass(comparison[key]?.change?.[metric])"
-                >
-                  {{ formatChange(comparison[key]?.change?.[metric]) }}
-                </span>
-              </div>
-            </div>
-          </div>
+      <el-row :gutter="20" class="analytics__charts">
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="hover">
+            <template #header>粉丝增长趋势</template>
+            <DataChart :option="followerChart" :height="350" />
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="hover">
+            <template #header>互动率趋势</template>
+            <DataChart :option="engagementChart" :height="350" />
+          </el-card>
         </el-col>
       </el-row>
-    </el-card>
 
-    <el-card shadow="hover" class="analytics__ranking">
-      <template #header>
-        <div class="ranking-header">
-          <span>播放量排行榜</span>
-          <el-radio-group v-model="rankingPeriod" size="small" @change="loadRanking">
-            <el-radio-button value="week">周榜</el-radio-button>
-            <el-radio-button value="month">月榜</el-radio-button>
-            <el-radio-button value="all">总榜</el-radio-button>
-          </el-radio-group>
-        </div>
-      </template>
-      <el-table :data="viewsRanking" v-loading="rankingLoading" stripe @row-click="handleRowClick"
-        ><template #empty><el-empty description="暂无排行数据" /></template>
-        <el-table-column label="排名" width="70">
-          <template #default="{ row }">
-            <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{ row.rank }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="内容" min-width="200">
-          <template #default="{ row }">
-            <div class="ranking-title">{{ row.title }}</div>
-            <div class="ranking-meta">{{ row.accountName }} · {{ row.platform }}</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="views" label="播放量" width="120">
-          <template #default="{ row }">{{ row.views?.toLocaleString() }}</template>
-        </el-table-column>
-        <el-table-column prop="likes" label="点赞" width="100">
-          <template #default="{ row }">{{ row.likes?.toLocaleString() }}</template>
-        </el-table-column>
-      </el-table>
-    </el-card>
+      <el-row :gutter="20" class="analytics__charts">
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="hover">
+            <template #header>发布效果</template>
+            <DataChart :option="publishEffectChart" :height="350" />
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :lg="12">
+          <el-card shadow="hover">
+            <template #header>平台对比</template>
+            <DataChart :option="platformCompareChart" :height="350" />
+          </el-card>
+        </el-col>
+      </el-row>
 
-    <PostDetailDrawer ref="detailDrawerRef" />
+      <el-card shadow="hover">
+        <template #header>平台数据明细</template>
+        <el-table :data="platformStats" stripe
+          ><template #empty><el-empty description="暂无平台数据，请先添加账号" /></template>
+          <el-table-column label="平台" width="100">
+            <template #default="{ row }"
+              ><PlatformIcon :platform="row.platform" show-label
+            /></template>
+          </el-table-column>
+          <el-table-column prop="accounts" label="账号数" width="100" />
+          <el-table-column prop="followers" label="粉丝数" width="120">
+            <template #default="{ row }">{{ row.followers?.toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column prop="likes" label="获赞数" width="120">
+            <template #default="{ row }">{{ row.likes?.toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column prop="publishes" label="发布数" width="100" />
+          <el-table-column prop="engagementRate" label="互动率" width="100">
+            <template #default="{ row }">{{ row.engagementRate }}%</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <el-card shadow="hover" class="analytics__comparison">
+        <template #header>数据对比（同比/环比）</template>
+        <el-row :gutter="20">
+          <el-col v-for="(item, key) in comparisonLabels" :key="key" :xs="24" :md="8">
+            <div class="comparison-card">
+              <div class="comparison-card__title">{{ item.label }}</div>
+              <div v-if="comparison" class="comparison-card__metrics">
+                <div v-for="metric in metricKeys" :key="metric" class="comparison-metric">
+                  <span class="comparison-metric__label">{{ metricLabels[metric] }}</span>
+                  <span class="comparison-metric__value">{{
+                    formatNum(comparison[key]?.current?.[metric])
+                  }}</span>
+                  <span
+                    class="comparison-metric__change"
+                    :class="getChangeClass(comparison[key]?.change?.[metric])"
+                  >
+                    {{ formatChange(comparison[key]?.change?.[metric]) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </el-col>
+        </el-row>
+      </el-card>
+
+      <el-card shadow="hover" class="analytics__ranking">
+        <template #header>
+          <div class="ranking-header">
+            <span>播放量排行榜</span>
+            <el-radio-group v-model="rankingPeriod" size="small" @change="loadRanking">
+              <el-radio-button value="week">周榜</el-radio-button>
+              <el-radio-button value="month">月榜</el-radio-button>
+              <el-radio-button value="all">总榜</el-radio-button>
+            </el-radio-group>
+          </div>
+        </template>
+        <el-table v-loading="rankingLoading" :data="viewsRanking" stripe @row-click="handleRowClick"
+          ><template #empty><el-empty description="暂无排行数据" /></template>
+          <el-table-column label="排名" width="70">
+            <template #default="{ row }">
+              <span class="rank-badge" :class="`rank-${Math.min(row.rank, 3)}`">{{
+                row.rank
+              }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="内容" min-width="200">
+            <template #default="{ row }">
+              <div class="ranking-title">{{ row.title }}</div>
+              <div class="ranking-meta">{{ row.accountName }} · {{ row.platform }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="views" label="播放量" width="120">
+            <template #default="{ row }">{{ row.views?.toLocaleString() }}</template>
+          </el-table-column>
+          <el-table-column prop="likes" label="点赞" width="100">
+            <template #default="{ row }">{{ row.likes?.toLocaleString() }}</template>
+          </el-table-column>
+        </el-table>
+      </el-card>
+
+      <PostDetailDrawer ref="detailDrawerRef" />
     </template>
   </div>
 </template>
@@ -422,7 +424,9 @@ async function loadRanking() {
   try {
     const r = await analyticsApi.getViewsRanking({ period: rankingPeriod.value as any, limit: 50 })
     viewsRanking.value = r.data?.ranking || []
-  } catch {}
+  } catch {
+    /* noop */
+  }
   rankingLoading.value = false
 }
 
@@ -512,14 +516,13 @@ onMounted(() => {
   }
 }
 .comparison-card {
-  padding: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  @include card;
+  padding: $space-sm $space-md;
   &__title {
     font-size: $text-body;
     font-weight: 600;
-    color: #f0ece4;
-    margin-bottom: 12px;
+    color: $color-text-primary;
+    margin-bottom: $space-sm;
   }
 }
 .comparison-metric {
@@ -527,18 +530,18 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid #f5f7fa;
+  border-bottom: 1px solid $color-border;
   &:last-child {
     border-bottom: none;
   }
   &__label {
     font-size: 13px;
-    color: #98989d;
+    color: $color-text-tertiary;
   }
   &__value {
     font-size: $text-body;
     font-weight: 500;
-    color: #f0ece4;
+    color: $color-text-primary;
   }
   &__change {
     font-size: $text-caption;
@@ -548,10 +551,10 @@ onMounted(() => {
   }
 }
 .change--up {
-  color: #6b9e6c;
+  color: $color-success;
 }
 .change--down {
-  color: #d4534a;
+  color: $color-danger;
 }
 .ranking-header {
   display: flex;
@@ -561,14 +564,14 @@ onMounted(() => {
 }
 .ranking-title {
   font-size: $text-body;
-  color: #f0ece4;
+  color: $color-text-primary;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .ranking-meta {
   font-size: $text-caption;
-  color: #b8b0a8;
+  color: $color-text-secondary;
   margin-top: 2px;
 }
 .rank-badge {
@@ -583,12 +586,12 @@ onMounted(() => {
   color: #fff;
 }
 .rank-1 {
-  background: #f5a623;
+  background: $color-warning;
 }
 .rank-2 {
-  background: #b8b0a8;
+  background: $color-text-secondary;
 }
 .rank-3 {
-  background: #b87333;
+  background: $color-accent-alt;
 }
 </style>

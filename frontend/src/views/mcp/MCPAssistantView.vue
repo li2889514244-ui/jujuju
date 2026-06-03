@@ -4,11 +4,7 @@
     <aside class="mcp-page__tools" :class="{ 'mcp-page__tools--collapsed': toolsCollapsed }">
       <div class="tools-header">
         <h3 v-if="!toolsCollapsed">可用工具</h3>
-        <el-button
-          text
-          class="tools-toggle"
-          @click="toolsCollapsed = !toolsCollapsed"
-        >
+        <el-button text class="tools-toggle" @click="toolsCollapsed = !toolsCollapsed">
           <el-icon :size="16">
             <component :is="toolsCollapsed ? DArrowRight : DArrowLeft" />
           </el-icon>
@@ -289,7 +285,9 @@ function scrollToBottom() {
   &--collapsed {
     width: 48px;
 
-    .tools-header { justify-content: center; }
+    .tools-header {
+      justify-content: center;
+    }
   }
 }
 
@@ -313,7 +311,9 @@ function scrollToBottom() {
 .tools-toggle {
   color: $color-text-tertiary;
   padding: 4px;
-  &:hover { color: $color-text-primary; }
+  &:hover {
+    color: $color-text-primary;
+  }
 }
 
 .tools-body {
@@ -335,7 +335,7 @@ function scrollToBottom() {
 
 .tools-error {
   flex-wrap: wrap;
-  color: $color-rust;
+  color: $color-danger;
 }
 
 .tools-list {
@@ -352,8 +352,8 @@ function scrollToBottom() {
   transition: all 0.2s;
 
   &:hover {
-    background: rgba(212, 155, 80, 0.05);
-    border-color: rgba(212, 155, 80, 0.12);
+    background: rgba(0, 204, 153, 0.05);
+    border-color: rgba(0, 204, 153, 0.12);
   }
 
   &__name {
@@ -362,7 +362,7 @@ function scrollToBottom() {
     gap: 6px;
     font-size: $text-caption;
     font-weight: 500;
-    color: $color-bronze;
+    color: $color-accent;
     margin-bottom: 4px;
   }
 
@@ -401,7 +401,7 @@ function scrollToBottom() {
     display: flex;
     align-items: center;
     gap: 8px;
-    color: $color-bronze;
+    color: $color-accent;
 
     h2 {
       margin: 0;
@@ -430,7 +430,10 @@ function scrollToBottom() {
   flex: 1;
   color: $color-text-tertiary;
 
-  &__icon { margin-bottom: $space-md; opacity: 0.4; }
+  &__icon {
+    margin-bottom: $space-md;
+    opacity: 0.4;
+  }
 
   &__title {
     font-size: $text-title;
@@ -448,8 +451,12 @@ function scrollToBottom() {
 .chat-message {
   display: flex;
 
-  &--user { justify-content: flex-end; }
-  &--assistant { justify-content: flex-start; }
+  &--user {
+    justify-content: flex-end;
+  }
+  &--assistant {
+    justify-content: flex-start;
+  }
 }
 
 .message-bubble {
@@ -461,8 +468,8 @@ function scrollToBottom() {
   word-break: break-word;
 
   &--user {
-    background: linear-gradient(135deg, rgba(212, 155, 80, 0.2), rgba(200, 133, 64, 0.15));
-    border: 1px solid rgba(212, 155, 80, 0.2);
+    background: linear-gradient(135deg, rgba(0, 204, 153, 0.15), rgba(59, 130, 246, 0.1));
+    border: 1px solid rgba(0, 204, 153, 0.2);
     color: $color-text-primary;
     border-bottom-right-radius: $radius-sm;
   }
@@ -488,7 +495,7 @@ function scrollToBottom() {
   display: flex;
   align-items: center;
   gap: 6px;
-  color: $color-rust;
+  color: $color-danger;
   font-size: $text-caption;
 }
 
@@ -534,8 +541,12 @@ function scrollToBottom() {
     border-color: $color-border;
     color: $color-text-primary;
 
-    &::placeholder { color: $color-text-placeholder; }
-    &:focus { border-color: $color-bronze; }
+    &::placeholder {
+      color: $color-text-placeholder;
+    }
+    &:focus {
+      border-color: $color-accent;
+    }
   }
 }
 </style>

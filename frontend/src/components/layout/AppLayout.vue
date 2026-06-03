@@ -22,13 +22,13 @@ function onPageEnter() {
   requestAnimationFrame(() => {
     document.querySelectorAll('.stagger-item').forEach((el, i) => {
       const htmlEl = el as HTMLElement
-      htmlEl.style.transitionDelay = `${i * 50}ms`
+      htmlEl.style.transitionDelay = `${i * 40}ms`
       htmlEl.classList.add('stagger-visible')
       setTimeout(
         () => {
           htmlEl.style.transitionDelay = '0ms'
         },
-        600 + i * 50,
+        500 + i * 40,
       )
     })
   })
@@ -58,7 +58,7 @@ function onPageEnter() {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: $space-2xl $space-3xl;
+    padding: $space-xl $space-2xl;
     position: relative;
   }
 }

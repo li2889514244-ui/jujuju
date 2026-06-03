@@ -7,8 +7,12 @@
       </div>
 
       <div class="login__switch">
-        <button :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">登录</button>
-        <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">注册</button>
+        <button :class="{ active: activeTab === 'login' }" @click="activeTab = 'login'">
+          登录
+        </button>
+        <button :class="{ active: activeTab === 'register' }" @click="activeTab = 'register'">
+          注册
+        </button>
       </div>
 
       <div v-show="activeTab === 'login'">
@@ -105,7 +109,10 @@ const registerFormRef = ref<FormInstance>()
 
 const loginForm = reactive({ email: '', password: '' })
 const registerForm = reactive({
-  name: '', email: '', password: '', confirmPassword: '',
+  name: '',
+  email: '',
+  password: '',
+  confirmPassword: '',
 })
 
 const loginRules: FormRules = {
@@ -120,10 +127,15 @@ const loginRules: FormRules = {
 }
 
 const validateConfirmPassword = (
-  _rule: unknown, value: string, callback: (error?: Error) => void,
+  _rule: unknown,
+  value: string,
+  callback: (error?: Error) => void,
 ) => {
-  if (value !== registerForm.password) { callback(new Error('两次密码不一致')) }
-  else { callback() }
+  if (value !== registerForm.password) {
+    callback(new Error('两次密码不一致'))
+  } else {
+    callback()
+  }
 }
 
 const registerRules: FormRules = {
@@ -154,8 +166,11 @@ async function handleLogin() {
     ElMessage.success('登录成功')
     const redirect = (route.query.redirect as string) || '/dashboard'
     router.push(redirect)
-  } catch { /* 错误已由拦截器处理 */ }
-  finally { loading.value = false }
+  } catch {
+    /* 错误已由拦截器处理 */
+  } finally {
+    loading.value = false
+  }
 }
 
 async function handleRegister() {
@@ -168,8 +183,11 @@ async function handleRegister() {
     ElMessage.success('注册成功，请登录')
     activeTab.value = 'login'
     loginForm.email = registerForm.email
-  } catch { /* 错误已由拦截器处理 */ }
-  finally { loading.value = false }
+  } catch {
+    /* 错误已由拦截器处理 */
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -189,8 +207,8 @@ async function handleRegister() {
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(ellipse 60% 30% at 50% 0%, rgba(212, 155, 80, 0.05) 0%, transparent 60%),
-      radial-gradient(ellipse 30% 40% at 80% 100%, rgba(200, 133, 64, 0.03) 0%, transparent 50%);
+      radial-gradient(ellipse 60% 30% at 50% 0%, rgba(0, 204, 153, 0.04) 0%, transparent 60%),
+      radial-gradient(ellipse 30% 40% at 80% 100%, rgba(59, 130, 246, 0.03) 0%, transparent 50%);
     pointer-events: none;
   }
 
@@ -199,7 +217,7 @@ async function handleRegister() {
     padding: $space-2xl;
     position: relative;
     z-index: 1;
-    background: rgba(32, 29, 27, 0.8);
+    background: rgba($color-bg-elevated, 0.85);
     backdrop-filter: blur(40px) saturate(120%);
     -webkit-backdrop-filter: blur(40px) saturate(120%);
     border: 1px solid $color-border;
@@ -213,10 +231,10 @@ async function handleRegister() {
   }
 
   &__title {
-    font-family: $font-display;
+    font-family: $font-heading;
     font-size: 28px;
     font-weight: 600;
-    color: $color-cream;
+    color: $color-text-primary;
     margin-bottom: 6px;
     letter-spacing: 0.02em;
   }
@@ -248,7 +266,7 @@ async function handleRegister() {
       &.active {
         background: $color-bg-elevated;
         color: $color-text-primary;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
       }
     }
   }

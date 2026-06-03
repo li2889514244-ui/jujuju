@@ -7,7 +7,7 @@
         <span class="subtitle">管理已授权的第三方平台账号</span>
       </div>
       <div class="header-actions">
-        <el-button v-if="hasOAuthAccounts" @click="refreshAllTokens" :loading="refreshing">
+        <el-button v-if="hasOAuthAccounts" :loading="refreshing" @click="refreshAllTokens">
           <el-icon><Refresh /></el-icon>
           刷新Token
         </el-button>
@@ -17,7 +17,7 @@
     <!-- 平台概览卡片 -->
     <div class="platform-stats">
       <el-row :gutter="16">
-        <el-col :xs="12" :sm="6" :md="4" :lg="3" v-for="stat in platformStats" :key="stat.platform">
+        <el-col v-for="stat in platformStats" :key="stat.platform" :xs="12" :sm="6" :md="4" :lg="3">
           <el-card shadow="hover" class="stat-card" :class="{ active: stat.count > 0 }">
             <div class="stat-icon">
               <PlatformIcon :platform="stat.platform" :size="32" />
@@ -42,12 +42,12 @@
         placeholder="搜索账号名称..."
         prefix-icon="Search"
         clearable
-        style="width: 240px; margin-left: 12px"
+        class="filter-bar__search"
       />
     </div>
 
     <!-- 已授权账号列表 -->
-    <el-table :data="filteredAccounts" v-loading="loading" stripe style="width: 100%">
+    <el-table v-loading="loading" :data="filteredAccounts" stripe style="width: 100%">
       <el-table-column label="平台" width="100">
         <template #default="{ row }">
           <div class="platform-cell">
@@ -126,16 +126,16 @@
 
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="collectData(row)" :loading="row._collecting">
+          <el-button size="small" :loading="row._collecting" @click="collectData(row)">
             采集数据
           </el-button>
           <el-button
             v-if="!isCookiePlatform(row.platform)"
             size="small"
             type="warning"
-            @click="refreshToken(row)"
             :loading="row._refreshing"
             :disabled="row.tokenStatus === 'valid'"
+            @click="refreshToken(row)"
           >
             刷新Token
           </el-button>
@@ -154,7 +154,7 @@
     </el-table>
 
     <!-- 分页 -->
-    <div class="pagination-wrapper" v-if="total > pageSize">
+    <div v-if="total > pageSize" class="pagination-wrapper">
       <el-pagination
         v-model:current-page="currentPage"
         :page-size="pageSize"
@@ -412,66 +412,67 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
+@import '@/assets/styles/variables';
+
 .platform-manage {
-  padding: $space-lg;
+  padding: 0;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 24px;
+  margin-bottom: $space-lg;
 
   .header-left {
     h2 {
       margin: 0 0 4px 0;
       font-size: $text-headline;
       font-weight: 600;
-      color: #1a1a1a;
+      color: $color-text-primary;
+      font-family: $font-heading;
     }
     .subtitle {
       font-size: $text-body;
-      color: #8c8c8c;
+      color: $color-text-tertiary;
     }
   }
-
   .header-actions {
     display: flex;
-    gap: 8px;
+    gap: $space-xs;
   }
 }
 
 .platform-stats {
-  margin-bottom: 20px;
+  margin-bottom: $space-lg;
 
   .stat-card {
     text-align: center;
     cursor: pointer;
-    transition: all 0.3s;
-    border: 2px solid transparent;
+    transition: all 0.2s $ease-out;
+    border: 1px solid $color-border;
 
     &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      border-color: $color-border-hover;
     }
 
     &.active {
-      border-color: #E60012;
+      border-color: $color-accent;
     }
 
     .stat-icon {
-      margin-bottom: 8px;
+      margin-bottom: $space-xs;
     }
 
     .stat-info {
       .stat-name {
         font-size: $text-body;
         font-weight: 500;
-        color: #f0ece4;
+        color: $color-text-primary;
       }
       .stat-count {
         font-size: $text-caption;
-        color: #b8b0a8;
+        color: $color-text-secondary;
         margin-top: 4px;
       }
     }
@@ -481,78 +482,80 @@ onMounted(async () => {
 .filter-bar {
   display: flex;
   align-items: center;
-  margin-bottom: 16px;
+  gap: $space-sm;
+  margin-bottom: $space-md;
+  &__search {
+    width: 240px;
+  }
 }
 
 .platform-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: $space-xs;
 }
 
 .account-cell {
   display: flex;
   align-items: center;
-  gap: 12px;
-
+  gap: $space-sm;
   .account-info {
     .nickname {
       font-weight: 500;
-      color: #f0ece4;
+      color: $color-text-primary;
     }
     .uid {
       font-size: $text-caption;
-      color: #b8b0a8;
+      color: $color-text-secondary;
     }
   }
 }
 
 .metric {
   font-weight: 500;
-  color: #f0ece4;
+  color: $color-text-primary;
 }
-
 .time-text {
   font-size: 13px;
-  color: #b8b0a8;
+  color: $color-text-secondary;
 }
 
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: 16px;
+  margin-top: $space-md;
 }
 
 .platform-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: $space-md;
 
   .platform-option {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 8px;
+    gap: $space-xs;
     padding: $space-lg;
-    border: 1px solid #e4e7ed;
-    border-radius: 8px;
+    border: 1px solid $color-border;
+    border-radius: $radius-md;
     cursor: pointer;
-    transition: all 0.3s;
+    transition: all 0.2s $ease-out;
 
     &:hover {
-      border-color: #E60012;
-      background: #f0f7ff;
+      border-color: $color-accent;
+      background: rgba($color-accent, 0.04);
     }
 
     &.authorized {
-      border-color: #6b9e6c;
-      background: #f0f9eb;
+      border-color: rgba($color-success, 0.3);
+      background: rgba($color-success, 0.05);
     }
 
     .platform-name {
       font-size: $text-body;
       font-weight: 500;
-      color: #f0ece4;
+      color: $color-text-primary;
     }
   }
 }

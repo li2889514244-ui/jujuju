@@ -5,40 +5,44 @@
       <div class="dashboard__skeleton">
         <!-- Hero skeleton -->
         <div class="dashboard__hero">
-          <el-skeleton :rows="1" animated style="width: 80px; margin: 0 auto;" />
-          <el-skeleton :rows="1" animated style="width: 200px; height: 80px; margin: 12px auto;" />
-          <el-skeleton :rows="1" animated style="width: 48px; height: 2px; margin: 20px auto;" />
+          <el-skeleton :rows="1" animated style="width: 80px; margin: 0 auto" />
+          <el-skeleton :rows="1" animated style="width: 200px; height: 80px; margin: 12px auto" />
+          <el-skeleton :rows="1" animated style="width: 48px; height: 2px; margin: 20px auto" />
         </div>
         <!-- Sub KPIs skeleton -->
         <div class="dashboard__sub-row">
           <div class="sub-kpis">
             <div v-for="i in 3" :key="i" class="sub-kpi">
-              <el-skeleton :rows="2" animated style="width: 80px;" />
+              <el-skeleton :rows="2" animated style="width: 80px" />
             </div>
           </div>
         </div>
         <!-- Time comparison cards skeleton -->
         <div class="dashboard__time-cards">
-          <div v-for="i in 2" :key="i" class="card-default" style="padding: 20px;">
+          <div v-for="i in 2" :key="i" class="card-default">
             <el-skeleton :rows="3" animated />
           </div>
         </div>
         <!-- Charts skeleton -->
         <div class="dashboard__charts">
-          <div v-for="i in 2" :key="i" class="card-default" style="padding: 20px;">
+          <div v-for="i in 2" :key="i" class="card-default">
             <el-skeleton :rows="10" animated />
           </div>
         </div>
         <!-- Account cards skeleton -->
         <div class="dashboard__accounts">
-          <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 16px;">
-            <el-skeleton :rows="1" animated style="width: 48px;" />
-            <el-skeleton :rows="1" animated style="width: 24px;" />
+          <div class="dashboard__skeleton-row">
+            <el-skeleton :rows="1" animated style="width: 48px" />
+            <el-skeleton :rows="1" animated style="width: 24px" />
           </div>
           <div class="account-grid">
-            <div v-for="i in 4" :key="i" class="account-card" style="pointer-events: none;">
-              <el-skeleton :rows="1" animated style="width: 34px; height: 34px; border-radius: 50%;" />
-              <el-skeleton :rows="2" animated style="width: 100px;" />
+            <div v-for="i in 4" :key="i" class="account-card" style="pointer-events: none">
+              <el-skeleton
+                :rows="1"
+                animated
+                style="width: 34px; height: 34px; border-radius: 50%"
+              />
+              <el-skeleton :rows="2" animated style="width: 100px" />
             </div>
           </div>
         </div>
@@ -47,117 +51,145 @@
 
     <!-- Actual content (hidden during skeleton) -->
     <template v-else>
-    <!-- Hero KPI -->
-    <div class="dashboard__hero" v-if="accountRows.length > 0">
-      <p class="hero-label">总粉丝</p>
-      <p class="hero-value display-number">{{ formatLargeNum(groupSummaryCards[0]?.rawValue || 0) }}</p>
-      <div class="hero-rule"></div>
-    </div>
-
-    <!-- 次级指标 + 操作 -->
-    <div class="dashboard__sub-row" v-if="accountRows.length > 0">
-      <div class="sub-kpis">
-        <div class="sub-kpi" v-for="card in groupSummaryCards.slice(1)" :key="card.label">
-          <span class="sub-kpi__value display-number">{{ formatLargeNum(card.rawValue) }}</span>
-          <span class="sub-kpi__label">{{ card.label }}</span>
-        </div>
+      <!-- Hero KPI -->
+      <div v-if="accountRows.length > 0" class="dashboard__hero">
+        <p class="hero-label">总粉丝</p>
+        <p class="hero-value display-number">
+          {{ formatLargeNum(groupSummaryCards[0]?.rawValue || 0) }}
+        </p>
+        <div class="hero-rule"></div>
       </div>
-      <div class="sub-actions">
-        <el-radio-group v-model="period" size="small" @change="onPeriodChange">
-          <el-radio-button value="day">日</el-radio-button>
-          <el-radio-button value="week">周</el-radio-button>
-        </el-radio-group>
-        <el-button size="small" @click="exportCSV" :disabled="accountRows.length === 0">导出</el-button>
-        <el-button :icon="Refresh" size="small" circle @click="refreshAll" :loading="loading" />
-      </div>
-    </div>
 
-    <!-- 时间维度对比卡片 -->
-    <div class="dashboard__time-cards" v-if="accountRows.length > 0">
-      <StatCard
-        v-for="(card, idx) in timeComparisonCards"
-        :key="card.label"
-        :label="card.label"
-        :value="card.rawValue"
-        :formatter="formatLargeNum"
-        :trend="card.trend"
-        :trend-label="card.label.startsWith('本周') ? '较上周' : '较上月'"
-        :accent-color="card.color"
-        :animated="false"
-        :delay="idx * 80"
-      />
-    </div>
-
-    <!-- 分组切换 -->
-    <div class="dashboard__groups" v-if="accountGroups.length > 0">
-      <el-select v-model="selectedGroup" size="small" @change="onGroupChange" style="width:120px">
-        <el-option label="全部" value="all" />
-        <el-option v-for="g in accountGroups" :key="g.name" :label="g.name" :value="g.name" />
-      </el-select>
-    </div>
-
-    <!-- 图表区 -->
-    <div class="dashboard__charts" v-if="accountRows.length > 0">
-      <div class="card-default stagger-item">
-        <div class="chart-header">
-          <span class="chart-title">增长趋势</span>
-          <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
-            <el-radio-button :value="7">7 天</el-radio-button>
-            <el-radio-button :value="30">30 天</el-radio-button>
-          </el-radio-group>
-        </div>
-        <DataChart :option="followerChartOption" :height="280" />
-      </div>
-      <div class="card-default stagger-item">
-        <div class="chart-header">
-          <span class="chart-title">平台分布</span>
-        </div>
-        <DataChart :option="platformChartOption" :height="280" />
-      </div>
-    </div>
-
-    <!-- 账号卡片 -->
-    <div class="dashboard__accounts" v-if="accountRows.length > 0">
-      <div class="section-header">
-        <span class="section-header__title">账号</span>
-        <span class="section-header__count">{{ accountRows.length }}</span>
-        <router-link to="/accounts" class="section-header__link">查看全部</router-link>
-      </div>
-      <div class="account-grid">
-        <router-link
-          v-for="(acc, i) in displayAccounts"
-          :key="acc.id"
-          :to="`/accounts/${acc.id}`"
-          class="account-card stagger-item"
-          :style="{ transitionDelay: `${i * 40}ms` }"
-        >
-          <el-avatar :size="34" :src="acc.avatar">
-            {{ acc.nickname?.charAt(0) }}
-          </el-avatar>
-          <div class="account-card__info">
-            <span class="account-card__name">{{ acc.nickname }}</span>
-            <PlatformBadge :platform="acc.platform" size="sm" />
+      <!-- 次级指标 + 操作 -->
+      <div v-if="accountRows.length > 0" class="dashboard__sub-row">
+        <div class="sub-kpis">
+          <div v-for="card in groupSummaryCards.slice(1)" :key="card.label" class="sub-kpi">
+            <span class="sub-kpi__value display-number">{{ formatLargeNum(card.rawValue) }}</span>
+            <span class="sub-kpi__label">{{ card.label }}</span>
           </div>
-          <el-icon :size="14" class="account-card__arrow"><ArrowRight /></el-icon>
-        </router-link>
-      </div>
-    </div>
-
-    <!-- 空状态 -->
-    <div class="dashboard__empty" v-if="accountRows.length === 0 && !loading">
-      <div class="empty-state">
-        <div class="empty-state__icon">
-          <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
-            <rect x="8" y="12" width="56" height="48" rx="8" stroke="#d49b50" stroke-width="1" opacity="0.3" />
-            <circle cx="36" cy="36" r="14" stroke="#d49b50" stroke-width="1" opacity="0.15" stroke-dasharray="4 4" />
-            <circle cx="36" cy="36" r="5" fill="#d49b50" opacity="0.4" />
-          </svg>
         </div>
-        <h3 class="empty-state__title">连接你的第一个账号</h3>
-        <p class="empty-state__desc">绑定社交媒体账号，开始矩阵管理与数据分析</p>
-        <el-button type="primary" size="large" @click="$router.push('/accounts')">添加账号</el-button>
+        <div class="sub-actions">
+          <el-radio-group v-model="period" size="small" @change="onPeriodChange">
+            <el-radio-button value="day">日</el-radio-button>
+            <el-radio-button value="week">周</el-radio-button>
+          </el-radio-group>
+          <el-button size="small" :disabled="accountRows.length === 0" @click="exportCSV"
+            >导出</el-button
+          >
+          <el-button :icon="Refresh" size="small" circle :loading="loading" @click="refreshAll" />
+        </div>
       </div>
-    </div>
+
+      <!-- 时间维度对比卡片 -->
+      <div v-if="accountRows.length > 0" class="dashboard__time-cards">
+        <StatCard
+          v-for="(card, idx) in timeComparisonCards"
+          :key="card.label"
+          :label="card.label"
+          :value="card.rawValue"
+          :formatter="formatLargeNum"
+          :trend="card.trend"
+          :trend-label="card.label.startsWith('本周') ? '较上周' : '较上月'"
+          :accent-color="card.color"
+          :animated="false"
+          :delay="idx * 80"
+        />
+      </div>
+
+      <!-- 分组切换 -->
+      <div v-if="accountGroups.length > 0" class="dashboard__groups">
+        <el-select
+          v-model="selectedGroup"
+          size="small"
+          style="width: 120px"
+          @change="onGroupChange"
+        >
+          <el-option label="全部" value="all" />
+          <el-option v-for="g in accountGroups" :key="g.name" :label="g.name" :value="g.name" />
+        </el-select>
+      </div>
+
+      <!-- 图表区 -->
+      <div v-if="accountRows.length > 0" class="dashboard__charts">
+        <div class="card-default stagger-item">
+          <div class="chart-header">
+            <span class="chart-title">增长趋势</span>
+            <el-radio-group v-model="trendDays" size="small" @change="loadFollowerTrend">
+              <el-radio-button :value="7">7 天</el-radio-button>
+              <el-radio-button :value="30">30 天</el-radio-button>
+            </el-radio-group>
+          </div>
+          <DataChart :option="followerChartOption" :height="280" />
+        </div>
+        <div class="card-default stagger-item">
+          <div class="chart-header">
+            <span class="chart-title">平台分布</span>
+          </div>
+          <DataChart :option="platformChartOption" :height="280" />
+        </div>
+      </div>
+
+      <!-- 账号卡片 -->
+      <div v-if="accountRows.length > 0" class="dashboard__accounts">
+        <div class="section-header">
+          <span class="section-header__title">账号</span>
+          <span class="section-header__count">{{ accountRows.length }}</span>
+          <router-link to="/accounts" class="section-header__link">查看全部</router-link>
+        </div>
+        <div class="account-grid">
+          <router-link
+            v-for="(acc, i) in displayAccounts"
+            :key="acc.id"
+            :to="`/accounts/${acc.id}`"
+            class="account-card stagger-item"
+            :style="{ transitionDelay: `${i * 40}ms` }"
+          >
+            <el-avatar :size="34" :src="acc.avatar">
+              {{ acc.nickname?.charAt(0) }}
+            </el-avatar>
+            <div class="account-card__info">
+              <span class="account-card__name">{{ acc.nickname }}</span>
+              <PlatformBadge :platform="acc.platform" size="sm" />
+            </div>
+            <el-icon :size="14" class="account-card__arrow"><ArrowRight /></el-icon>
+          </router-link>
+        </div>
+      </div>
+
+      <!-- 空状态 -->
+      <div v-if="accountRows.length === 0 && !loading" class="dashboard__empty">
+        <div class="empty-state">
+          <div class="empty-state__icon">
+            <svg width="72" height="72" viewBox="0 0 72 72" fill="none">
+              <rect
+                x="8"
+                y="12"
+                width="56"
+                height="48"
+                rx="8"
+                stroke="#00cc99"
+                stroke-width="1"
+                opacity="0.3"
+              />
+              <circle
+                cx="36"
+                cy="36"
+                r="14"
+                stroke="#00cc99"
+                stroke-width="1"
+                opacity="0.15"
+                stroke-dasharray="4 4"
+              />
+              <circle cx="36" cy="36" r="5" fill="#00cc99" opacity="0.4" />
+            </svg>
+          </div>
+          <h3 class="empty-state__title">连接你的第一个账号</h3>
+          <p class="empty-state__desc">绑定社交媒体账号，开始矩阵管理与数据分析</p>
+          <el-button type="primary" size="large" @click="$router.push('/accounts')"
+            >添加账号</el-button
+          >
+        </div>
+      </div>
     </template>
   </div>
 </template>
@@ -172,23 +204,43 @@ import { useDashboard } from '@/composables/useDashboard'
 import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
 
 const {
-  period, loading, trendDays, selectedGroup,
-  accountRows, accountGroups, displayAccounts, groupSummaryCards, timeComparisonCards,
-  refreshAll, loadFollowerTrend, onPeriodChange, onGroupChange,
-  followerChartOption, platformChartOption,
+  period,
+  loading,
+  trendDays,
+  selectedGroup,
+  accountRows,
+  accountGroups,
+  displayAccounts,
+  groupSummaryCards,
+  timeComparisonCards,
+  refreshAll,
+  loadFollowerTrend,
+  onPeriodChange,
+  onGroupChange,
+  followerChartOption,
+  platformChartOption,
 } = useDashboard()
 
 function exportCSV() {
   const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
   const rows = accountRows.value.map((r) => [
-    r.nickname, r.platform, r.followers, r.views, r.likes,
-    r.comments, r.shares, r.postCount, tokenStatusLabel(r),
+    r.nickname,
+    r.platform,
+    r.followers,
+    r.views,
+    r.likes,
+    r.comments,
+    r.shares,
+    r.postCount,
+    tokenStatusLabel(r),
   ])
   const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
-  const a = document.createElement('a'); a.href = url
-  a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`; a.click()
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`
+  a.click()
   URL.revokeObjectURL(url)
 }
 </script>
@@ -273,6 +325,12 @@ function exportCSV() {
       opacity: 0.7;
     }
   }
+  &__skeleton-row {
+    display: flex;
+    gap: $space-xs;
+    align-items: center;
+    margin-bottom: $space-md;
+  }
 }
 
 // Hero
@@ -288,12 +346,12 @@ function exportCSV() {
   font-weight: 500;
   letter-spacing: -0.03em;
   line-height: 1;
-  color: $color-cream;
+  color: $color-text-primary;
 }
 .hero-rule {
   width: 48px;
   height: 2px;
-  background: $color-bronze;
+  background: $color-accent;
   margin-top: 20px;
   border-radius: 1px;
   opacity: 0.5;
@@ -358,7 +416,7 @@ function exportCSV() {
   }
   &__count {
     font-size: 13px;
-    color: $color-bronze;
+    color: $color-accent;
     font-weight: 500;
   }
   &__link {
@@ -367,7 +425,9 @@ function exportCSV() {
     text-decoration: none;
     margin-left: auto;
     transition: color 0.2s;
-    &:hover { color: $color-bronze; }
+    &:hover {
+      color: $color-accent;
+    }
   }
 }
 
@@ -391,7 +451,7 @@ function exportCSV() {
   cursor: pointer;
 
   &:hover {
-    border-color: rgba(212, 155, 80, 0.18);
+    border-color: rgba(0, 204, 153, 0.18);
     background: $color-bg-tertiary;
   }
   &__info {
@@ -415,7 +475,10 @@ function exportCSV() {
     transition: all 0.2s;
     opacity: 0;
   }
-  &:hover &__arrow { opacity: 1; color: $color-bronze; }
+  &:hover &__arrow {
+    opacity: 1;
+    color: $color-accent;
+  }
 }
 
 // Empty state
@@ -425,9 +488,11 @@ function exportCSV() {
   align-items: center;
   gap: 24px;
   text-align: center;
-  &__icon { opacity: 0.7; }
+  &__icon {
+    opacity: 0.7;
+  }
   &__title {
-    font-family: $font-display;
+    font-family: $font-heading;
     font-size: $text-headline;
     font-weight: 500;
     color: $color-text-primary;

@@ -1,13 +1,13 @@
 <template>
   <div v-loading="loading" class="account-detail">
     <!-- Back -->
-    <el-page-header @back="$router.push('/accounts')" title="返回账号列表">
+    <el-page-header title="返回账号列表" @back="$router.push('/accounts')">
       <template #content>
         <span class="account-detail__title">{{ account?.nickname }}</span>
       </template>
     </el-page-header>
 
-    <el-row :gutter="20" v-if="account" class="account-detail__content">
+    <el-row v-if="account" :gutter="20" class="account-detail__content">
       <!-- Left: Info -->
       <el-col :xs="24" :lg="8">
         <el-card shadow="hover">
@@ -41,10 +41,10 @@
             <el-descriptions-item label="获赞数">{{
               account.likes?.toLocaleString()
             }}</el-descriptions-item>
-            <el-descriptions-item label="店铺评分" v-if="account.storeScore != null">
+            <el-descriptions-item v-if="account.storeScore != null" label="店铺评分">
               {{ account.storeScore }}
             </el-descriptions-item>
-            <el-descriptions-item label="店铺诊断" v-if="account.storeDiagnosis">
+            <el-descriptions-item v-if="account.storeDiagnosis" label="店铺诊断">
               {{ account.storeDiagnosis }}
             </el-descriptions-item>
             <el-descriptions-item label="最近活跃">{{
@@ -64,8 +64,8 @@
       <!-- Right: Data + Posts -->
       <el-col :xs="24" :lg="16">
         <!-- Data Overview Cards -->
-        <el-row :gutter="12" class="account-detail__analytics" v-if="analytics">
-          <el-col :span="8" v-for="card in analyticsCards" :key="card.label">
+        <el-row v-if="analytics" :gutter="12" class="account-detail__analytics">
+          <el-col v-for="card in analyticsCards" :key="card.label" :span="8">
             <el-card shadow="hover" class="analytics-mini-card">
               <div class="analytics-mini-card__label">{{ card.label }}</div>
               <div class="analytics-mini-card__value">{{ card.value }}</div>
@@ -81,7 +81,13 @@
               <el-button size="small" @click="exportAccountData">导出数据</el-button>
             </div>
           </template>
-          <el-table :data="posts" stripe v-loading="postsLoading" @sort-change="handleSortChange" @row-click="handleRowClick">
+          <el-table
+            v-loading="postsLoading"
+            :data="posts"
+            stripe
+            @sort-change="handleSortChange"
+            @row-click="handleRowClick"
+          >
             <template #empty><el-empty description="暂无发布内容" /></template>
             <el-table-column prop="title" label="标题" min-width="160" show-overflow-tooltip />
             <el-table-column prop="status" label="状态" width="80">
@@ -113,7 +119,7 @@
               <template #default="{ row }">{{ row.engagementRate }}%</template>
             </el-table-column>
           </el-table>
-          <div class="post-pagination" v-if="postTotal > postPageSize">
+          <div v-if="postTotal > postPageSize" class="post-pagination">
             <el-pagination
               v-model:current-page="postPage"
               :page-size="postPageSize"
@@ -267,38 +273,40 @@ function formatNum(n: any): string {
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .account-detail {
   &__title {
-    font-size: 18px;
+    font-size: $text-title;
     font-weight: 600;
   }
   &__content {
-    margin-top: 20px;
+    margin-top: $space-lg;
   }
   &__profile {
     text-align: center;
     padding: $space-lg 0;
     h3 {
-      margin: 12px 0 8px;
-      font-size: 18px;
+      margin: $space-sm 0 $space-xs;
+      font-size: $text-title;
     }
   }
   &__platform {
-    margin: 8px 0;
+    margin: $space-xs 0;
     display: flex;
     justify-content: center;
   }
   &__actions {
-    margin-top: 20px;
+    margin-top: $space-lg;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: $space-xs;
     .el-button {
       width: 100%;
     }
   }
   &__analytics {
-    margin-bottom: 16px;
+    margin-bottom: $space-md;
   }
 }
 
@@ -306,13 +314,13 @@ function formatNum(n: any): string {
   text-align: center;
   &__label {
     font-size: $text-caption;
-    color: #6b6560;
+    color: $color-text-tertiary;
     margin-bottom: 6px;
   }
   &__value {
     font-size: $text-headline;
     font-weight: 600;
-    color: #f0ece4;
+    color: $color-text-primary;
   }
 }
 
@@ -322,10 +330,9 @@ function formatNum(n: any): string {
   justify-content: space-between;
   width: 100%;
 }
-
 .post-pagination {
   display: flex;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: $space-md;
 }
 </style>

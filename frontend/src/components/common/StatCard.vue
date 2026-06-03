@@ -1,9 +1,5 @@
 <template>
-  <GlassCard
-    :padding="size === 'lg' ? 'lg' : 'md'"
-    class="stat-card"
-    :class="{ 'stat-card--lg': size === 'lg' }"
-  >
+  <div class="stat-card" :class="{ 'stat-card--lg': size === 'lg' }">
     <div class="stat-card__accent" :style="{ background: accentColor }" />
     <div class="stat-card__content">
       <span class="stat-card__label">{{ label }}</span>
@@ -33,13 +29,12 @@
     <div v-if="$slots.chart" class="stat-card__chart">
       <slot name="chart" />
     </div>
-  </GlassCard>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue'
 import { CaretTop, CaretBottom, Minus } from '@element-plus/icons-vue'
-import GlassCard from './GlassCard.vue'
 import AnimatedNumber from './AnimatedNumber.vue'
 
 const props = withDefaults(
@@ -57,7 +52,7 @@ const props = withDefaults(
   {
     trend: null,
     trendLabel: '较上周',
-    accentColor: 'var(--color-bronze)',
+    accentColor: '#00cc99',
     animated: true,
     delay: 0,
     size: 'md',
@@ -70,17 +65,26 @@ const displayValue = computed(() =>
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .stat-card {
   position: relative;
   overflow: hidden;
+  background: $color-bg-elevated;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  padding: $space-lg;
+  transition: border-color 0.2s;
+  &:hover {
+    border-color: $color-border-hover;
+  }
 
   &__accent {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
-    height: 3px;
-    border-radius: $radius-lg $radius-lg 0 0;
+    height: 2px;
   }
 
   &__content {
@@ -90,27 +94,27 @@ const displayValue = computed(() =>
 
   &__label {
     font-size: $text-caption;
-    color: var(--el-text-color-placeholder);
+    color: $color-text-tertiary;
     margin-bottom: $space-xs;
     display: block;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    font-weight: 500;
   }
 
   &__value {
-    font-size: 28px;
+    font-size: 32px;
     font-weight: 700;
-    color: var(--el-text-color-primary);
+    color: $color-text-primary;
     letter-spacing: -0.03em;
     line-height: 1.1;
     font-feature-settings: 'tnum';
     font-variant-numeric: tabular-nums;
+    font-family: $font-mono;
   }
 
-  // Stripe-style large KPI mode
   &--lg &__value {
     font-size: 48px;
-    font-weight: 700;
   }
 
   &__trend {
@@ -122,12 +126,12 @@ const displayValue = computed(() =>
     gap: 2px;
     padding: 2px 8px;
     border-radius: $radius-full;
-    background: rgba($color-sage, 0.1);
-    color: $color-sage;
+    background: rgba(34, 197, 94, 0.1);
+    color: $color-success;
 
     &--down {
-      background: rgba($color-rust, 0.1);
-      color: $color-rust;
+      background: rgba(239, 68, 68, 0.1);
+      color: $color-danger;
     }
   }
 

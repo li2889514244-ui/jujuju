@@ -54,10 +54,10 @@ export function useDashboard() {
     const totalLikes = rows.reduce((s, r) => s + r.likes, 0)
     const totalInteract = rows.reduce((s, r) => s + r.comments + r.shares, 0)
     return [
-      { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#d49b50' },
-      { label: '总播放量', rawValue: totalViews, trend: null, color: '#6b9e6c' },
-      { label: '总点赞', rawValue: totalLikes, trend: null, color: '#e0a030' },
-      { label: '总互动', rawValue: totalInteract, trend: null, color: '#d4534a' },
+      { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#00cc99' },
+      { label: '总播放量', rawValue: totalViews, trend: null, color: '#22c55e' },
+      { label: '总点赞', rawValue: totalLikes, trend: null, color: '#f59e0b' },
+      { label: '总互动', rawValue: totalInteract, trend: null, color: '#ef4444' },
     ]
   })
 
@@ -65,7 +65,12 @@ export function useDashboard() {
   function extractViews(val: unknown): number | null {
     if (val == null) return null
     if (typeof val === 'number') return val
-    if (typeof val === 'object' && val !== null && 'views' in val && typeof (val as Record<string, unknown>).views === 'number') {
+    if (
+      typeof val === 'object' &&
+      val !== null &&
+      'views' in val &&
+      typeof (val as Record<string, unknown>).views === 'number'
+    ) {
       return (val as Record<string, number>).views
     }
     return null
@@ -76,8 +81,16 @@ export function useDashboard() {
 
     const weekViews = cd ? extractViews(cd.weekOverWeek?.current) : null
     const monthViews = cd ? extractViews(cd.monthOverMonth?.current) : null
-    const weekChange = cd ? (typeof cd.weekOverWeek?.change === 'number' ? cd.weekOverWeek.change : null) : null
-    const monthChange = cd ? (typeof cd.monthOverMonth?.change === 'number' ? cd.monthOverMonth.change : null) : null
+    const weekChange = cd
+      ? typeof cd.weekOverWeek?.change === 'number'
+        ? cd.weekOverWeek.change
+        : null
+      : null
+    const monthChange = cd
+      ? typeof cd.monthOverMonth?.change === 'number'
+        ? cd.monthOverMonth.change
+        : null
+      : null
 
     return [
       { label: '本周播放', rawValue: weekViews ?? 0, trend: weekChange, color: '#e0a030' },
@@ -111,19 +124,23 @@ export function useDashboard() {
         if (g.id) groups[g.id] = g.name
       }
 
-      let dailyMap: DailyStatsMap = {}
+      const dailyMap: DailyStatsMap = {}
       try {
         const reportRes = await analyticsApi.getReport()
         const rptAccs =
-          (reportRes.data as { accounts?: Array<{
-            id: string
-            dailyStats?: Array<{
-              views?: number
-              likes?: number
-              comments?: number
-              shares?: number
-            }>
-          }> })?.accounts || []
+          (
+            reportRes.data as {
+              accounts?: Array<{
+                id: string
+                dailyStats?: Array<{
+                  views?: number
+                  likes?: number
+                  comments?: number
+                  shares?: number
+                }>
+              }>
+            }
+          )?.accounts || []
         for (const a of rptAccs) {
           const allStats = a.dailyStats || []
           dailyMap[a.id] = {
@@ -211,46 +228,54 @@ export function useDashboard() {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'axis' as const,
-      backgroundColor: 'rgba(40, 37, 34, 0.95)',
-      borderColor: 'rgba(212, 155, 80, 0.15)',
-      textStyle: { color: '#f0ece4', fontSize: 12 },
+      backgroundColor: 'rgba(26, 31, 42, 0.95)',
+      borderColor: 'rgba(0, 204, 153, 0.15)',
+      textStyle: { color: '#e8edf5', fontSize: 12 },
     },
     grid: { left: 50, right: 20, top: 20, bottom: 30 },
     xAxis: {
       type: 'category' as const,
       data: Array.from({ length: trendDays.value }, (_, i) =>
-        dayjs().subtract(trendDays.value - 1 - i, 'day').format('MM-DD'),
+        dayjs()
+          .subtract(trendDays.value - 1 - i, 'day')
+          .format('MM-DD'),
       ),
-      axisLine: { lineStyle: { color: 'rgba(212, 155, 80, 0.1)' } },
+      axisLine: { lineStyle: { color: 'rgba(0, 204, 153, 0.1)' } },
       axisTick: { show: false },
-      axisLabel: { color: '#6b6560', fontSize: 11 },
+      axisLabel: { color: '#6b7390', fontSize: 11 },
     },
     yAxis: {
       type: 'value' as const,
-      splitLine: { lineStyle: { color: 'rgba(212, 155, 80, 0.04)' } },
-      axisLabel: { color: '#6b6560', fontSize: 11 },
+      splitLine: { lineStyle: { color: 'rgba(0, 204, 153, 0.04)' } },
+      axisLabel: { color: '#6b7390', fontSize: 11 },
     },
     series:
       followerTrendData.value.length > 0
-        ? [{
-            name: '粉丝',
-            type: 'line' as const,
-            smooth: true,
-            symbol: 'circle',
-            symbolSize: 4,
-            lineStyle: { width: 2 },
-            itemStyle: { color: '#d49b50' },
-            areaStyle: {
-              color: {
-                type: 'linear' as const, x: 0, y: 0, x2: 0, y2: 1,
-                colorStops: [
-                  { offset: 0, color: 'rgba(212, 155, 80, 0.2)' },
-                  { offset: 1, color: 'rgba(212, 155, 80, 0)' },
-                ],
+        ? [
+            {
+              name: '粉丝',
+              type: 'line' as const,
+              smooth: true,
+              symbol: 'circle',
+              symbolSize: 4,
+              lineStyle: { width: 2 },
+              itemStyle: { color: '#00cc99' },
+              areaStyle: {
+                color: {
+                  type: 'linear' as const,
+                  x: 0,
+                  y: 0,
+                  x2: 0,
+                  y2: 1,
+                  colorStops: [
+                    { offset: 0, color: 'rgba(0, 204, 153, 0.2)' },
+                    { offset: 1, color: 'rgba(0, 204, 153, 0)' },
+                  ],
+                },
               },
+              data: followerTrendData.value,
             },
-            data: followerTrendData.value,
-          }]
+          ]
         : [],
   }))
 
@@ -258,32 +283,34 @@ export function useDashboard() {
     backgroundColor: 'transparent',
     tooltip: {
       trigger: 'item' as const,
-      backgroundColor: 'rgba(40, 37, 34, 0.95)',
-      borderColor: 'rgba(212, 155, 80, 0.15)',
-      textStyle: { color: '#f0ece4', fontSize: 12 },
+      backgroundColor: 'rgba(26, 31, 42, 0.95)',
+      borderColor: 'rgba(0, 204, 153, 0.15)',
+      textStyle: { color: '#e8edf5', fontSize: 12 },
     },
     legend: {
       bottom: 0,
       textStyle: { color: '#a09888', fontSize: 11 },
     },
-    series: [{
-      type: 'pie' as const,
-      radius: ['45%', '75%'],
-      center: ['50%', '45%'],
-      itemStyle: {
-        borderRadius: 4,
-        borderColor: '#1a1817',
-        borderWidth: 3,
+    series: [
+      {
+        type: 'pie' as const,
+        radius: ['45%', '75%'],
+        center: ['50%', '45%'],
+        itemStyle: {
+          borderRadius: 4,
+          borderColor: '#1a1817',
+          borderWidth: 3,
+        },
+        label: { show: false },
+        emphasis: {
+          label: { show: true, fontSize: 14, fontWeight: 'bold' as const, color: '#f0ece4' },
+        },
+        data:
+          platformDistribution.value.length > 0
+            ? platformDistribution.value
+            : [{ value: 0, name: '暂无数据', itemStyle: { color: '#4a4540' } }],
       },
-      label: { show: false },
-      emphasis: {
-        label: { show: true, fontSize: 14, fontWeight: 'bold' as const, color: '#f0ece4' },
-      },
-      data:
-        platformDistribution.value.length > 0
-          ? platformDistribution.value
-          : [{ value: 0, name: '暂无数据', itemStyle: { color: '#4a4540' } }],
-    }],
+    ],
   }))
 
   onMounted(() => {

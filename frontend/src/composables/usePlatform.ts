@@ -16,7 +16,7 @@ export const PLATFORM_COLORS: Record<string, string> = {
   doudian: '#FF7700',
   xiaohongshu_shop: '#FF2442',
   wechat_shop: '#07C160',
-  default: '#d49b50',
+  default: '#00cc99',
 }
 
 const PLATFORM_META: Record<string, PlatformMeta> = {
@@ -61,7 +61,7 @@ export function getPlatformMeta(platform: string): PlatformMeta {
   return PLATFORM_META[normalizeKey(platform)] || { label: platform, color: '#8a8078', char: '?' }
 }
 
-/** Map notification type to bronze-palette semantic color. */
+/** Map notification type to accent-palette semantic color. */
 export function getNotificationColor(type: string): string {
   switch (type) {
     case 'PUBLISH_FAILED':

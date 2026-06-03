@@ -1,11 +1,11 @@
-// 披星云 v3 — Warm Precision 全局样式
+// MatrixFlow v4 — Lunar Precision 全局样式
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html, body, #app {
   width: 100%; height: 100%;
   font-family: $font-body;
-  font-size: 15px; line-height: 1.5;
+  font-size: 14px; line-height: 1.5;
   background: $color-bg-primary;
   color: $color-text-primary;
   -webkit-font-smoothing: antialiased;
@@ -13,15 +13,15 @@ html, body, #app {
   overflow: hidden;
 }
 
-// 暖色渐变背景（替代星空）
+// 深空背景（微妙的星点 + 渐变光晕）
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   background:
-    radial-gradient(ellipse at 50% 0%, rgba(212, 155, 80, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 100%, rgba(200, 133, 64, 0.02) 0%, transparent 40%),
-    radial-gradient(ellipse at 20% 100%, rgba(107, 158, 108, 0.02) 0%, transparent 40%);
+    radial-gradient(ellipse at 50% -20%, rgba(0, 204, 153, 0.03) 0%, transparent 60%),
+    radial-gradient(ellipse at 80% 80%, rgba(59, 130, 246, 0.02) 0%, transparent 50%),
+    radial-gradient(ellipse at 20% 80%, rgba(99, 102, 241, 0.02) 0%, transparent 50%);
   pointer-events: none;
   z-index: 0;
 }
@@ -30,57 +30,72 @@ body::before {
 h1, h2, h3, h4, h5, h6 {
   line-height: 1.2; font-weight: 600; letter-spacing: -0.01em;
   color: $color-text-primary;
-  font-family: $font-display;
+  font-family: $font-heading;
 }
-a { text-decoration: none; color: $color-bronze; }
+a { text-decoration: none; color: $color-accent; transition: color 0.2s; }
+a:hover { color: lighten($color-accent, 10%); }
 p { line-height: 1.6; }
 small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
 .text-micro { font-size: $text-micro; text-transform: uppercase; letter-spacing: 0.06em; }
 
-// 暖色滚动条
-::-webkit-scrollbar { width: 5px; }
+// 滚动条
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(212, 155, 80, 0.15); border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(212, 155, 80, 0.3); }
+::-webkit-scrollbar-thumb { background: rgba(59, 130, 246, 0.12); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(59, 130, 246, 0.25); }
+::-webkit-scrollbar-corner { background: transparent; }
 
-::selection { background: rgba(212, 155, 80, 0.25); color: $color-cream; }
-:focus-visible { outline: 2px solid $color-bronze; outline-offset: 2px; border-radius: 2px; }
+::selection { background: rgba(0, 204, 153, 0.2); color: $color-text-primary; }
+:focus-visible { @include focus-ring; border-radius: 2px; }
 
 // === Element Plus 组件覆写 ===
+
+// ---- Button ----
+.el-button {
+  font-weight: 500; letter-spacing: -0.01em; border-radius: $radius-md;
+  transition: all 0.2s $ease-out;
+}
 .el-button--primary {
-  border-radius: 9999px; font-weight: 500; letter-spacing: -0.01em;
-  background: $color-bronze !important;
-  border: none !important;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-  transition: all 0.3s $ease-out;
+  background: $color-accent !important;
+  border-color: $color-accent !important;
+  color: #0b0e13 !important;
+  font-weight: 600;
   &:hover {
-    background: lighten($color-bronze, 6%) !important;
-    box-shadow: 0 2px 8px rgba(212, 155, 80, 0.25);
+    background: lighten($color-accent, 6%) !important;
+    box-shadow: 0 2px 12px rgba(0, 204, 153, 0.3);
     transform: translateY(-1px);
   }
-  &:active { transform: scale(0.98); }
+  &:active { transform: translateY(0); }
 }
-
 .el-button--default {
-  border-radius: $radius-full;
-  background: $color-bg-elevated !important;
+  background: $color-bg-tertiary !important;
   border-color: $color-border !important;
   color: $color-text-secondary !important;
-  transition: all 0.2s;
   &:hover {
-    border-color: rgba(212, 155, 80, 0.2) !important;
+    border-color: $color-border-hover !important;
     color: $color-text-primary !important;
-    background: lighten($color-bg-elevated, 4%) !important;
+    background: $color-bg-hover !important;
+  }
+}
+.el-button.is-plain {
+  background: transparent !important;
+  border-color: $color-border !important;
+  color: $color-accent !important;
+  &:hover {
+    background: rgba(0, 204, 153, 0.08) !important;
+    border-color: rgba(0, 204, 153, 0.3) !important;
   }
 }
 
+// ---- Card ----
 .el-card {
   border-radius: $radius-lg;
   border: 1px solid $color-border;
   background: $color-bg-elevated;
-  box-shadow: $shadow-sm;
+  box-shadow: none;
 }
 
+// ---- Dialog ----
 .el-dialog {
   border-radius: $radius-xl;
   border: 1px solid $color-border;
@@ -88,106 +103,187 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
   background: $color-bg-elevated;
 }
 .el-dialog__header {
-  padding: 28px 28px 0;
-  .el-dialog__title { font-size: 18px; font-weight: 600; }
+  padding: 24px 28px 0;
+  .el-dialog__title { font-size: 18px; font-weight: 600; color: $color-text-primary; }
 }
 .el-dialog__headerbtn {
-  top: 28px; right: 28px; width: 32px; height: 32px;
+  top: 24px; right: 24px; width: 32px; height: 32px;
   .el-dialog__close { color: $color-text-secondary; }
 }
 .el-dialog__body { padding: 24px 28px; color: $color-text-secondary; }
-.el-dialog__footer { padding: 0 28px 28px; }
+.el-dialog__footer { padding: 0 28px 24px; }
 
+// ---- Input ----
 .el-input__wrapper {
-  border-radius: 8px;
-  transition: all 0.2s;
+  border-radius: $radius-md;
   background: $color-bg-tertiary !important;
-  border-color: $color-border !important;
+  border: 1px solid $color-border !important;
   box-shadow: none !important;
-  &:hover { border-color: rgba(212, 155, 80, 0.15) !important; }
-  &.is-focus { border-color: $color-bronze !important; box-shadow: 0 0 0 1px rgba(212, 155, 80, 0.2) !important; }
+  transition: all 0.2s;
+  &:hover { border-color: $color-border-hover !important; }
+  &.is-focus {
+    @include focus-ring;
+  }
 }
 .el-input__inner { color: $color-text-primary !important; &::placeholder { color: $color-text-placeholder !important; } }
 
-.el-tag {
-  border-radius: 9999px; font-weight: 500;
-  &.el-tag--primary { background: rgba(212, 155, 80, 0.12); border-color: rgba(212, 155, 80, 0.2); color: $color-bronze; }
-}
-
-.el-menu { background: transparent !important; border-right: none !important; }
-
-.el-select {
-  .el-input__wrapper { background: $color-bg-tertiary !important; }
-}
+// ---- Select ----
+.el-select .el-input__wrapper { background: $color-bg-tertiary !important; }
 .el-select-dropdown {
   background: $color-bg-elevated !important;
   border: 1px solid $color-border !important;
+  border-radius: $radius-md;
+  box-shadow: $shadow-lg;
   .el-select-dropdown__item {
     color: $color-text-secondary !important;
-    &.is-selected { color: $color-bronze !important; }
-    &:hover { background: rgba(212, 155, 80, 0.06) !important; }
+    &.is-selected { color: $color-accent !important; font-weight: 500; }
+    &:hover { background: rgba(0, 204, 153, 0.06) !important; }
   }
 }
 
+// ---- Tag ----
+.el-tag {
+  border-radius: $radius-sm; font-weight: 500; font-size: 12px;
+  &.el-tag--primary {
+    background: rgba(0, 204, 153, 0.1); border-color: rgba(0, 204, 153, 0.2); color: $color-accent;
+  }
+  &.el-tag--success { background: rgba(34, 197, 94, 0.1); border-color: rgba(34, 197, 94, 0.2); color: $color-success; }
+  &.el-tag--warning { background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: $color-warning; }
+  &.el-tag--danger  { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: $color-danger; }
+}
+
+// ---- Menu ----
+.el-menu {
+  background: transparent !important;
+  border-right: none !important;
+}
+
+// ---- Radio Group ----
 .el-radio-group {
   .el-radio-button__inner {
     background: $color-bg-tertiary !important;
     border-color: $color-border !important;
     color: $color-text-secondary !important;
-    &:hover { color: $color-bronze !important; }
+    font-size: 13px;
+    &:hover { color: $color-accent !important; }
   }
   .is-active .el-radio-button__inner {
-    background: rgba(212, 155, 80, 0.12) !important;
-    border-color: rgba(212, 155, 80, 0.25) !important;
-    color: $color-bronze !important;
+    background: rgba(0, 204, 153, 0.1) !important;
+    border-color: rgba(0, 204, 153, 0.25) !important;
+    color: $color-accent !important;
     box-shadow: none !important;
   }
 }
 
+// ---- Table ----
 .el-table {
   --el-table-tr-bg-color: transparent;
-  --el-table-row-hover-bg-color: rgba(212, 155, 80, 0.04);
-  --el-table-border-color: rgba(212, 155, 80, 0.06);
-  --el-table-header-bg-color: rgba(212, 155, 80, 0.03);
+  --el-table-row-hover-bg-color: rgba(59, 130, 246, 0.03);
+  --el-table-border-color: rgba(59, 130, 246, 0.05);
+  --el-table-header-bg-color: rgba(59, 130, 246, 0.02);
   background: transparent;
   color: $color-text-primary;
-  th { color: $color-text-secondary !important; font-weight: 500; }
-  td { border-bottom-color: rgba(212, 155, 80, 0.04) !important; }
-  &__body-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+  border-radius: $radius-lg;
+  th {
+    color: $color-text-secondary !important;
+    font-weight: 500;
+    font-size: 13px;
+    border-bottom-color: $color-border !important;
   }
+  td {
+    border-bottom-color: rgba(59, 130, 246, 0.04) !important;
+    color: $color-text-primary;
+  }
+  &__body-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
+// ---- Pagination ----
 .el-pagination {
   button, .el-pager li {
     background: $color-bg-tertiary !important;
     color: $color-text-secondary !important;
-    border-radius: 6px;
-    &.is-active { background: rgba(212, 155, 80, 0.15) !important; color: $color-bronze !important; }
+    border-radius: $radius-sm;
+    font-size: 13px;
+    &.is-active {
+      background: rgba(0, 204, 153, 0.12) !important;
+      color: $color-accent !important;
+      font-weight: 600;
+    }
   }
 }
 
-.el-badge__content { background: $color-rust; }
+// ---- Badge ----
+.el-badge__content { background: $color-danger; font-size: 10px; }
 
-.el-avatar { background: linear-gradient(135deg, $color-bronze, $color-copper) !important; color: $color-cream; }
-
-// === 动画 ===
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s $ease-out; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.slide-up-enter-active, .slide-up-leave-active { transition: all 0.3s $ease-spring; }
-.slide-up-enter-from { opacity: 0; transform: translateY(12px); }
-.slide-up-leave-to { opacity: 0; transform: translateY(-8px); }
-
-.stagger-item { opacity: 0; transform: translateY(16px); transition: all 0.5s $ease-out; }
-.stagger-item.stagger-visible { opacity: 1; transform: translateY(0); }
-
-// === 通用组件 ===
-.glass-panel {
-  @include panel;
-  padding: $space-lg;
+// ---- Avatar ----
+.el-avatar {
+  background: linear-gradient(135deg, $color-accent, $color-accent-alt) !important;
+  color: $color-text-primary;
 }
 
+// ---- Breadcrumb ----
+.el-breadcrumb__inner { color: $color-text-secondary !important; font-weight: 400 !important; }
+.el-breadcrumb__item:last-child .el-breadcrumb__inner { color: $color-text-primary !important; font-weight: 500 !important; }
+
+// ---- Notification / Message Box ----
+.el-notification { background: $color-bg-elevated !important; border: 1px solid $color-border !important; border-radius: $radius-lg !important; }
+.el-message { border-radius: $radius-md !important; }
+.el-message-box {
+  background: $color-bg-elevated !important;
+  border: 1px solid $color-border !important;
+  border-radius: $radius-xl !important;
+  .el-message-box__title { color: $color-text-primary !important; }
+  .el-message-box__message { color: $color-text-secondary !important; }
+}
+
+// ---- Dropdown ----
+.el-dropdown-menu {
+  background: $color-bg-elevated !important;
+  border: 1px solid $color-border !important;
+  border-radius: $radius-md;
+  padding: 4px;
+  .el-dropdown-menu__item {
+    color: $color-text-secondary !important;
+    border-radius: $radius-sm;
+    &:hover { background: rgba(0, 204, 153, 0.06) !important; color: $color-text-primary !important; }
+  }
+}
+
+// ---- Tabs ----
+.el-tabs__nav-wrap::after { background-color: $color-border; }
+.el-tabs__item {
+  color: $color-text-secondary;
+  &.is-active { color: $color-accent; }
+  &:hover { color: $color-text-primary; }
+}
+.el-tabs__active-bar { background-color: $color-accent; }
+
+// ---- Popover ----
+.el-popover {
+  background: $color-bg-elevated !important;
+  border: 1px solid $color-border !important;
+  border-radius: $radius-lg;
+  color: $color-text-primary;
+}
+
+// ---- DatePicker ----
+.el-picker-panel {
+  background: $color-bg-elevated !important;
+  border: 1px solid $color-border !important;
+  color: $color-text-primary;
+}
+
+// === 动画 ===
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s $ease-out; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
+.slide-up-enter-active, .slide-up-leave-active { transition: all 0.25s $ease-out; }
+.slide-up-enter-from { opacity: 0; transform: translateY(8px); }
+.slide-up-leave-to { opacity: 0; transform: translateY(-6px); }
+
+.stagger-item { opacity: 0; transform: translateY(12px); transition: all 0.4s $ease-out; }
+.stagger-item.stagger-visible { opacity: 1; transform: translateY(0); }
+
+// === 通用组件类 ===
 .card-default {
   @include card;
   padding: $space-lg;
@@ -195,32 +291,30 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
 }
 
 .card-flat {
-  background: $color-bg-secondary;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
+  @include card-flat;
   padding: $space-lg;
 }
 
 .section-label {
   font-size: $text-micro;
-  font-weight: 500;
+  font-weight: 600;
   color: $color-text-tertiary;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 
-// 装饰线
 .rule-line {
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, $color-border, rgba(212, 155, 80, 0.03), transparent);
+  background: linear-gradient(90deg, $color-border, rgba(59, 130, 246, 0.03), transparent);
 }
 
 .display-number {
-  font-family: $font-display;
-  font-weight: 600;
+  font-family: $font-mono;
+  font-weight: 500;
   font-feature-settings: 'tnum';
   font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 // === 响应式 ===
@@ -244,6 +338,10 @@ small, .text-caption { font-size: $text-caption; color: $color-text-tertiary; }
   .account-grid { grid-template-columns: repeat(2, 1fr) !important; }
   .data-center__body .el-col { flex: 0 0 100%; max-width: 100%; }
   .data-center__overview .el-col { flex: 0 0 50%; max-width: 50%; }
+}
+
+@media (max-width: 640px) {
+  .app-layout__content { padding: $space-md 12px !important; }
 }
 
 // 表单移动端适配

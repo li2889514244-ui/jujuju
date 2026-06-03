@@ -22,9 +22,8 @@
                 href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
                 target="_blank"
                 class="topbar__more-link"
+                ><el-icon :size="16"><Download /></el-icon> 桌面端</a
               >
-                <el-icon :size="16"><Download /></el-icon> 桌面端
-              </a>
             </el-dropdown-item>
             <el-dropdown-item>
               <router-link to="/ai" class="topbar__more-link">
@@ -40,33 +39,34 @@
         </template>
       </el-dropdown>
 
-      <!-- Desktop: action items -->
-      <el-tooltip content="下载桌面伴侣" placement="bottom" class="topbar__desktop">
-        <a
-          href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
-          target="_blank"
-          class="topbar__action"
-        >
-          <el-icon :size="18"><Download /></el-icon>
-          <span>桌面端</span>
-        </a>
-      </el-tooltip>
+      <!-- Desktop actions -->
+      <a
+        href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+        target="_blank"
+        class="topbar__action topbar__desktop"
+        title="下载桌面伴侣"
+      >
+        <el-icon :size="16"><Download /></el-icon>
+        <span>桌面端</span>
+      </a>
 
       <router-link to="/ai" class="topbar__action topbar__desktop" title="AI 助手">
-        <el-icon :size="18"><MagicStick /></el-icon>
+        <el-icon :size="16"><MagicStick /></el-icon>
         <span>AI 助手</span>
       </router-link>
 
-      <router-link to="/mcp" class="topbar__action topbar__desktop" title="MCP 数据查询">
-        <el-icon :size="18"><ChatDotRound /></el-icon>
-        <span>MCP 查询</span>
+      <router-link to="/mcp" class="topbar__action topbar__desktop" title="MCP 查询">
+        <el-icon :size="16"><ChatDotRound /></el-icon>
+        <span>MCP</span>
       </router-link>
 
       <!-- Team Switcher -->
       <el-dropdown trigger="click" class="topbar__team-wrap" @command="handleTeamSwitch">
         <div class="topbar__team">
-          <el-icon :size="16"><OfficeBuilding /></el-icon>
-          <span class="topbar__team-name">{{ teamStore.currentTeam?.name || '选择团队' }}</span>
+          <el-icon :size="15"><OfficeBuilding /></el-icon>
+          <span class="topbar__team-name topbar__desktop">{{
+            teamStore.currentTeam?.name || '选择团队'
+          }}</span>
           <el-icon :size="12"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
@@ -76,9 +76,8 @@
               :key="team.id"
               :command="team"
               :class="{ 'is-active': team.id === teamStore.currentTeamId }"
+              >{{ team.name }} ({{ team.memberCount }}人)</el-dropdown-item
             >
-              {{ team.name }} ({{ team.memberCount }}人)
-            </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -93,7 +92,7 @@
         <template #reference>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="topbar__notification">
             <el-icon
-              :size="19"
+              :size="18"
               class="topbar__icon-btn"
               role="button"
               aria-label="通知"
@@ -141,22 +140,22 @@
       <!-- User Menu -->
       <el-dropdown trigger="click" @command="handleUserCommand">
         <div class="topbar__user">
-          <el-avatar :size="30" :src="userStore.avatar">
+          <el-avatar :size="28" :src="userStore.avatar">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
           <span class="topbar__username topbar__desktop">{{ userStore.username }}</span>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="profile">
-              <el-icon><User /></el-icon>个人设置
-            </el-dropdown-item>
-            <el-dropdown-item command="password">
-              <el-icon><Lock /></el-icon>修改密码
-            </el-dropdown-item>
-            <el-dropdown-item divided command="logout">
-              <el-icon><SwitchButton /></el-icon>退出登录
-            </el-dropdown-item>
+            <el-dropdown-item command="profile"
+              ><el-icon><User /></el-icon>个人设置</el-dropdown-item
+            >
+            <el-dropdown-item command="password"
+              ><el-icon><Lock /></el-icon>修改密码</el-dropdown-item
+            >
+            <el-dropdown-item divided command="logout"
+              ><el-icon><SwitchButton /></el-icon>退出登录</el-dropdown-item
+            >
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -206,7 +205,7 @@ async function fetchUnreadCount() {
     const res = await notificationApi.getUnreadCount()
     unreadCount.value = res.data.unreadCount
   } catch {
-    /* silent */
+    /* */
   }
 }
 
@@ -217,7 +216,7 @@ async function fetchNotifications() {
     notifications.value = res.data.notifications
     unreadCount.value = res.data.unreadCount
   } catch {
-    /* silent */
+    /* */
   }
   notifLoading.value = false
 }
@@ -248,15 +247,15 @@ function getNotifIcon(type: string) {
   }
 }
 
-function getNotifColor(type: string): string {
+function getNotifColor(type: string) {
   return getNotificationColor(type)
 }
 
 function formatTime(dateStr: string) {
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const minutes = Math.floor(diff / 60000)
+  const date = new Date(dateStr),
+    now = new Date(),
+    diff = now.getTime() - date.getTime(),
+    minutes = Math.floor(diff / 60000)
   if (minutes < 1) return '刚刚'
   if (minutes < 60) return `${minutes}分钟前`
   const hours = Math.floor(minutes / 60)
@@ -284,6 +283,8 @@ function handleUserCommand(command: string) {
 </script>
 
 <style lang="scss" scoped>
+@import '@/assets/styles/variables';
+
 .topbar {
   height: $topbar-height;
   background: $color-bg-secondary;
@@ -291,125 +292,112 @@ function handleUserCommand(command: string) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 20px;
   flex-shrink: 0;
   z-index: 5;
+}
 
-  &__left {
-    :deep(.el-breadcrumb) {
-      font-size: 13px;
-      .el-breadcrumb__item {
-        color: $color-text-tertiary;
-      }
-      .el-breadcrumb__inner {
-        color: $color-text-secondary;
-        font-weight: 400;
-      }
-      .el-breadcrumb__separator {
-        color: $color-text-tertiary;
-        margin: 0 6px;
-      }
-    }
-  }
-
-  &__right {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-  }
-
-  &__more {
-    display: none;
-  }
-
-  &__desktop {
-    display: flex;
-  }
-
-  &__more-link {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: $color-text-secondary;
-    text-decoration: none;
-    &:hover {
-      color: $color-bronze;
-    }
-  }
-
-  &__team-wrap {
-    &:deep(.topbar__team-name) {
-      display: inline;
-    }
-  }
-
-  &__action {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    color: $color-text-secondary;
-    text-decoration: none;
+.topbar__left {
+  :deep(.el-breadcrumb) {
     font-size: 13px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    transition: all 0.2s;
-    &:hover {
-      background: rgba(212, 155, 80, 0.06);
-      color: $color-bronze;
+    .el-breadcrumb__separator {
+      color: $color-text-tertiary;
+      margin: 0 4px;
     }
   }
+}
 
-  &__team {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    cursor: pointer;
-    color: $color-text-secondary;
-    font-size: 13px;
-    padding: 6px 12px;
-    border-radius: 6px;
-    transition: all 0.2s;
-    &:hover {
-      background: rgba(212, 155, 80, 0.06);
-    }
-  }
+.topbar__right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 
-  &__notification {
-    cursor: pointer;
-    :deep(.el-badge__content) {
-      font-size: 10px;
-      height: 16px;
-      line-height: 16px;
-      padding: 0 4px;
-    }
-  }
+.topbar__more {
+  display: none;
+}
 
-  &__icon-btn {
-    color: $color-text-secondary;
-    cursor: pointer;
-    transition: color 0.2s;
-    &:hover {
-      color: $color-bronze;
-    }
-  }
+.topbar__desktop {
+  display: flex;
+}
 
-  &__user {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 4px 8px 4px 4px;
-    border-radius: 9999px;
-    transition: background 0.2s;
-    &:hover {
-      background: rgba(212, 155, 80, 0.06);
-    }
+.topbar__more-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $color-text-secondary;
+  text-decoration: none;
+  &:hover {
+    color: $color-accent;
   }
-  &__username {
-    font-size: 13px;
-    color: $color-text-primary;
-    font-weight: 450;
+}
+
+.topbar__action {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: $color-text-secondary;
+  text-decoration: none;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: $radius-sm;
+  transition: all 0.15s;
+  &:hover {
+    background: rgba(0, 204, 153, 0.06);
+    color: $color-accent;
   }
+}
+
+.topbar__team {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  color: $color-text-secondary;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: $radius-sm;
+  transition: all 0.15s;
+  &:hover {
+    background: rgba(0, 204, 153, 0.06);
+  }
+}
+
+.topbar__icon-btn {
+  color: $color-text-secondary;
+  cursor: pointer;
+  transition: color 0.15s;
+  &:hover {
+    color: $color-accent;
+  }
+}
+
+.topbar__notification {
+  cursor: pointer;
+  :deep(.el-badge__content) {
+    font-size: 10px;
+    height: 16px;
+    line-height: 16px;
+    padding: 0 4px;
+  }
+}
+
+.topbar__user {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  padding: 3px 8px 3px 3px;
+  border-radius: $radius-full;
+  transition: background 0.15s;
+  &:hover {
+    background: rgba(0, 204, 153, 0.06);
+  }
+}
+.topbar__username {
+  font-size: 13px;
+  color: $color-text-primary;
+  font-weight: 500;
 }
 
 // Notification panel
@@ -420,13 +408,13 @@ function handleUserCommand(command: string) {
     align-items: center;
     padding-bottom: 12px;
     border-bottom: 1px solid $color-border;
-    font-weight: 500;
+    font-weight: 600;
     font-size: 14px;
   }
   &__body {
     max-height: 360px;
     overflow-y: auto;
-    padding-top: 8px;
+    padding-top: 6px;
   }
   &__empty {
     text-align: center;
@@ -441,14 +429,14 @@ function handleUserCommand(command: string) {
   align-items: flex-start;
   gap: 10px;
   padding: 10px 6px;
-  border-radius: 6px;
+  border-radius: $radius-sm;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.12s;
   &:hover {
-    background: rgba(212, 155, 80, 0.05);
+    background: rgba(0, 204, 153, 0.04);
   }
   &--unread {
-    background: rgba(212, 155, 80, 0.06);
+    background: rgba(0, 204, 153, 0.05);
   }
   &__icon {
     padding-top: 1px;
@@ -472,12 +460,12 @@ function handleUserCommand(command: string) {
   }
 }
 
-// Mobile: compact topbar
+// Mobile
 @media (max-width: 768px) {
   .topbar {
-    padding: 0 12px;
+    padding: 0 10px;
     &__right {
-      gap: 8px;
+      gap: 6px;
     }
     &__more {
       display: flex;
@@ -489,13 +477,13 @@ function handleUserCommand(command: string) {
       display: none !important;
     }
     &__team {
-      padding: 6px 8px;
+      padding: 5px 6px;
     }
     &__user {
       padding: 2px;
     }
     &__left {
-      padding-left: 48px; // make room for sidebar hamburger
+      padding-left: 44px;
       :deep(.el-breadcrumb__item:first-child .el-breadcrumb__inner) {
         display: none;
       }

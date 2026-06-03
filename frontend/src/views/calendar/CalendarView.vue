@@ -75,7 +75,7 @@
             :style="{ background: evt.color + '22', borderLeftColor: evt.color }"
             @click="openEditDialog(evt)"
           >
-            <span class="cal-event__time" v-if="!evt.allDay">{{
+            <span v-if="!evt.allDay" class="cal-event__time">{{
               evt.startTime?.slice(11, 16)
             }}</span>
             <span class="cal-event__title">{{ evt.title }}</span>
@@ -102,7 +102,7 @@
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="时间" v-if="!form.allDay">
+        <el-form-item v-if="!form.allDay" label="时间">
           <el-time-picker
             v-model="formTime"
             is-range
@@ -124,7 +124,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button v-if="editingEvent" type="danger" @click="deleteEvent" plain>删除</el-button>
+        <el-button v-if="editingEvent" type="danger" plain @click="deleteEvent">删除</el-button>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="saveEvent">保存</el-button>
       </template>
@@ -158,18 +158,18 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
 const editingEvent = ref<CalendarEvent | null>(null)
-const form = ref({ title: '', allDay: false, color: '#d49b50', description: '' })
+const form = ref({ title: '', allDay: false, color: '#00cc99', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
 const predefineColors = [
-  '#d49b50',
-  '#6b9e6c',
-  '#e0a030',
-  '#d4534a',
-  '#8a8078',
-  '#c88540',
-  '#a09888',
+  '#00cc99',
+  '#22c55e',
+  '#f59e0b',
+  '#ef4444',
+  '#3b82f6',
+  '#6366f1',
+  '#9aa4b8',
   '#6b6560',
 ]
 
@@ -219,7 +219,7 @@ function nextPeriod() {
 
 function openAddDialog() {
   editingEvent.value = null
-  form.value = { title: '', allDay: false, color: '#d49b50', description: '' }
+  form.value = { title: '', allDay: false, color: '#00cc99', description: '' }
   formDate.value = new Date()
   formTime.value = null
   dialogVisible.value = true
@@ -309,9 +309,7 @@ async function deleteEvent() {
 }
 
 .cal-month {
-  @include panel;
-  border: 1px solid var(--el-border-color);
-  border-radius: $radius-lg;
+  @include card;
   overflow: hidden;
 }
 .cal-weekdays {
@@ -343,9 +341,9 @@ async function deleteEvent() {
     color: var(--el-text-color-placeholder);
   }
   &--today {
-    background: rgba(#d49b50, 0.06);
+    background: rgba(#00cc99, 0.06);
     .cal-day__num {
-      color: #d49b50;
+      color: #00cc99;
       font-weight: 700;
     }
   }
@@ -384,9 +382,7 @@ async function deleteEvent() {
 }
 
 .cal-week {
-  @include panel;
-  border: 1px solid var(--el-border-color);
-  border-radius: $radius-lg;
+  @include card;
   &__header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
@@ -398,7 +394,7 @@ async function deleteEvent() {
     font-size: 13px;
     color: var(--el-text-color-secondary);
     &.is-today {
-      color: #d49b50;
+      color: #00cc99;
       font-weight: 600;
     }
   }
@@ -418,7 +414,7 @@ async function deleteEvent() {
       border-right: none;
     }
     &.is-today {
-      background: rgba(#d49b50, 0.06);
+      background: rgba(#00cc99, 0.06);
     }
   }
 }
