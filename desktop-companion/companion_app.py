@@ -1686,26 +1686,12 @@ async def _scrape_account_pages(context, platform: str) -> dict:
             except Exception as e:
                 print(f'[DC] video-list error {platform}: {e}')
 
-        # 4. Monetization / Revenue — store platforms use dedicated store scraper
-        store_platforms = ('DOUYIN', 'XIAOHONGSHU', 'WECHAT_VIDEO')
-        store_url = entry.get('store_url')
+        # 4. Monetization / Revenue
         if monetization_url:
             try:
                 await page.goto(monetization_url, wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(6000)
-                if platform in store_platforms and store_url:
-                    # Also try store page
-                    try:
-                        await page.goto(store_url, wait_until='domcontentloaded', timeout=30000)
-                        await page.wait_for_timeout(6000)
-                        rev = await _scrape_store_dashboard(page, platform)
-                    except Exception as e:
-                        print(f'[DC] store page error {platform}: {e}')
-                        rev = await _scrape_monetization(page)
-                elif platform in store_platforms:
-                    rev = await _scrape_store_dashboard(page, platform)
-                else:
-                    rev = await _scrape_monetization(page)
+                rev = await _scrape_monetization(page)
                 for k, v in rev.items():
                     if v is not None and (isinstance(v, bool) or v > 0 or isinstance(v, str)):
                         metrics[k] = v
@@ -1768,9 +1754,11 @@ async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: P
             pass
 
         if browser and browser.contexts:
-            # ── 直接复用伴侣 Chrome 已有 context（cookie 在里面不会秒过期）──
-            context = browser.contexts[0]
-        else:
+            # ── CDP 模式下不复用主 context，每个账号用自己的 persistent context ──
+            # 否则所有视频号账号共用一个 cookie，数据全串
+            context = None  # fall through to persistent_context below
+
+        if not context:
             launch_kw = {
                 'user_data_dir': str(profile_dir), 'headless': True,
                 'viewport': {'width': 1280, 'height': 800}, 'locale': 'zh-CN',
@@ -2259,9 +2247,18 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     # ── 存入本地 DB + 保存 Profile 状态 ──
                     #  即使后端注册失败，本地也要保存（矩阵管理是离线优先架构）
                     if not account_id:
-                        import uuid as _uuid
-                        account_id = f'local_{_uuid.uuid4().hex[:16]}'
-                        print(f'[Worker] Backend unreachable, using local ID: {account_id}')
+                        # Check local DB for existing account with same platform_uid
+                        from local_db import get_accounts_by_platform
+                        local_accounts = get_accounts_by_platform(platform_key)
+                        for la in local_accounts:
+                            if la.get('platform_uid') == platform_uid:
+                                account_id = la['id']
+                                print(f'[Worker] Reusing existing local account {account_id} for uid {platform_uid}')
+                                break
+                        if not account_id:
+                            import uuid as _uuid
+                            account_id = f'local_{_uuid.uuid4().hex[:16]}'
+                            print(f'[Worker] Backend unreachable, using local ID: {account_id}')
                     
                     # Always save locally (regardless of backend status)
                     profile_dir = get_or_create_profile_dir(account_id, platform_key)

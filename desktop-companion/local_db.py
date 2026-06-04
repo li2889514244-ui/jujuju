@@ -153,9 +153,30 @@ def _migrate_columns(conn):
 
 def add_account(account_id: str, platform: str, profile_dir: str,
                 platform_uid: str = '', nickname: str = '') -> bool:
-    """绑定新账号，返回是否成功"""
+    """绑定新账号，返回是否成功。
+    
+    如果 platform_uid 已存在 → 更新现有记录（防重复绑定）。
+    否则插入新记录。
+    """
     conn = _get_conn()
     try:
+        # Check for existing account with same platform_uid
+        if platform_uid:
+            existing = conn.execute(
+                "SELECT id FROM accounts WHERE platform_uid = ? AND platform = ? AND status != 'deleted'",
+                (platform_uid, platform),
+            ).fetchone()
+            if existing:
+                existing_id = existing['id']
+                # Use existing ID instead of new one, keep original profile_dir
+                conn.execute(
+                    "UPDATE accounts SET nickname = ?, status = 'active', last_collected_at = ? WHERE id = ?",
+                    (nickname, None, existing_id),
+                )
+                conn.commit()
+                print(f'[LocalDB] Duplicate bind detected: {platform_uid}, using existing account {existing_id}')
+                return True
+
         conn.execute(
             "INSERT OR REPLACE INTO accounts (id, platform, platform_uid, nickname, profile_dir, status) "
             "VALUES (?, ?, ?, ?, ?, 'active')",
