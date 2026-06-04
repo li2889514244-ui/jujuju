@@ -118,9 +118,8 @@ def main():
     
     all_videos = []
     page = 1
-    max_pages = 10
     
-    while page <= max_pages:
+    while True:
         print(f"\n[2/5] 采集第 {page} 页...")
         
         result = extract_videos_from_shadow()

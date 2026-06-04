@@ -1,5 +1,17 @@
 <template>
   <div class="report">
+    <div class="report__header">
+      <div>
+        <span class="section-label">报表导出</span>
+        <h2>管理汇报与数据留档</h2>
+        <p>按时间和平台生成可导出的矩阵账号经营报表。</p>
+      </div>
+      <div class="report__links">
+        <router-link to="/data-center">矩阵总览</router-link>
+        <router-link to="/analytics">内容分析</router-link>
+      </div>
+    </div>
+
     <!-- Filters -->
     <el-card shadow="hover" class="report__filter">
       <el-form :inline="true">
@@ -308,6 +320,45 @@ async function exportExcel() {
 @import '@/assets/styles/variables';
 
 .report {
+  &__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: $space-lg;
+    margin-bottom: $space-lg;
+
+    h2 {
+      margin: 4px 0 6px;
+      font-size: $text-headline;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: $color-text-secondary;
+      margin: 0;
+    }
+  }
+
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-xs;
+
+    a {
+      padding: 6px 10px;
+      border: 1px solid $color-border;
+      border-radius: $radius-sm;
+      background: $color-bg-tertiary;
+      color: $color-text-secondary;
+      font-size: $text-caption;
+
+      &:hover {
+        color: $color-accent;
+        border-color: $color-border-hover;
+      }
+    }
+  }
+
   &__filter {
     margin-bottom: $space-lg;
   }
@@ -329,6 +380,13 @@ async function exportExcel() {
     font-weight: 600;
     margin-bottom: $space-xs;
     color: $color-text-primary;
+  }
+}
+
+@media (max-width: 768px) {
+  .report__header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 .report-date-picker {

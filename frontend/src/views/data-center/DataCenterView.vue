@@ -1,5 +1,18 @@
 <template>
   <div class="data-center">
+    <div class="data-center__header">
+      <div>
+        <span class="section-label">矩阵数据</span>
+        <h2>账号矩阵总览</h2>
+        <p>看全局表现、涨粉趋势、平台分布和内容排行榜。</p>
+      </div>
+      <div class="data-center__links">
+        <router-link to="/analytics">内容分析</router-link>
+        <router-link to="/report">报表导出</router-link>
+        <router-link to="/monetization">微信小店销售</router-link>
+      </div>
+    </div>
+
     <!-- Filter -->
     <el-card shadow="hover" class="data-center__filter">
       <el-form :inline="true">
@@ -355,6 +368,45 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .data-center {
+  &__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: $space-lg;
+    margin-bottom: $space-lg;
+
+    h2 {
+      margin: 4px 0 6px;
+      font-size: $text-headline;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: $color-text-secondary;
+      margin: 0;
+    }
+  }
+
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-xs;
+
+    a {
+      padding: 6px 10px;
+      border: 1px solid $color-border;
+      border-radius: $radius-sm;
+      background: $color-bg-tertiary;
+      color: $color-text-secondary;
+      font-size: $text-caption;
+
+      &:hover {
+        color: $color-accent;
+        border-color: $color-border-hover;
+      }
+    }
+  }
+
   &__filter {
     margin-bottom: 20px;
   }
@@ -434,5 +486,12 @@ onMounted(() => {
 }
 .rank-3 {
   background: $color-accent-alt;
+}
+
+@media (max-width: 768px) {
+  .data-center__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

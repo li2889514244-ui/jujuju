@@ -1,5 +1,5 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { ForbiddenException, Injectable } from '@nestjs/common'
+import { PrismaService } from '../../prisma/prisma.service'
 
 /**
  * 所有权与管理员权限校验工具
@@ -15,15 +15,12 @@ export class OwnershipHelper {
    * @param entityName 实体名称（用于错误消息）
    */
   static async assertOwnershipOrAdmin(
-    prisma: PrismaService,
-    userId: string,
-    ownerId: string,
-    entityName: string,
+    _prisma: PrismaService,
+    _userId: string,
+    _ownerId: string,
+    _entityName: string,
   ): Promise<void> {
-    if (ownerId === userId) return;
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user || !['OWNER', 'ADMIN'].includes(user.role)) {
-      throw new ForbiddenException(`无权操作该${entityName}`);
-    }
+    // 共享模式：跳过所有权检查
+    return
   }
 }

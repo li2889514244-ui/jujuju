@@ -12,19 +12,22 @@
 
   <!-- Menu -->
   <nav class="sidebar-inner__menu">
-    <router-link
-      v-for="r in menuRoutes"
-      :key="r.path"
-      :to="'/' + r.path"
-      class="sidebar-inner__item"
-      :class="{ 'sidebar-inner__item--active': activeMenu === '/' + r.path }"
-      @click="$emit('navigate')"
-    >
-      <el-icon :size="18" class="sidebar-inner__item-icon">
-        <component :is="getIcon(r.meta?.icon)" />
-      </el-icon>
-      <span v-if="!collapsed" class="sidebar-inner__item-label">{{ r.meta?.title }}</span>
-    </router-link>
+    <div v-for="section in menuSections" :key="section.name" class="sidebar-inner__section">
+      <div v-if="!collapsed" class="sidebar-inner__section-label">{{ section.name }}</div>
+      <router-link
+        v-for="r in section.routes"
+        :key="r.path"
+        :to="'/' + r.path"
+        class="sidebar-inner__item"
+        :class="{ 'sidebar-inner__item--active': isActiveRoute(r.path) }"
+        @click="$emit('navigate')"
+      >
+        <el-icon :size="18" class="sidebar-inner__item-icon">
+          <component :is="getIcon(r.meta?.icon)" />
+        </el-icon>
+        <span v-if="!collapsed" class="sidebar-inner__item-label">{{ r.meta?.title }}</span>
+      </router-link>
+    </div>
   </nav>
 
   <!-- Bottom -->
@@ -104,12 +107,24 @@ function onLogoClick() {
   emit('navigate')
 }
 
-const activeMenu = computed(() => route.path)
-
 const menuRoutes = computed(() => {
   const mainRoute = router.options.routes.find((r) => r.path === '/')
   return (mainRoute?.children || []).filter((r) => !r.meta?.hidden)
 })
+
+const menuSections = computed(() => {
+  const sections = new Map<string, typeof menuRoutes.value>()
+  menuRoutes.value.forEach((r) => {
+    const sectionName = typeof r.meta?.section === 'string' ? r.meta.section : '其他'
+    sections.set(sectionName, [...(sections.get(sectionName) || []), r])
+  })
+  return Array.from(sections.entries()).map(([name, routes]) => ({ name, routes }))
+})
+
+function isActiveRoute(path: string) {
+  const fullPath = `/${path}`
+  return route.path === fullPath || route.path.startsWith(`${fullPath}/`)
+}
 
 const iconMap: Record<string, Component> = {
   Odometer: markRaw(Monitor),
@@ -165,11 +180,26 @@ function getIcon(name: unknown): Component {
 
   &__menu {
     overflow-y: auto;
-    padding: 8px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    flex: 1;
+  }
+
+  &__section {
     display: flex;
     flex-direction: column;
     gap: 2px;
-    flex: 1;
+  }
+
+  &__section-label {
+    padding: 8px 12px 4px;
+    color: $color-text-placeholder;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
   }
 
   &__item {

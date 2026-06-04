@@ -1,25 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { QueryAnalyticsDto } from './dto/query-analytics.dto';
+import { Injectable, Logger } from '@nestjs/common'
+import { PrismaService } from '../../prisma/prisma.service'
+import { QueryAnalyticsDto } from './dto/query-analytics.dto'
 import { Platform } from '../../common/prisma-enums'
-import { Prisma } from '@prisma/client';
+import { Prisma } from '@prisma/client'
 
 @Injectable()
 export class AnalyticsService {
-  private readonly logger = new Logger(AnalyticsService.name);
+  private readonly logger = new Logger(AnalyticsService.name)
 
   constructor(private prisma: PrismaService) {}
 
   async getFollowersTrend(userId: string, days: number = 7, platform?: string) {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - days)
+    startDate.setHours(0, 0, 0, 0)
 
     const accounts = await this.prisma.account.findMany({
-      where: { ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
+    })
+    const accountIds = accounts.map((a) => a.id)
 
     const stats = await this.prisma.dailyStats.findMany({
       where: {
@@ -28,66 +28,75 @@ export class AnalyticsService {
       },
       select: { date: true, followers: true },
       orderBy: { date: 'asc' },
-    });
+    })
 
-    const byDate: Record<string, number> = {};
+    const byDate: Record<string, number> = {}
     for (const s of stats) {
-      const key = s.date.toISOString().slice(0, 10);
-      byDate[key] = (byDate[key] || 0) + s.followers;
+      const key = s.date.toISOString().slice(0, 10)
+      byDate[key] = (byDate[key] || 0) + s.followers
     }
 
-    const result: { date: string; value: number }[] = [];
+    const result: { date: string; value: number }[] = []
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().slice(0, 10);
-      result.push({ date: key, value: byDate[key] || 0 });
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const key = d.toISOString().slice(0, 10)
+      result.push({ date: key, value: byDate[key] || 0 })
     }
-    return result;
+    return result
   }
 
   /**
    * 鑾峰彇姣忔棩缁熻鏁版嵁
    */
-  async createManualMonetization(userId: string, dto: {
-    date: string; platform: string; revenue?: number; gmv?: number;
-    orders?: number; buyerCount?: number; commission?: number;
-    avgOrderValue?: number;
-  }) {
+  async createManualMonetization(
+    userId: string,
+    dto: {
+      date: string
+      platform: string
+      revenue?: number
+      gmv?: number
+      orders?: number
+      buyerCount?: number
+      commission?: number
+      avgOrderValue?: number
+    },
+  ) {
     const account = await this.prisma.account.findFirst({
-      where: { platform: dto.platform as Platform },
+      where: { userId, platform: dto.platform as Platform },
       select: { id: true },
-    });
-    if (!account) throw new Error('未找到该平台的账号');
+    })
+    if (!account) throw new Error('未找到该平台的账号')
 
-    const date = new Date(dto.date);
-    date.setHours(0, 0, 0, 0);
+    const date = new Date(dto.date)
+    date.setHours(0, 0, 0, 0)
 
-    const data: any = {};
-    if (dto.revenue !== undefined) data.revenue = dto.revenue;
-    if (dto.gmv !== undefined) data.gmv = dto.gmv;
-    if (dto.orders !== undefined) data.orders = dto.orders;
-    if (dto.buyerCount !== undefined) data.buyerCount = dto.buyerCount;
-    if (dto.commission !== undefined) data.commission = dto.commission;
-    if (dto.avgOrderValue !== undefined) data.avgOrderValue = dto.avgOrderValue;
+    const data: any = {}
+    if (dto.revenue !== undefined) data.revenue = dto.revenue
+    if (dto.gmv !== undefined) data.gmv = dto.gmv
+    if (dto.orders !== undefined) data.orders = dto.orders
+    if (dto.buyerCount !== undefined) data.buyerCount = dto.buyerCount
+    if (dto.commission !== undefined) data.commission = dto.commission
+    if (dto.avgOrderValue !== undefined) data.avgOrderValue = dto.avgOrderValue
 
     return this.prisma.dailyStats.upsert({
       where: { accountId_date: { accountId: account.id, date } },
       create: { accountId: account.id, date, platform: dto.platform as Platform, ...data },
       update: data,
-    });
+    })
   }
 
-  async getDailyStats(dto: QueryAnalyticsDto) {
-    const where: Prisma.DailyStatsWhereInput = {};
+  async getDailyStats(dto: QueryAnalyticsDto, userId?: string) {
+    const where: Prisma.DailyStatsWhereInput = {}
 
-    if (dto.accountId) where.accountId = dto.accountId;
-    if (dto.platform) where.platform = dto.platform;
+    if (dto.accountId) where.accountId = dto.accountId
+    if (dto.platform) where.platform = dto.platform
+    if (userId) where.account = { userId }
 
     if (dto.startDate || dto.endDate) {
-      where.date = {};
-      if (dto.startDate) where.date.gte = new Date(dto.startDate);
-      if (dto.endDate) where.date.lte = new Date(dto.endDate);
+      where.date = {}
+      if (dto.startDate) where.date.gte = new Date(dto.startDate)
+      if (dto.endDate) where.date.lte = new Date(dto.endDate)
     }
 
     const stats = await this.prisma.dailyStats.findMany({
@@ -102,22 +111,23 @@ export class AnalyticsService {
           },
         },
       },
-    });
+    })
 
-    return stats;
+    return stats
   }
 
   /**
    * 鑾峰彇鍐呭琛ㄧ幇缁熻
    */
-  async getPostStats(dto: QueryAnalyticsDto) {
-    const where: Prisma.PostStatsWhereInput = {};
+  async getPostStats(dto: QueryAnalyticsDto, userId?: string) {
+    const where: Prisma.PostStatsWhereInput = {}
 
-    if (dto.accountId || dto.platform) {
-      where.post = {};
-      if (dto.accountId) where.post.accountId = dto.accountId;
-      if (dto.platform) {
-        where.post.account = { platform: dto.platform };
+    where.post = {}
+    if (dto.accountId) where.post.accountId = dto.accountId
+    if (userId || dto.platform) {
+      where.post.account = {
+        ...(userId ? { userId } : {}),
+        ...(dto.platform ? { platform: dto.platform } : {}),
       }
     }
 
@@ -141,9 +151,9 @@ export class AnalyticsService {
         },
       },
       orderBy: { collectedAt: 'desc' },
-    });
+    })
 
-    return stats;
+    return stats
   }
 
   /**
@@ -152,11 +162,11 @@ export class AnalyticsService {
   async getOverview(userId: string) {
     // 鑾峰彇鐢ㄦ埛鐨勬墍鏈夎处鍙?
     const accounts = await this.prisma.account.findMany({
-      where: {},
+      where: { userId },
       select: { id: true, platform: true, followers: true, likes: true, status: true },
-    });
+    })
 
-    const accountIds = accounts.map((a) => a.id);
+    const accountIds = accounts.map((a) => a.id)
 
     // 鍐呭缁熻
     const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
@@ -167,7 +177,7 @@ export class AnalyticsService {
       this.prisma.post.count({
         where: { accountId: { in: accountIds }, status: 'FAILED' },
       }),
-    ]);
+    ])
 
     // 绱浜掑姩鏁版嵁
     const statsAgg = await this.prisma.postStats.aggregate({
@@ -183,17 +193,17 @@ export class AnalyticsService {
       _avg: {
         completionRate: true,
       },
-    });
+    })
 
     // 鎸夊钩鍙板垎缁勮处鍙锋暟
-    const platformCounts: Record<string, number> = {};
+    const platformCounts: Record<string, number> = {}
     accounts.forEach((a) => {
-      platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1;
-    });
+      platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1
+    })
 
     // 鎬荤矇涓濇暟
-    const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0);
-    const totalLikes = accounts.reduce((sum, a) => sum + a.likes, 0);
+    const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0)
+    const totalLikes = accounts.reduce((sum, a) => sum + a.likes, 0)
 
     return {
       accounts: {
@@ -219,7 +229,7 @@ export class AnalyticsService {
           ? Math.round(statsAgg._avg.completionRate * 100) / 100
           : 0,
       },
-    };
+    }
   }
 
   /**
@@ -227,30 +237,30 @@ export class AnalyticsService {
    */
   async getPlatformComparison(userId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: {},
+      where: { userId },
       select: { id: true, platform: true, followers: true, likes: true },
-    });
+    })
 
-    const platforms = [...new Set(accounts.map((a) => a.platform))];
+    const platforms = [...new Set(accounts.map((a) => a.platform))]
     const result: Array<{
-      platform: string;
-      accounts: number;
-      followers: number;
-      likes: number;
-      publishes: number;
-      views: number;
-      comments: number;
-      shares: number;
-      saves: number;
-      engagementRate: number;
-    }> = [];
+      platform: string
+      accounts: number
+      followers: number
+      likes: number
+      publishes: number
+      views: number
+      comments: number
+      shares: number
+      saves: number
+      engagementRate: number
+    }> = []
 
     for (const platform of platforms) {
-      const platformAccounts = accounts.filter((a) => a.platform === platform);
-      const platformAccountIds = platformAccounts.map((a) => a.id);
+      const platformAccounts = accounts.filter((a) => a.platform === platform)
+      const platformAccountIds = platformAccounts.map((a) => a.id)
 
-      const totalFollowers = platformAccounts.reduce((s, a) => s + a.followers, 0);
-      const totalLikes = platformAccounts.reduce((s, a) => s + a.likes, 0);
+      const totalFollowers = platformAccounts.reduce((s, a) => s + a.followers, 0)
+      const totalLikes = platformAccounts.reduce((s, a) => s + a.likes, 0)
 
       const [postCount, statsAgg] = await Promise.all([
         this.prisma.post.count({
@@ -263,10 +273,10 @@ export class AnalyticsService {
           where: { post: { accountId: { in: platformAccountIds } } },
           _sum: { views: true, likes: true, comments: true, shares: true, saves: true },
         }),
-      ]);
+      ])
 
-      const views = statsAgg._sum.views || 0;
-      const plikes = statsAgg._sum.likes || 0;
+      const views = statsAgg._sum.views || 0
+      const plikes = statsAgg._sum.likes || 0
 
       result.push({
         platform,
@@ -279,25 +289,28 @@ export class AnalyticsService {
         shares: statsAgg._sum.shares || 0,
         saves: statsAgg._sum.saves || 0,
         engagementRate: views > 0 ? Math.round((plikes / views) * 10000) / 100 : 0,
-      });
+      })
     }
 
-    return result;
+    return result
   }
 
   /**
    * 鐢熸垚鏁版嵁鎶ヨ〃
    */
-  async generateReport(userId: string, params: {
-    startDate?: Date;
-    endDate?: Date;
-    platform?: string;
-  }) {
-    const { startDate, endDate, platform } = params;
+  async generateReport(
+    userId: string,
+    params: {
+      startDate?: Date
+      endDate?: Date
+      platform?: string
+    },
+  ) {
+    const { startDate, endDate, platform } = params
 
     // 榛樿鏈€杩?0澶?
-    const end = endDate || new Date();
-    const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const end = endDate || new Date()
+    const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000)
 
     const accounts = await this.prisma.account.findMany({
       where: {
@@ -305,9 +318,9 @@ export class AnalyticsService {
         ...(platform ? { platform: platform as Platform } : {}),
       },
       select: { id: true, platform: true, nickname: true, followers: true, likes: true },
-    });
+    })
 
-    const accountIds = accounts.map((a) => a.id);
+    const accountIds = accounts.map((a) => a.id)
 
     // 姣忔棩鏁版嵁瓒嬪娍
     const dailyStats = await this.prisma.dailyStats.findMany({
@@ -319,7 +332,27 @@ export class AnalyticsService {
       include: {
         account: { select: { nickname: true, platform: true } },
       },
-    });
+    })
+
+    const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
+      this.prisma.post.count({
+        where: { accountId: { in: accountIds }, createdAt: { gte: start, lte: end } },
+      }),
+      this.prisma.post.count({
+        where: {
+          accountId: { in: accountIds },
+          status: 'PUBLISHED',
+          createdAt: { gte: start, lte: end },
+        },
+      }),
+      this.prisma.post.count({
+        where: {
+          accountId: { in: accountIds },
+          status: 'FAILED',
+          createdAt: { gte: start, lte: end },
+        },
+      }),
+    ])
 
     // 鍐呭琛ㄧ幇 Top 10
     const topPosts = await this.prisma.post.findMany({
@@ -334,14 +367,41 @@ export class AnalyticsService {
       },
       orderBy: { stats: { views: 'desc' } },
       take: 10,
-    });
+    })
 
-    // 姹囨€?
-    const overview = await this.getOverview(userId);
+    const scopedOverview = {
+      accounts: {
+        total: accounts.length,
+        active: accounts.length,
+        byPlatform: accounts.reduce(
+          (acc, account) => {
+            acc[account.platform] = (acc[account.platform] || 0) + 1
+            return acc
+          },
+          {} as Record<string, number>,
+        ),
+        totalFollowers: accounts.reduce((sum, account) => sum + (account.followers || 0), 0),
+        totalLikes: accounts.reduce((sum, account) => sum + (account.likes || 0), 0),
+      },
+      posts: {
+        total: totalPosts,
+        published: publishedPosts,
+        failed: failedPosts,
+      },
+      engagement: {
+        totalViews: dailyStats.reduce((sum, stat) => sum + (stat.views || 0), 0),
+        totalLikes: dailyStats.reduce((sum, stat) => sum + (stat.likes || 0), 0),
+        totalComments: dailyStats.reduce((sum, stat) => sum + (stat.comments || 0), 0),
+        totalShares: dailyStats.reduce((sum, stat) => sum + (stat.shares || 0), 0),
+        totalSaves: 0,
+        totalDanmaku: 0,
+        avgCompletionRate: 0,
+      },
+    }
 
     return {
       period: { start, end },
-      overview,
+      overview: scopedOverview,
       accounts: accounts.map((a) => ({
         ...a,
         dailyStats: dailyStats.filter((d) => d.accountId === a.id),
@@ -359,7 +419,7 @@ export class AnalyticsService {
         publishedAt: p.updatedAt,
       })),
       dailyTrend: dailyStats,
-    };
+    }
   }
 
   /**
@@ -368,26 +428,26 @@ export class AnalyticsService {
    */
   async getComparison(userId: string) {
     const accounts = await this.prisma.account.findMany({
-      where: {},
+      where: { userId },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
+    })
+    const accountIds = accounts.map((a) => a.id)
 
-    const now = new Date();
+    const now = new Date()
 
     // 鏈懆锛堝懆涓€鍒颁粖澶╋級
-    const thisWeekStart = this.getWeekStart(now);
-    const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const lastWeekEnd = new Date(thisWeekStart.getTime() - 1);
+    const thisWeekStart = this.getWeekStart(now)
+    const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const lastWeekEnd = new Date(thisWeekStart.getTime() - 1)
 
     // 鏈湀
-    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const lastMonthEnd = new Date(thisMonthStart.getTime() - 1);
+    const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastMonthEnd = new Date(thisMonthStart.getTime() - 1)
 
     // 鍘诲勾鍚屾湀
-    const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-    const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0);
+    const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
+    const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0)
 
     const [thisWeek, lastWeek, thisMonth, lastMonth, lastYearSameMonth] = await Promise.all([
       this.aggregateStats(accountIds, thisWeekStart, now),
@@ -395,7 +455,7 @@ export class AnalyticsService {
       this.aggregateStats(accountIds, thisMonthStart, now),
       this.aggregateStats(accountIds, lastMonthStart, lastMonthEnd),
       this.aggregateStats(accountIds, lastYearSameMonthStart, lastYearSameMonthEnd),
-    ]);
+    ])
 
     return {
       weekOverWeek: {
@@ -413,18 +473,21 @@ export class AnalyticsService {
         previous: lastYearSameMonth,
         change: this.calcChange(thisMonth, lastYearSameMonth),
       },
-    };
+    }
   }
 
   /**
    * 鎾斁閲忔鍗?鈥?鎸夋挱鏀鹃噺鎺掑悕鐨勮棰戝垪琛?
    */
-  async getViewsRanking(userId: string, params: {
-    limit?: number;
-    period?: 'week' | 'month' | 'all';
-    platform?: string;
-  }) {
-    const { limit = 50, period = 'all', platform } = params;
+  async getViewsRanking(
+    userId: string,
+    params: {
+      limit?: number
+      period?: 'week' | 'month' | 'all'
+      platform?: string
+    },
+  ) {
+    const { limit = 50, period = 'all', platform } = params
 
     const accounts = await this.prisma.account.findMany({
       where: {
@@ -432,16 +495,16 @@ export class AnalyticsService {
         ...(platform ? { platform: platform as Platform } : {}),
       },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
+    })
+    const accountIds = accounts.map((a) => a.id)
 
     // 鏃堕棿鑼冨洿
-    let dateFilter: Prisma.PostWhereInput = {};
-    const now = new Date();
+    let dateFilter: Prisma.PostWhereInput = {}
+    const now = new Date()
     if (period === 'week') {
-      dateFilter = { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
+      dateFilter = { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } }
     } else if (period === 'month') {
-      dateFilter = { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+      dateFilter = { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } }
     }
 
     const posts = await this.prisma.post.findMany({
@@ -459,7 +522,7 @@ export class AnalyticsService {
       },
       orderBy: { stats: { views: 'desc' } },
       take: limit,
-    });
+    })
 
     return {
       ranking: posts.map((p, index) => ({
@@ -479,7 +542,7 @@ export class AnalyticsService {
       })),
       total: posts.length,
       period,
-    };
+    }
   }
 
   /**
@@ -487,7 +550,7 @@ export class AnalyticsService {
    */
   private async aggregateStats(accountIds: string[], start: Date, end: Date) {
     if (accountIds.length === 0) {
-      return { views: 0, likes: 0, comments: 0, shares: 0, followers: 0, posts: 0 };
+      return { views: 0, likes: 0, comments: 0, shares: 0, followers: 0, posts: 0 }
     }
 
     const [dailyAgg, postCount] = await Promise.all([
@@ -505,23 +568,32 @@ export class AnalyticsService {
           updatedAt: { gte: start, lte: end },
         },
       }),
-    ]);
+    ])
 
     // 绮変笣澧為暱 = 鏈熸湯 - 鏈熷垵
-    const [latestFollowers, earliestFollowers] = await Promise.all([
-      this.prisma.dailyStats.findFirst({
-        where: { accountId: { in: accountIds }, date: { lte: end } },
-        orderBy: { date: 'desc' },
-        select: { followers: true },
-      }),
-      this.prisma.dailyStats.findFirst({
-        where: { accountId: { in: accountIds }, date: { gte: start } },
-        orderBy: { date: 'asc' },
-        select: { followers: true },
-      }),
-    ]);
+    const followerStats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { gte: start, lte: end },
+      },
+      orderBy: [{ accountId: 'asc' }, { date: 'asc' }],
+      select: { accountId: true, followers: true },
+    })
 
-    const followerGrowth = (latestFollowers?.followers || 0) - (earliestFollowers?.followers || 0);
+    const firstFollowers: Record<string, number> = {}
+    const lastFollowers: Record<string, number> = {}
+    for (const stat of followerStats) {
+      if (firstFollowers[stat.accountId] === undefined) {
+        firstFollowers[stat.accountId] = stat.followers || 0
+      }
+      lastFollowers[stat.accountId] = stat.followers || 0
+    }
+
+    const followerGrowth = accountIds.reduce((sum, accountId) => {
+      const first = firstFollowers[accountId] ?? 0
+      const last = lastFollowers[accountId] ?? first
+      return sum + Math.max(0, last - first)
+    }, 0)
 
     return {
       views: dailyAgg._sum.views || 0,
@@ -530,24 +602,24 @@ export class AnalyticsService {
       shares: dailyAgg._sum.shares || 0,
       followers: Math.max(0, followerGrowth),
       posts: postCount,
-    };
+    }
   }
 
   /**
    * 璁＄畻鍙樺寲鐜?
    */
   private calcChange(current: Record<string, number>, previous: Record<string, number>) {
-    const result: Record<string, number | null> = {};
+    const result: Record<string, number | null> = {}
     for (const key of Object.keys(current)) {
-      const cur = current[key] || 0;
-      const prev = previous[key] || 0;
+      const cur = current[key] || 0
+      const prev = previous[key] || 0
       if (prev === 0) {
-        result[key] = cur > 0 ? 100 : 0;
+        result[key] = cur > 0 ? 100 : 0
       } else {
-        result[key] = Math.round(((cur - prev) / prev) * 100);
+        result[key] = Math.round(((cur - prev) / prev) * 100)
       }
     }
-    return result;
+    return result
   }
 
   /**
@@ -555,58 +627,58 @@ export class AnalyticsService {
    */
   private getWeekStart(date: Date): Date {
     // 杞崲涓?UTC+8
-    const utc8Offset = 8 * 60 * 60 * 1000;
-    const localTime = new Date(date.getTime() + utc8Offset);
-    const day = localTime.getUTCDay();
-    const diff = localTime.getUTCDate() - day + (day === 0 ? -6 : 1);
-    localTime.setUTCDate(diff);
-    localTime.setUTCHours(0, 0, 0, 0);
+    const utc8Offset = 8 * 60 * 60 * 1000
+    const localTime = new Date(date.getTime() + utc8Offset)
+    const day = localTime.getUTCDay()
+    const diff = localTime.getUTCDate() - day + (day === 0 ? -6 : 1)
+    localTime.setUTCDate(diff)
+    localTime.setUTCHours(0, 0, 0, 0)
     // 杞洖 UTC
-    return new Date(localTime.getTime() - utc8Offset);
+    return new Date(localTime.getTime() - utc8Offset)
   }
 
   // ─── 以下为补全的 7 个缺失服务方法 ───
 
   async getLikesTrend(userId: string, days: number = 7, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    })
+    const accountIds = accounts.map((a) => a.id)
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
     const stats = await this.prisma.dailyStats.findMany({
       where: { accountId: { in: accountIds }, date: { gte: startDate } },
       orderBy: { date: 'asc' },
       select: { date: true, likes: true },
-    });
+    })
 
-    const byDate: Record<string, number> = {};
+    const byDate: Record<string, number> = {}
     for (const s of stats) {
-      const d = s.date.toISOString().slice(0, 10);
-      byDate[d] = (byDate[d] || 0) + s.likes;
+      const d = s.date.toISOString().slice(0, 10)
+      byDate[d] = (byDate[d] || 0) + s.likes
     }
 
-    const result: { date: string; value: number }[] = [];
+    const result: { date: string; value: number }[] = []
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-      const key = d.toISOString().slice(0, 10);
-      result.push({ date: key, value: byDate[key] || 0 });
+      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000)
+      const key = d.toISOString().slice(0, 10)
+      result.push({ date: key, value: byDate[key] || 0 })
     }
-    return result;
+    return result
   }
 
   async getPublishEffect(userId: string, days?: number, contentId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: {},
+      where: { userId },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
+    })
+    const accountIds = accounts.map((a) => a.id)
 
-    const where: any = { accountId: { in: accountIds } };
-    if (contentId) where.id = contentId;
+    const where: any = { accountId: { in: accountIds } }
+    if (contentId) where.id = contentId
     if (days) {
-      where.createdAt = { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) };
+      where.createdAt = { gte: new Date(Date.now() - days * 24 * 60 * 60 * 1000) }
     }
 
     const posts = await this.prisma.post.findMany({
@@ -617,7 +689,7 @@ export class AnalyticsService {
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
-    });
+    })
 
     return posts.map((p) => ({
       id: p.id,
@@ -635,35 +707,35 @@ export class AnalyticsService {
       danmakuCount: p.stats?.danmakuCount || 0,
       followsFromPost: p.stats?.followsFromPost || 0,
       publishedAt: p.publishAt || p.createdAt,
-    }));
+    }))
   }
 
   async getEngagementRate(userId: string, days: number = 7, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    })
+    const accountIds = accounts.map((a) => a.id)
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
     const stats = await this.prisma.dailyStats.findMany({
       where: { accountId: { in: accountIds }, date: { gte: startDate } },
       orderBy: { date: 'asc' },
       select: { date: true, views: true, likes: true, comments: true, shares: true },
-    });
+    })
 
-    const byDate: Record<string, { views: number; interactions: number }> = {};
+    const byDate: Record<string, { views: number; interactions: number }> = {}
     for (const s of stats) {
-      const d = s.date.toISOString().slice(0, 10);
-      if (!byDate[d]) byDate[d] = { views: 0, interactions: 0 };
-      byDate[d].views += s.views;
-      byDate[d].interactions += s.likes + s.comments + s.shares;
+      const d = s.date.toISOString().slice(0, 10)
+      if (!byDate[d]) byDate[d] = { views: 0, interactions: 0 }
+      byDate[d].views += s.views
+      byDate[d].interactions += s.likes + s.comments + s.shares
     }
 
     return Object.entries(byDate).map(([date, data]) => ({
       date,
       value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
-    }));
+    }))
   }
 
   async exportReport(
@@ -675,57 +747,70 @@ export class AnalyticsService {
     const report = await this.generateReport(userId, {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
-    });
+    })
 
     if (format === 'csv') {
-      const headers = 'date,platform,account,views,likes,comments,shares,followers';
+      const headers = 'date,platform,account,views,likes,comments,shares,followers'
       const rows = (report.dailyTrend || []).map(
         (d: any) =>
           `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`,
-      );
-      return [headers, ...rows].join('\n');
+      )
+      return [headers, ...rows].join('\n')
     }
-    return report;
+    return report
   }
 
   async getMonetization(userId: string, days: number = 30, platform?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true, platform: true },
-    });
-    const accountIds = accounts.map((a) => a.id);
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    })
+    const accountIds = accounts.map((a) => a.id)
+    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
 
     const stats = await this.prisma.dailyStats.findMany({
       where: { accountId: { in: accountIds }, date: { gte: startDate } },
       orderBy: { date: 'asc' },
       include: { account: { select: { platform: true } } },
-    });
+    })
 
-    const totals = { revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
-    let avgCount = 0;
-    const byPlatform: Record<string, any> = {};
-    const dailyTrend: any[] = [];
+    const totals = { revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 }
+    let avgCount = 0
+    const byPlatform: Record<string, any> = {}
+    const dailyTrend: any[] = []
 
     for (const s of stats) {
-      totals.revenue += s.revenue;
-      totals.gmv += s.gmv;
-      totals.orders += s.orders;
-      totals.commission += s.commission;
-      totals.buyerCount += s.buyerCount;
-      if (s.avgOrderValue > 0) { totals.avgOrderValue += s.avgOrderValue; avgCount++; }
-
-      const p = s.account.platform;
-      if (!byPlatform[p]) {
-        byPlatform[p] = { platform: p, revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
-      }
-      byPlatform[p].revenue += s.revenue;
-      byPlatform[p].gmv += s.gmv;
-      byPlatform[p].orders += s.orders;
-      byPlatform[p].commission += s.commission;
-      byPlatform[p].buyerCount += s.buyerCount;
+      totals.revenue += s.revenue
+      totals.gmv += s.gmv
+      totals.orders += s.orders
+      totals.commission += s.commission
+      totals.buyerCount += s.buyerCount
       if (s.avgOrderValue > 0) {
-        byPlatform[p].avgOrderValue = Math.round((byPlatform[p].avgOrderValue + s.avgOrderValue) / 2);
+        totals.avgOrderValue += s.avgOrderValue
+        avgCount++
+      }
+
+      const p = s.account.platform
+      if (!byPlatform[p]) {
+        byPlatform[p] = {
+          platform: p,
+          revenue: 0,
+          gmv: 0,
+          orders: 0,
+          commission: 0,
+          buyerCount: 0,
+          avgOrderValue: 0,
+        }
+      }
+      byPlatform[p].revenue += s.revenue
+      byPlatform[p].gmv += s.gmv
+      byPlatform[p].orders += s.orders
+      byPlatform[p].commission += s.commission
+      byPlatform[p].buyerCount += s.buyerCount
+      if (s.avgOrderValue > 0) {
+        byPlatform[p].avgOrderValue = Math.round(
+          (byPlatform[p].avgOrderValue + s.avgOrderValue) / 2,
+        )
       }
 
       dailyTrend.push({
@@ -736,10 +821,10 @@ export class AnalyticsService {
         commission: s.commission,
         buyerCount: s.buyerCount,
         avgOrderValue: s.avgOrderValue,
-      });
+      })
     }
 
-    if (avgCount > 0) totals.avgOrderValue = Math.round(totals.avgOrderValue / avgCount);
+    if (avgCount > 0) totals.avgOrderValue = Math.round(totals.avgOrderValue / avgCount)
 
     return {
       totalRevenue: totals.revenue,
@@ -750,7 +835,7 @@ export class AnalyticsService {
       totalAvgOrderValue: totals.avgOrderValue,
       byPlatform: Object.values(byPlatform),
       dailyTrend,
-    };
+    }
   }
 
   async getAccountAnalytics(accountId: string) {
@@ -761,18 +846,25 @@ export class AnalyticsService {
       }),
       this.prisma.postStats.aggregate({
         where: { post: { accountId } },
-        _sum: { views: true, likes: true, comments: true, shares: true, saves: true, danmakuCount: true, followsFromPost: true },
+        _sum: {
+          views: true,
+          likes: true,
+          comments: true,
+          shares: true,
+          saves: true,
+          danmakuCount: true,
+          followsFromPost: true,
+        },
         _avg: { completionRate: true },
       }),
       this.prisma.post.count({ where: { accountId } }),
-    ]);
+    ])
 
     const totalInteractions =
-      (statsAgg._sum.likes || 0) + (statsAgg._sum.comments || 0) + (statsAgg._sum.shares || 0);
-    const totalViews = statsAgg._sum.views || 0;
-    const avgEngagementRate = totalViews > 0
-      ? Math.round((totalInteractions / totalViews) * 10000) / 100
-      : 0;
+      (statsAgg._sum.likes || 0) + (statsAgg._sum.comments || 0) + (statsAgg._sum.shares || 0)
+    const totalViews = statsAgg._sum.views || 0
+    const avgEngagementRate =
+      totalViews > 0 ? Math.round((totalInteractions / totalViews) * 10000) / 100 : 0
 
     return {
       totalViews,
@@ -787,23 +879,32 @@ export class AnalyticsService {
         : 0,
       totalPosts: postCount,
       avgEngagementRate,
-    };
+    }
   }
 
   async getAccountPosts(
     accountId: string,
     params: { page: number; pageSize: number; sortBy: string; sortOrder: 'asc' | 'desc' },
   ) {
-    const { page, pageSize, sortBy, sortOrder } = params;
-    const skip = (page - 1) * pageSize;
+    const { page, pageSize, sortBy, sortOrder } = params
+    const skip = (page - 1) * pageSize
 
-    const where = { accountId };
-    const orderBy: any = {};
-    const statsFields = ['views', 'likes', 'comments', 'shares', 'saves', 'completionRate', 'followsFromPost', 'danmakuCount'];
+    const where = { accountId }
+    const orderBy: any = {}
+    const statsFields = [
+      'views',
+      'likes',
+      'comments',
+      'shares',
+      'saves',
+      'completionRate',
+      'followsFromPost',
+      'danmakuCount',
+    ]
     if (statsFields.includes(sortBy)) {
-      orderBy.stats = { [sortBy]: sortOrder };
+      orderBy.stats = { [sortBy]: sortOrder }
     } else {
-      orderBy[sortBy] = sortOrder;
+      orderBy[sortBy] = sortOrder
     }
 
     const [posts, total] = await Promise.all([
@@ -815,16 +916,15 @@ export class AnalyticsService {
         take: pageSize,
       }),
       this.prisma.post.count({ where }),
-    ]);
+    ])
 
     const items = posts.map((p) => {
-      const views = p.stats?.views || 0;
-      const likes = p.stats?.likes || 0;
-      const comments = p.stats?.comments || 0;
-      const shares = p.stats?.shares || 0;
-      const engagementRate = views > 0
-        ? Math.round(((likes + comments + shares) / views) * 10000) / 100
-        : 0;
+      const views = p.stats?.views || 0
+      const likes = p.stats?.likes || 0
+      const comments = p.stats?.comments || 0
+      const shares = p.stats?.shares || 0
+      const engagementRate =
+        views > 0 ? Math.round(((likes + comments + shares) / views) * 10000) / 100 : 0
 
       return {
         id: p.id,
@@ -843,10 +943,33 @@ export class AnalyticsService {
         danmakuCount: p.stats?.danmakuCount || 0,
         followsFromPost: p.stats?.followsFromPost || 0,
         engagementRate,
-      };
-    });
+        tags: (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g)?.map((t: string) => t.slice(1)) || [],
+      }
+    })
 
-    return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
+  /** 从所有作品标题中提取 #标签 并统计频次 */
+  async getTags() {
+    const posts = await this.prisma.post.findMany({
+      select: { title: true },
+      where: { title: { not: '' } },
+      take: 5000,
+    })
+    const tagCount: Record<string, number> = {}
+    for (const p of posts) {
+      const matches = (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g)
+      if (matches) {
+        for (const tag of matches) {
+          const t = tag.slice(1)
+          if (t.length >= 2) tagCount[t] = (tagCount[t] || 0) + 1
+        }
+      }
+    }
+    return Object.entries(tagCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 50)
+      .map(([name, count]) => ({ name, count }))
+  }
 }

@@ -55,9 +55,9 @@ export function useDashboard() {
     const totalInteract = rows.reduce((s, r) => s + r.comments + r.shares, 0)
     return [
       { label: '总粉丝', rawValue: totalFollowers, trend: null, color: '#00cc99' },
-      { label: '总播放量', rawValue: totalViews, trend: null, color: '#22c55e' },
-      { label: '总点赞', rawValue: totalLikes, trend: null, color: '#f59e0b' },
-      { label: '总互动', rawValue: totalInteract, trend: null, color: '#ef4444' },
+      { label: '近30日播放', rawValue: totalViews, trend: null, color: '#22c55e' },
+      { label: '近30日点赞', rawValue: totalLikes, trend: null, color: '#f59e0b' },
+      { label: '近30日互动', rawValue: totalInteract, trend: null, color: '#ef4444' },
     ]
   })
 

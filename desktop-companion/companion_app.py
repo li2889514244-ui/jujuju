@@ -1364,7 +1364,8 @@ async def _scrape_video_list(page, platform: str) -> list:
     all_videos = []
     seen_titles = set()
     
-    for page_num in range(1, 10):  # 最多 9 页
+    page_num = 1
+    while True:
         # Wait for content to load
         await page.wait_for_timeout(3000 if page_num == 1 else 2500)
         
@@ -1438,11 +1439,12 @@ async def _scrape_video_list(page, platform: str) -> list:
         
         # Click "下一页" inside wujie-app shadow DOM
         clicked = await _wujie_click_text(page, '下一页')
+        page_num += 1
         if not clicked:
             break
     
     # Trim to top 50 to avoid overwhelming local DB (162 videos is a lot)
-    return all_videos[:50]
+    return all_videos
 
 
 async def _scrape_monetization(page) -> dict:
@@ -1993,6 +1995,11 @@ def _run_collection_once():
 
         _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
         _collector_last_error = None
+        # 更新所有已采集平台的 cookie 状态
+        platform_map = {'DOUYIN':'douyin','XIAOHONGSHU':'xiaohongshu','KUAISHOU':'kuaishou','WECHAT_VIDEO':'tencent'}
+        for acc in local_accounts:
+            key = platform_map.get(acc.get('platform',''))
+            if key: _record_scan_time(key)
         print(f'[DC] Done: {reported}/{len(scraped)} reported')
     except Exception as e:
         _collector_last_error = str(e)

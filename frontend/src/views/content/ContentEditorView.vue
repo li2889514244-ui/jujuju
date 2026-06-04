@@ -6,7 +6,7 @@
           <span>{{ isEditing ? '编辑内容' : '新建内容' }}</span>
           <div>
             <el-button @click="handleSaveDraft">保存草稿</el-button>
-            <el-button type="primary" @click="handleSaveAndPublish">保存并发布</el-button>
+            <el-button type="primary" @click="handleSaveAndPublish">保存并去发布</el-button>
           </div>
         </div>
       </template>

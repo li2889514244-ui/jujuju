@@ -1,5 +1,14 @@
 <template>
   <div class="account-list">
+    <div class="account-list__header">
+      <div>
+        <span class="section-label">账号矩阵</span>
+        <h2>账号状态、分组和作品数据</h2>
+        <p>点击账号详情，可查看单账号视频播放、点赞、评论、收藏和互动率。</p>
+      </div>
+      <router-link to="/data-center" class="account-list__header-link">查看矩阵数据</router-link>
+    </div>
+
     <!-- Filters -->
     <GlassCard class="account-list__filter">
       <el-form :inline="true" :model="accountStore.filter">
@@ -50,7 +59,7 @@
     <!-- Action Bar -->
     <div class="account-list__actions">
       <el-button type="primary" @click="showAddDialog = true">
-        <el-icon><Plus /></el-icon>扫码添加
+        <el-icon><Plus /></el-icon>接入账号
       </el-button>
       <el-button @click="showGroupDialog = true">
         <el-icon><FolderAdd /></el-icon>新建分组
@@ -229,12 +238,18 @@
     </el-dialog>
 
     <!-- Add Account Guide Dialog -->
-    <el-dialog v-model="showAddDialog" title="添加账号" width="500px">
+    <el-dialog v-model="showAddDialog" title="接入账号" width="540px">
       <div class="add-dialog">
-        <p class="add-dialog__title">请使用 <strong>披星云桌面伴侣</strong> 绑定账号</p>
+        <div class="add-dialog__intro">
+          <p class="add-dialog__eyebrow">推荐方式</p>
+          <p class="add-dialog__title">用桌面伴侣完成扫码登录</p>
+          <p class="add-dialog__desc">
+            桌面伴侣会在本机打开平台登录页，登录成功后自动同步账号状态。
+          </p>
+        </div>
         <div v-if="companionOnline" class="companion-online-box">
-          <p class="companion-online-box__status">已检测到桌面伴侣运行中</p>
-          <p class="companion-online-box__hint">选择平台后，桌面伴侣会自动弹出浏览器窗口</p>
+          <p class="companion-online-box__status">桌面伴侣已连接</p>
+          <p class="companion-online-box__hint">选择要绑定的平台，随后在弹出的窗口里完成登录。</p>
           <div class="companion-online-box__btns">
             <el-button
               v-for="p in bindablePlatforms"
@@ -247,6 +262,12 @@
           </div>
         </div>
         <template v-else>
+          <div class="companion-offline-box">
+            <p><strong>1. 下载并解压桌面伴侣</strong></p>
+            <p>2. 双击 install.bat 完成安装</p>
+            <p>3. 双击 start.bat 启动后回到这里</p>
+            <p>4. 选择平台并扫码登录，账号会自动同步</p>
+          </div>
           <el-button
             type="primary"
             size="large"
@@ -257,19 +278,12 @@
           >
             <el-icon><Download /></el-icon>下载桌面伴侣
           </el-button>
-          <div class="companion-offline-box">
-            <p>1. 下载并解压桌面伴侣</p>
-            <p>2. 双击 install.bat 一键安装</p>
-            <p>3. 双击 start.bat 启动，自动打开界面</p>
-            <p>4. 回到本页选择平台，扫码登录</p>
-            <p>5. Cookie 自动上传，刷新即可见</p>
-          </div>
         </template>
-        <p class="text-caption">桌面端使用你电脑的真实 IP 登录平台，不会触发风控封号。</p>
+        <p class="text-caption">遇到特殊平台或调试场景时，也可以使用手动录入。</p>
       </div>
       <template #footer>
         <el-button @click="showAddDialog = false">关闭</el-button>
-        <el-button type="primary" @click="openManualAdd">手动输入 Cookie</el-button>
+        <el-button @click="openManualAdd">手动录入</el-button>
       </template>
     </el-dialog>
     <!-- Manual Add Dialog -->
@@ -500,7 +514,40 @@ function openManualAdd() {
 .account-list {
   display: flex;
   flex-direction: column;
-  gap: $section-gap;
+  gap: $space-lg;
+
+  &__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: $space-lg;
+
+    h2 {
+      margin: 4px 0 6px;
+      font-size: $text-headline;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: var(--el-text-color-secondary);
+      margin: 0;
+    }
+  }
+
+  &__header-link {
+    padding: 7px 12px;
+    border: 1px solid $color-border;
+    border-radius: $radius-sm;
+    background: $color-bg-tertiary;
+    color: $color-text-secondary;
+    font-size: $text-caption;
+    white-space: nowrap;
+
+    &:hover {
+      color: $color-accent;
+      border-color: $color-border-hover;
+    }
+  }
 
   &__filter {
     :deep(.el-form--inline .el-form-item) {
@@ -521,6 +568,13 @@ function openManualAdd() {
     display: flex;
     justify-content: center;
     padding-top: $space-lg;
+  }
+}
+
+@media (max-width: 768px) {
+  .account-list__header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
@@ -640,11 +694,28 @@ function openManualAdd() {
 
 // === Add dialog ===
 .add-dialog {
-  text-align: center;
-  padding: $space-lg;
+  display: flex;
+  flex-direction: column;
+  gap: $space-md;
+  padding: $space-sm 0;
   .add-dialog__title {
     font-size: $text-title;
-    margin-bottom: $space-md;
+    color: var(--el-text-color-primary);
+    font-weight: 700;
+    margin: 0;
+  }
+  .add-dialog__eyebrow {
+    color: $color-accent;
+    font-size: $text-micro;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin: 0 0 4px;
+    text-transform: uppercase;
+  }
+  .add-dialog__desc {
+    color: var(--el-text-color-secondary);
+    font-size: $text-caption;
+    margin: 6px 0 0;
   }
 }
 .companion-online-box {
@@ -652,7 +723,6 @@ function openManualAdd() {
   border: 1px solid var(--el-border-color);
   border-radius: $radius-sm;
   padding: $space-md;
-  margin-bottom: $space-md;
   .companion-online-box__status {
     color: $color-success;
     font-weight: 600;
@@ -672,10 +742,10 @@ function openManualAdd() {
 }
 .companion-offline-box {
   background: var(--el-fill-color-lighter);
+  border: 1px solid var(--el-border-color);
   border-radius: $radius-sm;
   padding: $space-md;
   text-align: left;
-  margin-bottom: $space-md;
   p {
     margin: 4px 0;
     font-size: $text-caption;

@@ -1,5 +1,17 @@
 <template>
   <div class="analytics">
+    <div class="analytics__header">
+      <div>
+        <span class="section-label">内容分析</span>
+        <h2>作品表现与增长复盘</h2>
+        <p>聚焦内容发布后的播放、互动、平台对比和爆款排行。</p>
+      </div>
+      <div class="analytics__links">
+        <router-link to="/data-center">矩阵总览</router-link>
+        <router-link to="/report">报表导出</router-link>
+      </div>
+    </div>
+
     <!-- Loading Skeleton -->
     <template v-if="loadingCharts && platformStats.length === 0 && followerTrend.length === 0">
       <div class="analytics__skeleton">
@@ -494,6 +506,45 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .analytics {
+  &__header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: $space-lg;
+    margin-bottom: $space-lg;
+
+    h2 {
+      margin: 4px 0 6px;
+      font-size: $text-headline;
+      letter-spacing: 0;
+    }
+
+    p {
+      color: $color-text-secondary;
+      margin: 0;
+    }
+  }
+
+  &__links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: $space-xs;
+
+    a {
+      padding: 6px 10px;
+      border: 1px solid $color-border;
+      border-radius: $radius-sm;
+      background: $color-bg-tertiary;
+      color: $color-text-secondary;
+      font-size: $text-caption;
+
+      &:hover {
+        color: $color-accent;
+        border-color: $color-border-hover;
+      }
+    }
+  }
+
   &__filter {
     margin-bottom: 20px;
   }
@@ -593,5 +644,12 @@ onMounted(() => {
 }
 .rank-3 {
   background: $color-accent-alt;
+}
+
+@media (max-width: 768px) {
+  .analytics__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>

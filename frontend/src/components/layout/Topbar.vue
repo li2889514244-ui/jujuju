@@ -10,55 +10,35 @@
     </div>
 
     <div class="topbar__right">
-      <!-- Mobile: "More" menu -->
-      <el-dropdown trigger="click" class="topbar__more">
-        <el-icon :size="20" class="topbar__icon-btn" role="button" aria-label="更多">
-          <MoreFilled />
-        </el-icon>
+      <!-- Tools -->
+      <el-dropdown trigger="click" class="topbar__tools">
+        <div class="topbar__tool-button" role="button" aria-label="工具">
+          <el-icon :size="16"><MoreFilled /></el-icon>
+          <span class="topbar__desktop">工具</span>
+        </div>
         <template #dropdown>
           <el-dropdown-menu>
             <el-dropdown-item>
               <a
                 href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
                 target="_blank"
-                class="topbar__more-link"
-                ><el-icon :size="16"><Download /></el-icon> 桌面端</a
+                class="topbar__tool-link"
+                ><el-icon :size="16"><Download /></el-icon> 下载桌面伴侣</a
               >
             </el-dropdown-item>
             <el-dropdown-item>
-              <router-link to="/ai" class="topbar__more-link">
+              <router-link to="/ai" class="topbar__tool-link">
                 <el-icon :size="16"><MagicStick /></el-icon> AI 助手
               </router-link>
             </el-dropdown-item>
             <el-dropdown-item>
-              <router-link to="/mcp" class="topbar__more-link">
+              <router-link to="/mcp" class="topbar__tool-link">
                 <el-icon :size="16"><ChatDotRound /></el-icon> MCP 查询
               </router-link>
             </el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
-
-      <!-- Desktop actions -->
-      <a
-        href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
-        target="_blank"
-        class="topbar__action topbar__desktop"
-        title="下载桌面伴侣"
-      >
-        <el-icon :size="16"><Download /></el-icon>
-        <span>桌面端</span>
-      </a>
-
-      <router-link to="/ai" class="topbar__action topbar__desktop" title="AI 助手">
-        <el-icon :size="16"><MagicStick /></el-icon>
-        <span>AI 助手</span>
-      </router-link>
-
-      <router-link to="/mcp" class="topbar__action topbar__desktop" title="MCP 查询">
-        <el-icon :size="16"><ChatDotRound /></el-icon>
-        <span>MCP</span>
-      </router-link>
 
       <!-- Team Switcher -->
       <el-dropdown trigger="click" class="topbar__team-wrap" @command="handleTeamSwitch">
@@ -313,37 +293,37 @@ function handleUserCommand(command: string) {
   gap: 16px;
 }
 
-.topbar__more {
-  display: none;
-}
-
 .topbar__desktop {
   display: flex;
 }
 
-.topbar__more-link {
+.topbar__tools {
+  display: flex;
+}
+
+.topbar__tool-button {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: $color-text-secondary;
+  font-size: 13px;
+  padding: 5px 10px;
+  border-radius: $radius-sm;
+  cursor: pointer;
+  transition: all 0.15s;
+  &:hover {
+    background: rgba(0, 204, 153, 0.06);
+    color: $color-accent;
+  }
+}
+
+.topbar__tool-link {
   display: flex;
   align-items: center;
   gap: 8px;
   color: $color-text-secondary;
   text-decoration: none;
   &:hover {
-    color: $color-accent;
-  }
-}
-
-.topbar__action {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: $color-text-secondary;
-  text-decoration: none;
-  font-size: 13px;
-  padding: 5px 10px;
-  border-radius: $radius-sm;
-  transition: all 0.15s;
-  &:hover {
-    background: rgba(0, 204, 153, 0.06);
     color: $color-accent;
   }
 }
@@ -467,9 +447,6 @@ function handleUserCommand(command: string) {
     &__right {
       gap: 6px;
     }
-    &__more {
-      display: flex;
-    }
     &__desktop {
       display: none !important;
     }
@@ -477,6 +454,9 @@ function handleUserCommand(command: string) {
       display: none !important;
     }
     &__team {
+      padding: 5px 6px;
+    }
+    &__tool-button {
       padding: 5px 6px;
     }
     &__user {

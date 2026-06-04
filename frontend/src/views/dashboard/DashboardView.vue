@@ -51,6 +51,105 @@
 
     <!-- Actual content (hidden during skeleton) -->
     <template v-else>
+      <!-- Command Center -->
+      <section class="dashboard__command stagger-item">
+        <div class="command-copy">
+          <span class="section-label">矩阵账号管理平台</span>
+          <h1>账号状态、作品表现、涨粉趋势和销售数据统一看</h1>
+          <p>
+            {{
+              accountRows.length > 0
+                ? `当前矩阵已接入 ${accountRows.length} 个账号。先看账号健康，再看内容表现和转化。`
+                : '先接入第一个账号，系统会开始沉淀作品数据、涨粉趋势、发布记录和小店销售。'
+            }}
+          </p>
+          <div class="command-meta">
+            <span>数据口径：账号粉丝为当前快照</span>
+            <span>播放/互动为采集期统计</span>
+            <span v-if="lastUpdate">最近刷新 {{ lastUpdate }}</span>
+          </div>
+        </div>
+        <div class="command-actions">
+          <router-link to="/accounts" class="command-action command-action--primary">
+            <span class="command-action__label">{{
+              accountRows.length > 0 ? '管理账号' : '接入账号'
+            }}</span>
+            <span class="command-action__hint">扫码绑定与分组</span>
+          </router-link>
+          <router-link to="/content" class="command-action">
+            <span class="command-action__label">制作内容</span>
+            <span class="command-action__hint">{{
+              accountRows.length > 0 ? '上传素材与审核文案' : '可先保存草稿'
+            }}</span>
+          </router-link>
+          <router-link to="/publish" class="command-action">
+            <span class="command-action__label">安排发布</span>
+            <span class="command-action__hint">{{
+              accountRows.length > 0 ? '多平台排期' : '接入账号后排期'
+            }}</span>
+          </router-link>
+        </div>
+      </section>
+
+      <section class="dashboard__runway stagger-item">
+        <div class="runway-step" :class="{ 'runway-step--done': accountRows.length > 0 }">
+          <span class="runway-step__index">1</span>
+          <div>
+            <strong>接入账号</strong>
+            <span>{{
+              accountRows.length > 0 ? '账号已接入，可以继续运营' : '从扫码绑定开始'
+            }}</span>
+          </div>
+        </div>
+        <div class="runway-step" :class="{ 'runway-step--ready': accountRows.length > 0 }">
+          <span class="runway-step__index">2</span>
+          <div>
+            <strong>制作内容</strong>
+            <span>上传视频、封面和文案</span>
+          </div>
+        </div>
+        <div class="runway-step" :class="{ 'runway-step--ready': accountRows.length > 0 }">
+          <span class="runway-step__index">3</span>
+          <div>
+            <strong>发布复盘</strong>
+            <span>排期发布后查看增长趋势</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="dashboard__capabilities stagger-item">
+        <router-link to="/accounts" class="capability-card">
+          <span class="capability-card__tag">账号矩阵</span>
+          <strong>账号状态与分组</strong>
+          <span>授权、过期、粉丝、分组和账号详情入口</span>
+        </router-link>
+        <router-link to="/accounts" class="capability-card">
+          <span class="capability-card__tag">作品数据</span>
+          <strong>单账号视频明细</strong>
+          <span>进入账号详情查看播放、点赞、评论、收藏和互动率</span>
+        </router-link>
+        <router-link to="/data-center" class="capability-card">
+          <span class="capability-card__tag">增长复盘</span>
+          <strong>涨粉与平台对比</strong>
+          <span>按平台查看播放、互动率、粉丝增长和排行榜</span>
+        </router-link>
+        <router-link to="/monetization" class="capability-card">
+          <span class="capability-card__tag">微信小店</span>
+          <strong>销售、订单与售后</strong>
+          <span>查看 GMV、订单状态、商品销量和退款提醒</span>
+        </router-link>
+        <router-link to="/publish" class="capability-card">
+          <span class="capability-card__tag">发布排期</span>
+          <strong>多平台一键发布</strong>
+          <span>选择内容、账号和发布时间，跟踪发布结果</span>
+        </router-link>
+        <router-link to="/report" class="capability-card">
+          <span class="capability-card__tag">管理汇报</span>
+          <strong>报表导出</strong>
+          <span>按时间和平台生成 Excel，用于复盘和汇报</span>
+        </router-link>
+      </section>
+
       <!-- Hero KPI -->
       <div v-if="accountRows.length > 0" class="dashboard__hero">
         <p class="hero-label">总粉丝</p>
@@ -208,6 +307,7 @@ const {
   loading,
   trendDays,
   selectedGroup,
+  lastUpdate,
   accountRows,
   accountGroups,
   displayAccounts,
@@ -250,7 +350,7 @@ function exportCSV() {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: $section-gap;
+  gap: $space-lg;
   min-height: 100%;
 
   &__hero {
@@ -330,6 +430,198 @@ function exportCSV() {
     gap: $space-xs;
     align-items: center;
     margin-bottom: $space-md;
+  }
+}
+
+// Command center
+.dashboard__command {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
+  gap: $space-xl;
+  align-items: stretch;
+  padding: $space-xl;
+  border: 1px solid $color-border;
+  border-radius: $radius-lg;
+  background: linear-gradient(180deg, rgba(26, 31, 42, 0.84), rgba(17, 21, 27, 0.84));
+  position: relative;
+  z-index: 1;
+}
+
+.command-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: $space-sm;
+
+  h1 {
+    max-width: 640px;
+    font-size: 30px;
+    line-height: 1.25;
+    letter-spacing: 0;
+    margin: 0;
+  }
+
+  p {
+    max-width: 560px;
+    color: $color-text-secondary;
+    margin: 0;
+  }
+}
+
+.command-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $space-xs;
+  margin-top: $space-xs;
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    min-height: 24px;
+    padding: 2px 8px;
+    border-radius: $radius-sm;
+    background: rgba(59, 130, 246, 0.08);
+    color: $color-text-tertiary;
+    font-size: $text-micro;
+  }
+}
+
+.command-actions {
+  display: grid;
+  gap: $space-sm;
+}
+
+.command-action {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 72px;
+  padding: 14px 16px;
+  border-radius: $radius-md;
+  border: 1px solid $color-border;
+  background: $color-bg-tertiary;
+  color: $color-text-primary;
+  transition: all 0.2s $ease-out;
+
+  &:hover {
+    border-color: $color-border-hover;
+    background: $color-bg-hover;
+  }
+
+  &--primary {
+    border-color: rgba(0, 204, 153, 0.28);
+    background: rgba(0, 204, 153, 0.09);
+  }
+
+  &__label {
+    font-size: $text-body;
+    font-weight: 700;
+  }
+
+  &__hint {
+    font-size: $text-caption;
+    color: $color-text-tertiary;
+  }
+}
+
+.dashboard__runway {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: $space-md;
+  position: relative;
+  z-index: 1;
+}
+
+.runway-step {
+  display: flex;
+  align-items: center;
+  gap: $space-sm;
+  padding: 14px 16px;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: rgba(17, 21, 27, 0.7);
+
+  &__index {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    background: $color-bg-hover;
+    color: $color-text-tertiary;
+    font-family: $font-mono;
+    font-size: $text-caption;
+  }
+
+  strong {
+    display: block;
+    color: $color-text-primary;
+    font-size: $text-caption;
+    margin-bottom: 2px;
+  }
+
+  span {
+    color: $color-text-tertiary;
+    font-size: $text-caption;
+  }
+
+  &--done .runway-step__index {
+    background: rgba(34, 197, 94, 0.14);
+    color: $color-success;
+  }
+
+  &--ready .runway-step__index {
+    background: rgba(0, 204, 153, 0.12);
+    color: $color-accent;
+  }
+}
+
+.dashboard__capabilities {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: $space-md;
+  position: relative;
+  z-index: 1;
+}
+
+.capability-card {
+  min-height: 132px;
+  padding: $space-md;
+  border: 1px solid $color-border;
+  border-radius: $radius-md;
+  background: rgba(17, 21, 27, 0.72);
+  color: $color-text-primary;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s $ease-out;
+
+  &:hover {
+    border-color: $color-border-hover;
+    background: $color-bg-tertiary;
+    transform: translateY(-1px);
+  }
+
+  &__tag {
+    color: $color-accent;
+    font-size: $text-micro;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  strong {
+    font-size: $text-title;
+    letter-spacing: 0;
+  }
+
+  span:last-child {
+    color: $color-text-tertiary;
+    font-size: $text-caption;
+    line-height: 1.5;
   }
 }
 
@@ -504,6 +796,20 @@ function exportCSV() {
     margin: 0;
     max-width: 320px;
     line-height: 1.6;
+  }
+}
+
+@media (max-width: 1023px) {
+  .dashboard__command {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard__runway {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard__capabilities {
+    grid-template-columns: 1fr;
   }
 }
 </style>

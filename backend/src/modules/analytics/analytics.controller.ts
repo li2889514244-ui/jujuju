@@ -9,20 +9,14 @@ import {
   ForbiddenException,
   BadRequestException,
   Res,
-} from '@nestjs/common';
-import { Response } from 'express';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiBearerAuth,
-  ApiQuery,
-  ApiParam,
-} from '@nestjs/swagger';
-import { AnalyticsService } from './analytics.service';
-import { QueryAnalyticsDto } from './dto/query-analytics.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PrismaService } from '../../prisma/prisma.service';
+} from '@nestjs/common'
+import { Response } from 'express'
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger'
+import { AnalyticsService } from './analytics.service'
+import { QueryAnalyticsDto } from './dto/query-analytics.dto'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { PrismaService } from '../../prisma/prisma.service'
 
 @ApiTags('analytics')
 @ApiBearerAuth('access-token')
@@ -41,13 +35,13 @@ export class AnalyticsController {
     @Query('days') days?: number,
     @Query('platform') platform?: string,
   ) {
-    return this.analyticsService.getFollowersTrend(userId, days || 7, platform);
+    return this.analyticsService.getFollowersTrend(userId, days || 7, platform)
   }
 
   @Get('overview')
   @ApiOperation({ summary: '获取数据概览' })
   async getOverview(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getOverview(userId);
+    return this.analyticsService.getOverview(userId)
   }
 
   /**
@@ -61,9 +55,9 @@ export class AnalyticsController {
     @CurrentUser('role') userRole: string,
   ) {
     if (dto.accountId) {
-      await this.verifyAccountOwnership(dto.accountId, userId, userRole);
+      await this.verifyAccountOwnership(dto.accountId, userId, userRole)
     }
-    return this.analyticsService.getDailyStats(dto);
+    return this.analyticsService.getDailyStats(dto, userId)
   }
 
   /**
@@ -77,15 +71,15 @@ export class AnalyticsController {
     @CurrentUser('role') userRole: string,
   ) {
     if (dto.accountId) {
-      await this.verifyAccountOwnership(dto.accountId, userId, userRole);
+      await this.verifyAccountOwnership(dto.accountId, userId, userRole)
     }
-    return this.analyticsService.getPostStats(dto);
+    return this.analyticsService.getPostStats(dto, userId)
   }
 
   @Get('platforms')
   @ApiOperation({ summary: '获取平台维度对比数据' })
   async getPlatformComparison(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getPlatformComparison(userId);
+    return this.analyticsService.getPlatformComparison(userId)
   }
 
   @Get('report')
@@ -100,33 +94,44 @@ export class AnalyticsController {
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       platform,
-    });
+    })
   }
 
   @Get('comparison')
   @ApiOperation({ summary: '数据同比环比对比（周环比、月环比、年同比）' })
   async getComparison(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getComparison(userId);
+    return this.analyticsService.getComparison(userId)
   }
 
   @Post('monetization/manual')
   @ApiOperation({ summary: '手动录入变现数据' })
   async createManualMonetization(
     @CurrentUser('id') userId: string,
-    @Body() dto: {
-      date: string; platform: string; revenue?: number; gmv?: number;
-      orders?: number; buyerCount?: number; commission?: number;
-      avgOrderValue?: number;
+    @Body()
+    dto: {
+      date: string
+      platform: string
+      revenue?: number
+      gmv?: number
+      orders?: number
+      buyerCount?: number
+      commission?: number
+      avgOrderValue?: number
     },
   ) {
-    if (!dto.date || !dto.platform) throw new BadRequestException('日期和平台不能为空');
-    return this.analyticsService.createManualMonetization(userId, dto);
+    if (!dto.date || !dto.platform) throw new BadRequestException('日期和平台不能为空')
+    return this.analyticsService.createManualMonetization(userId, dto)
   }
 
   @Get('views-ranking')
   @ApiOperation({ summary: '播放量榜单（按播放量排名）' })
   @ApiQuery({ name: 'limit', required: false, description: '返回条数（默认50）' })
-  @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'all'], description: '时间范围' })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['week', 'month', 'all'],
+    description: '时间范围',
+  })
   @ApiQuery({ name: 'platform', required: false, description: '平台筛选' })
   async getViewsRanking(
     @CurrentUser('id') userId: string,
@@ -138,7 +143,7 @@ export class AnalyticsController {
       limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
       period: period || 'all',
       platform,
-    });
+    })
   }
 
   // ─── 以下为补全的 7 个缺失端点 ───
@@ -150,7 +155,7 @@ export class AnalyticsController {
     @Query('days') days?: number,
     @Query('platform') platform?: string,
   ) {
-    return this.analyticsService.getLikesTrend(userId, days || 7, platform);
+    return this.analyticsService.getLikesTrend(userId, days || 7, platform)
   }
 
   @Get('publish-effect')
@@ -160,7 +165,7 @@ export class AnalyticsController {
     @Query('days') days?: number,
     @Query('contentId') contentId?: string,
   ) {
-    return this.analyticsService.getPublishEffect(userId, days, contentId);
+    return this.analyticsService.getPublishEffect(userId, days, contentId)
   }
 
   @Get('engagement')
@@ -170,7 +175,7 @@ export class AnalyticsController {
     @Query('days') days?: number,
     @Query('platform') platform?: string,
   ) {
-    return this.analyticsService.getEngagementRate(userId, days || 7, platform);
+    return this.analyticsService.getEngagementRate(userId, days || 7, platform)
   }
 
   @Get('export')
@@ -183,19 +188,22 @@ export class AnalyticsController {
     @Res() res?: Response,
   ) {
     const result = await this.analyticsService.exportReport(
-      userId, startDate, endDate, format || 'json',
-    );
+      userId,
+      startDate,
+      endDate,
+      format || 'json',
+    )
     if (format === 'csv' && res) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
       res.setHeader(
         'Content-Disposition',
         `attachment; filename="analytics-report-${new Date().toISOString().slice(0, 10)}.csv"`,
-      );
+      )
       // Add BOM for Excel UTF-8 compatibility
-      res.send('\uFEFF' + result);
-      return;
+      res.send('\uFEFF' + result)
+      return
     }
-    return result;
+    return result
   }
 
   @Get('monetization')
@@ -205,7 +213,7 @@ export class AnalyticsController {
     @Query('days') days?: number,
     @Query('platform') platform?: string,
   ) {
-    return this.analyticsService.getMonetization(userId, days || 30, platform);
+    return this.analyticsService.getMonetization(userId, days || 30, platform)
   }
 
   @Get('account/:id')
@@ -216,8 +224,8 @@ export class AnalyticsController {
     @CurrentUser('id') userId: string,
     @CurrentUser('role') userRole: string,
   ) {
-    await this.verifyAccountOwnership(accountId, userId, userRole);
-    return this.analyticsService.getAccountAnalytics(accountId);
+    await this.verifyAccountOwnership(accountId, userId, userRole)
+    return this.analyticsService.getAccountAnalytics(accountId)
   }
 
   @Get('account/:id/posts')
@@ -232,32 +240,26 @@ export class AnalyticsController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    await this.verifyAccountOwnership(accountId, userId, userRole);
+    await this.verifyAccountOwnership(accountId, userId, userRole)
     return this.analyticsService.getAccountPosts(accountId, {
       page: page || 1,
       pageSize: pageSize || 20,
       sortBy: sortBy || 'createdAt',
       sortOrder: sortOrder || 'desc',
-    });
+    })
   }
 
   /**
    * 校验账号是否属于当前用户（管理员除外）
    */
-  private async verifyAccountOwnership(
-    accountId: string,
-    userId: string,
-    userRole: string,
-  ) {
-    if (['OWNER', 'ADMIN'].includes(userRole)) return;
+  private async verifyAccountOwnership(_accountId: string, _userId: string, _userRole: string) {
+    // 共享模式：跳过所有权检查，所有用户可查看所有数据
+    return
+  }
 
-    const account = await this.prisma.account.findUnique({
-      where: { id: accountId },
-      select: { userId: true },
-    });
-
-    if (!account || account.userId !== userId) {
-      throw new ForbiddenException('无权查看此账号的数据统计');
-    }
+  @Get('tags')
+  @ApiOperation({ summary: '获取热门标签' })
+  async getTags() {
+    return this.analyticsService.getTags()
   }
 }

@@ -8,36 +8,30 @@ import {
   Query,
   UseGuards,
   ForbiddenException,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { IsOptional, IsString } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Role } from '../../common/prisma-enums';
-import { PrismaService } from '../../prisma/prisma.service';
+} from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { UsersService } from './users.service'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { RolesGuard } from '../auth/guards/roles.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { Roles } from '../../common/decorators/roles.decorator'
+import { IsOptional, IsString } from 'class-validator'
+import { ApiPropertyOptional } from '@nestjs/swagger'
+import { Role } from '../../common/prisma-enums'
+import { PrismaService } from '../../prisma/prisma.service'
 
 class UpdateUserDto {
   @IsOptional()
   @IsString()
-  name?: string;
+  name?: string
 
   @IsOptional()
   @IsString()
-  phone?: string;
+  phone?: string
 
   @IsOptional()
   @IsString()
-  avatar?: string;
+  avatar?: string
 }
 
 @ApiTags('users')
@@ -57,9 +51,9 @@ export class UsersController {
     @Query('limit') limit?: number,
     @Query('search') search?: string,
   ) {
-    const pageNum = Math.max(1, page || 1);
-    const limitNum = Math.min(100, Math.max(1, limit || 20));
-    const skip = (pageNum - 1) * limitNum;
+    const pageNum = Math.max(1, page || 1)
+    const limitNum = Math.min(100, Math.max(1, limit || 20))
+    const skip = (pageNum - 1) * limitNum
 
     const where = search
       ? {
@@ -68,14 +62,14 @@ export class UsersController {
             { email: { contains: search, mode: 'insensitive' as const } },
           ],
         }
-      : {};
+      : {}
 
-    return this.usersService.findAll({ skip, take: limitNum, where });
+    return this.usersService.findAll({ skip, take: limitNum, where })
   }
 
   @Get('me')
   async getProfile(@CurrentUser('id') userId: string) {
-    return this.usersService.findById(userId);
+    return this.usersService.findById(userId)
   }
 
   /**
@@ -89,22 +83,19 @@ export class UsersController {
   ) {
     // 鏅€氱敤鎴峰彧鑳芥煡鐪嬭嚜宸?
     if (id !== currentUserId && !['OWNER', 'ADMIN'].includes(currentRole)) {
-      throw new ForbiddenException('鏃犳潈鏌ョ湅鍏朵粬鐢ㄦ埛淇℃伅');
+      throw new ForbiddenException('鏃犳潈鏌ョ湅鍏朵粬鐢ㄦ埛淇℃伅')
     }
-    return this.usersService.findById(id);
+    return this.usersService.findById(id)
   }
 
   @Put('me')
-  async updateProfile(
-    @CurrentUser('id') userId: string,
-    @Body() dto: UpdateUserDto,
-  ) {
-    return this.usersService.update(userId, dto);
+  async updateProfile(@CurrentUser('id') userId: string, @Body() dto: UpdateUserDto) {
+    return this.usersService.update(userId, dto)
   }
 
   @Delete(':id')
   @Roles(Role.OWNER, Role.ADMIN)
   async remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+    return this.usersService.remove(id)
   }
 }
