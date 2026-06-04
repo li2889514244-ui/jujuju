@@ -15,9 +15,9 @@ export class AnalyticsService {
     startDate.setDate(startDate.getDate() - days)
     startDate.setHours(0, 0, 0, 0)
 
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
       where: {
-        userId,
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
@@ -66,8 +66,9 @@ export class AnalyticsService {
       avgOrderValue?: number
     },
   ) {
+    // shared mode: 查所有用户的账号
     const account = await this.prisma.account.findFirst({
-      where: { userId, platform: dto.platform as Platform },
+      where: { platform: dto.platform as Platform },
       select: { id: true },
     })
     if (!account) throw new Error('未找到该平台的账号')
@@ -95,7 +96,7 @@ export class AnalyticsService {
 
     if (dto.accountId) where.accountId = dto.accountId
     if (dto.platform) where.platform = dto.platform
-    if (userId) where.account = { userId }
+    // shared mode: 不按 userId 过滤
 
     if (dto.startDate || dto.endDate) {
       where.date = {}
@@ -128,10 +129,10 @@ export class AnalyticsService {
 
     where.post = {}
     if (dto.accountId) where.post.accountId = dto.accountId
-    if (userId || dto.platform) {
+    // shared mode: 不按 userId 过滤
+    if (dto.platform) {
       where.post.account = {
-        ...(userId ? { userId } : {}),
-        ...(dto.platform ? { platform: dto.platform } : {}),
+        platform: dto.platform,
       }
     }
 
@@ -164,9 +165,9 @@ export class AnalyticsService {
    * 鑾峰彇鑱氬悎姒傝鏁版嵁
    */
   async getOverview(userId: string, groupId?: string) {
-    // 鑾峰彇鐢ㄦ埛鐨勬墍鏈夎处鍙?
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(groupId ? { groupId } : {}) },
+      where: { ...(groupId ? { groupId } : {}) },
       select: { id: true, platform: true, followers: true, likes: true, status: true },
     })
 
@@ -240,8 +241,9 @@ export class AnalyticsService {
    * 鑾峰彇骞冲彴缁村害瀵规瘮鏁版嵁
    */
   async getPlatformComparison(userId: string, groupId?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(groupId ? { groupId } : {}) },
+      where: { ...(groupId ? { groupId } : {}) },
       select: { id: true, platform: true, followers: true, likes: true },
     })
 
@@ -315,9 +317,9 @@ export class AnalyticsService {
     const end = endDate || new Date()
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000)
 
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
       where: {
-        userId,
         ...(platform ? { platform: platform as Platform } : {}),
       },
       select: { id: true, platform: true, nickname: true, followers: true, likes: true },
@@ -430,8 +432,9 @@ export class AnalyticsService {
    * 杩斿洖鏈懆vs涓婂懆銆佹湰鏈坴s涓婃湀銆佹湰鏈坴s鍘诲勾鍚屾湀鐨勬牳蹇冩寚鏍囧姣?
    */
   async getComparison(userId: string, groupId?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(groupId ? { groupId } : {}) },
+      where: { ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -493,9 +496,9 @@ export class AnalyticsService {
   ) {
     const { limit = 50, period = 'all', platform, groupId } = params
 
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
       where: {
-        userId,
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
@@ -650,8 +653,9 @@ export class AnalyticsService {
   // ─── 以下为补全的 7 个缺失服务方法 ───
 
   async getLikesTrend(userId: string, days: number = 7, platform?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -679,8 +683,9 @@ export class AnalyticsService {
   }
 
   async getPublishEffect(userId: string, days?: number, contentId?: string, groupId?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(groupId ? { groupId } : {}) },
+      where: { ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -721,9 +726,9 @@ export class AnalyticsService {
   }
 
   async getEngagementRate(userId: string, days: number = 7, platform?: string, groupId?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
       where: {
-        userId,
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
@@ -775,8 +780,9 @@ export class AnalyticsService {
   }
 
   async getMonetization(userId: string, days: number = 30, platform?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { ...(platform ? { platform: platform as Platform } : {}) },
       select: { id: true, platform: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -1018,9 +1024,9 @@ export class AnalyticsService {
    * month = 最近30天增量之和
    */
   async getAccountDetailList(userId: string, platform?: string, groupId?: string) {
+    // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
       where: {
-        userId,
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
