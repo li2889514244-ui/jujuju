@@ -6,11 +6,11 @@ export declare class AnalyticsController {
     private readonly analyticsService;
     private readonly prisma;
     constructor(analyticsService: AnalyticsService, prisma: PrismaService);
-    getFollowerTrend(userId: string, days?: number, platform?: string): Promise<{
+    getFollowerTrend(userId: string, days?: number, platform?: string, groupId?: string): Promise<{
         date: string;
         value: number;
     }[]>;
-    getOverview(userId: string): Promise<{
+    getOverview(userId: string, groupId?: string): Promise<{
         accounts: {
             total: number;
             active: number;
@@ -94,7 +94,7 @@ export declare class AnalyticsController {
         collectedAt: Date;
         postId: string;
     })[]>;
-    getPlatformComparison(userId: string): Promise<{
+    getPlatformComparison(userId: string, groupId?: string): Promise<{
         platform: string;
         accounts: number;
         followers: number;
@@ -214,7 +214,7 @@ export declare class AnalyticsController {
             accountId: string;
         })[];
     }>;
-    getComparison(userId: string): Promise<{
+    getComparison(userId: string, groupId?: string): Promise<{
         weekOverWeek: {
             current: {
                 views: number;
@@ -307,7 +307,7 @@ export declare class AnalyticsController {
         createdAt: Date;
         accountId: string;
     }>;
-    getViewsRanking(userId: string, limit?: number, period?: 'week' | 'month' | 'all', platform?: string): Promise<{
+    getViewsRanking(userId: string, limit?: number, period?: 'week' | 'month' | 'all', platform?: string, groupId?: string): Promise<{
         ranking: {
             rank: number;
             postId: string;
@@ -321,6 +321,27 @@ export declare class AnalyticsController {
             shares: number;
             completionRate: number;
             avgPlayDuration: number;
+            engagementRate: number;
+            publishedAt: Date;
+        }[];
+        total: number;
+        period: "week" | "month" | "all";
+    }>;
+    getEngagementRanking(userId: string, limit?: number, period?: 'week' | 'month' | 'all', platform?: string, groupId?: string): Promise<{
+        ranking: {
+            rank: number;
+            postId: string;
+            title: string | null;
+            platform: import(".prisma/client").$Enums.PlatformEnum;
+            accountName: string;
+            accountAvatar: string | null;
+            views: number;
+            likes: number;
+            comments: number;
+            shares: number;
+            completionRate: number;
+            avgPlayDuration: number;
+            engagementRate: number;
             publishedAt: Date;
         }[];
         total: number;
@@ -330,7 +351,7 @@ export declare class AnalyticsController {
         date: string;
         value: number;
     }[]>;
-    getPublishEffect(userId: string, days?: number, contentId?: string): Promise<{
+    getPublishEffect(userId: string, days?: number, contentId?: string, groupId?: string): Promise<{
         id: string;
         title: string | null;
         platform: import(".prisma/client").$Enums.PlatformEnum;
@@ -347,7 +368,7 @@ export declare class AnalyticsController {
         followsFromPost: number;
         publishedAt: Date;
     }[]>;
-    getEngagementRate(userId: string, days?: number, platform?: string): Promise<{
+    getEngagementRate(userId: string, days?: number, platform?: string, groupId?: string): Promise<{
         date: string;
         value: number;
     }[]>;
@@ -499,6 +520,7 @@ export declare class AnalyticsController {
             danmakuCount: number;
             followsFromPost: number;
             engagementRate: number;
+            tags: string[];
         }[];
         total: number;
         page: number;
@@ -506,4 +528,38 @@ export declare class AnalyticsController {
         totalPages: number;
     }>;
     private verifyAccountOwnership;
+    getAccountDetailList(userId: string, platform?: string, groupId?: string): Promise<{
+        id: string;
+        nickname: string;
+        avatar: string | null;
+        platform: import(".prisma/client").$Enums.PlatformEnum;
+        fans: number;
+        info: {
+            day_total: {
+                play: number;
+                like: number;
+                comment: number;
+                share: number;
+                new_fans: number;
+            };
+            week_total: {
+                play: number;
+                like: number;
+                comment: number;
+                share: number;
+                new_fans: number;
+            };
+            month_total: {
+                play: number;
+                like: number;
+                comment: number;
+                share: number;
+                new_fans: number;
+            };
+        };
+    }[]>;
+    getTags(groupId?: string): Promise<{
+        name: string;
+        count: number;
+    }[]>;
 }

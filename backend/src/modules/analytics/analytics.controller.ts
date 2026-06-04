@@ -40,10 +40,7 @@ export class AnalyticsController {
 
   @Get('overview')
   @ApiOperation({ summary: '获取数据概览' })
-  async getOverview(
-    @CurrentUser('id') userId: string,
-    @Query('groupId') groupId?: string,
-  ) {
+  async getOverview(@CurrentUser('id') userId: string, @Query('groupId') groupId?: string) {
     return this.analyticsService.getOverview(userId, groupId)
   }
 
@@ -105,10 +102,7 @@ export class AnalyticsController {
 
   @Get('comparison')
   @ApiOperation({ summary: '数据同比环比对比（周环比、月环比、年同比）' })
-  async getComparison(
-    @CurrentUser('id') userId: string,
-    @Query('groupId') groupId?: string,
-  ) {
+  async getComparison(@CurrentUser('id') userId: string, @Query('groupId') groupId?: string) {
     return this.analyticsService.getComparison(userId, groupId)
   }
 
@@ -201,8 +195,9 @@ export class AnalyticsController {
     @CurrentUser('id') userId: string,
     @Query('days') days?: number,
     @Query('contentId') contentId?: string,
+    @Query('groupId') groupId?: string,
   ) {
-    return this.analyticsService.getPublishEffect(userId, days, contentId)
+    return this.analyticsService.getPublishEffect(userId, days, contentId, groupId)
   }
 
   @Get('engagement')
@@ -298,16 +293,19 @@ export class AnalyticsController {
   @Get('account-detail-list')
   @ApiOperation({ summary: '获取所有账号日/周/月维度数据明细列表' })
   @ApiQuery({ name: 'platform', required: false })
+  @ApiQuery({ name: 'groupId', required: false })
   async getAccountDetailList(
     @CurrentUser('id') userId: string,
     @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
   ) {
-    return this.analyticsService.getAccountDetailList(userId, platform)
+    return this.analyticsService.getAccountDetailList(userId, platform, groupId)
   }
 
   @Get('tags')
   @ApiOperation({ summary: '获取热门标签' })
-  async getTags() {
-    return this.analyticsService.getTags()
+  @ApiQuery({ name: 'groupId', required: false })
+  async getTags(@Query('groupId') groupId?: string) {
+    return this.analyticsService.getTags(groupId)
   }
 }

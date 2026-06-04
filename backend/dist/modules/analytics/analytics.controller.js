@@ -25,26 +25,26 @@ let AnalyticsController = class AnalyticsController {
         this.analyticsService = analyticsService;
         this.prisma = prisma;
     }
-    async getFollowerTrend(userId, days, platform) {
-        return this.analyticsService.getFollowersTrend(userId, days || 7, platform);
+    async getFollowerTrend(userId, days, platform, groupId) {
+        return this.analyticsService.getFollowersTrend(userId, days || 7, platform, groupId);
     }
-    async getOverview(userId) {
-        return this.analyticsService.getOverview(userId);
+    async getOverview(userId, groupId) {
+        return this.analyticsService.getOverview(userId, groupId);
     }
     async getDailyStats(dto, userId, userRole) {
         if (dto.accountId) {
             await this.verifyAccountOwnership(dto.accountId, userId, userRole);
         }
-        return this.analyticsService.getDailyStats(dto);
+        return this.analyticsService.getDailyStats(dto, userId);
     }
     async getPostStats(dto, userId, userRole) {
         if (dto.accountId) {
             await this.verifyAccountOwnership(dto.accountId, userId, userRole);
         }
-        return this.analyticsService.getPostStats(dto);
+        return this.analyticsService.getPostStats(dto, userId);
     }
-    async getPlatformComparison(userId) {
-        return this.analyticsService.getPlatformComparison(userId);
+    async getPlatformComparison(userId, groupId) {
+        return this.analyticsService.getPlatformComparison(userId, groupId);
     }
     async getReport(userId, startDate, endDate, platform) {
         return this.analyticsService.generateReport(userId, {
@@ -53,29 +53,42 @@ let AnalyticsController = class AnalyticsController {
             platform,
         });
     }
-    async getComparison(userId) {
-        return this.analyticsService.getComparison(userId);
+    async getComparison(userId, groupId) {
+        return this.analyticsService.getComparison(userId, groupId);
     }
     async createManualMonetization(userId, dto) {
         if (!dto.date || !dto.platform)
             throw new common_1.BadRequestException('日期和平台不能为空');
         return this.analyticsService.createManualMonetization(userId, dto);
     }
-    async getViewsRanking(userId, limit, period, platform) {
+    async getViewsRanking(userId, limit, period, platform, groupId) {
         return this.analyticsService.getViewsRanking(userId, {
             limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
             period: period || 'all',
             platform,
+            groupId,
         });
+    }
+    async getEngagementRanking(userId, limit, period, platform, groupId) {
+        const result = await this.analyticsService.getViewsRanking(userId, {
+            limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+            period: period || 'all',
+            platform,
+            groupId,
+        });
+        return {
+            ...result,
+            ranking: result.ranking.sort((a, b) => b.engagementRate - a.engagementRate),
+        };
     }
     async getLikesTrend(userId, days, platform) {
         return this.analyticsService.getLikesTrend(userId, days || 7, platform);
     }
-    async getPublishEffect(userId, days, contentId) {
-        return this.analyticsService.getPublishEffect(userId, days, contentId);
+    async getPublishEffect(userId, days, contentId, groupId) {
+        return this.analyticsService.getPublishEffect(userId, days, contentId, groupId);
     }
-    async getEngagementRate(userId, days, platform) {
-        return this.analyticsService.getEngagementRate(userId, days || 7, platform);
+    async getEngagementRate(userId, days, platform, groupId) {
+        return this.analyticsService.getEngagementRate(userId, days || 7, platform, groupId);
     }
     async exportReport(userId, startDate, endDate, format, res) {
         const result = await this.analyticsService.exportReport(userId, startDate, endDate, format || 'json');
@@ -103,16 +116,14 @@ let AnalyticsController = class AnalyticsController {
             sortOrder: sortOrder || 'desc',
         });
     }
-    async verifyAccountOwnership(accountId, userId, userRole) {
-        if (['OWNER', 'ADMIN'].includes(userRole))
-            return;
-        const account = await this.prisma.account.findUnique({
-            where: { id: accountId },
-            select: { userId: true },
-        });
-        if (!account || account.userId !== userId) {
-            throw new common_1.ForbiddenException('无权查看此账号的数据统计');
-        }
+    async verifyAccountOwnership(_accountId, _userId, _userRole) {
+        return;
+    }
+    async getAccountDetailList(userId, platform, groupId) {
+        return this.analyticsService.getAccountDetailList(userId, platform, groupId);
+    }
+    async getTags(groupId) {
+        return this.analyticsService.getTags(groupId);
     }
 };
 exports.AnalyticsController = AnalyticsController;
@@ -122,16 +133,18 @@ __decorate([
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('days')),
     __param(2, (0, common_1.Query)('platform')),
+    __param(3, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, String]),
+    __metadata("design:paramtypes", [String, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getFollowerTrend", null);
 __decorate([
     (0, common_1.Get)('overview'),
     (0, swagger_1.ApiOperation)({ summary: '获取数据概览' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getOverview", null);
 __decorate([
@@ -158,8 +171,9 @@ __decorate([
     (0, common_1.Get)('platforms'),
     (0, swagger_1.ApiOperation)({ summary: '获取平台维度对比数据' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getPlatformComparison", null);
 __decorate([
@@ -177,8 +191,9 @@ __decorate([
     (0, common_1.Get)('comparison'),
     (0, swagger_1.ApiOperation)({ summary: '数据同比环比对比（周环比、月环比、年同比）' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getComparison", null);
 __decorate([
@@ -194,16 +209,39 @@ __decorate([
     (0, common_1.Get)('views-ranking'),
     (0, swagger_1.ApiOperation)({ summary: '播放量榜单（按播放量排名）' }),
     (0, swagger_1.ApiQuery)({ name: 'limit', required: false, description: '返回条数（默认50）' }),
-    (0, swagger_1.ApiQuery)({ name: 'period', required: false, enum: ['week', 'month', 'all'], description: '时间范围' }),
+    (0, swagger_1.ApiQuery)({
+        name: 'period',
+        required: false,
+        enum: ['week', 'month', 'all'],
+        description: '时间范围',
+    }),
     (0, swagger_1.ApiQuery)({ name: 'platform', required: false, description: '平台筛选' }),
+    (0, swagger_1.ApiQuery)({ name: 'groupId', required: false, description: '分组筛选' }),
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('limit')),
     __param(2, (0, common_1.Query)('period')),
     __param(3, (0, common_1.Query)('platform')),
+    __param(4, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, String, String]),
+    __metadata("design:paramtypes", [String, Number, String, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getViewsRanking", null);
+__decorate([
+    (0, common_1.Get)('engagement-ranking'),
+    (0, swagger_1.ApiOperation)({ summary: '互动率榜单（按互动率排名）' }),
+    (0, swagger_1.ApiQuery)({ name: 'limit', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'period', required: false, enum: ['week', 'month', 'all'] }),
+    (0, swagger_1.ApiQuery)({ name: 'platform', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'groupId', required: false }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('limit')),
+    __param(2, (0, common_1.Query)('period')),
+    __param(3, (0, common_1.Query)('platform')),
+    __param(4, (0, common_1.Query)('groupId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number, String, String, String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getEngagementRanking", null);
 __decorate([
     (0, common_1.Get)('likes/trend'),
     (0, swagger_1.ApiOperation)({ summary: '获取点赞增长趋势' }),
@@ -220,8 +258,9 @@ __decorate([
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('days')),
     __param(2, (0, common_1.Query)('contentId')),
+    __param(3, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, String]),
+    __metadata("design:paramtypes", [String, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getPublishEffect", null);
 __decorate([
@@ -230,8 +269,9 @@ __decorate([
     __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
     __param(1, (0, common_1.Query)('days')),
     __param(2, (0, common_1.Query)('platform')),
+    __param(3, (0, common_1.Query)('groupId')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, String]),
+    __metadata("design:paramtypes", [String, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getEngagementRate", null);
 __decorate([
@@ -282,6 +322,27 @@ __decorate([
     __metadata("design:paramtypes", [String, String, String, Number, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getAccountPosts", null);
+__decorate([
+    (0, common_1.Get)('account-detail-list'),
+    (0, swagger_1.ApiOperation)({ summary: '获取所有账号日/周/月维度数据明细列表' }),
+    (0, swagger_1.ApiQuery)({ name: 'platform', required: false }),
+    (0, swagger_1.ApiQuery)({ name: 'groupId', required: false }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('platform')),
+    __param(2, (0, common_1.Query)('groupId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String, String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getAccountDetailList", null);
+__decorate([
+    (0, common_1.Get)('tags'),
+    (0, swagger_1.ApiOperation)({ summary: '获取热门标签' }),
+    (0, swagger_1.ApiQuery)({ name: 'groupId', required: false }),
+    __param(0, (0, common_1.Query)('groupId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getTags", null);
 exports.AnalyticsController = AnalyticsController = __decorate([
     (0, swagger_1.ApiTags)('analytics'),
     (0, swagger_1.ApiBearerAuth)('access-token'),

@@ -26,7 +26,10 @@ export interface AccountDetailItem {
 
 export const analyticsApi = {
   getOverview(params?: { groupId?: string; teamId?: string }) {
-    return get<AnalyticsOverview>('/analytics/overview', params ? params as Record<string, unknown> : undefined)
+    return get<AnalyticsOverview>(
+      '/analytics/overview',
+      params ? (params as Record<string, unknown>) : undefined,
+    )
   },
 
   getFollowerTrend(params: { days?: number; platform?: string }) {
@@ -37,11 +40,14 @@ export const analyticsApi = {
     return get<TrendData[]>('/analytics/likes/trend', params as Record<string, unknown>)
   },
 
-  getPlatformStats() {
-    return get<PlatformStats[]>('/analytics/platforms')
+  getPlatformStats(params?: { groupId?: string }) {
+    return get<PlatformStats[]>(
+      '/analytics/platforms',
+      params ? (params as Record<string, unknown>) : undefined,
+    )
   },
 
-  getPublishEffect(params: { days?: number; contentId?: string }) {
+  getPublishEffect(params: { days?: number; contentId?: string; groupId?: string }) {
     return get<PublishEffect[]>('/analytics/publish-effect', params as Record<string, unknown>)
   },
 
@@ -72,7 +78,7 @@ export const analyticsApi = {
       weekOverWeek: { current: any; previous: any; change: any }
       monthOverMonth: { current: any; previous: any; change: any }
       yearOverYear: { current: any; previous: any; change: any }
-    }>('/analytics/comparison', params ? params as Record<string, unknown> : undefined)
+    }>('/analytics/comparison', params ? (params as Record<string, unknown>) : undefined)
   },
 
   getViewsRanking(params?: {
@@ -127,12 +133,18 @@ export const analyticsApi = {
     }>('/analytics/engagement-ranking', params as Record<string, unknown>)
   },
 
-  getTags() {
-    return get<Array<{ name: string; count: number }>>('/analytics/tags')
+  getTags(params?: { groupId?: string }) {
+    return get<Array<{ name: string; count: number }>>(
+      '/analytics/tags',
+      params ? (params as Record<string, unknown>) : undefined,
+    )
   },
 
-  getAccountDetailList(params?: { platform?: string }) {
-    return get<AccountDetailItem[]>('/analytics/account-detail-list', params as Record<string, unknown>)
+  getAccountDetailList(params?: { platform?: string; groupId?: string }) {
+    return get<AccountDetailItem[]>(
+      '/analytics/account-detail-list',
+      params as Record<string, unknown>,
+    )
   },
 
   getMonetization(days?: number) {

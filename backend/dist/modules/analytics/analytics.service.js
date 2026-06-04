@@ -18,12 +18,12 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         this.prisma = prisma;
         this.logger = new common_1.Logger(AnalyticsService_1.name);
     }
-    async getFollowersTrend(userId, days = 7, platform) {
+    async getFollowersTrend(userId, days = 7, platform, groupId) {
         const startDate = new Date();
         startDate.setDate(startDate.getDate() - days);
         startDate.setHours(0, 0, 0, 0);
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}) },
+            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -77,12 +77,14 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             update: data,
         });
     }
-    async getDailyStats(dto) {
+    async getDailyStats(dto, userId) {
         const where = {};
         if (dto.accountId)
             where.accountId = dto.accountId;
         if (dto.platform)
             where.platform = dto.platform;
+        if (userId)
+            where.account = { userId };
         if (dto.startDate || dto.endDate) {
             where.date = {};
             if (dto.startDate)
@@ -105,15 +107,16 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         });
         return stats;
     }
-    async getPostStats(dto) {
+    async getPostStats(dto, userId) {
         const where = {};
-        if (dto.accountId || dto.platform) {
-            where.post = {};
-            if (dto.accountId)
-                where.post.accountId = dto.accountId;
-            if (dto.platform) {
-                where.post.account = { platform: dto.platform };
-            }
+        where.post = {};
+        if (dto.accountId)
+            where.post.accountId = dto.accountId;
+        if (userId || dto.platform) {
+            where.post.account = {
+                ...(userId ? { userId } : {}),
+                ...(dto.platform ? { platform: dto.platform } : {}),
+            };
         }
         const stats = await this.prisma.postStats.findMany({
             where,
@@ -138,9 +141,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         });
         return stats;
     }
-    async getOverview(userId) {
+    async getOverview(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId },
+            where: { userId, ...(groupId ? { groupId } : {}) },
             select: { id: true, platform: true, followers: true, likes: true, status: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -199,9 +202,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             },
         };
     }
-    async getPlatformComparison(userId) {
+    async getPlatformComparison(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId },
+            where: { userId, ...(groupId ? { groupId } : {}) },
             select: { id: true, platform: true, followers: true, likes: true },
         });
         const platforms = [...new Set(accounts.map((a) => a.platform))];
@@ -210,7 +213,6 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const platformAccounts = accounts.filter((a) => a.platform === platform);
             const platformAccountIds = platformAccounts.map((a) => a.id);
             const totalFollowers = platformAccounts.reduce((s, a) => s + a.followers, 0);
-            const totalLikes = platformAccounts.reduce((s, a) => s + a.likes, 0);
             const [postCount, statsAgg] = await Promise.all([
                 this.prisma.post.count({
                     where: {
@@ -229,7 +231,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 platform,
                 accounts: platformAccountIds.length,
                 followers: totalFollowers,
-                likes: totalLikes,
+                likes: plikes,
                 publishes: postCount,
                 views,
                 comments: statsAgg._sum.comments || 0,
@@ -262,6 +264,25 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 account: { select: { nickname: true, platform: true } },
             },
         });
+        const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
+            this.prisma.post.count({
+                where: { accountId: { in: accountIds }, createdAt: { gte: start, lte: end } },
+            }),
+            this.prisma.post.count({
+                where: {
+                    accountId: { in: accountIds },
+                    status: 'PUBLISHED',
+                    createdAt: { gte: start, lte: end },
+                },
+            }),
+            this.prisma.post.count({
+                where: {
+                    accountId: { in: accountIds },
+                    status: 'FAILED',
+                    createdAt: { gte: start, lte: end },
+                },
+            }),
+        ]);
         const topPosts = await this.prisma.post.findMany({
             where: {
                 accountId: { in: accountIds },
@@ -275,10 +296,35 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             orderBy: { stats: { views: 'desc' } },
             take: 10,
         });
-        const overview = await this.getOverview(userId);
+        const scopedOverview = {
+            accounts: {
+                total: accounts.length,
+                active: accounts.length,
+                byPlatform: accounts.reduce((acc, account) => {
+                    acc[account.platform] = (acc[account.platform] || 0) + 1;
+                    return acc;
+                }, {}),
+                totalFollowers: accounts.reduce((sum, account) => sum + (account.followers || 0), 0),
+                totalLikes: accounts.reduce((sum, account) => sum + (account.likes || 0), 0),
+            },
+            posts: {
+                total: totalPosts,
+                published: publishedPosts,
+                failed: failedPosts,
+            },
+            engagement: {
+                totalViews: dailyStats.reduce((sum, stat) => sum + (stat.views || 0), 0),
+                totalLikes: dailyStats.reduce((sum, stat) => sum + (stat.likes || 0), 0),
+                totalComments: dailyStats.reduce((sum, stat) => sum + (stat.comments || 0), 0),
+                totalShares: dailyStats.reduce((sum, stat) => sum + (stat.shares || 0), 0),
+                totalSaves: 0,
+                totalDanmaku: 0,
+                avgCompletionRate: 0,
+            },
+        };
         return {
             period: { start, end },
-            overview,
+            overview: scopedOverview,
             accounts: accounts.map((a) => ({
                 ...a,
                 dailyStats: dailyStats.filter((d) => d.accountId === a.id),
@@ -298,9 +344,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             dailyTrend: dailyStats,
         };
     }
-    async getComparison(userId) {
+    async getComparison(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId },
+            where: { userId, ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -339,11 +385,12 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         };
     }
     async getViewsRanking(userId, params) {
-        const { limit = 50, period = 'all', platform } = params;
+        const { limit = 50, period = 'all', platform, groupId } = params;
         const accounts = await this.prisma.account.findMany({
             where: {
                 userId,
                 ...(platform ? { platform: platform } : {}),
+                ...(groupId ? { groupId } : {}),
             },
             select: { id: true },
         });
@@ -373,21 +420,26 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             take: limit,
         });
         return {
-            ranking: posts.map((p, index) => ({
-                rank: index + 1,
-                postId: p.id,
-                title: p.title,
-                platform: p.account.platform,
-                accountName: p.account.nickname,
-                accountAvatar: p.account.avatar,
-                views: p.stats?.views || 0,
-                likes: p.stats?.likes || 0,
-                comments: p.stats?.comments || 0,
-                shares: p.stats?.shares || 0,
-                completionRate: p.stats?.completionRate || 0,
-                avgPlayDuration: p.stats?.avgPlayDuration || 0,
-                publishedAt: p.updatedAt,
-            })),
+            ranking: posts.map((p, index) => {
+                const pviews = p.stats?.views || 0;
+                const plikes = p.stats?.likes || 0;
+                return {
+                    rank: index + 1,
+                    postId: p.id,
+                    title: p.title,
+                    platform: p.account.platform,
+                    accountName: p.account.nickname,
+                    accountAvatar: p.account.avatar,
+                    views: pviews,
+                    likes: plikes,
+                    comments: p.stats?.comments || 0,
+                    shares: p.stats?.shares || 0,
+                    completionRate: p.stats?.completionRate || 0,
+                    avgPlayDuration: p.stats?.avgPlayDuration || 0,
+                    engagementRate: pviews > 0 ? Math.round((plikes / pviews) * 10000) / 100 : 0,
+                    publishedAt: p.updatedAt,
+                };
+            }),
             total: posts.length,
             period,
         };
@@ -412,19 +464,27 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 },
             }),
         ]);
-        const [latestFollowers, earliestFollowers] = await Promise.all([
-            this.prisma.dailyStats.findFirst({
-                where: { accountId: { in: accountIds }, date: { lte: end } },
-                orderBy: { date: 'desc' },
-                select: { followers: true },
-            }),
-            this.prisma.dailyStats.findFirst({
-                where: { accountId: { in: accountIds }, date: { gte: start } },
-                orderBy: { date: 'asc' },
-                select: { followers: true },
-            }),
-        ]);
-        const followerGrowth = (latestFollowers?.followers || 0) - (earliestFollowers?.followers || 0);
+        const followerStats = await this.prisma.dailyStats.findMany({
+            where: {
+                accountId: { in: accountIds },
+                date: { gte: start, lte: end },
+            },
+            orderBy: [{ accountId: 'asc' }, { date: 'asc' }],
+            select: { accountId: true, followers: true },
+        });
+        const firstFollowers = {};
+        const lastFollowers = {};
+        for (const stat of followerStats) {
+            if (firstFollowers[stat.accountId] === undefined) {
+                firstFollowers[stat.accountId] = stat.followers || 0;
+            }
+            lastFollowers[stat.accountId] = stat.followers || 0;
+        }
+        const followerGrowth = accountIds.reduce((sum, accountId) => {
+            const first = firstFollowers[accountId] ?? 0;
+            const last = lastFollowers[accountId] ?? first;
+            return sum + Math.max(0, last - first);
+        }, 0);
         return {
             views: dailyAgg._sum.views || 0,
             likes: dailyAgg._sum.likes || 0,
@@ -440,7 +500,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const cur = current[key] || 0;
             const prev = previous[key] || 0;
             if (prev === 0) {
-                result[key] = cur > 0 ? 100 : 0;
+                result[key] = null;
             }
             else {
                 result[key] = Math.round(((cur - prev) / prev) * 100);
@@ -482,9 +542,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         }
         return result;
     }
-    async getPublishEffect(userId, days, contentId) {
+    async getPublishEffect(userId, days, contentId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId },
+            where: { userId, ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -521,9 +581,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             publishedAt: p.publishAt || p.createdAt,
         }));
     }
-    async getEngagementRate(userId, days = 7, platform) {
+    async getEngagementRate(userId, days = 7, platform, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}) },
+            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -586,7 +646,15 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             }
             const p = s.account.platform;
             if (!byPlatform[p]) {
-                byPlatform[p] = { platform: p, revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
+                byPlatform[p] = {
+                    platform: p,
+                    revenue: 0,
+                    gmv: 0,
+                    orders: 0,
+                    commission: 0,
+                    buyerCount: 0,
+                    avgOrderValue: 0,
+                };
             }
             byPlatform[p].revenue += s.revenue;
             byPlatform[p].gmv += s.gmv;
@@ -627,16 +695,22 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             }),
             this.prisma.postStats.aggregate({
                 where: { post: { accountId } },
-                _sum: { views: true, likes: true, comments: true, shares: true, saves: true, danmakuCount: true, followsFromPost: true },
+                _sum: {
+                    views: true,
+                    likes: true,
+                    comments: true,
+                    shares: true,
+                    saves: true,
+                    danmakuCount: true,
+                    followsFromPost: true,
+                },
                 _avg: { completionRate: true },
             }),
             this.prisma.post.count({ where: { accountId } }),
         ]);
         const totalInteractions = (statsAgg._sum.likes || 0) + (statsAgg._sum.comments || 0) + (statsAgg._sum.shares || 0);
         const totalViews = statsAgg._sum.views || 0;
-        const avgEngagementRate = totalViews > 0
-            ? Math.round((totalInteractions / totalViews) * 10000) / 100
-            : 0;
+        const avgEngagementRate = totalViews > 0 ? Math.round((totalInteractions / totalViews) * 10000) / 100 : 0;
         return {
             totalViews,
             totalLikes: statsAgg._sum.likes || 0,
@@ -657,7 +731,16 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const skip = (page - 1) * pageSize;
         const where = { accountId };
         const orderBy = {};
-        const statsFields = ['views', 'likes', 'comments', 'shares', 'saves', 'completionRate', 'followsFromPost', 'danmakuCount'];
+        const statsFields = [
+            'views',
+            'likes',
+            'comments',
+            'shares',
+            'saves',
+            'completionRate',
+            'followsFromPost',
+            'danmakuCount',
+        ];
         if (statsFields.includes(sortBy)) {
             orderBy.stats = { [sortBy]: sortOrder };
         }
@@ -679,9 +762,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             const likes = p.stats?.likes || 0;
             const comments = p.stats?.comments || 0;
             const shares = p.stats?.shares || 0;
-            const engagementRate = views > 0
-                ? Math.round(((likes + comments + shares) / views) * 10000) / 100
-                : 0;
+            const engagementRate = views > 0 ? Math.round(((likes + comments + shares) / views) * 10000) / 100 : 0;
             return {
                 id: p.id,
                 title: p.title,
@@ -699,9 +780,145 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 danmakuCount: p.stats?.danmakuCount || 0,
                 followsFromPost: p.stats?.followsFromPost || 0,
                 engagementRate,
+                tags: (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g)?.map((t) => t.slice(1)) || [],
             };
         });
         return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) };
+    }
+    async getTags(groupId) {
+        let accountIds;
+        if (groupId) {
+            const accounts = await this.prisma.account.findMany({
+                where: { groupId },
+                select: { id: true },
+            });
+            accountIds = accounts.map((a) => a.id);
+        }
+        const posts = await this.prisma.post.findMany({
+            select: { tags: true, title: true },
+            where: {
+                ...(accountIds ? { accountId: { in: accountIds } } : {}),
+                OR: [{ tags: { not: '' } }, { title: { not: '' } }],
+            },
+            take: 5000,
+        });
+        const tagCount = {};
+        for (const p of posts) {
+            let tagList = [];
+            if (p.tags) {
+                try {
+                    const parsed = JSON.parse(p.tags);
+                    tagList = Array.isArray(parsed) ? parsed.map((t) => String(t)) : [];
+                }
+                catch {
+                }
+            }
+            if (tagList.length === 0) {
+                const matches = (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g);
+                if (matches)
+                    tagList = matches.map((t) => t.slice(1));
+            }
+            for (const tag of tagList) {
+                const t = tag.trim();
+                if (t.length >= 2)
+                    tagCount[t] = (tagCount[t] || 0) + 1;
+            }
+        }
+        return Object.entries(tagCount)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 50)
+            .map(([name, count]) => ({ name, count }));
+    }
+    async getAccountDetailList(userId, platform, groupId) {
+        const accounts = await this.prisma.account.findMany({
+            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
+            select: { id: true, platform: true, nickname: true, avatar: true, followers: true },
+            orderBy: { createdAt: 'desc' },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        thirtyDaysAgo.setHours(0, 0, 0, 0);
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(0, 0, 0, 0);
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        sevenDaysAgo.setHours(0, 0, 0, 0);
+        const allStats = await this.prisma.dailyStats.findMany({
+            where: {
+                accountId: { in: accountIds },
+                date: { gte: thirtyDaysAgo },
+            },
+            select: {
+                accountId: true,
+                date: true,
+                followers: true,
+                viewsIncrement: true,
+                likesIncrement: true,
+                commentsIncrement: true,
+                sharesIncrement: true,
+                followersIncrement: true,
+            },
+            orderBy: { date: 'asc' },
+        });
+        const statsByAccount = {};
+        for (const s of allStats) {
+            if (!statsByAccount[s.accountId])
+                statsByAccount[s.accountId] = [];
+            statsByAccount[s.accountId].push(s);
+        }
+        const isWithinLast7 = (d) => d >= sevenDaysAgo;
+        const isYesterday = (d) => {
+            const ds = d.toISOString().slice(0, 10);
+            const ys = yesterday.toISOString().slice(0, 10);
+            return ds === ys;
+        };
+        return accounts.map((acc) => {
+            const stats = statsByAccount[acc.id] || [];
+            const monthTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 };
+            const weekTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 };
+            const dayTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 };
+            let lastFans = acc.followers || 0;
+            for (const s of stats) {
+                const increments = {
+                    play: s.viewsIncrement || 0,
+                    like: s.likesIncrement || 0,
+                    comment: s.commentsIncrement || 0,
+                    share: s.sharesIncrement || 0,
+                    new_fans: s.followersIncrement || 0,
+                };
+                monthTotal.play += increments.play;
+                monthTotal.like += increments.like;
+                monthTotal.comment += increments.comment;
+                monthTotal.share += increments.share;
+                monthTotal.new_fans += increments.new_fans;
+                if (isWithinLast7(s.date)) {
+                    weekTotal.play += increments.play;
+                    weekTotal.like += increments.like;
+                    weekTotal.comment += increments.comment;
+                    weekTotal.share += increments.share;
+                    weekTotal.new_fans += increments.new_fans;
+                }
+                if (isYesterday(s.date)) {
+                    dayTotal.play += increments.play;
+                    dayTotal.like += increments.like;
+                    dayTotal.comment += increments.comment;
+                    dayTotal.share += increments.share;
+                    dayTotal.new_fans += increments.new_fans;
+                }
+                if (s.followers > 0)
+                    lastFans = s.followers;
+            }
+            return {
+                id: acc.id,
+                nickname: acc.nickname,
+                avatar: acc.avatar,
+                platform: acc.platform,
+                fans: lastFans,
+                info: { day_total: dayTotal, week_total: weekTotal, month_total: monthTotal },
+            };
+        });
     }
 };
 exports.AnalyticsService = AnalyticsService;

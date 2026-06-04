@@ -16,7 +16,11 @@ export class AnalyticsService {
     startDate.setHours(0, 0, 0, 0)
 
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}), ...(groupId ? { groupId } : {}) },
+      where: {
+        userId,
+        ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
+      },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -427,7 +431,7 @@ export class AnalyticsService {
    */
   async getComparison(userId: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: { userId, ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -674,9 +678,9 @@ export class AnalyticsService {
     return result
   }
 
-  async getPublishEffect(userId: string, days?: number, contentId?: string) {
+  async getPublishEffect(userId: string, days?: number, contentId?: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: { userId, ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -718,7 +722,11 @@ export class AnalyticsService {
 
   async getEngagementRate(userId: string, days: number = 7, platform?: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}), ...(groupId ? { groupId } : {}) },
+      where: {
+        userId,
+        ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
+      },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -957,10 +965,21 @@ export class AnalyticsService {
   }
 
   /** 从 Post.tags JSON 字段提取标签频次统计 */
-  async getTags() {
+  async getTags(groupId?: string) {
+    let accountIds: string[] | undefined
+    if (groupId) {
+      const accounts = await this.prisma.account.findMany({
+        where: { groupId },
+        select: { id: true },
+      })
+      accountIds = accounts.map((a) => a.id)
+    }
     const posts = await this.prisma.post.findMany({
       select: { tags: true, title: true },
-      where: { OR: [{ tags: { not: '' } }, { title: { not: '' } }] },
+      where: {
+        ...(accountIds ? { accountId: { in: accountIds } } : {}),
+        OR: [{ tags: { not: '' } }, { title: { not: '' } }],
+      },
       take: 5000,
     })
     const tagCount: Record<string, number> = {}
@@ -998,9 +1017,13 @@ export class AnalyticsService {
    * week = 最近7天增量之和
    * month = 最近30天增量之和
    */
-  async getAccountDetailList(userId: string, platform?: string) {
+  async getAccountDetailList(userId: string, platform?: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: {
+        userId,
+        ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
+      },
       select: { id: true, platform: true, nickname: true, avatar: true, followers: true },
       orderBy: { createdAt: 'desc' },
     })

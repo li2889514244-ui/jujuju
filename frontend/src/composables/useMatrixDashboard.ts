@@ -33,8 +33,6 @@ export interface TagItem {
   count: number
 }
 
-const EMPTY_METRICS: DailyMetrics = { play: 0, new_fans: 0, like: 0, comment: 0, share: 0 }
-
 export function useMatrixDashboard() {
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -144,9 +142,14 @@ export function useMatrixDashboard() {
   // ─── 日期类型标签 ───
   const dateTypeLabel = computed(() => {
     switch (dateType.value) {
-      case 'day': return '昨日'
-      case 'week': return '近7天'
-      case 'month': return '近30天'
+      case 'day':
+        return '昨日'
+      case 'week':
+        return '近7天'
+      case 'month':
+        return '近30天'
+      default:
+        return ''
     }
   })
 
@@ -179,7 +182,7 @@ export function useMatrixDashboard() {
     const list = accountDetailList.value
     const period = dateType.value
 
-    let rows: AccountTableRow[] = list.map((acc) => {
+    const rows: AccountTableRow[] = list.map((acc) => {
       const source =
         period === 'day'
           ? acc.info.day_total
@@ -224,14 +227,24 @@ export function useMatrixDashboard() {
 
   function toggleSort(prop: string) {
     const propMap: Record<string, string> = {
-      fansFormatted: 'fans', playFormatted: 'play', newFansFormatted: 'new_fans',
-      likeFormatted: 'like', commentFormatted: 'comment', shareFormatted: 'share',
+      fansFormatted: 'fans',
+      playFormatted: 'play',
+      newFansFormatted: 'new_fans',
+      likeFormatted: 'like',
+      commentFormatted: 'comment',
+      shareFormatted: 'share',
     }
     const key = propMap[prop] || prop
-    if (!key) { sortKey.value = ''; return }
+    if (!key) {
+      sortKey.value = ''
+      return
+    }
     if (sortKey.value === key) {
       sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-    } else { sortKey.value = key; sortOrder.value = 'desc' }
+    } else {
+      sortKey.value = key
+      sortOrder.value = 'desc'
+    }
   }
 
   // ─── Platform Table ───
@@ -282,16 +295,18 @@ export function useMatrixDashboard() {
       const [ov, comp, ps, ft, er, vr, tg, adl, grps] = await Promise.all([
         analyticsApi.getOverview(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getComparison(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
-        analyticsApi.getPlatformStats().then((r: any) => r.data),
+        analyticsApi.getPlatformStats(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getFollowerTrend(filter).then((r: any) => r.data),
         analyticsApi.getEngagementRate(filter).then((r: any) => r.data),
         analyticsApi
           .getViewsRanking({
-            limit: 50, period: rankingPeriod.value,
-            platform: platform.value || undefined, groupId: gid,
+            limit: 50,
+            period: rankingPeriod.value,
+            platform: platform.value || undefined,
+            groupId: gid,
           })
           .then((r: any) => r.data),
-        analyticsApi.getTags().then((r: any) => r.data),
+        analyticsApi.getTags(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getAccountDetailList(pFilter).then((r: any) => r.data),
         accountsApi.getGroups().then((r: any) => r.data),
       ])
@@ -303,7 +318,9 @@ export function useMatrixDashboard() {
       accountDetailList.value = adl || []
       groups.value = grps || []
 
-      const pe = await analyticsApi.getPublishEffect({ days: days.value }).then((r: any) => r.data)
+      const pe = await analyticsApi
+        .getPublishEffect({ days: days.value, groupId: gid })
+        .then((r: any) => r.data)
       const byDate: Record<string, number> = {}
       if (pe) {
         for (const item of pe) {
@@ -319,10 +336,12 @@ export function useMatrixDashboard() {
       tags.value = tg || []
 
       try {
-        const enr = await         analyticsApi
+        const enr = await analyticsApi
           .getEngagementRanking({
-            limit: 50, period: rankingPeriod.value,
-            platform: platform.value || undefined, groupId: gid,
+            limit: 50,
+            period: rankingPeriod.value,
+            platform: platform.value || undefined,
+            groupId: gid,
           })
           .then((r: any) => r.data)
         engagementRanking.value = enr?.ranking || []
