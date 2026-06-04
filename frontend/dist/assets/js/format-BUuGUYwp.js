@@ -1,0 +1,1 @@
+function e(t){return t.tokenStatus==="valid"?"已连接":t.tokenStatus==="expiring_soon"?"即将过期":t.tokenStatus==="expired"?"已失效":t.hasCookies?"在线":"待授权"}function r(t){return t>=1e8?(t/1e8).toFixed(1)+"亿":t>=1e4?(t/1e4).toFixed(1)+"万":t===0?"-":t.toLocaleString()}function i(t){return t>=1e4?(t/1e4).toFixed(1)+"w":t?.toLocaleString()||"0"}export{i as a,r as f,e as t};

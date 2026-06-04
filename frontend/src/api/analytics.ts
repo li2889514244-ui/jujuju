@@ -71,11 +71,43 @@ export const analyticsApi = {
         likes: number
         comments: number
         shares: number
+        completionRate: number
+        avgPlayDuration: number
+        engagementRate: number
         publishedAt: string
       }>
       total: number
       period: string
     }>('/analytics/views-ranking', params as Record<string, unknown>)
+  },
+
+  getEngagementRanking(params?: {
+    limit?: number
+    period?: 'week' | 'month' | 'all'
+    platform?: string
+  }) {
+    return get<{
+      ranking: Array<{
+        rank: number
+        postId: string
+        title: string
+        platform: string
+        accountName: string
+        accountAvatar: string
+        views: number
+        likes: number
+        comments: number
+        shares: number
+        engagementRate: number
+        publishedAt: string
+      }>
+      total: number
+      period: string
+    }>('/analytics/engagement-ranking', params as Record<string, unknown>)
+  },
+
+  getTags() {
+    return get<Array<{ name: string; count: number }>>('/analytics/tags')
   },
 
   getMonetization(days?: number) {
@@ -86,15 +118,36 @@ export const analyticsApi = {
       totalCommission: number
       totalBuyerCount: number
       totalAvgOrderValue: number
-      byPlatform: Array<{ platform: string; revenue: number; gmv: number; orders: number; commission: number; buyerCount: number; avgOrderValue: number }>
-      dailyTrend: Array<{ date: string; revenue: number; gmv: number; orders: number; commission: number; buyerCount: number; avgOrderValue: number }>
+      byPlatform: Array<{
+        platform: string
+        revenue: number
+        gmv: number
+        orders: number
+        commission: number
+        buyerCount: number
+        avgOrderValue: number
+      }>
+      dailyTrend: Array<{
+        date: string
+        revenue: number
+        gmv: number
+        orders: number
+        commission: number
+        buyerCount: number
+        avgOrderValue: number
+      }>
     }>('/analytics/monetization', { days })
   },
 
   createManualMonetization(data: {
-    date: string; platform: string; revenue?: number; gmv?: number;
-    orders?: number; buyerCount?: number; commission?: number;
-    avgOrderValue?: number;
+    date: string
+    platform: string
+    revenue?: number
+    gmv?: number
+    orders?: number
+    buyerCount?: number
+    commission?: number
+    avgOrderValue?: number
   }) {
     return post('/analytics/monetization/manual', data)
   },

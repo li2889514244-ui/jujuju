@@ -195,6 +195,10 @@ export interface PlatformStats {
   followers: number
   likes: number
   publishes: number
+  views: number
+  comments: number
+  shares: number
+  saves: number
   engagementRate: number
 }
 
@@ -272,10 +276,10 @@ export interface ApiResponse<T = unknown> {
 }
 
 export interface PaginatedResponse<T> {
-  items: T[];
-  total: number;
-  skip?: number;
-  take?: number;
+  items: T[]
+  total: number
+  skip?: number
+  take?: number
 }
 
 // ===== Account Posts & Analytics =====

@@ -6,7 +6,6 @@ import {
   Query,
   Param,
   UseGuards,
-  ForbiddenException,
   BadRequestException,
   Res,
 } from '@nestjs/common'
@@ -144,6 +143,28 @@ export class AnalyticsController {
       period: period || 'all',
       platform,
     })
+  }
+
+  @Get('engagement-ranking')
+  @ApiOperation({ summary: '互动率榜单（按互动率排名）' })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'all'] })
+  @ApiQuery({ name: 'platform', required: false })
+  async getEngagementRanking(
+    @CurrentUser('id') userId: string,
+    @Query('limit') limit?: number,
+    @Query('period') period?: 'week' | 'month' | 'all',
+    @Query('platform') platform?: string,
+  ) {
+    const result = await this.analyticsService.getViewsRanking(userId, {
+      limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
+      period: period || 'all',
+      platform,
+    })
+    return {
+      ...result,
+      ranking: result.ranking.sort((a, b) => b.engagementRate - a.engagementRate),
+    }
   }
 
   // ─── 以下为补全的 7 个缺失端点 ───

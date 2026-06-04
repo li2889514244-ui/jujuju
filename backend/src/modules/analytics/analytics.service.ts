@@ -260,7 +260,6 @@ export class AnalyticsService {
       const platformAccountIds = platformAccounts.map((a) => a.id)
 
       const totalFollowers = platformAccounts.reduce((s, a) => s + a.followers, 0)
-      const totalLikes = platformAccounts.reduce((s, a) => s + a.likes, 0)
 
       const [postCount, statsAgg] = await Promise.all([
         this.prisma.post.count({
@@ -282,7 +281,7 @@ export class AnalyticsService {
         platform,
         accounts: platformAccountIds.length,
         followers: totalFollowers,
-        likes: totalLikes,
+        likes: plikes,
         publishes: postCount,
         views,
         comments: statsAgg._sum.comments || 0,
@@ -525,21 +524,26 @@ export class AnalyticsService {
     })
 
     return {
-      ranking: posts.map((p, index) => ({
-        rank: index + 1,
-        postId: p.id,
-        title: p.title,
-        platform: p.account.platform,
-        accountName: p.account.nickname,
-        accountAvatar: p.account.avatar,
-        views: p.stats?.views || 0,
-        likes: p.stats?.likes || 0,
-        comments: p.stats?.comments || 0,
-        shares: p.stats?.shares || 0,
-        completionRate: p.stats?.completionRate || 0,
-        avgPlayDuration: p.stats?.avgPlayDuration || 0,
-        publishedAt: p.updatedAt,
-      })),
+      ranking: posts.map((p, index) => {
+        const pviews = p.stats?.views || 0
+        const plikes = p.stats?.likes || 0
+        return {
+          rank: index + 1,
+          postId: p.id,
+          title: p.title,
+          platform: p.account.platform,
+          accountName: p.account.nickname,
+          accountAvatar: p.account.avatar,
+          views: pviews,
+          likes: plikes,
+          comments: p.stats?.comments || 0,
+          shares: p.stats?.shares || 0,
+          completionRate: p.stats?.completionRate || 0,
+          avgPlayDuration: p.stats?.avgPlayDuration || 0,
+          engagementRate: pviews > 0 ? Math.round((plikes / pviews) * 10000) / 100 : 0,
+          publishedAt: p.updatedAt,
+        }
+      }),
       total: posts.length,
       period,
     }
@@ -614,7 +618,7 @@ export class AnalyticsService {
       const cur = current[key] || 0
       const prev = previous[key] || 0
       if (prev === 0) {
-        result[key] = cur > 0 ? 100 : 0
+        result[key] = null // 上周无数据时不显示增长率
       } else {
         result[key] = Math.round(((cur - prev) / prev) * 100)
       }
@@ -950,21 +954,33 @@ export class AnalyticsService {
     return { items, total, page, pageSize, totalPages: Math.ceil(total / pageSize) }
   }
 
-  /** 从所有作品标题中提取 #标签 并统计频次 */
+  /** 从 Post.tags JSON 字段提取标签频次统计 */
   async getTags() {
     const posts = await this.prisma.post.findMany({
-      select: { title: true },
-      where: { title: { not: '' } },
+      select: { tags: true, title: true },
+      where: { OR: [{ tags: { not: '' } }, { title: { not: '' } }] },
       take: 5000,
     })
     const tagCount: Record<string, number> = {}
     for (const p of posts) {
-      const matches = (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g)
-      if (matches) {
-        for (const tag of matches) {
-          const t = tag.slice(1)
-          if (t.length >= 2) tagCount[t] = (tagCount[t] || 0) + 1
+      let tagList: string[] = []
+      // 优先从 tags JSON 字段读取
+      if (p.tags) {
+        try {
+          const parsed = JSON.parse(p.tags)
+          tagList = Array.isArray(parsed) ? parsed.map((t: any) => String(t)) : []
+        } catch {
+          // JSON 解析失败，回退到 title 正则提取
         }
+      }
+      // 回退：从标题提取 #标签
+      if (tagList.length === 0) {
+        const matches = (p.title || '').match(/#[\u4e00-\u9fa5\w]+/g)
+        if (matches) tagList = matches.map((t) => t.slice(1))
+      }
+      for (const tag of tagList) {
+        const t = tag.trim()
+        if (t.length >= 2) tagCount[t] = (tagCount[t] || 0) + 1
       }
     }
     return Object.entries(tagCount)

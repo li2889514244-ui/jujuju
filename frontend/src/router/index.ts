@@ -21,8 +21,8 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'dashboard',
         name: 'Dashboard',
-        component: () => import('@/views/dashboard/DashboardView.vue'),
-        meta: { title: '工作台', icon: 'Odometer', section: '总览' },
+        component: () => import('@/views/dashboard/MatrixDashboard.vue'),
+        meta: { title: '矩阵数据', icon: 'Odometer', section: '总览' },
       },
       {
         path: 'accounts',
@@ -47,18 +47,6 @@ const routes: RouteRecordRaw[] = [
         name: 'Publish',
         component: () => import('@/views/content/PublishView.vue'),
         meta: { title: '发布排期', icon: 'Promotion', section: '运营流程' },
-      },
-      {
-        path: 'analytics',
-        name: 'Analytics',
-        component: () => import('@/views/analytics/AnalyticsView.vue'),
-        meta: { title: '内容分析', icon: 'DataAnalysis', section: '数据复盘' },
-      },
-      {
-        path: 'data-center',
-        name: 'DataCenter',
-        component: () => import('@/views/data-center/DataCenterView.vue'),
-        meta: { title: '矩阵数据', icon: 'DataAnalysis', section: '数据复盘' },
       },
       {
         path: 'monetization',

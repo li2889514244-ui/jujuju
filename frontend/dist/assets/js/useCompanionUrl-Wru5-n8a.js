@@ -1,1 +1,0 @@
-import{r as o}from"./vendor-rqakzDxg.js";const r="http://localhost:5409";async function s(){try{if((await fetch(`${r}/health`,{signal:AbortSignal.timeout(2e3)})).ok)return r}catch{}return null}function c(){const t="",n=o(!1);async function e(){const a=await s();return n.value=!!a,a}return{baseUrl:t,available:n,healthCheck:e}}export{s as g,c as u};

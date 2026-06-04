@@ -232,6 +232,13 @@ export class PlatformsService {
         buyerCount: metrics.buyerCount || 0,
         productCount: metrics.productCount || 0,
         avgOrderValue: metrics.avgOrderValue || 0,
+        // 伴侣已采集的增量字段，直接映射
+        followersIncrement: metrics.newFollowers || 0,
+        viewsIncrement: metrics.newViews || 0,
+        likesIncrement: metrics.newLikes || 0,
+        commentsIncrement: metrics.newComments || 0,
+        sharesIncrement: metrics.newShares || 0,
+        unfollows: metrics.unfollows || 0,
       }
       await this.prisma.dailyStats.upsert({
         where: { accountId_date: { accountId, date: targetDate } },
