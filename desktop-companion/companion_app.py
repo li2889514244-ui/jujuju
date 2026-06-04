@@ -290,6 +290,14 @@ body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif
     <div class="sidebar-footer-btns">
       <button class="btn-collect" @click="triggerCollect" :disabled="collecting">{{collecting?'采集中...':'触发采集'}}</button>
     </div>
+    <div class="collect-progress" v-if="dcProgress && dcProgress.running" style="padding:8px 12px;font-size:11px;color:#8890b0">
+      <div style="margin-bottom:4px">{{dcProgress.progress?.nickname||'采集'}} ({{dcProgress.progress?.current||0}}/{{dcProgress.progress?.total||0}})</div>
+      <div style="margin-bottom:4px">{{dcProgress.progress?.phase||''}}</div>
+      <div class="progress-bar" style="background:rgba(255,255,255,.08);height:3px;border-radius:2px">
+        <div class="fill" :style="{width:Math.round((dcProgress.progress?.current||0)/(dcProgress.progress?.total||1)*100)+'%',height:'100%',background:'var(--accent)',borderRadius:'2px'}"></div>
+      </div>
+      <div v-if="dcProgress.progress?.video_page>1" style="margin-top:3px;font-size:10px">视频第{{dcProgress.progress.video_page}}页 / {{dcProgress.progress.video_count}}条</div>
+    </div>
   </div>
 </aside>
 
@@ -403,13 +411,17 @@ createApp({data(){return{
   selected:'',status:'idle',qrUrl:'',errorMsg:'',siteConnected:false,evtSource:null,progress:0,timer:null,platformFromUrl:'',tokenFromUrl:'',apiFromUrl:'',sessionId:'',
   configured:false,loginEmail:'',loginPass:'',loginLoading:false,loginError:'',rememberPwd:true,loginHint:'',
   cookieStatus:null,cookieAlerts:[],cookieFreshness:'',collecting:false,
+  dcProgress:null,_dcPollTimer:null,
   pwRunning:false,pwCompleted:0,pwTask:'',
   localAccounts:[],
 }},computed:{selectedPlatform(){return this.platforms.find(p=>p.id===this.selected)}},
 methods:{
   async fetchPixingStatus(){try{const r=await fetch('/api/pixing-worker/status');const j=await r.json();this.pwRunning=j.running;this.pwCompleted=j.completed;this.pwTask=j.current_task||''}catch(e){}},
   async togglePixingWorker(){const url=this.pwRunning?'/api/pixing-worker/stop':'/api/pixing-worker/start';await fetch(url,{method:'POST'});await this.fetchPixingStatus()},
-  async triggerCollect(){this.collecting=true;try{await fetch('/api/data-collection/trigger',{method:'POST'});setTimeout(()=>this.collecting=false,3000)}catch(e){this.collecting=false}},
+  async triggerCollect(){this.collecting=true;try{await fetch('/api/data-collection/trigger',{method:'POST'});this._startProgressPoll()}catch(e){this.collecting=false}},
+  _startProgressPoll(){const self=this;self._stopProgressPoll();self._dcPollTimer=setInterval(async()=>{try{const r=await fetch('/api/data-collection/status');const j=await r.json();self.dcProgress=j;if(!j.running){self._stopProgressPoll();self.collecting=false}}catch(e){}},1500)},
+  _stopProgressPoll(){if(this._dcPollTimer){clearInterval(this._dcPollTimer);this._dcPollTimer=null}},
+  mounted(){this._startProgressPoll();if(this.configured){this.loadLocalAccounts()}},
   async loadCookieStatus(){
     try{const r=await fetch('/api/cookie-status');const j=await r.json();
       this.cookieStatus=j.by_platform;
@@ -620,6 +632,12 @@ _collector_running = False
 _collector_last_run = None
 _collector_last_error = None
 
+# Progress tracking for UI
+_collector_progress = {
+    'total': 0, 'current': 0, 'nickname': '',
+    'phase': '', 'video_page': 0, 'video_count': 0
+}
+
 # Cookie freshness tracking
 _COOKIE_AGE_WARN_HOURS = 23  # warn when > 23 hours
 _COOKIE_AGE_EXPIRED_HOURS = 48  # consider expired > 48 hours
@@ -774,6 +792,7 @@ def data_collection_status():
         'last_run': _collector_last_run,
         'last_error': _collector_last_error,
         'cookies_age_hours': cookie_status,
+        'progress': _collector_progress,
     })
 
 
@@ -1357,6 +1376,7 @@ async def _scrape_data_center(page, platform: str) -> dict:
 async def _scrape_video_list(page, platform: str) -> list:
     """从视频号作品列表页提取每条视频的播放/点赞/评论。
     穿透 wujie-app shadow DOM，遍历全部页（最多 9 页，每页 20 条）。"""
+    global _collector_progress
     import hashlib
     
     await page.wait_for_timeout(6000)
@@ -1438,6 +1458,8 @@ async def _scrape_video_list(page, platform: str) -> list:
             break
         
         # Click "下一页" inside wujie-app shadow DOM
+        _collector_progress['video_page'] = page_num
+        _collector_progress['video_count'] = len(all_videos)
         clicked = await _wujie_click_text(page, '下一页')
         page_num += 1
         if not clicked:
@@ -1619,6 +1641,7 @@ async def _scrape_account_pages(context, platform: str) -> dict:
     """Scan once, grab all pages in a single authenticated session.
     Navigates dashboard → data center → video list → monetization.
     Returns {'metrics': {...}, 'video_stats': [...]}"""
+    global _collector_progress
     entry = PLATFORM_DASHBOARDS.get(platform)
     if not entry:
         return {'metrics': {}, 'video_stats': []}
@@ -1664,6 +1687,7 @@ async def _scrape_account_pages(context, platform: str) -> dict:
 
         # 2. Data center
         if data_center_url:
+            _collector_progress['phase'] = '数据中心'
             try:
                 await page.goto(data_center_url, wait_until='domcontentloaded', timeout=30000)
                 try:
@@ -1679,6 +1703,7 @@ async def _scrape_account_pages(context, platform: str) -> dict:
 
         # 3. Video list
         if video_list_url:
+            _collector_progress['phase'] = '视频采集'
             try:
                 await page.goto(video_list_url, wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(8000)
@@ -1801,13 +1826,21 @@ async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: P
 
 async def _scrape_all(accounts: list) -> list:
     """多账号采集：每个账号独立 Chrome 实例，用自己的 Profile（1账号=1实例=1cookie）"""
+    global _collector_progress
     from playwright.async_api import async_playwright
     from local_db import get_profile_path
 
     results = []
+    _collector_progress['total'] = len(accounts)
+    _collector_progress['current'] = 0
 
     async with async_playwright() as pw:
         for acc in accounts:
+            _collector_progress['current'] += 1
+            _collector_progress['nickname'] = acc.get('nickname', '')[:20]
+            _collector_progress['phase'] = '仪表盘'
+            _collector_progress['video_page'] = 0
+            _collector_progress['video_count'] = 0
             aid = (acc.get('id') or '').strip()
             platform = (acc.get('platform') or '').strip().upper()
             if not aid or not platform:
