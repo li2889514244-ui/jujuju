@@ -24,13 +24,17 @@ import { UpdateAccountDto } from './dto/update-account.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Platform } from '../../common/prisma-enums';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @ApiTags('accounts')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
 @Controller('accounts')
 export class AccountsController {
-  constructor(private readonly accountsService: AccountsService) {}
+  constructor(
+    private readonly accountsService: AccountsService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Post()
   async create(
@@ -38,6 +42,20 @@ export class AccountsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.accountsService.create(dto, userId);
+  }
+
+  @Post('bulk-move')
+  @ApiOperation({ summary: '批量移动账号到分组' })
+  async bulkMove(
+    @Body() dto: { ids: string[]; groupId: string },
+    @CurrentUser('id') _userId: string,
+  ) {
+    const { ids, groupId } = dto
+    await this.prisma.account.updateMany({
+      where: { id: { in: ids } },
+      data: { groupId: groupId || null },
+    })
+    return { success: true, count: ids.length }
   }
 
   @Get()
