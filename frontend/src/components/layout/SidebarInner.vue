@@ -3,11 +3,14 @@
   <div class="sidebar-inner__logo" @click="onLogoClick">
     <div class="sidebar-inner__logo-mark">
       <svg viewBox="0 0 28 28" fill="none" width="20" height="20">
-        <rect width="28" height="28" rx="5" fill="#00cc99" />
-        <path d="M9 20V8l10 6-10 6z" fill="#0b0e13" opacity="0.92" />
+        <rect width="28" height="28" rx="8" fill="#c7ff45" />
+        <path d="M9 20V8l10 6-10 6z" fill="#071008" opacity="0.96" />
       </svg>
     </div>
-    <span v-if="!collapsed" class="sidebar-inner__logo-text">披星云</span>
+    <div v-if="!collapsed" class="sidebar-inner__brand">
+      <span class="sidebar-inner__logo-text">披星云</span>
+      <span class="sidebar-inner__logo-subtitle">Matrix Ops</span>
+    </div>
   </div>
 
   <!-- Menu -->
@@ -153,52 +156,88 @@ function getIcon(name: unknown): Component {
 
 .sidebar-inner {
   &__logo {
-    height: 48px;
+    height: 78px;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 0 16px;
+    gap: 12px;
+    padding: 0 18px;
     cursor: pointer;
-    border-bottom: 1px solid $color-border;
+    border-bottom: 1px solid rgba(199, 255, 69, 0.11);
+    position: relative;
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: 18px;
+      bottom: -1px;
+      left: 18px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba($color-accent, 0.65), transparent);
+    }
+
     &-mark {
-      width: 26px;
-      height: 26px;
+      width: 36px;
+      height: 36px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 12px;
+      background: rgba($color-accent, 0.08);
+      box-shadow:
+        0 0 24px rgba($color-accent, 0.18),
+        inset 0 0 0 1px rgba($color-accent, 0.12);
     }
+
+    &-subtitle {
+      color: $color-text-tertiary;
+      font-family: $font-mono;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+  }
+
+  &__brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  &__logo {
     &-text {
       font-family: $font-heading;
-      font-size: 17px;
-      font-weight: 700;
+      font-size: 18px;
+      font-weight: 860;
       color: $color-text-primary;
       white-space: nowrap;
-      letter-spacing: 0.01em;
+      letter-spacing: -0.03em;
     }
   }
 
   &__menu {
     overflow-y: auto;
-    padding: 10px 8px;
+    padding: 18px 12px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 18px;
     flex: 1;
   }
 
   &__section {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 6px;
   }
 
   &__section-label {
-    padding: 8px 12px 4px;
-    color: $color-text-placeholder;
+    padding: 0 10px 2px;
+    color: rgba($color-accent, 0.62);
     font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 860;
+    letter-spacing: 0.16em;
     text-transform: uppercase;
   }
 
@@ -206,23 +245,48 @@ function getIcon(name: unknown): Component {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 9px 12px;
+    padding: 11px 12px;
     border-radius: $radius-md;
     color: $color-text-secondary;
     text-decoration: none;
-    font-size: 13px;
-    font-weight: 450;
-    transition: all 0.15s $ease-out;
+    font-size: 14px;
+    font-weight: 720;
+    transition: all 0.18s $ease-out;
     white-space: nowrap;
+    border: 1px solid transparent;
+    position: relative;
+    overflow: hidden;
 
     &:hover {
-      background: rgba(0, 204, 153, 0.06);
+      background: rgba($color-accent, 0.07);
+      border-color: rgba($color-accent, 0.13);
       color: $color-text-primary;
     }
+
     &--active {
-      background: rgba(0, 204, 153, 0.08);
+      background:
+        linear-gradient(90deg, rgba($color-accent, 0.18), rgba($color-accent-alt, 0.05)),
+        rgba(199, 255, 69, 0.045);
+      border-color: rgba($color-accent, 0.3);
       color: $color-accent;
-      font-weight: 600;
+      box-shadow:
+        inset 3px 0 0 $color-accent,
+        0 0 22px rgba($color-accent, 0.08);
+      font-weight: 840;
+
+      &::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          115deg,
+          transparent 0%,
+          rgba(255, 255, 255, 0.08) 45%,
+          transparent 70%
+        );
+        transform: translateX(-55%);
+      }
+
       .sidebar-inner__item-icon {
         color: $color-accent;
       }
@@ -240,8 +304,8 @@ function getIcon(name: unknown): Component {
   }
 
   &__bottom {
-    padding: 10px 8px;
-    border-top: 1px solid $color-border;
+    padding: 14px 12px 16px;
+    border-top: 1px solid rgba(199, 255, 69, 0.11);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -252,11 +316,14 @@ function getIcon(name: unknown): Component {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 10px;
+    padding: 7px 11px;
     border-radius: $radius-full;
-    background: rgba(239, 68, 68, 0.08);
+    background: rgba($color-danger, 0.08);
+    border: 1px solid rgba($color-danger, 0.16);
+
     &--ok {
-      background: rgba(34, 197, 94, 0.08);
+      background: rgba($color-success, 0.08);
+      border-color: rgba($color-success, 0.16);
     }
     &-dot {
       width: 5px;
@@ -269,7 +336,7 @@ function getIcon(name: unknown): Component {
     }
     &-text {
       font-size: $text-micro;
-      color: $color-text-tertiary;
+      color: $color-text-secondary;
       font-family: $font-mono;
     }
     &-retry {
@@ -283,8 +350,8 @@ function getIcon(name: unknown): Component {
   }
 
   &__toggle {
-    width: 30px;
-    height: 30px;
+    width: 34px;
+    height: 34px;
     border-radius: $radius-sm;
     display: flex;
     align-items: center;
@@ -294,7 +361,7 @@ function getIcon(name: unknown): Component {
     transition: all 0.15s;
     flex-shrink: 0;
     &:hover {
-      background: rgba(0, 204, 153, 0.06);
+      background: rgba($color-accent, 0.08);
       color: $color-text-primary;
     }
   }

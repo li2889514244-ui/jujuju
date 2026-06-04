@@ -61,14 +61,16 @@ onUnmounted(() => {
 
 .sidebar__hamburger {
   position: fixed;
-  top: 8px;
-  left: 8px;
+  top: 12px;
+  left: 12px;
   z-index: 1001;
-  width: 36px;
-  height: 36px;
+  width: 42px;
+  height: 42px;
   border-radius: $radius-md;
-  background: $color-bg-elevated;
+  background: rgba(8, 11, 8, 0.9);
   border: 1px solid $color-border;
+  box-shadow: $shadow-md;
+  backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -83,8 +85,11 @@ onUnmounted(() => {
 .sidebar {
   width: $sidebar-width;
   height: 100vh;
-  background: $color-bg-secondary;
-  border-right: 1px solid $color-border;
+  background:
+    linear-gradient(180deg, rgba(199, 255, 69, 0.08), transparent 22%), rgba(5, 7, 5, 0.86);
+  border-right: 1px solid rgba(199, 255, 69, 0.12);
+  box-shadow: 20px 0 70px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(26px);
   display: flex;
   flex-direction: column;
   transition: width 0.25s $ease-out;
@@ -96,7 +101,7 @@ onUnmounted(() => {
     width: $sidebar-collapsed-width;
   }
   &--drawer {
-    background: $color-bg-secondary;
+    background: $color-bg-primary;
     border-right: none;
   }
 }
@@ -104,7 +109,7 @@ onUnmounted(() => {
 
 <style lang="scss">
 .sidebar-drawer {
-  background: $color-bg-secondary !important;
+  background: $color-bg-primary !important;
   .el-drawer__body {
     padding: 0;
     height: 100%;

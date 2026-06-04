@@ -266,7 +266,7 @@
                 width="56"
                 height="48"
                 rx="8"
-                stroke="#00cc99"
+                stroke="#c7ff45"
                 stroke-width="1"
                 opacity="0.3"
               />
@@ -274,12 +274,12 @@
                 cx="36"
                 cy="36"
                 r="14"
-                stroke="#00cc99"
+                stroke="#c7ff45"
                 stroke-width="1"
                 opacity="0.15"
                 stroke-dasharray="4 4"
               />
-              <circle cx="36" cy="36" r="5" fill="#00cc99" opacity="0.4" />
+              <circle cx="36" cy="36" r="5" fill="#c7ff45" opacity="0.4" />
             </svg>
           </div>
           <h3 class="empty-state__title">连接你的第一个账号</h3>
@@ -350,7 +350,7 @@ function exportCSV() {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: $space-lg;
+  gap: $space-xl;
   min-height: 100%;
 
   &__hero {
@@ -358,7 +358,7 @@ function exportCSV() {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: $space-3xl 0 $space-lg;
+    padding: $space-2xl 0 $space-lg;
     position: relative;
     z-index: 1;
   }
@@ -382,7 +382,6 @@ function exportCSV() {
     gap: $space-md;
     position: relative;
     z-index: 1;
-    padding: 0 $space-lg;
   }
   &__charts {
     display: grid;
@@ -439,31 +438,65 @@ function exportCSV() {
   grid-template-columns: minmax(0, 1.2fr) minmax(360px, 0.8fr);
   gap: $space-xl;
   align-items: stretch;
-  padding: $space-xl;
-  border: 1px solid $color-border;
-  border-radius: $radius-lg;
-  background: linear-gradient(180deg, rgba(26, 31, 42, 0.84), rgba(17, 21, 27, 0.84));
+  min-height: 310px;
+  padding: clamp(28px, 4vw, 52px);
+  border: 1px solid rgba($color-accent, 0.22);
+  border-radius: $radius-xl;
+  background:
+    radial-gradient(circle at 10% 12%, rgba($color-accent, 0.2), transparent 28%),
+    radial-gradient(circle at 84% 18%, rgba($color-accent-alt, 0.14), transparent 26%),
+    linear-gradient(135deg, rgba(243, 240, 223, 0.08), rgba(243, 240, 223, 0.018)),
+    rgba(8, 11, 8, 0.84);
+  box-shadow: $shadow-lg;
+  overflow: hidden;
   position: relative;
   z-index: 1;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 18px;
+    border: 1px solid rgba(243, 240, 223, 0.06);
+    border-radius: 24px;
+    pointer-events: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: -8%;
+    bottom: -42%;
+    width: 430px;
+    height: 430px;
+    border: 1px solid rgba($color-accent, 0.18);
+    border-radius: 50%;
+    box-shadow:
+      inset 0 0 80px rgba($color-accent, 0.06),
+      0 0 90px rgba($color-accent-alt, 0.06);
+    pointer-events: none;
+  }
 }
 
 .command-copy {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: $space-sm;
+  gap: $space-md;
+  position: relative;
+  z-index: 1;
 
   h1 {
-    max-width: 640px;
-    font-size: 30px;
-    line-height: 1.25;
-    letter-spacing: 0;
+    max-width: 760px;
+    font-size: clamp(34px, 4.3vw, 58px);
+    line-height: 0.98;
+    letter-spacing: -0.065em;
     margin: 0;
   }
 
   p {
-    max-width: 560px;
+    max-width: 620px;
     color: $color-text-secondary;
+    font-size: 16px;
     margin: 0;
   }
 }
@@ -477,46 +510,59 @@ function exportCSV() {
   span {
     display: inline-flex;
     align-items: center;
-    min-height: 24px;
-    padding: 2px 8px;
-    border-radius: $radius-sm;
-    background: rgba(59, 130, 246, 0.08);
-    color: $color-text-tertiary;
+    min-height: 28px;
+    padding: 4px 10px;
+    border: 1px solid rgba(243, 240, 223, 0.1);
+    border-radius: $radius-full;
+    background: rgba(5, 7, 5, 0.42);
+    color: $color-text-secondary;
     font-size: $text-micro;
+    font-weight: 760;
   }
 }
 
 .command-actions {
   display: grid;
   gap: $space-sm;
+  position: relative;
+  z-index: 1;
 }
 
 .command-action {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  min-height: 72px;
-  padding: 14px 16px;
-  border-radius: $radius-md;
-  border: 1px solid $color-border;
-  background: $color-bg-tertiary;
+  gap: 8px;
+  min-height: 82px;
+  padding: 18px 20px;
+  border-radius: $radius-lg;
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  background:
+    linear-gradient(135deg, rgba(243, 240, 223, 0.055), rgba(243, 240, 223, 0.016)),
+    rgba(5, 7, 5, 0.48);
   color: $color-text-primary;
-  transition: all 0.2s $ease-out;
+  transition: all 0.22s $ease-out;
 
   &:hover {
     border-color: $color-border-hover;
-    background: $color-bg-hover;
+    background: rgba($color-accent, 0.08);
+    transform: translateX(4px);
   }
 
   &--primary {
-    border-color: rgba(0, 204, 153, 0.28);
-    background: rgba(0, 204, 153, 0.09);
+    color: #071008;
+    border-color: rgba($color-accent, 0.68);
+    background: linear-gradient(135deg, $color-accent, #90f35b);
+    box-shadow: 0 18px 44px rgba($color-accent, 0.16);
+
+    .command-action__hint {
+      color: rgba(7, 16, 8, 0.72);
+    }
   }
 
   &__label {
-    font-size: $text-body;
-    font-weight: 700;
+    font-size: 16px;
+    font-weight: 860;
   }
 
   &__hint {
@@ -537,20 +583,21 @@ function exportCSV() {
   display: flex;
   align-items: center;
   gap: $space-sm;
-  padding: 14px 16px;
-  border: 1px solid $color-border;
-  border-radius: $radius-md;
-  background: rgba(17, 21, 27, 0.7);
+  padding: 18px 20px;
+  border: 1px solid rgba(243, 240, 223, 0.09);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(135deg, rgba(243, 240, 223, 0.045), transparent), rgba(13, 19, 15, 0.72);
 
   &__index {
-    width: 28px;
-    height: 28px;
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    background: $color-bg-hover;
+    background: rgba(243, 240, 223, 0.08);
     color: $color-text-tertiary;
     font-family: $font-mono;
     font-size: $text-caption;
@@ -559,7 +606,7 @@ function exportCSV() {
   strong {
     display: block;
     color: $color-text-primary;
-    font-size: $text-caption;
+    font-size: 14px;
     margin-bottom: 2px;
   }
 
@@ -569,12 +616,12 @@ function exportCSV() {
   }
 
   &--done .runway-step__index {
-    background: rgba(34, 197, 94, 0.14);
+    background: rgba($color-success, 0.16);
     color: $color-success;
   }
 
   &--ready .runway-step__index {
-    background: rgba(0, 204, 153, 0.12);
+    background: rgba($color-accent, 0.16);
     color: $color-accent;
   }
 }
@@ -588,34 +635,56 @@ function exportCSV() {
 }
 
 .capability-card {
-  min-height: 132px;
-  padding: $space-md;
-  border: 1px solid $color-border;
-  border-radius: $radius-md;
-  background: rgba(17, 21, 27, 0.72);
+  min-height: 154px;
+  padding: 22px;
+  border: 1px solid rgba(243, 240, 223, 0.09);
+  border-radius: $radius-lg;
+  background:
+    linear-gradient(145deg, rgba(243, 240, 223, 0.05), rgba(243, 240, 223, 0.012)),
+    rgba(13, 19, 15, 0.74);
   color: $color-text-primary;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  transition: all 0.2s $ease-out;
+  box-shadow: $shadow-sm;
+  transition: all 0.24s $ease-out;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, $color-accent, transparent);
+    opacity: 0;
+    transition: opacity 0.24s $ease-out;
+  }
 
   &:hover {
     border-color: $color-border-hover;
-    background: $color-bg-tertiary;
-    transform: translateY(-1px);
+    background: rgba(29, 43, 34, 0.82);
+    transform: translateY(-4px);
+    box-shadow: $shadow-md;
+
+    &::before {
+      opacity: 1;
+    }
   }
 
   &__tag {
     color: $color-accent;
     font-size: $text-micro;
-    font-weight: 700;
-    letter-spacing: 0.08em;
+    font-weight: 860;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
   }
 
   strong {
-    font-size: $text-title;
-    letter-spacing: 0;
+    font-size: 20px;
+    letter-spacing: -0.035em;
   }
 
   span:last-child {
@@ -628,25 +697,26 @@ function exportCSV() {
 // Hero
 .hero-label {
   font-size: 12px;
-  color: $color-text-tertiary;
+  color: $color-accent;
   text-transform: uppercase;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
+  font-weight: 860;
   margin-bottom: $space-sm;
 }
 .hero-value {
-  font-size: 80px;
-  font-weight: 500;
-  letter-spacing: -0.03em;
+  font-size: clamp(54px, 8vw, 112px);
+  font-weight: 860;
+  letter-spacing: -0.08em;
   line-height: 1;
-  color: $color-text-primary;
+  color: $color-accent;
+  text-shadow: 0 0 32px rgba($color-accent, 0.18);
 }
 .hero-rule {
-  width: 48px;
-  height: 2px;
-  background: $color-accent;
+  width: 90px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, $color-accent, transparent);
   margin-top: 20px;
-  border-radius: 1px;
-  opacity: 0.5;
+  border-radius: $radius-full;
 }
 
 // Sub KPIs
@@ -743,7 +813,7 @@ function exportCSV() {
   cursor: pointer;
 
   &:hover {
-    border-color: rgba(0, 204, 153, 0.18);
+    border-color: rgba($color-accent, 0.24);
     background: $color-bg-tertiary;
   }
   &__info {

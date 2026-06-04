@@ -97,7 +97,7 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon v-if="selectedIds.includes(acc.id)" :size="20" color="#00cc99"
+          <el-icon v-if="selectedIds.includes(acc.id)" :size="20" color="#c7ff45"
             ><CircleCheckFilled
           /></el-icon>
           <span v-else class="account-card__check-empty" />
@@ -143,14 +143,14 @@
           width="48"
           height="40"
           rx="6"
-          stroke="#00cc99"
+          stroke="#c7ff45"
           stroke-width="2"
           fill="none"
         />
-        <circle cx="32" cy="30" r="8" stroke="#00cc99" stroke-width="2" fill="none" />
+        <circle cx="32" cy="30" r="8" stroke="#c7ff45" stroke-width="2" fill="none" />
         <path
           d="M18 48c4-6 10-10 16-10s12 4 16 10"
-          stroke="#00cc99"
+          stroke="#c7ff45"
           stroke-width="2"
           fill="none"
           stroke-linecap="round"
@@ -514,42 +514,72 @@ function openManualAdd() {
 .account-list {
   display: flex;
   flex-direction: column;
-  gap: $space-lg;
+  gap: $space-xl;
 
   &__header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
     gap: $space-lg;
+    padding: 30px;
+    border: 1px solid rgba($color-accent, 0.18);
+    border-radius: $radius-xl;
+    background:
+      radial-gradient(circle at 8% 10%, rgba($color-accent, 0.16), transparent 34%),
+      linear-gradient(135deg, rgba(243, 240, 223, 0.065), rgba(243, 240, 223, 0.012)),
+      rgba(8, 11, 8, 0.72);
+    box-shadow: $shadow-md;
+    position: relative;
+    overflow: hidden;
+
+    &::after {
+      content: '';
+      position: absolute;
+      right: -60px;
+      bottom: -90px;
+      width: 260px;
+      height: 260px;
+      border: 1px solid rgba($color-accent, 0.15);
+      border-radius: 50%;
+      pointer-events: none;
+    }
 
     h2 {
-      margin: 4px 0 6px;
-      font-size: $text-headline;
-      letter-spacing: 0;
+      margin: 10px 0 10px;
+      font-size: clamp(30px, 3vw, 44px);
+      letter-spacing: -0.06em;
     }
 
     p {
-      color: var(--el-text-color-secondary);
+      max-width: 620px;
+      color: $color-text-secondary;
       margin: 0;
+      font-size: 15px;
     }
   }
 
   &__header-link {
-    padding: 7px 12px;
-    border: 1px solid $color-border;
-    border-radius: $radius-sm;
-    background: $color-bg-tertiary;
-    color: $color-text-secondary;
+    position: relative;
+    z-index: 1;
+    padding: 11px 16px;
+    border: 1px solid rgba($color-accent, 0.26);
+    border-radius: $radius-full;
+    background: rgba($color-accent, 0.08);
+    color: $color-accent;
     font-size: $text-caption;
+    font-weight: 820;
     white-space: nowrap;
 
     &:hover {
-      color: $color-accent;
+      color: #071008;
+      background: $color-accent;
       border-color: $color-border-hover;
     }
   }
 
   &__filter {
+    border-radius: $radius-lg;
+
     :deep(.el-form--inline .el-form-item) {
       margin-right: $space-sm;
     }
@@ -559,6 +589,11 @@ function openManualAdd() {
     display: flex;
     gap: $space-sm;
     flex-wrap: wrap;
+    padding: $space-sm;
+    border: 1px solid rgba(243, 240, 223, 0.08);
+    border-radius: $radius-lg;
+    background: rgba(8, 11, 8, 0.52);
+
     .ml-auto {
       margin-left: auto;
     }
@@ -581,35 +616,56 @@ function openManualAdd() {
 // === Account card grid ===
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: $space-md;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: $space-lg;
 }
 
 .account-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $space-sm;
-  padding: 24px $space-md;
-  background: var(--el-fill-color-light);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid var(--el-border-color);
-  border-radius: $radius-lg;
+  gap: 14px;
+  min-height: 282px;
+  padding: 28px 22px 22px;
+  background:
+    linear-gradient(145deg, rgba(243, 240, 223, 0.06), rgba(243, 240, 223, 0.012)),
+    rgba(13, 19, 15, 0.78);
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  border-radius: $radius-xl;
+  box-shadow: $shadow-sm;
   cursor: pointer;
   transition: all 0.25s $ease-out;
   text-align: center;
   position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 22px;
+    left: 22px;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, $color-accent, transparent);
+    opacity: 0;
+    transition: opacity 0.25s $ease-out;
+  }
 
   &:hover {
-    transform: translateY(-2px);
-    border-color: var(--el-border-color);
-    box-shadow: var(--el-box-shadow);
+    transform: translateY(-5px);
+    border-color: $color-border-hover;
+    box-shadow: $shadow-md;
+
+    &::before {
+      opacity: 1;
+    }
   }
 
   &--selected {
-    border-color: #00cc99;
-    background: rgba(#00cc99, 0.06);
+    border-color: $color-accent;
+    background:
+      linear-gradient(145deg, rgba($color-accent, 0.12), rgba($color-accent-alt, 0.045)),
+      rgba(13, 19, 15, 0.78);
   }
 
   &__check {
@@ -621,7 +677,7 @@ function openManualAdd() {
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    border: 2px solid var(--el-border-color);
+    border: 2px solid rgba(243, 240, 223, 0.16);
     display: block;
   }
 
@@ -634,9 +690,9 @@ function openManualAdd() {
     width: 100%;
   }
   &__name {
-    font-size: $text-body;
-    font-weight: 600;
-    color: var(--el-text-color-primary);
+    font-size: 17px;
+    font-weight: 860;
+    color: $color-text-primary;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -649,27 +705,32 @@ function openManualAdd() {
     gap: 0;
   }
   &__stat-value {
-    font-size: $text-headline;
-    font-weight: 700;
-    color: var(--el-text-color-primary);
+    font-family: $font-mono;
+    font-size: 34px;
+    font-weight: 860;
+    color: $color-accent;
     font-feature-settings: 'tnum';
+    letter-spacing: -0.06em;
   }
   &__stat-label {
     font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
+    color: $color-text-tertiary;
+    font-weight: 760;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
   }
   &__group {
     font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
-    background: var(--el-fill-color-lighter);
-    padding: 1px 10px;
+    color: $color-text-secondary;
+    background: rgba(243, 240, 223, 0.07);
+    border: 1px solid rgba(243, 240, 223, 0.08);
+    padding: 3px 10px;
     border-radius: $radius-full;
   }
   &__status {
     font-size: $text-micro;
-    font-weight: 500;
-    padding: 2px 10px;
+    font-weight: 820;
+    padding: 4px 10px;
     border-radius: $radius-full;
     &.status--valid {
       background: rgba($color-success, 0.1);
@@ -688,7 +749,7 @@ function openManualAdd() {
   &__actions {
     display: flex;
     gap: $space-xs;
-    margin-top: 2px;
+    margin-top: auto;
   }
 }
 
@@ -700,7 +761,7 @@ function openManualAdd() {
   padding: $space-sm 0;
   .add-dialog__title {
     font-size: $text-title;
-    color: var(--el-text-color-primary);
+    color: $color-text-primary;
     font-weight: 700;
     margin: 0;
   }
@@ -713,15 +774,15 @@ function openManualAdd() {
     text-transform: uppercase;
   }
   .add-dialog__desc {
-    color: var(--el-text-color-secondary);
+    color: $color-text-secondary;
     font-size: $text-caption;
     margin: 6px 0 0;
   }
 }
 .companion-online-box {
-  background: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color);
-  border-radius: $radius-sm;
+  background: rgba(243, 240, 223, 0.055);
+  border: 1px solid rgba(243, 240, 223, 0.09);
+  border-radius: $radius-md;
   padding: $space-md;
   .companion-online-box__status {
     color: $color-success;
@@ -729,7 +790,7 @@ function openManualAdd() {
     margin-bottom: $space-sm;
   }
   .companion-online-box__hint {
-    color: var(--el-text-color-secondary);
+    color: $color-text-secondary;
     font-size: $text-caption;
     margin-bottom: $space-sm;
   }
@@ -741,15 +802,15 @@ function openManualAdd() {
   }
 }
 .companion-offline-box {
-  background: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color);
-  border-radius: $radius-sm;
+  background: rgba(243, 240, 223, 0.055);
+  border: 1px solid rgba(243, 240, 223, 0.09);
+  border-radius: $radius-md;
   padding: $space-md;
   text-align: left;
   p {
     margin: 4px 0;
     font-size: $text-caption;
-    color: var(--el-text-color-secondary);
+    color: $color-text-secondary;
   }
 }
 .download-btn {
@@ -765,16 +826,17 @@ function openManualAdd() {
   display: flex;
   align-items: center;
   gap: $space-lg;
-  background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color);
+  background: rgba(8, 11, 8, 0.92);
+  border: 1px solid rgba($color-accent, 0.18);
   border-radius: $radius-lg;
-  box-shadow: var(--el-box-shadow-dark);
+  box-shadow: $shadow-lg;
+  backdrop-filter: blur(18px);
   padding: $space-sm $space-lg;
   z-index: 100;
   &__count {
     font-size: $text-body;
     font-weight: 600;
-    color: var(--el-text-color-primary);
+    color: $color-text-primary;
   }
   &__actions {
     display: flex;
@@ -793,12 +855,12 @@ function openManualAdd() {
   h3 {
     font-size: $text-headline;
     font-weight: 600;
-    color: var(--el-text-color-primary);
+    color: $color-text-primary;
     margin: 0;
   }
   p {
     font-size: $text-body;
-    color: var(--el-text-color-placeholder);
+    color: $color-text-tertiary;
     margin: 0;
   }
 }

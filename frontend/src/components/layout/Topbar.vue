@@ -267,22 +267,37 @@ function handleUserCommand(command: string) {
 
 .topbar {
   height: $topbar-height;
-  background: $color-bg-secondary;
-  border-bottom: 1px solid $color-border;
+  background:
+    linear-gradient(90deg, rgba(199, 255, 69, 0.055), transparent 32%), rgba(8, 11, 8, 0.72);
+  border-bottom: 1px solid rgba(199, 255, 69, 0.11);
+  backdrop-filter: blur(22px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: 0 24px;
   flex-shrink: 0;
   z-index: 5;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    right: 24px;
+    bottom: -1px;
+    left: 24px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba($color-accent, 0.3), transparent);
+  }
 }
 
 .topbar__left {
   :deep(.el-breadcrumb) {
-    font-size: 13px;
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
     .el-breadcrumb__separator {
       color: $color-text-tertiary;
-      margin: 0 4px;
+      margin: 0 6px;
     }
   }
 }
@@ -290,7 +305,7 @@ function handleUserCommand(command: string) {
 .topbar__right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
 }
 
 .topbar__desktop {
@@ -304,15 +319,19 @@ function handleUserCommand(command: string) {
 .topbar__tool-button {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   color: $color-text-secondary;
   font-size: 13px;
-  padding: 5px 10px;
-  border-radius: $radius-sm;
+  font-weight: 760;
+  padding: 8px 12px;
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  border-radius: $radius-full;
+  background: rgba(13, 19, 15, 0.62);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.18s $ease-out;
   &:hover {
-    background: rgba(0, 204, 153, 0.06);
+    background: rgba($color-accent, 0.09);
+    border-color: rgba($color-accent, 0.22);
     color: $color-accent;
   }
 }
@@ -331,24 +350,37 @@ function handleUserCommand(command: string) {
 .topbar__team {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 7px;
   cursor: pointer;
   color: $color-text-secondary;
   font-size: 13px;
-  padding: 5px 10px;
-  border-radius: $radius-sm;
-  transition: all 0.15s;
+  font-weight: 760;
+  padding: 8px 12px;
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  border-radius: $radius-full;
+  background: rgba(13, 19, 15, 0.62);
+  transition: all 0.18s $ease-out;
   &:hover {
-    background: rgba(0, 204, 153, 0.06);
+    background: rgba($color-accent, 0.08);
+    border-color: rgba($color-accent, 0.2);
+    color: $color-text-primary;
   }
 }
 
 .topbar__icon-btn {
   color: $color-text-secondary;
   cursor: pointer;
-  transition: color 0.15s;
+  width: 36px;
+  height: 36px;
+  padding: 9px;
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  border-radius: $radius-full;
+  background: rgba(13, 19, 15, 0.62);
+  transition: all 0.18s $ease-out;
   &:hover {
     color: $color-accent;
+    border-color: rgba($color-accent, 0.2);
+    background: rgba($color-accent, 0.08);
   }
 }
 
@@ -365,19 +397,22 @@ function handleUserCommand(command: string) {
 .topbar__user {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 9px;
   cursor: pointer;
-  padding: 3px 8px 3px 3px;
+  padding: 4px 12px 4px 4px;
   border-radius: $radius-full;
-  transition: background 0.15s;
+  border: 1px solid rgba(243, 240, 223, 0.1);
+  background: rgba(13, 19, 15, 0.62);
+  transition: all 0.18s $ease-out;
   &:hover {
-    background: rgba(0, 204, 153, 0.06);
+    background: rgba($color-accent, 0.08);
+    border-color: rgba($color-accent, 0.2);
   }
 }
 .topbar__username {
   font-size: 13px;
   color: $color-text-primary;
-  font-weight: 500;
+  font-weight: 760;
 }
 
 // Notification panel
@@ -388,7 +423,7 @@ function handleUserCommand(command: string) {
     align-items: center;
     padding-bottom: 12px;
     border-bottom: 1px solid $color-border;
-    font-weight: 600;
+    font-weight: 800;
     font-size: 14px;
   }
   &__body {
@@ -413,10 +448,10 @@ function handleUserCommand(command: string) {
   cursor: pointer;
   transition: background 0.12s;
   &:hover {
-    background: rgba(0, 204, 153, 0.04);
+    background: rgba($color-accent, 0.06);
   }
   &--unread {
-    background: rgba(0, 204, 153, 0.05);
+    background: rgba($color-accent, 0.08);
   }
   &__icon {
     padding-top: 1px;
@@ -457,7 +492,7 @@ function handleUserCommand(command: string) {
       padding: 5px 6px;
     }
     &__tool-button {
-      padding: 5px 6px;
+      padding: 8px;
     }
     &__user {
       padding: 2px;

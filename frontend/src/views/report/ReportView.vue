@@ -325,12 +325,20 @@ async function exportExcel() {
     align-items: flex-end;
     justify-content: space-between;
     gap: $space-lg;
-    margin-bottom: $space-lg;
+    margin-bottom: $space-xl;
+    padding: 28px 30px;
+    border: 1px solid rgba($color-accent, 0.16);
+    border-radius: $radius-xl;
+    background:
+      radial-gradient(circle at 12% 12%, rgba($color-warning, 0.12), transparent 34%),
+      linear-gradient(135deg, rgba(243, 240, 223, 0.055), rgba(243, 240, 223, 0.012)),
+      rgba(8, 11, 8, 0.68);
+    box-shadow: $shadow-sm;
 
     h2 {
-      margin: 4px 0 6px;
-      font-size: $text-headline;
-      letter-spacing: 0;
+      margin: 10px 0;
+      font-size: clamp(30px, 3vw, 42px);
+      letter-spacing: -0.06em;
     }
 
     p {
@@ -345,15 +353,17 @@ async function exportExcel() {
     gap: $space-xs;
 
     a {
-      padding: 6px 10px;
-      border: 1px solid $color-border;
-      border-radius: $radius-sm;
-      background: $color-bg-tertiary;
-      color: $color-text-secondary;
+      padding: 9px 13px;
+      border: 1px solid rgba($color-accent, 0.18);
+      border-radius: $radius-full;
+      background: rgba($color-accent, 0.065);
+      color: $color-accent;
       font-size: $text-caption;
+      font-weight: 760;
 
       &:hover {
-        color: $color-accent;
+        color: #071008;
+        background: $color-accent;
         border-color: $color-border-hover;
       }
     }
