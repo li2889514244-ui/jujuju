@@ -10,13 +10,13 @@ export class AnalyticsService {
 
   constructor(private prisma: PrismaService) {}
 
-  async getFollowersTrend(userId: string, days: number = 7, platform?: string) {
+  async getFollowersTrend(userId: string, days: number = 7, platform?: string, groupId?: string) {
     const startDate = new Date()
     startDate.setDate(startDate.getDate() - days)
     startDate.setHours(0, 0, 0, 0)
 
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}), ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -159,10 +159,10 @@ export class AnalyticsService {
   /**
    * 鑾峰彇鑱氬悎姒傝鏁版嵁
    */
-  async getOverview(userId: string) {
+  async getOverview(userId: string, groupId?: string) {
     // 鑾峰彇鐢ㄦ埛鐨勬墍鏈夎处鍙?
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: { userId, ...(groupId ? { groupId } : {}) },
       select: { id: true, platform: true, followers: true, likes: true, status: true },
     })
 
@@ -235,9 +235,9 @@ export class AnalyticsService {
   /**
    * 鑾峰彇骞冲彴缁村害瀵规瘮鏁版嵁
    */
-  async getPlatformComparison(userId: string) {
+  async getPlatformComparison(userId: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId },
+      where: { userId, ...(groupId ? { groupId } : {}) },
       select: { id: true, platform: true, followers: true, likes: true },
     })
 
@@ -425,7 +425,7 @@ export class AnalyticsService {
    * 鏁版嵁鍚屾瘮鐜瘮瀵规瘮
    * 杩斿洖鏈懆vs涓婂懆銆佹湰鏈坴s涓婃湀銆佹湰鏈坴s鍘诲勾鍚屾湀鐨勬牳蹇冩寚鏍囧姣?
    */
-  async getComparison(userId: string) {
+  async getComparison(userId: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
       where: { userId },
       select: { id: true },
@@ -484,14 +484,16 @@ export class AnalyticsService {
       limit?: number
       period?: 'week' | 'month' | 'all'
       platform?: string
+      groupId?: string
     },
   ) {
-    const { limit = 50, period = 'all', platform } = params
+    const { limit = 50, period = 'all', platform, groupId } = params
 
     const accounts = await this.prisma.account.findMany({
       where: {
         userId,
         ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
       },
       select: { id: true },
     })
@@ -714,9 +716,9 @@ export class AnalyticsService {
     }))
   }
 
-  async getEngagementRate(userId: string, days: number = 7, platform?: string) {
+  async getEngagementRate(userId: string, days: number = 7, platform?: string, groupId?: string) {
     const accounts = await this.prisma.account.findMany({
-      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}), ...(groupId ? { groupId } : {}) },
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
@@ -987,5 +989,124 @@ export class AnalyticsService {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 50)
       .map(([name, count]) => ({ name, count }))
+  }
+
+  /**
+   * 获取所有账号的日/周/月维度数据明细列表
+   * 设计参考：聚合 DailyStats 增量字段
+   * day = 昨日的增量
+   * week = 最近7天增量之和
+   * month = 最近30天增量之和
+   */
+  async getAccountDetailList(userId: string, platform?: string) {
+    const accounts = await this.prisma.account.findMany({
+      where: { userId, ...(platform ? { platform: platform as Platform } : {}) },
+      select: { id: true, platform: true, nickname: true, avatar: true, followers: true },
+      orderBy: { createdAt: 'desc' },
+    })
+
+    const accountIds = accounts.map((a) => a.id)
+
+    // 查询最近30天的 DailyStats
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    thirtyDaysAgo.setHours(0, 0, 0, 0)
+
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    yesterday.setHours(0, 0, 0, 0)
+
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    sevenDaysAgo.setHours(0, 0, 0, 0)
+
+    const allStats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { gte: thirtyDaysAgo },
+      },
+      select: {
+        accountId: true,
+        date: true,
+        followers: true,
+        viewsIncrement: true,
+        likesIncrement: true,
+        commentsIncrement: true,
+        sharesIncrement: true,
+        followersIncrement: true,
+      },
+      orderBy: { date: 'asc' },
+    })
+
+    // 按 accountId 分组
+    const statsByAccount: Record<string, typeof allStats> = {}
+    for (const s of allStats) {
+      if (!statsByAccount[s.accountId]) statsByAccount[s.accountId] = []
+      statsByAccount[s.accountId].push(s)
+    }
+
+    // 计算每个账号的日/周/月聚合
+    const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
+    const isYesterday = (d: Date) => {
+      const ds = d.toISOString().slice(0, 10)
+      const ys = yesterday.toISOString().slice(0, 10)
+      return ds === ys
+    }
+
+    return accounts.map((acc) => {
+      const stats = statsByAccount[acc.id] || []
+
+      const monthTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
+      const weekTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
+      const dayTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
+      let lastFans = acc.followers || 0
+
+      for (const s of stats) {
+        const increments = {
+          play: s.viewsIncrement || 0,
+          like: s.likesIncrement || 0,
+          comment: s.commentsIncrement || 0,
+          share: s.sharesIncrement || 0,
+          new_fans: s.followersIncrement || 0,
+        }
+
+        // 月累计：全部30天
+        monthTotal.play += increments.play
+        monthTotal.like += increments.like
+        monthTotal.comment += increments.comment
+        monthTotal.share += increments.share
+        monthTotal.new_fans += increments.new_fans
+
+        // 周累计：最近7天
+        if (isWithinLast7(s.date)) {
+          weekTotal.play += increments.play
+          weekTotal.like += increments.like
+          weekTotal.comment += increments.comment
+          weekTotal.share += increments.share
+          weekTotal.new_fans += increments.new_fans
+        }
+
+        // 日：昨天
+        if (isYesterday(s.date)) {
+          dayTotal.play += increments.play
+          dayTotal.like += increments.like
+          dayTotal.comment += increments.comment
+          dayTotal.share += increments.share
+          dayTotal.new_fans += increments.new_fans
+        }
+
+        // 取最新的粉丝快照
+        if (s.followers > 0) lastFans = s.followers
+      }
+
+      return {
+        id: acc.id,
+        nickname: acc.nickname,
+        avatar: acc.avatar,
+        platform: acc.platform,
+        fans: lastFans,
+        info: { day_total: dayTotal, week_total: weekTotal, month_total: monthTotal },
+      }
+    })
   }
 }

@@ -3,9 +3,30 @@ import service from './request'
 import type { AnalyticsOverview, TrendData, PlatformStats, PublishEffect } from '@/types'
 import { getCompanionUrl } from '@/composables/useCompanionUrl'
 
+export interface DailyMetrics {
+  play: number
+  like: number
+  comment: number
+  share: number
+  new_fans: number
+}
+
+export interface AccountDetailItem {
+  id: string
+  nickname: string
+  avatar: string
+  platform: string
+  fans: number
+  info: {
+    day_total: DailyMetrics
+    week_total: DailyMetrics
+    month_total: DailyMetrics
+  }
+}
+
 export const analyticsApi = {
-  getOverview(teamId?: string) {
-    return get<AnalyticsOverview>('/analytics/overview', { teamId })
+  getOverview(params?: { groupId?: string; teamId?: string }) {
+    return get<AnalyticsOverview>('/analytics/overview', params ? params as Record<string, unknown> : undefined)
   },
 
   getFollowerTrend(params: { days?: number; platform?: string }) {
@@ -46,12 +67,12 @@ export const analyticsApi = {
     }>('/analytics/report', params as Record<string, unknown>)
   },
 
-  getComparison() {
+  getComparison(params?: { groupId?: string }) {
     return get<{
       weekOverWeek: { current: any; previous: any; change: any }
       monthOverMonth: { current: any; previous: any; change: any }
       yearOverYear: { current: any; previous: any; change: any }
-    }>('/analytics/comparison')
+    }>('/analytics/comparison', params ? params as Record<string, unknown> : undefined)
   },
 
   getViewsRanking(params?: {
@@ -108,6 +129,10 @@ export const analyticsApi = {
 
   getTags() {
     return get<Array<{ name: string; count: number }>>('/analytics/tags')
+  },
+
+  getAccountDetailList(params?: { platform?: string }) {
+    return get<AccountDetailItem[]>('/analytics/account-detail-list', params as Record<string, unknown>)
   },
 
   getMonetization(days?: number) {

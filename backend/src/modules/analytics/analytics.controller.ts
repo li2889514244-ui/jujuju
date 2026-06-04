@@ -33,14 +33,18 @@ export class AnalyticsController {
     @CurrentUser('id') userId: string,
     @Query('days') days?: number,
     @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
   ) {
-    return this.analyticsService.getFollowersTrend(userId, days || 7, platform)
+    return this.analyticsService.getFollowersTrend(userId, days || 7, platform, groupId)
   }
 
   @Get('overview')
   @ApiOperation({ summary: '获取数据概览' })
-  async getOverview(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getOverview(userId)
+  async getOverview(
+    @CurrentUser('id') userId: string,
+    @Query('groupId') groupId?: string,
+  ) {
+    return this.analyticsService.getOverview(userId, groupId)
   }
 
   /**
@@ -77,8 +81,11 @@ export class AnalyticsController {
 
   @Get('platforms')
   @ApiOperation({ summary: '获取平台维度对比数据' })
-  async getPlatformComparison(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getPlatformComparison(userId)
+  async getPlatformComparison(
+    @CurrentUser('id') userId: string,
+    @Query('groupId') groupId?: string,
+  ) {
+    return this.analyticsService.getPlatformComparison(userId, groupId)
   }
 
   @Get('report')
@@ -98,8 +105,11 @@ export class AnalyticsController {
 
   @Get('comparison')
   @ApiOperation({ summary: '数据同比环比对比（周环比、月环比、年同比）' })
-  async getComparison(@CurrentUser('id') userId: string) {
-    return this.analyticsService.getComparison(userId)
+  async getComparison(
+    @CurrentUser('id') userId: string,
+    @Query('groupId') groupId?: string,
+  ) {
+    return this.analyticsService.getComparison(userId, groupId)
   }
 
   @Post('monetization/manual')
@@ -132,16 +142,19 @@ export class AnalyticsController {
     description: '时间范围',
   })
   @ApiQuery({ name: 'platform', required: false, description: '平台筛选' })
+  @ApiQuery({ name: 'groupId', required: false, description: '分组筛选' })
   async getViewsRanking(
     @CurrentUser('id') userId: string,
     @Query('limit') limit?: number,
     @Query('period') period?: 'week' | 'month' | 'all',
     @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
   ) {
     return this.analyticsService.getViewsRanking(userId, {
       limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
       period: period || 'all',
       platform,
+      groupId,
     })
   }
 
@@ -150,16 +163,19 @@ export class AnalyticsController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'all'] })
   @ApiQuery({ name: 'platform', required: false })
+  @ApiQuery({ name: 'groupId', required: false })
   async getEngagementRanking(
     @CurrentUser('id') userId: string,
     @Query('limit') limit?: number,
     @Query('period') period?: 'week' | 'month' | 'all',
     @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
   ) {
     const result = await this.analyticsService.getViewsRanking(userId, {
       limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
       period: period || 'all',
       platform,
+      groupId,
     })
     return {
       ...result,
@@ -195,8 +211,9 @@ export class AnalyticsController {
     @CurrentUser('id') userId: string,
     @Query('days') days?: number,
     @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
   ) {
-    return this.analyticsService.getEngagementRate(userId, days || 7, platform)
+    return this.analyticsService.getEngagementRate(userId, days || 7, platform, groupId)
   }
 
   @Get('export')
@@ -276,6 +293,16 @@ export class AnalyticsController {
   private async verifyAccountOwnership(_accountId: string, _userId: string, _userRole: string) {
     // 共享模式：跳过所有权检查，所有用户可查看所有数据
     return
+  }
+
+  @Get('account-detail-list')
+  @ApiOperation({ summary: '获取所有账号日/周/月维度数据明细列表' })
+  @ApiQuery({ name: 'platform', required: false })
+  async getAccountDetailList(
+    @CurrentUser('id') userId: string,
+    @Query('platform') platform?: string,
+  ) {
+    return this.analyticsService.getAccountDetailList(userId, platform)
   }
 
   @Get('tags')

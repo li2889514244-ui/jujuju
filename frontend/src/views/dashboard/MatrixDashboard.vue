@@ -7,10 +7,19 @@
         <p class="md-header__sub">全平台账号数据实时监控</p>
       </div>
       <div class="md-header__right">
-        <el-select v-model="days" class="filter-select" @change="refreshAll">
-          <el-option :value="7" label="近7天" />
-          <el-option :value="30" label="近30天" />
-          <el-option :value="90" label="近90天" />
+        <el-select
+          v-model="groupId"
+          class="filter-select group-select"
+          clearable
+          placeholder="全部老师"
+          @change="refreshAll"
+        >
+          <el-option
+            v-for="g in groups"
+            :key="g.id"
+            :value="g.id"
+            :label="g.name + ' (' + g._count.accounts + '账号)'"
+          />
         </el-select>
         <el-select
           v-model="platform"
@@ -66,6 +75,67 @@
           <div v-else class="md-kpi-card__trend is-none">—</div>
         </div>
       </div>
+
+      <!-- 日/周/月 聚合统计 -->
+      <el-card shadow="hover" class="md-section">
+        <div class="md-section__header">
+          <span>数据总览</span>
+          <el-radio-group v-model="dateType" size="small">
+            <el-radio-button value="day">日</el-radio-button>
+            <el-radio-button value="week">周</el-radio-button>
+            <el-radio-button value="month">月</el-radio-button>
+          </el-radio-group>
+        </div>
+        <el-tooltip
+          effect="light"
+          content="日:昨日，周:最近7天，月:最近30天"
+          placement="bottom"
+        >
+          <span class="md-date-hint">{{ dateTypeLabel }}数据</span>
+        </el-tooltip>
+        <div class="md-stats-bar">
+          <div v-for="stat in aggregatedStats" :key="stat.id" class="md-stat-item">
+            <div class="md-stat-item__label">{{ stat.text }}</div>
+            <div class="md-stat-item__value">{{ formatNum(stat.value) }}</div>
+          </div>
+        </div>
+      </el-card>
+
+      <!-- 多账号明细 -->
+      <el-card shadow="hover" class="md-section">
+        <template #header>
+          <div class="md-section__header">
+            <span>多账号明细</span>
+            <span class="md-table-subtitle">展示数据为账号最近30天累计获取得到的最新数据</span>
+          </div>
+        </template>
+        <el-table
+          :data="accountTableData"
+          stripe
+          size="small"
+          max-height="520"
+          empty-text="暂无账号数据"
+          @sort-change="(sort: any) => toggleSort(sort?.prop || '')"
+        >
+          <el-table-column type="index" width="50" label="#" align="center" />
+          <el-table-column prop="avatar" label="头像" width="60" align="center">
+            <template #default="{ row }">
+              <el-avatar :size="32" :src="row.avatar" />
+            </template>
+          </el-table-column>
+          <el-table-column prop="nickname" label="账号名称" min-width="120">
+            <template #default="{ row }">
+              <el-text truncated>{{ row.nickname }}</el-text>
+            </template>
+          </el-table-column>
+          <el-table-column prop="fansFormatted" label="粉丝数" width="100" align="right" sortable="custom" />
+          <el-table-column prop="playFormatted" label="播放量" width="100" align="right" sortable="custom" />
+          <el-table-column prop="newFansFormatted" label="净增粉丝" width="100" align="right" sortable="custom" />
+          <el-table-column prop="likeFormatted" label="点赞" width="80" align="right" sortable="custom" />
+          <el-table-column prop="commentFormatted" label="评论" width="80" align="right" sortable="custom" />
+          <el-table-column prop="shareFormatted" label="分享" width="80" align="right" sortable="custom" />
+        </el-table>
+      </el-card>
 
       <!-- Trend Chart -->
       <el-card shadow="hover" class="md-section">
@@ -204,19 +274,25 @@ import { PLATFORM_LABELS } from '@/types'
 const {
   loading,
   error,
-  days,
+  dateType,
+  dateTypeLabel,
   platform,
+  groupId,
+  groups,
   rankingPeriod,
   rankingTab,
   trendMetric,
   overview,
   kpiCards,
+  aggregatedStats,
   platformStats,
   platformTableData,
   platformChartData,
   trendChartData,
   currentRanking,
   tags,
+  accountTableData,
+  toggleSort,
   refreshAll,
 } = useMatrixDashboard()
 
@@ -334,6 +410,9 @@ onMounted(() => {
 }
 .filter-select {
   width: 110px;
+}
+.group-select {
+  width: 160px;
 }
 
 // ─── Skeleton / Empty / Error ───
@@ -514,5 +593,44 @@ onMounted(() => {
   &:hover {
     opacity: 0.75;
   }
+}
+
+// ─── Stats Bar (日/周/月) ───
+.md-date-hint {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  margin-left: 4px;
+}
+.md-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  margin-top: 16px;
+  @media (max-width: 900px) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+.md-stat-item {
+  text-align: center;
+  padding: 16px 12px;
+  background: var(--color-bg-tertiary);
+  border-radius: 8px;
+  &__label {
+    font-size: 12px;
+    color: var(--color-text-secondary);
+    margin-bottom: 6px;
+  }
+  &__value {
+    font-size: 22px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+// ─── Account Table ───
+.md-table-subtitle {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  margin-left: 8px;
 }
 </style>

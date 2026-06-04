@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
-import { analyticsApi } from '@/api/analytics'
+import { analyticsApi, type AccountDetailItem, type DailyMetrics } from '@/api/analytics'
+import { accountsApi } from '@/api/accounts'
 import { formatLargeNum } from '@/utils/format'
 import type { AnalyticsOverview, PlatformStats, TrendData } from '@/types'
 
@@ -32,6 +33,8 @@ export interface TagItem {
   count: number
 }
 
+const EMPTY_METRICS: DailyMetrics = { play: 0, new_fans: 0, like: 0, comment: 0, share: 0 }
+
 export function useMatrixDashboard() {
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -40,6 +43,11 @@ export function useMatrixDashboard() {
   const rankingPeriod = ref<'week' | 'month' | 'all'>('all')
   const rankingTab = ref<'views' | 'engagement'>('views')
   const trendMetric = ref<'followers' | 'views' | 'engagement'>('followers')
+  const dateType = ref<'day' | 'week' | 'month'>('day')
+  const groupId = ref<string>('')
+
+  // Groups for teacher-centric view
+  const groups = ref<Array<{ id: string; name: string; _count: { accounts: number } }>>([])
 
   // Data
   const overview = ref<AnalyticsOverview | null>(null)
@@ -51,8 +59,43 @@ export function useMatrixDashboard() {
   const viewsRanking = ref<RankingItem[]>([])
   const engagementRanking = ref<RankingItem[]>([])
   const tags = ref<TagItem[]>([])
+  const accountDetailList = ref<AccountDetailItem[]>([])
 
-  // ─── KPI Cards ───
+  // ─── 日/周/月 聚合统计 (7 KPI 卡片) ───
+  interface UserStat {
+    id: number
+    type: keyof DailyMetrics
+    text: string
+    value: number
+  }
+
+  const userStatDefs: Omit<UserStat, 'value'>[] = [
+    { id: 1, type: 'play', text: '新增播放' },
+    { id: 2, type: 'new_fans', text: '净增粉丝' },
+    { id: 3, type: 'like', text: '新增点赞' },
+    { id: 4, type: 'comment', text: '新增评论' },
+    { id: 5, type: 'share', text: '新增分享' },
+  ]
+
+  const aggregatedStats = computed<UserStat[]>(() => {
+    const list = accountDetailList.value
+    return userStatDefs.map((def) => {
+      let total = 0
+      const period = dateType.value
+      for (const acc of list) {
+        const source =
+          period === 'day'
+            ? acc.info.day_total
+            : period === 'week'
+              ? acc.info.week_total
+              : acc.info.month_total
+        total += source?.[def.type] || 0
+      }
+      return { ...def, value: total }
+    })
+  })
+
+  // ─── KPI Cards (保留原有的4张，新增日/周/月聚合卡) ───
   const kpiCards = computed<KpiCard[]>(() => {
     const ov = overview.value
     const comp = comparison.value
@@ -98,6 +141,99 @@ export function useMatrixDashboard() {
     ]
   })
 
+  // ─── 日期类型标签 ───
+  const dateTypeLabel = computed(() => {
+    switch (dateType.value) {
+      case 'day': return '昨日'
+      case 'week': return '近7天'
+      case 'month': return '近30天'
+    }
+  })
+
+  // ─── 账号明细表 ───
+  interface AccountTableRow {
+    id: string
+    nickname: string
+    avatar: string
+    platform: string
+    fans: number
+    play: number
+    issue?: number
+    new_fans: number
+    uv?: number
+    like: number
+    comment: number
+    share: number
+    fansFormatted: string
+    playFormatted: string
+    newFansFormatted: string
+    likeFormatted: string
+    commentFormatted: string
+    shareFormatted: string
+  }
+
+  const sortKey = ref<string>('')
+  const sortOrder = ref<'asc' | 'desc'>('desc')
+
+  const accountTableData = computed<AccountTableRow[]>(() => {
+    const list = accountDetailList.value
+    const period = dateType.value
+
+    let rows: AccountTableRow[] = list.map((acc) => {
+      const source =
+        period === 'day'
+          ? acc.info.day_total
+          : period === 'week'
+            ? acc.info.week_total
+            : acc.info.month_total
+
+      const play = source?.play || 0
+      const new_fans = source?.new_fans || 0
+      const like = source?.like || 0
+      const comment = source?.comment || 0
+      const share = source?.share || 0
+
+      return {
+        id: acc.id,
+        nickname: acc.nickname || '--',
+        avatar: acc.avatar || '',
+        platform: acc.platform,
+        fans: acc.fans || 0,
+        play,
+        new_fans,
+        like,
+        comment,
+        share,
+        fansFormatted: formatLargeNum(acc.fans || 0),
+        playFormatted: formatLargeNum(play),
+        newFansFormatted: formatLargeNum(new_fans),
+        likeFormatted: formatLargeNum(like),
+        commentFormatted: formatLargeNum(comment),
+        shareFormatted: formatLargeNum(share),
+      }
+    })
+
+    // 排序
+    if (sortKey.value) {
+      const dir = sortOrder.value === 'asc' ? 1 : -1
+      rows.sort((a: any, b: any) => (a[sortKey.value] - b[sortKey.value]) * dir)
+    }
+
+    return rows
+  })
+
+  function toggleSort(prop: string) {
+    const propMap: Record<string, string> = {
+      fansFormatted: 'fans', playFormatted: 'play', newFansFormatted: 'new_fans',
+      likeFormatted: 'like', commentFormatted: 'comment', shareFormatted: 'share',
+    }
+    const key = propMap[prop] || prop
+    if (!key) { sortKey.value = ''; return }
+    if (sortKey.value === key) {
+      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
+    } else { sortKey.value = key; sortOrder.value = 'desc' }
+  }
+
   // ─── Platform Table ───
   const platformTableData = computed(() => {
     return platformStats.value.map((p) => ({
@@ -108,7 +244,6 @@ export function useMatrixDashboard() {
     }))
   })
 
-  // ─── Platform Chart Data ───
   const platformChartData = computed(() => {
     const platforms = platformStats.value
     return {
@@ -119,12 +254,10 @@ export function useMatrixDashboard() {
     }
   })
 
-  // ─── Ranking ───
   const currentRanking = computed(() =>
     rankingTab.value === 'views' ? viewsRanking.value : engagementRanking.value,
   )
 
-  // ─── Trend Chart Data ───
   const trendChartData = computed(() => {
     switch (trendMetric.value) {
       case 'followers':
@@ -143,29 +276,33 @@ export function useMatrixDashboard() {
     loading.value = true
     error.value = null
     try {
-      const filter = { days: days.value, platform: platform.value || undefined }
-      const [ov, comp, ps, ft, er, vr, tg] = await Promise.all([
-        analyticsApi.getOverview().then((r: any) => r.data),
-        analyticsApi.getComparison().then((r: any) => r.data),
+      const gid = groupId.value || undefined
+      const filter = { days: days.value, platform: platform.value || undefined, groupId: gid }
+      const pFilter = { platform: platform.value || undefined, groupId: gid }
+      const [ov, comp, ps, ft, er, vr, tg, adl, grps] = await Promise.all([
+        analyticsApi.getOverview(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
+        analyticsApi.getComparison(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getPlatformStats().then((r: any) => r.data),
         analyticsApi.getFollowerTrend(filter).then((r: any) => r.data),
         analyticsApi.getEngagementRate(filter).then((r: any) => r.data),
         analyticsApi
           .getViewsRanking({
-            limit: 50,
-            period: rankingPeriod.value,
-            platform: platform.value || undefined,
+            limit: 50, period: rankingPeriod.value,
+            platform: platform.value || undefined, groupId: gid,
           })
           .then((r: any) => r.data),
         analyticsApi.getTags().then((r: any) => r.data),
+        analyticsApi.getAccountDetailList(pFilter).then((r: any) => r.data),
+        accountsApi.getGroups().then((r: any) => r.data),
       ])
       overview.value = ov
       comparison.value = comp
       platformStats.value = ps || []
       followerTrend.value = ft || []
       engagementTrend.value = er || []
+      accountDetailList.value = adl || []
+      groups.value = grps || []
 
-      // Daily views trend from publish effect aggregated by date
       const pe = await analyticsApi.getPublishEffect({ days: days.value }).then((r: any) => r.data)
       const byDate: Record<string, number> = {}
       if (pe) {
@@ -181,18 +318,15 @@ export function useMatrixDashboard() {
       viewsRanking.value = vr?.ranking || []
       tags.value = tg || []
 
-      // Engagement ranking
       try {
-        const enr = await analyticsApi
+        const enr = await         analyticsApi
           .getEngagementRanking({
-            limit: 50,
-            period: rankingPeriod.value,
-            platform: platform.value || undefined,
+            limit: 50, period: rankingPeriod.value,
+            platform: platform.value || undefined, groupId: gid,
           })
           .then((r: any) => r.data)
         engagementRanking.value = enr?.ranking || []
       } catch {
-        // fallback: sort views ranking by engagement
         engagementRanking.value = [...viewsRanking.value].sort(
           (a, b) => b.engagementRate - a.engagementRate,
         )
@@ -209,11 +343,14 @@ export function useMatrixDashboard() {
     error,
     days,
     platform,
+    dateType,
+    dateTypeLabel,
     rankingPeriod,
     rankingTab,
     trendMetric,
     overview,
     kpiCards,
+    aggregatedStats,
     platformStats,
     platformTableData,
     platformChartData,
@@ -225,6 +362,12 @@ export function useMatrixDashboard() {
     engagementRanking,
     currentRanking,
     tags,
+    accountTableData,
+    sortKey,
+    sortOrder,
+    toggleSort,
+    groups,
+    groupId,
     refreshAll,
   }
 }
