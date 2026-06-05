@@ -667,6 +667,7 @@ PLATFORM_DASHBOARDS = {
 }
 
 _collector_running = False
+_collector_lock = threading.Lock()
 _collector_last_run = None
 _collector_last_error = None
 
@@ -866,6 +867,8 @@ def data_collection_trigger():
     if not _collector_loop_started:
         _collector_loop_started = True
         threading.Thread(target=_data_collector_loop, daemon=True).start()
+    if _collector_running:
+        return jsonify({'status': 'already_running'})
     # 立即执行一次采集
     t = threading.Thread(target=_run_collection_once, daemon=True)
     t.start()
@@ -1939,6 +1942,11 @@ def _run_collection_once():
     global _collector_running, _collector_last_run
     global _collector_last_error, _CONFIG_CACHE
 
+    if not _collector_lock.acquire(blocking=False):
+        _collector_last_error = 'Collection already running'
+        print('[DC] Collection already running, skipping duplicate trigger')
+        return
+
     _collector_running = True
     try:
         cfg = _load_config()
@@ -1947,7 +1955,7 @@ def _run_collection_once():
         token = cfg.get('token', '')
 
         if not api_url or not token:
-            _collector_last_error = 'Token expired, running local-only collection'
+            _collector_last_error = 'No backend token; running local-only collection'
             # Don't return — allow collection to run locally even without valid token
 
         if api_url and not token:
@@ -2035,9 +2043,18 @@ def _run_collection_once():
             loop.close()
 
         reported = 0
+
+        def can_report_to_backend(local_account_id, backend_account_id):
+            if not api_url or not token or not backend_account_id:
+                return False
+            if backend_account_ids.get(local_account_id):
+                return True
+            return not str(backend_account_id).startswith('local_')
+
         for item in scraped:
             local_account_id = item['accountId']
             backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
+            can_report = can_report_to_backend(local_account_id, backend_account_id)
             metrics = item['metrics']
             # Extract historical data before cleaning up
             history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
@@ -2057,7 +2074,7 @@ def _run_collection_once():
             nickname = metrics.pop('_nickname', None) if isinstance(metrics, dict) else None
             avatar = metrics.pop('_avatar', None) if isinstance(metrics, dict) else None
 
-            if metrics and any(v for v in metrics.values() if isinstance(v, (int, float))):
+            if can_report and metrics and any(v for v in metrics.values() if isinstance(v, (int, float))):
                 payload = {'accountId': backend_account_id,
                            'metrics': {
                                **metrics,
@@ -2082,7 +2099,7 @@ def _run_collection_once():
                     print(f'[DC] Report error {local_account_id}->{backend_account_id}: {e}')
 
             # Report historical data (7-day / 30-day) if available
-            if history:
+            if can_report and history:
                 for hist_entry in history:
                     hist_date = hist_entry.pop('date', None)
                     if not hist_date:
@@ -2106,8 +2123,12 @@ def _run_collection_once():
         for item in scraped:
             local_account_id = item['accountId']
             backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
+            can_report = can_report_to_backend(local_account_id, backend_account_id)
             vstats = item.get('videoStats') or []
             if not vstats:
+                continue
+            if not can_report:
+                print(f'[DC] Skipping backend video report for local-only account {local_account_id}')
                 continue
             try:
                 r = requests.post(
@@ -2129,10 +2150,11 @@ def _run_collection_once():
         for item in scraped:
             local_account_id = item['accountId']
             backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
+            can_report = can_report_to_backend(local_account_id, backend_account_id)
             m = item.get('metrics', {})
             m.pop('_nickname', None)
             avatar = m.pop('_avatar', None)
-            if avatar:
+            if can_report and avatar:
                 try:
                     r = requests.put(
                         f'{api_url}/accounts/{backend_account_id}',
@@ -2158,6 +2180,7 @@ def _run_collection_once():
         print(f'[DC] Fatal: {e}')
     finally:
         _collector_running = False
+        _collector_lock.release()
 
 
 def _get_collection_interval() -> int:
@@ -2497,14 +2520,18 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
 
                             # Extract historical data before reporting
                             history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
+                            can_report_initial = bool(
+                                api_url and token and account_id
+                                and not str(account_id).startswith('local_')
+                            )
 
-                            if metrics:
+                            if can_report_initial and metrics:
                                 req.post(f"{api_url.rstrip('/')}/platforms/report-metrics",
                                     json={'accountId': account_id, 'metrics': metrics},
                                     headers={'Authorization': f'Bearer {token}'}, timeout=30)
 
                             # Report historical data (7-day / 30-day)
-                            if history:
+                            if can_report_initial and history:
                                 for hist_entry in history:
                                     hist_date = hist_entry.pop('date', None)
                                     if not hist_date:
@@ -2519,7 +2546,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                         pass
 
                             vstats = extra.get('video_stats') or []
-                            if vstats and account_id:
+                            if can_report_initial and vstats and account_id:
                                 try:
                                     req.post(
                                         f'{api_url}/platforms/report-post-stats',
@@ -2758,17 +2785,19 @@ if __name__ == '__main__':
         _CDP_URL = None
 
     # ── 3. 等待用户关闭 ──
-    # Auto-start background collector loop (after a short delay for auto-login)
-    def _auto_start_collector():
-        global _collector_loop_started
-        time.sleep(15)  # Wait for auto-login to complete
-        if not _collector_loop_started:
-            _collector_loop_started = True
-            print('[Main] Auto-starting background collector (every 30min day / 2h night)')
-            # Run first collection immediately, then loop
-            threading.Thread(target=_run_collection_once, daemon=True).start()
-            threading.Thread(target=_data_collector_loop, daemon=True).start()
-    threading.Thread(target=_auto_start_collector, daemon=True).start()
+    # Keep collection idle until the user explicitly triggers it.
+    if _load_config().get('auto_collect_on_start') is True:
+        def _auto_start_collector():
+            global _collector_loop_started
+            time.sleep(15)  # Wait for auto-login to complete
+            if not _collector_loop_started:
+                _collector_loop_started = True
+                print('[Main] Auto-starting background collector (every 30min day / 2h night)')
+                threading.Thread(target=_run_collection_once, daemon=True).start()
+                threading.Thread(target=_data_collector_loop, daemon=True).start()
+        threading.Thread(target=_auto_start_collector, daemon=True).start()
+    else:
+        print('[Main] Background collector idle; use trigger to start scheduled collection')
 
     try:
         while _cdp.is_running:

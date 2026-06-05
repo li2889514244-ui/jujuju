@@ -19,7 +19,6 @@ import { PlatformsService } from './platforms.service'
 import { OAuthService } from './oauth/oauth.service'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
-import { Public } from '../../common/decorators/public.decorator'
 import {
   AuthorizePlatformDto,
   CollectDataDto,
@@ -109,7 +108,6 @@ export class PlatformsController {
   // ==================== 伴侣数据上报 ====================
 
   @Post('report-metrics')
-  @Public()
   @ApiOperation({ summary: '桌面伴侣上报账号指标' })
   @HttpCode(HttpStatus.OK)
   async reportMetrics(@Body() dto: ReportMetricsDto) {
@@ -117,7 +115,6 @@ export class PlatformsController {
   }
 
   @Post('report-post-stats')
-  @Public()
   @ApiOperation({ summary: '桌面伴侣上报视频/帖子数据' })
   @HttpCode(HttpStatus.OK)
   async reportPostStats(@Body() dto: ReportPostStatsDto) {
