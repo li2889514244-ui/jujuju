@@ -184,7 +184,9 @@ export class AnalyticsController {
     })
     return {
       ...result,
-      ranking: result.ranking.sort((a, b) => b.engagementRate - a.engagementRate),
+      ranking: [...result.ranking]
+        .sort((a, b) => b.engagementRate - a.engagementRate)
+        .map((item, index) => ({ ...item, rank: index + 1 })),
     }
   }
 

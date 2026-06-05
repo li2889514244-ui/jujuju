@@ -424,6 +424,62 @@ export class AnalyticsService {
       take: 10,
     })
 
+    const postStatsAgg = await this.prisma.postStats.aggregate({
+      where: {
+        post: {
+          accountId: { in: accountIds },
+          status: 'PUBLISHED',
+          createdAt: { gte: start, lte: end },
+        },
+      },
+      _sum: {
+        views: true,
+        likes: true,
+        comments: true,
+        shares: true,
+        saves: true,
+        danmakuCount: true,
+      },
+      _avg: { completionRate: true },
+    })
+
+    const rowsByAccount: Record<string, typeof dailyStats> = {}
+    for (const stat of dailyStats) {
+      if (!rowsByAccount[stat.accountId]) rowsByAccount[stat.accountId] = []
+      rowsByAccount[stat.accountId].push(stat)
+    }
+
+    const dateKeys = Array.from(
+      new Set(dailyStats.map((stat) => stat.date.toISOString().slice(0, 10))),
+    ).sort()
+    const dailyTrend = dateKeys.map((date) => {
+      const rowsForDate = dailyStats.filter((stat) => stat.date.toISOString().slice(0, 10) === date)
+      let followers = 0
+      for (const account of accounts) {
+        const rows = rowsByAccount[account.id] || []
+        const latestAtOrBefore = [...rows]
+          .reverse()
+          .find((row) => row.date.toISOString().slice(0, 10) <= date)
+        const firstKnown = rows[0]
+        followers += latestAtOrBefore?.followers ?? firstKnown?.followers ?? account.followers ?? 0
+      }
+
+      return {
+        date,
+        followers,
+        views: rowsForDate.reduce((sum, stat) => sum + (stat.viewsIncrement || stat.views || 0), 0),
+        likes: rowsForDate.reduce((sum, stat) => sum + (stat.likesIncrement || stat.likes || 0), 0),
+        comments: rowsForDate.reduce(
+          (sum, stat) => sum + (stat.commentsIncrement || stat.comments || 0),
+          0,
+        ),
+        shares: rowsForDate.reduce(
+          (sum, stat) => sum + (stat.sharesIncrement || stat.shares || 0),
+          0,
+        ),
+      }
+    })
+
     const scopedOverview = {
       accounts: {
         total: accounts.length,
@@ -444,13 +500,13 @@ export class AnalyticsService {
         failed: failedPosts,
       },
       engagement: {
-        totalViews: dailyStats.reduce((sum, stat) => sum + (stat.views || 0), 0),
-        totalLikes: dailyStats.reduce((sum, stat) => sum + (stat.likes || 0), 0),
-        totalComments: dailyStats.reduce((sum, stat) => sum + (stat.comments || 0), 0),
-        totalShares: dailyStats.reduce((sum, stat) => sum + (stat.shares || 0), 0),
-        totalSaves: 0,
-        totalDanmaku: 0,
-        avgCompletionRate: 0,
+        totalViews: postStatsAgg._sum.views || 0,
+        totalLikes: postStatsAgg._sum.likes || 0,
+        totalComments: postStatsAgg._sum.comments || 0,
+        totalShares: postStatsAgg._sum.shares || 0,
+        totalSaves: postStatsAgg._sum.saves || 0,
+        totalDanmaku: postStatsAgg._sum.danmakuCount || 0,
+        avgCompletionRate: postStatsAgg._avg.completionRate || 0,
       },
     }
 
@@ -473,7 +529,7 @@ export class AnalyticsService {
         saves: p.stats?.saves || 0,
         publishedAt: p.updatedAt,
       })),
-      dailyTrend: dailyStats,
+      dailyTrend,
     }
   }
 
@@ -877,7 +933,19 @@ export class AnalyticsService {
     const totals = { revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 }
     let avgCount = 0
     const byPlatform: Record<string, any> = {}
-    const dailyTrend: any[] = []
+    const dailyTrendByDate: Record<
+      string,
+      {
+        date: string
+        revenue: number
+        gmv: number
+        orders: number
+        commission: number
+        buyerCount: number
+        avgOrderValue: number
+        avgOrderValueCount: number
+      }
+    > = {}
 
     for (const s of stats) {
       totals.revenue += s.revenue
@@ -913,18 +981,38 @@ export class AnalyticsService {
         )
       }
 
-      dailyTrend.push({
-        date: s.date.toISOString().slice(0, 10),
-        revenue: s.revenue,
-        gmv: s.gmv,
-        orders: s.orders,
-        commission: s.commission,
-        buyerCount: s.buyerCount,
-        avgOrderValue: s.avgOrderValue,
-      })
+      const date = s.date.toISOString().slice(0, 10)
+      if (!dailyTrendByDate[date]) {
+        dailyTrendByDate[date] = {
+          date,
+          revenue: 0,
+          gmv: 0,
+          orders: 0,
+          commission: 0,
+          buyerCount: 0,
+          avgOrderValue: 0,
+          avgOrderValueCount: 0,
+        }
+      }
+      dailyTrendByDate[date].revenue += s.revenue
+      dailyTrendByDate[date].gmv += s.gmv
+      dailyTrendByDate[date].orders += s.orders
+      dailyTrendByDate[date].commission += s.commission
+      dailyTrendByDate[date].buyerCount += s.buyerCount
+      if (s.avgOrderValue > 0) {
+        dailyTrendByDate[date].avgOrderValue += s.avgOrderValue
+        dailyTrendByDate[date].avgOrderValueCount += 1
+      }
     }
 
     if (avgCount > 0) totals.avgOrderValue = Math.round(totals.avgOrderValue / avgCount)
+    const dailyTrend = Object.values(dailyTrendByDate)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .map(({ avgOrderValueCount, ...row }) => ({
+        ...row,
+        avgOrderValue:
+          avgOrderValueCount > 0 ? Math.round(row.avgOrderValue / avgOrderValueCount) : 0,
+      }))
 
     return {
       totalRevenue: totals.revenue,
