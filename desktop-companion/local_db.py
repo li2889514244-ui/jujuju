@@ -199,10 +199,13 @@ def get_account(account_id: str) -> dict | None:
     return dict(row) if row else None
 
 
-def get_all_accounts() -> list[dict]:
-    """获取所有活跃账号"""
+def get_all_accounts(include_expired: bool = False) -> list[dict]:
+    """Return local accounts. By default only active accounts are collectable."""
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM accounts WHERE status = 'active' ORDER BY created_at").fetchall()
+    if include_expired:
+        rows = conn.execute("SELECT * FROM accounts WHERE status != 'deleted' ORDER BY created_at").fetchall()
+    else:
+        rows = conn.execute("SELECT * FROM accounts WHERE status = 'active' ORDER BY created_at").fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -210,7 +213,7 @@ def get_all_accounts() -> list[dict]:
 def get_accounts_by_platform(platform: str) -> list[dict]:
     """按平台筛选"""
     conn = _get_conn()
-    rows = conn.execute("SELECT * FROM accounts WHERE platform = ? AND status = 'active'", (platform,)).fetchall()
+    rows = conn.execute("SELECT * FROM accounts WHERE platform = ? AND status != 'deleted'", (platform,)).fetchall()
     conn.close()
     return [dict(r) for r in rows]
 
@@ -275,21 +278,64 @@ def save_contents(account_id: str, posts: list):
         return
     conn = _get_conn()
     for p in posts:
-        conn.execute(
-            """INSERT OR REPLACE INTO contents 
-               (account_id, content_id, title, cover_url, play_count, like_count, 
-                comment_count, share_count, publish_time, collected_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
-            (account_id,
-             p.get('id', '') or p.get('content_id', ''),
-             p.get('title', ''),
-             p.get('cover_url', '') or p.get('cover', ''),
-             p.get('play_count', 0) or p.get('views', 0) or 0,
-             p.get('like_count', 0) or p.get('likes', 0) or 0,
-             p.get('comment_count', 0) or p.get('comments', 0) or 0,
-             p.get('share_count', 0) or p.get('shares', 0) or 0,
-             p.get('publish_time', '') or p.get('create_time', '') or '',
-             ))
+        content_id = p.get('id', '') or p.get('content_id', '')
+        title = p.get('title', '')
+        cover_url = p.get('cover_url', '') or p.get('cover', '')
+        play_count = p.get('play_count', 0) or p.get('views', 0) or 0
+        like_count = p.get('like_count', 0) or p.get('likes', 0) or 0
+        comment_count = p.get('comment_count', 0) or p.get('comments', 0) or 0
+        share_count = p.get('share_count', 0) or p.get('shares', 0) or 0
+        publish_time = p.get('publish_time', '') or p.get('create_time', '') or p.get('date', '') or ''
+
+        existing = None
+        if content_id:
+            existing = conn.execute(
+                "SELECT id FROM contents WHERE account_id = ? AND content_id = ? LIMIT 1",
+                (account_id, content_id),
+            ).fetchone()
+        if not existing and title:
+            existing = conn.execute(
+                "SELECT id FROM contents WHERE account_id = ? AND title = ? LIMIT 1",
+                (account_id, title),
+            ).fetchone()
+
+        if existing:
+            conn.execute(
+                """UPDATE contents
+                   SET content_id = ?, title = ?, cover_url = ?, play_count = ?,
+                       like_count = ?, comment_count = ?, share_count = ?,
+                       publish_time = ?, collected_at = datetime('now')
+                   WHERE id = ?""",
+                (
+                    content_id,
+                    title,
+                    cover_url,
+                    play_count,
+                    like_count,
+                    comment_count,
+                    share_count,
+                    publish_time,
+                    existing['id'],
+                ),
+            )
+        else:
+            conn.execute(
+                """INSERT INTO contents
+                   (account_id, content_id, title, cover_url, play_count, like_count,
+                    comment_count, share_count, publish_time, collected_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))""",
+                (
+                    account_id,
+                    content_id,
+                    title,
+                    cover_url,
+                    play_count,
+                    like_count,
+                    comment_count,
+                    share_count,
+                    publish_time,
+                ),
+            )
     conn.commit()
     conn.close()
 

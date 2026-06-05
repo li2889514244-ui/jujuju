@@ -273,7 +273,7 @@
             size="large"
             class="download-btn"
             tag="a"
-            href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+            href="/downloads/pixingyun-mate-portable.zip"
             target="_blank"
           >
             <el-icon><Download /></el-icon>下载桌面伴侣

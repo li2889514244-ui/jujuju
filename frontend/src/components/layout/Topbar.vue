@@ -20,7 +20,7 @@
           <el-dropdown-menu>
             <el-dropdown-item>
               <a
-                href="https://github.com/li2889514244-ui/pixingyun-desktop/archive/refs/heads/main.zip"
+                href="/downloads/pixingyun-mate-portable.zip"
                 target="_blank"
                 class="topbar__tool-link"
                 ><el-icon :size="16"><Download /></el-icon> 下载桌面伴侣</a

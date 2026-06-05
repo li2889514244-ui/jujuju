@@ -395,6 +395,7 @@ body{font-family:"Segoe UI","Microsoft YaHei","PingFang SC",system-ui,sans-serif
           <span class="acct-platform">{{a.platform}}</span>
           <span class="acct-name">{{a.nickname||a.platform_uid||a.id.slice(0,8)}}</span>
           <span class="acct-time">{{a.last_collected_at?a.last_collected_at.slice(11,16):'待采集'}}</span>
+          <span class="acct-time" v-if="a.status==='expired'">需重扫</span>
           <span class="acct-del" @click="removeLocalAccount(a.id)">删除</span>
         </div>
       </div>
@@ -583,6 +584,43 @@ def _save_config(cfg: dict):
 
 _CONFIG_CACHE = _load_config()
 
+
+def _login_with_saved_credentials(cfg: dict) -> str:
+    """Return a fresh access token using the saved login, or an empty string."""
+    import requests as req
+
+    email = cfg.get('saved_email', '')
+    password = cfg.get('saved_password', '')
+    api_url = cfg.get('api_url', 'https://ddddkiii.com/api/v1').rstrip('/')
+    if not email or not password or not api_url:
+        return ''
+    try:
+        r = req.post(
+            f'{api_url}/auth/login',
+            json={'email': email, 'password': password},
+            timeout=15,
+        )
+        if r.status_code not in (200, 201):
+            print(f'[Auth] Saved-login failed: HTTP {r.status_code}')
+            return ''
+
+        body = r.json()
+        inner = body.get('data') or body
+        token = inner.get('accessToken') or inner.get('access_token') or ''
+        refresh_token = inner.get('refreshToken') or inner.get('refresh_token') or ''
+        if not token:
+            return ''
+
+        cfg['token'] = token
+        if refresh_token:
+            cfg['refreshToken'] = refresh_token
+        _save_config(cfg)
+        _CONFIG_CACHE.update(cfg)
+        return token
+    except Exception as e:
+        print(f'[Auth] Saved-login error: {str(e)[:120]}')
+        return ''
+
 PLATFORM_DASHBOARDS = {
     'DOUYIN': {
         'url': 'https://creator.douyin.com',
@@ -695,8 +733,11 @@ def handle_login():
             body = r.json()
             inner = body.get('data') or body
             token = inner.get('accessToken') or inner.get('access_token') or ''
+            refresh_token = inner.get('refreshToken') or inner.get('refresh_token') or ''
             if token:
                 cfg['token'] = token
+                if refresh_token:
+                    cfg['refreshToken'] = refresh_token
                 cfg['api_url'] = api_url
                 if remember:
                     cfg['saved_email'] = email
@@ -753,8 +794,11 @@ def auto_login():
             body = r.json()
             inner = body.get('data') or body
             token = inner.get('accessToken') or inner.get('access_token') or ''
+            refresh_token = inner.get('refreshToken') or inner.get('refresh_token') or ''
             if token:
                 cfg['token'] = token
+                if refresh_token:
+                    cfg['refreshToken'] = refresh_token
                 _save_config(cfg)
                 _CONFIG_CACHE.update(cfg)
                 return jsonify({'configured': True, 'message': '自动登录成功'})
@@ -835,7 +879,7 @@ def data_collection_trigger():
 def local_accounts_list():
     """列出所有本地绑定的账号"""
     from local_db import get_all_accounts
-    accounts = get_all_accounts()
+    accounts = get_all_accounts(include_expired=True)
     return jsonify({'code': 0, 'data': accounts})
 
 
@@ -1675,13 +1719,36 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                           'signin', 'authorize', 'verify']
         if any(kw in current_url for kw in login_keywords):
             print(f'[DC] {platform}: redirected to login page (url={current_url[:80]}), skipping')
-            return {'metrics': {}, 'video_stats': []}
+            return {'metrics': {}, 'video_stats': [], 'expired': True}
 
         # Also check page title for login indicators
         login_titles = ['登录', 'sign in', 'log in']
         if any(kw in page_title for kw in login_titles):
             print(f'[DC] {platform}: login page detected by title "{page_title[:60]}", skipping')
-            return {'metrics': {}, 'video_stats': []}
+            return {'metrics': {}, 'video_stats': [], 'expired': True}
+
+        try:
+            login_dom = await page.evaluate('''() => {
+                const text = (document.body && document.body.innerText || '').toLowerCase();
+                const mediaUrls = Array.from(document.querySelectorAll('iframe,img'))
+                    .map(el => (el.src || '').toLowerCase()).join('\\n');
+                const textMarkers = [
+                    'login', 'sign in', 'qrcode',
+                    '\\u626b\\u7801\\u767b\\u5f55',
+                    '\\u8bf7\\u4f7f\\u7528\\u5fae\\u4fe1',
+                    '\\u5fae\\u4fe1\\u626b\\u4e00\\u626b',
+                    '\\u6388\\u6743\\u767b\\u5f55',
+                    '\\u7acb\\u5373\\u767b\\u5f55',
+                    '\\u8d26\\u53f7\\u767b\\u5f55'
+                ];
+                return textMarkers.some(marker => text.includes(marker)) ||
+                    /login|passport|authorize|qrcode|qr_code/.test(mediaUrls);
+            }''')
+            if login_dom:
+                print(f'[DC] {platform}: login UI detected, marking cookie expired')
+                return {'metrics': {}, 'video_stats': [], 'expired': True}
+        except Exception:
+            pass
 
         metrics = await _scrape_dashboard(page)
 
@@ -1801,16 +1868,23 @@ async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: P
         label = nickname or account_id[:12]
         print(f'[DC] Scraping {label} ({platform})...')
         result = await _scrape_account_pages(context, platform)
-        # After successful scrape, mark cookie as fresh
+        # After successful scrape, keep account active and mark collection time.
         if result.get('metrics') or result.get('video_stats'):
             try:
-                from local_db import update_collection_time
+                from local_db import update_collection_time, update_status
+                update_status(account_id, 'active')
                 update_collection_time(account_id)
             except Exception:
                 pass
-        else:
-            # Login redirect / cookie expired
+        elif result.get('expired'):
+            try:
+                from local_db import update_status
+                update_status(account_id, 'expired')
+            except Exception:
+                pass
             print(f'[DC] Cookie expired for {label}, needs re-scan')
+        else:
+            print(f'[DC] No data scraped for {label}; keeping current account status')
         return {'accountId': account_id, 'metrics': result['metrics'], 'videoStats': result['video_stats']}
     except Exception as e:
         print(f'[DC] scrape error {platform}/{account_id}: {str(e)[:120]}')
@@ -1876,36 +1950,75 @@ def _run_collection_once():
             _collector_last_error = 'Token expired, running local-only collection'
             # Don't return — allow collection to run locally even without valid token
 
+        if api_url and not token:
+            token = _login_with_saved_credentials(cfg)
+
         from local_db import get_all_accounts, update_collection_time, get_profile_path
         import requests
 
-        # 从本地 DB 获取所有绑定的账号
-        local_accounts = get_all_accounts()
+        # 从本地 DB 获取所有绑定的账号（含 expired — 不预判过期，实际试了再说）
+        local_accounts = get_all_accounts(include_expired=True)
         if not local_accounts:
             _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
             _collector_last_error = None
             return
+
+        backend_account_ids = {}
+        if api_url and token:
+            def fetch_remote_accounts(current_token: str):
+                return requests.get(
+                    f'{api_url}/platforms/accounts?take=200',
+                    headers={'Authorization': f'Bearer {current_token}'},
+                    timeout=15,
+                )
+
+            try:
+                remote_resp = fetch_remote_accounts(token)
+                if remote_resp.status_code == 401:
+                    fresh_token = _login_with_saved_credentials(cfg)
+                    if fresh_token:
+                        token = fresh_token
+                        remote_resp = fetch_remote_accounts(token)
+
+                if remote_resp.status_code < 400:
+                    body = remote_resp.json()
+                    inner = body.get('data') or body
+                    remote_accounts = inner.get('accounts') if isinstance(inner, dict) else []
+                    by_platform_uid = {}
+                    by_platform_name = {}
+                    for remote in remote_accounts or []:
+                        remote_id = (remote.get('id') or '').strip()
+                        remote_platform = (remote.get('platform') or '').strip().upper()
+                        remote_uid = (remote.get('platformUserId') or '').strip()
+                        remote_name = (remote.get('nickname') or '').strip()
+                        if remote_id and remote_platform and remote_uid:
+                            by_platform_uid[(remote_platform, remote_uid)] = remote_id
+                        if remote_id and remote_platform and remote_name:
+                            by_platform_name[(remote_platform, remote_name)] = remote_id
+
+                    for acc in local_accounts:
+                        local_id = (acc.get('id') or '').strip()
+                        local_platform = (acc.get('platform') or '').strip().upper()
+                        local_uid = (acc.get('platform_uid') or '').strip()
+                        local_name = (acc.get('nickname') or '').strip()
+                        backend_id = (
+                            by_platform_uid.get((local_platform, local_uid))
+                            or by_platform_name.get((local_platform, local_name))
+                        )
+                        if backend_id:
+                            backend_account_ids[local_id] = backend_id
+                            if backend_id != local_id:
+                                print(f'[DC] Mapped local account {local_id} -> backend {backend_id}')
+                else:
+                    print(f'[DC] Cannot fetch backend accounts: HTTP {remote_resp.status_code}')
+            except Exception as e:
+                print(f'[DC] Backend account mapping failed: {str(e)[:120]}')
 
         # 构造采集列表（本地 DB 里的账号 + 后端平台类型）
         accounts = []
         for acc in local_accounts:
             aid = acc['id']
             nickname = acc.get('nickname', '')
-            # Check cookie freshness before scraping
-            try:
-                prof_dir = get_profile_path(aid)
-                if prof_dir:
-                    ci_path = prof_dir / 'cookie_info.json'
-                    if ci_path.exists():
-                        info = json.loads(ci_path.read_text())
-                        last = info.get('last_cookie_refresh', '')
-                        if last:
-                            age = time.time() - time.mktime(time.strptime(last, '%Y-%m-%d %H:%M:%S'))
-                            if age > 600:  # 10 minutes
-                                print(f'[DC] Cookie too old ({age:.0f}s), skipping {nickname}')
-                                continue
-            except Exception:
-                pass
             accounts.append({
                 'id': aid,
                 'platform': acc['platform'],
@@ -1923,24 +2036,34 @@ def _run_collection_once():
 
         reported = 0
         for item in scraped:
+            local_account_id = item['accountId']
+            backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
             metrics = item['metrics']
             # Extract historical data before cleaning up
             history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
 
             # ── ALWAYS save to local DB first (even if backend is down) ──
             try:
-                from local_db import update_metrics, save_contents
-                update_metrics(item['accountId'], metrics)
+                from local_db import update_metrics, save_contents, save_history_snapshot
+                update_metrics(local_account_id, metrics)
                 vstats = item.get('videoStats') or []
                 if vstats:
-                    save_contents(item['accountId'], vstats)
-                update_collection_time(item['accountId'])
+                    save_contents(local_account_id, vstats)
+                save_history_snapshot(local_account_id)
+                update_collection_time(local_account_id)
             except Exception as e:
-                print(f'[DC] Local save error {item["accountId"]}: {e}')
+                print(f'[DC] Local save error {local_account_id}: {e}')
+
+            nickname = metrics.pop('_nickname', None) if isinstance(metrics, dict) else None
+            avatar = metrics.pop('_avatar', None) if isinstance(metrics, dict) else None
 
             if metrics and any(v for v in metrics.values() if isinstance(v, (int, float))):
-                payload = {'accountId': item['accountId'],
-                           'metrics': metrics}
+                payload = {'accountId': backend_account_id,
+                           'metrics': {
+                               **metrics,
+                               **({'_nickname': nickname} if nickname else {}),
+                               **({'_avatar': avatar} if avatar else {}),
+                           }}
                 try:
                     r = requests.post(
                         f'{api_url}/platforms/report-metrics',
@@ -1950,13 +2073,13 @@ def _run_collection_once():
                     )
                     if r.status_code < 400:
                         reported += 1
-                        update_collection_time(item['accountId'])
+                        update_collection_time(local_account_id)
                     else:
                         print(
                             f'[DC] Report HTTP {r.status_code} for '
-                            f'{item["accountId"]}: {r.text[:200]}')
+                            f'{local_account_id}->{backend_account_id}: {r.text[:200]}')
                 except Exception as e:
-                    print(f'[DC] Report error {item["accountId"]}: {e}')
+                    print(f'[DC] Report error {local_account_id}->{backend_account_id}: {e}')
 
             # Report historical data (7-day / 30-day) if available
             if history:
@@ -1968,7 +2091,7 @@ def _run_collection_once():
                         r = requests.post(
                             f'{api_url}/platforms/report-metrics',
                             json={
-                                'accountId': item['accountId'],
+                                'accountId': backend_account_id,
                                 'metrics': hist_entry,
                                 'date': hist_date,
                             },
@@ -1976,43 +2099,51 @@ def _run_collection_once():
                             timeout=30,
                         )
                     except Exception as e:
-                        print(f'[DC] History report error {item["accountId"]} {hist_date}: {e}')
+                        print(f'[DC] History report error {local_account_id}->{backend_account_id} {hist_date}: {e}')
 
         # Report per-video stats
         video_reported = 0
         for item in scraped:
+            local_account_id = item['accountId']
+            backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
             vstats = item.get('videoStats') or []
             if not vstats:
                 continue
             try:
                 r = requests.post(
                     f'{api_url}/platforms/report-post-stats',
-                    json={'accountId': item['accountId'], 'posts': vstats},
+                    json={'accountId': backend_account_id, 'posts': vstats},
                     headers={'Authorization': f'Bearer {token}'},
                     timeout=30,
                 )
                 if r.status_code < 400:
                     video_reported += len(vstats)
+                else:
+                    print(
+                        f'[DC] Video report HTTP {r.status_code} for '
+                        f'{local_account_id}->{backend_account_id}: {r.text[:200]}')
             except Exception as e:
-                print(f'[DC] Video report error {item["accountId"]}: {e}')
+                print(f'[DC] Video report error {local_account_id}->{backend_account_id}: {e}')
 
         # Sync avatars extracted from dashboard
         for item in scraped:
+            local_account_id = item['accountId']
+            backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
             m = item.get('metrics', {})
             m.pop('_nickname', None)
             avatar = m.pop('_avatar', None)
             if avatar:
                 try:
                     r = requests.put(
-                        f'{api_url}/accounts/{item["accountId"]}',
+                        f'{api_url}/accounts/{backend_account_id}',
                         json={'avatar': avatar},
                         headers={'Authorization': f'Bearer {token}'},
                         timeout=15,
                     )
                     if r.status_code < 400:
-                        print(f'[DC] Synced avatar for {item["accountId"]}')
+                        print(f'[DC] Synced avatar for {local_account_id}->{backend_account_id}')
                 except Exception as e:
-                    print(f'[DC] Avatar sync error {item["accountId"]}: {e}')
+                    print(f'[DC] Avatar sync error {local_account_id}->{backend_account_id}: {e}')
 
         _collector_last_run = time.strftime('%Y-%m-%d %H:%M:%S')
         _collector_last_error = None
@@ -2334,9 +2465,12 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             yd_start = page_text.find('昨日数据')
                             if yd_start > 0:
                                 yd = page_text[yd_start:yd_start+500]
-                                for label, key in [('净增关注','newFollowers'),('新增播放','views'),('新增评论','comments'),('新增','likes')]:
+                                for label, key in [('净增关注','newFollowers'),('新增播放','newViews'),('新增评论','newComments'),('新增分享','newShares')]:
                                     m = re.search(rf'{label}\s*([\d,.]+[万wW]?)', yd)
                                     if m: metrics[key] = _parse_metric_num(m.group(1))
+                                # 新增❤️ / 新增(行尾) → likes，排除已被上述前缀匹配的行
+                                m_like = re.search(r'新增(?!播放|评论|分享)\s*([\d,.]+[万wW]?)', yd)
+                                if m_like: metrics['newLikes'] = _parse_metric_num(m_like.group(1))
 
                             # Deep scrape
                             extra = {}

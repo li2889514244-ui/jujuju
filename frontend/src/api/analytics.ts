@@ -32,8 +32,12 @@ export const analyticsApi = {
     )
   },
 
-  getFollowerTrend(params: { days?: number; platform?: string }) {
+  getFollowerTrend(params: { days?: number; platform?: string; groupId?: string }) {
     return get<TrendData[]>('/analytics/followers/trend', params as Record<string, unknown>)
+  },
+
+  getViewsTrend(params: { days?: number; platform?: string; groupId?: string }) {
+    return get<TrendData[]>('/analytics/views/trend', params as Record<string, unknown>)
   },
 
   getLikesTrend(params: { days?: number; platform?: string }) {
@@ -51,7 +55,7 @@ export const analyticsApi = {
     return get<PublishEffect[]>('/analytics/publish-effect', params as Record<string, unknown>)
   },
 
-  getEngagementRate(params: { days?: number; platform?: string }) {
+  getEngagementRate(params: { days?: number; platform?: string; groupId?: string }) {
     return get<TrendData[]>('/analytics/engagement', params as Record<string, unknown>)
   },
 
@@ -85,6 +89,7 @@ export const analyticsApi = {
     limit?: number
     period?: 'week' | 'month' | 'all'
     platform?: string
+    groupId?: string
   }) {
     return get<{
       ranking: Array<{
@@ -112,6 +117,7 @@ export const analyticsApi = {
     limit?: number
     period?: 'week' | 'month' | 'all'
     platform?: string
+    groupId?: string
   }) {
     return get<{
       ranking: Array<{

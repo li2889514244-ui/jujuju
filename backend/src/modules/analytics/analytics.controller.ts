@@ -38,6 +38,17 @@ export class AnalyticsController {
     return this.analyticsService.getFollowersTrend(userId, days || 7, platform, groupId)
   }
 
+  @Get('views/trend')
+  @ApiOperation({ summary: '鑾峰彇鎾斁澧為暱瓒嬪娍' })
+  async getViewsTrend(
+    @CurrentUser('id') userId: string,
+    @Query('days') days?: number,
+    @Query('platform') platform?: string,
+    @Query('groupId') groupId?: string,
+  ) {
+    return this.analyticsService.getViewsTrend(userId, days || 7, platform, groupId)
+  }
+
   @Get('overview')
   @ApiOperation({ summary: '获取数据概览' })
   async getOverview(@CurrentUser('id') userId: string, @Query('groupId') groupId?: string) {

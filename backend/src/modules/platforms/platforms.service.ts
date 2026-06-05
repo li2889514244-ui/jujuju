@@ -218,32 +218,41 @@ export class PlatformsService {
     const platform = account.platform as any
 
     try {
+      const pickNumber = (value: unknown) =>
+        typeof value === 'number' && Number.isFinite(value) ? value : undefined
+
       // Upsert DailyStats for the target date (including monetization + store fields)
       const statData = {
-        followers: metrics.followers || 0,
-        views: metrics.views || 0,
-        likes: metrics.likes || 0,
-        comments: metrics.comments || 0,
-        shares: metrics.shares || 0,
-        revenue: metrics.revenue || 0,
-        gmv: metrics.gmv || 0,
-        orders: metrics.orders || 0,
-        commission: metrics.commission || 0,
-        buyerCount: metrics.buyerCount || 0,
-        productCount: metrics.productCount || 0,
-        avgOrderValue: metrics.avgOrderValue || 0,
+        followers: pickNumber(metrics.followers),
+        views: pickNumber(metrics.views),
+        likes: pickNumber(metrics.likes),
+        comments: pickNumber(metrics.comments),
+        shares: pickNumber(metrics.shares),
+        revenue: pickNumber(metrics.revenue),
+        gmv: pickNumber(metrics.gmv),
+        orders: pickNumber(metrics.orders),
+        commission: pickNumber(metrics.commission),
+        buyerCount: pickNumber(metrics.buyerCount),
+        productCount: pickNumber(metrics.productCount),
+        avgOrderValue: pickNumber(metrics.avgOrderValue),
         // 伴侣已采集的增量字段，直接映射
-        followersIncrement: metrics.newFollowers || 0,
-        viewsIncrement: metrics.newViews || 0,
-        likesIncrement: metrics.newLikes || 0,
-        commentsIncrement: metrics.newComments || 0,
-        sharesIncrement: metrics.newShares || 0,
-        unfollows: metrics.unfollows || 0,
+        followersIncrement: pickNumber(metrics.newFollowers),
+        viewsIncrement: pickNumber(metrics.newViews),
+        likesIncrement: pickNumber(metrics.newLikes),
+        commentsIncrement: pickNumber(metrics.newComments),
+        sharesIncrement: pickNumber(metrics.newShares),
+        unfollows: pickNumber(metrics.unfollows),
       }
+      const statUpdateData = Object.fromEntries(
+        Object.entries(statData).filter(([, value]) => value !== undefined),
+      )
+      const statCreateData = Object.fromEntries(
+        Object.entries(statData).map(([key, value]) => [key, value ?? 0]),
+      )
       await this.prisma.dailyStats.upsert({
         where: { accountId_date: { accountId, date: targetDate } },
-        update: statData,
-        create: { accountId, platform, date: targetDate, ...statData },
+        update: statUpdateData,
+        create: { accountId, platform, date: targetDate, ...statCreateData },
       })
 
       // Update Account fields
@@ -254,6 +263,8 @@ export class PlatformsService {
       const nickname = metrics._nickname
       if (nickname && typeof nickname === 'string' && nickname.length >= 2)
         accountUpdates.nickname = nickname
+      const avatar = metrics._avatar
+      if (avatar && typeof avatar === 'string') accountUpdates.avatar = avatar
       if (metrics.storeScore !== undefined) accountUpdates.storeScore = metrics.storeScore
       if (metrics.storeDiagnosis !== undefined)
         accountUpdates.storeDiagnosis = metrics.storeDiagnosis
@@ -278,6 +289,21 @@ export class PlatformsService {
   /**
    * 接收桌面伴侣上报的视频/帖子数据，写入 Post + PostStats
    */
+  private parseReportedPostDate(value: unknown): Date | undefined {
+    if (typeof value !== 'string' || !value.trim()) return undefined
+
+    const raw = value.trim()
+    const direct = new Date(raw)
+    if (!Number.isNaN(direct.getTime())) return direct
+
+    const match = raw.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
+    if (!match) return undefined
+
+    const [, year, month, day] = match
+    const parsed = new Date(Number(year), Number(month) - 1, Number(day))
+    return Number.isNaN(parsed.getTime()) ? undefined : parsed
+  }
+
   async reportPostStats(dto: ReportPostStatsDto) {
     const { accountId, posts } = dto
     const account = await this.prisma.account.findUnique({ where: { id: accountId } })
@@ -292,6 +318,7 @@ export class PlatformsService {
     for (const p of posts) {
       try {
         const title = p.title || ''
+        const publishAt = this.parseReportedPostDate(p.publishedAt || p.date)
         // Use title as a unique-ish key for the post within this account
         const postId = `${accountId}_${title.substring(0, 40)}`
 
@@ -303,11 +330,13 @@ export class PlatformsService {
         let post
         if (existing) {
           post = existing
-          // Update coverUrl if provided
-          if (p.coverUrl) {
+          const postUpdates: any = {}
+          if (p.coverUrl) postUpdates.coverUrl = p.coverUrl
+          if (publishAt && !existing.publishAt) postUpdates.publishAt = publishAt
+          if (Object.keys(postUpdates).length > 0) {
             post = await this.prisma.post.update({
               where: { id: existing.id },
-              data: { coverUrl: p.coverUrl },
+              data: postUpdates,
             })
           }
           updated++
@@ -318,6 +347,7 @@ export class PlatformsService {
               title,
               status: 'PUBLISHED',
               coverUrl: p.coverUrl,
+              publishAt,
             },
           })
           created++

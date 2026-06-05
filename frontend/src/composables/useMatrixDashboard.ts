@@ -292,11 +292,12 @@ export function useMatrixDashboard() {
       const gid = groupId.value || undefined
       const filter = { days: days.value, platform: platform.value || undefined, groupId: gid }
       const pFilter = { platform: platform.value || undefined, groupId: gid }
-      const [ov, comp, ps, ft, er, vr, tg, adl, grps] = await Promise.all([
+      const [ov, comp, ps, ft, vt, er, vr, tg, adl, grps] = await Promise.all([
         analyticsApi.getOverview(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getComparison(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getPlatformStats(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getFollowerTrend(filter).then((r: any) => r.data),
+        analyticsApi.getViewsTrend(filter).then((r: any) => r.data),
         analyticsApi.getEngagementRate(filter).then((r: any) => r.data),
         analyticsApi
           .getViewsRanking({
@@ -314,23 +315,10 @@ export function useMatrixDashboard() {
       comparison.value = comp
       platformStats.value = ps || []
       followerTrend.value = ft || []
+      dailyStatsTrend.value = vt || []
       engagementTrend.value = er || []
       accountDetailList.value = adl || []
       groups.value = grps || []
-
-      const pe = await analyticsApi
-        .getPublishEffect({ days: days.value, groupId: gid })
-        .then((r: any) => r.data)
-      const byDate: Record<string, number> = {}
-      if (pe) {
-        for (const item of pe) {
-          const d = item.date?.slice(0, 10) || item.publishedAt?.slice(0, 10)
-          if (d) byDate[d] = (byDate[d] || 0) + (item.views || 0)
-        }
-      }
-      dailyStatsTrend.value = Object.entries(byDate)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([date, value]) => ({ date, value }))
 
       viewsRanking.value = vr?.ranking || []
       tags.value = tg || []

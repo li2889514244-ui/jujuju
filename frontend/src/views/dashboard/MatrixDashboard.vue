@@ -43,7 +43,7 @@
     <div v-else-if="!loading && !overview && !error" class="md-empty">
       <div class="md-empty__icon">📊</div>
       <h3>暂无数据</h3>
-      <p>请确保障侣正在运行，或添加账号后等待数据采集</p>
+      <p>请确保伴侣正在运行，或添加账号后等待数据采集</p>
     </div>
 
     <template v-else>
@@ -86,11 +86,7 @@
             <el-radio-button value="month">月</el-radio-button>
           </el-radio-group>
         </div>
-        <el-tooltip
-          effect="light"
-          content="日:昨日，周:最近7天，月:最近30天"
-          placement="bottom"
-        >
+        <el-tooltip effect="light" content="日:昨日，周:最近7天，月:最近30天" placement="bottom">
           <span class="md-date-hint">{{ dateTypeLabel }}数据</span>
         </el-tooltip>
         <div class="md-stats-bar">
@@ -128,12 +124,48 @@
               <el-text truncated>{{ row.nickname }}</el-text>
             </template>
           </el-table-column>
-          <el-table-column prop="fansFormatted" label="粉丝数" width="100" align="right" sortable="custom" />
-          <el-table-column prop="playFormatted" label="播放量" width="100" align="right" sortable="custom" />
-          <el-table-column prop="newFansFormatted" label="净增粉丝" width="100" align="right" sortable="custom" />
-          <el-table-column prop="likeFormatted" label="点赞" width="80" align="right" sortable="custom" />
-          <el-table-column prop="commentFormatted" label="评论" width="80" align="right" sortable="custom" />
-          <el-table-column prop="shareFormatted" label="分享" width="80" align="right" sortable="custom" />
+          <el-table-column
+            prop="fansFormatted"
+            label="粉丝数"
+            width="100"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="playFormatted"
+            label="播放量"
+            width="100"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="newFansFormatted"
+            label="净增粉丝"
+            width="100"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="likeFormatted"
+            label="点赞"
+            width="80"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="commentFormatted"
+            label="评论"
+            width="80"
+            align="right"
+            sortable="custom"
+          />
+          <el-table-column
+            prop="shareFormatted"
+            label="分享"
+            width="80"
+            align="right"
+            sortable="custom"
+          />
         </el-table>
       </el-card>
 
@@ -149,15 +181,15 @@
             </el-radio-group>
           </div>
         </template>
-        <DataChart v-if="trendChartData.length > 0" :option="trendChartOption" height="320" />
-        <div v-else class="md-chart-empty">暂无趋势数据，请确保障侣持续采集</div>
+        <DataChart v-if="trendChartData.length > 0" :option="trendChartOption" :height="320" />
+        <div v-else class="md-chart-empty">暂无趋势数据，请确保伴侣持续采集</div>
       </el-card>
 
       <!-- Platform Comparison + Table -->
       <div class="md-platform-row">
         <el-card shadow="hover" class="md-platform-chart">
           <template #header><span>跨平台对比</span></template>
-          <DataChart v-if="platformStats.length > 0" :option="platformChartOption" height="300" />
+          <DataChart v-if="platformStats.length > 0" :option="platformChartOption" :height="300" />
           <div v-else class="md-chart-empty">暂无平台数据</div>
         </el-card>
         <el-card shadow="hover" class="md-platform-table">
@@ -270,6 +302,7 @@ import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
+import type { EChartsOption } from 'echarts'
 
 const {
   loading,
@@ -299,7 +332,7 @@ const {
 const platforms = Object.entries(PLATFORM_LABELS).map(([value, label]) => ({ value, label }))
 
 // ─── Charts ───
-const trendChartOption = computed(() => {
+const trendChartOption = computed<EChartsOption>(() => {
   const data = trendChartData.value
   const labels = data.map((d: any) => d.date?.slice(5)) // MM-DD
   const values = data.map((d: any) => d.value)
@@ -327,7 +360,7 @@ const trendChartOption = computed(() => {
   }
 })
 
-const platformChartOption = computed(() => {
+const platformChartOption = computed<EChartsOption>(() => {
   const d = platformChartData.value
   return {
     tooltip: { trigger: 'axis' },

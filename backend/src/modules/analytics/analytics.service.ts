@@ -11,11 +11,64 @@ export class AnalyticsService {
   constructor(private prisma: PrismaService) {}
 
   async getFollowersTrend(userId: string, days: number = 7, platform?: string, groupId?: string) {
-    const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
-    startDate.setHours(0, 0, 0, 0)
+    const safeDays = Math.max(1, Number(days) || 7)
+    const endDate = new Date()
+    endDate.setHours(0, 0, 0, 0)
+    const dateKeys = Array.from({ length: safeDays }, (_, index) => {
+      const d = new Date(endDate)
+      d.setDate(endDate.getDate() - (safeDays - 1 - index))
+      return d.toISOString().slice(0, 10)
+    })
 
     // shared mode: 不按 userId 过滤
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
+      },
+      select: { id: true, followers: true },
+    })
+    const accountIds = accounts.map((a) => a.id)
+    if (accountIds.length === 0) {
+      return dateKeys.map((date) => ({ date, value: 0 }))
+    }
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { lte: endDate },
+      },
+      select: { accountId: true, date: true, followers: true },
+      orderBy: [{ accountId: 'asc' }, { date: 'asc' }],
+    })
+
+    const statsByAccount: Record<string, Array<{ date: string; followers: number }>> = {}
+    for (const s of stats) {
+      if (!statsByAccount[s.accountId]) statsByAccount[s.accountId] = []
+      statsByAccount[s.accountId].push({
+        date: s.date.toISOString().slice(0, 10),
+        followers: s.followers || 0,
+      })
+    }
+
+    return dateKeys.map((date) => {
+      let value = 0
+      for (const account of accounts) {
+        const rows = statsByAccount[account.id] || []
+        const latestAtOrBefore = [...rows].reverse().find((row) => row.date <= date)
+        const firstKnown = rows[0]
+        value += latestAtOrBefore?.followers ?? firstKnown?.followers ?? account.followers ?? 0
+      }
+      return { date, value }
+    })
+  }
+
+  async getViewsTrend(userId: string, days: number = 7, platform?: string, groupId?: string) {
+    const safeDays = Math.max(1, Number(days) || 7)
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - (safeDays - 1))
+    startDate.setHours(0, 0, 0, 0)
+
     const accounts = await this.prisma.account.findMany({
       where: {
         ...(platform ? { platform: platform as Platform } : {}),
@@ -25,29 +78,26 @@ export class AnalyticsService {
     })
     const accountIds = accounts.map((a) => a.id)
 
-    const stats = await this.prisma.dailyStats.findMany({
-      where: {
-        accountId: { in: accountIds },
-        date: { gte: startDate },
-      },
-      select: { date: true, followers: true },
-      orderBy: { date: 'asc' },
-    })
+    const stats = accountIds.length
+      ? await this.prisma.dailyStats.findMany({
+          where: { accountId: { in: accountIds }, date: { gte: startDate } },
+          select: { date: true, views: true, viewsIncrement: true },
+          orderBy: { date: 'asc' },
+        })
+      : []
 
     const byDate: Record<string, number> = {}
     for (const s of stats) {
-      const key = s.date.toISOString().slice(0, 10)
-      byDate[key] = (byDate[key] || 0) + s.followers
+      const date = s.date.toISOString().slice(0, 10)
+      byDate[date] = (byDate[date] || 0) + (s.viewsIncrement || s.views || 0)
     }
 
-    const result: { date: string; value: number }[] = []
-    for (let i = days - 1; i >= 0; i--) {
+    return Array.from({ length: safeDays }, (_, index) => {
       const d = new Date()
-      d.setDate(d.getDate() - i)
-      const key = d.toISOString().slice(0, 10)
-      result.push({ date: key, value: byDate[key] || 0 })
-    }
-    return result
+      d.setDate(d.getDate() - (safeDays - 1 - index))
+      const date = d.toISOString().slice(0, 10)
+      return { date, value: byDate[date] || 0 }
+    })
   }
 
   /**
@@ -572,7 +622,13 @@ export class AnalyticsService {
           accountId: { in: accountIds },
           date: { gte: start, lte: end },
         },
-        _sum: { views: true, likes: true, comments: true, shares: true },
+        _sum: {
+          viewsIncrement: true,
+          likesIncrement: true,
+          commentsIncrement: true,
+          sharesIncrement: true,
+          followersIncrement: true,
+        },
       }),
       this.prisma.post.count({
         where: {
@@ -609,11 +665,11 @@ export class AnalyticsService {
     }, 0)
 
     return {
-      views: dailyAgg._sum.views || 0,
-      likes: dailyAgg._sum.likes || 0,
-      comments: dailyAgg._sum.comments || 0,
-      shares: dailyAgg._sum.shares || 0,
-      followers: Math.max(0, followerGrowth),
+      views: dailyAgg._sum.viewsIncrement || 0,
+      likes: dailyAgg._sum.likesIncrement || 0,
+      comments: dailyAgg._sum.commentsIncrement || 0,
+      shares: dailyAgg._sum.sharesIncrement || 0,
+      followers: dailyAgg._sum.followersIncrement || 0,
       posts: postCount,
     }
   }
@@ -735,26 +791,50 @@ export class AnalyticsService {
       select: { id: true },
     })
     const accountIds = accounts.map((a) => a.id)
-    const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    const safeDays = Math.max(1, Number(days) || 7)
+    const startDate = new Date()
+    startDate.setDate(startDate.getDate() - (safeDays - 1))
+    startDate.setHours(0, 0, 0, 0)
 
     const stats = await this.prisma.dailyStats.findMany({
       where: { accountId: { in: accountIds }, date: { gte: startDate } },
       orderBy: { date: 'asc' },
-      select: { date: true, views: true, likes: true, comments: true, shares: true },
+      select: {
+        date: true,
+        views: true,
+        likes: true,
+        comments: true,
+        shares: true,
+        viewsIncrement: true,
+        likesIncrement: true,
+        commentsIncrement: true,
+        sharesIncrement: true,
+      },
     })
 
     const byDate: Record<string, { views: number; interactions: number }> = {}
     for (const s of stats) {
       const d = s.date.toISOString().slice(0, 10)
       if (!byDate[d]) byDate[d] = { views: 0, interactions: 0 }
-      byDate[d].views += s.views
-      byDate[d].interactions += s.likes + s.comments + s.shares
+      const views = s.viewsIncrement || s.views || 0
+      const interactions =
+        (s.likesIncrement || s.likes || 0) +
+        (s.commentsIncrement || s.comments || 0) +
+        (s.sharesIncrement || s.shares || 0)
+      byDate[d].views += views
+      byDate[d].interactions += interactions
     }
 
-    return Object.entries(byDate).map(([date, data]) => ({
-      date,
-      value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
-    }))
+    return Array.from({ length: safeDays }, (_, index) => {
+      const date = new Date()
+      date.setDate(date.getDate() - (safeDays - 1 - index))
+      const key = date.toISOString().slice(0, 10)
+      const data = byDate[key] || { views: 0, interactions: 0 }
+      return {
+        date: key,
+        value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
+      }
+    })
   }
 
   async exportReport(
