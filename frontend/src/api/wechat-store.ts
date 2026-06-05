@@ -53,8 +53,11 @@ export const wechatStoreApi = {
   // ── 售后 ──
 
   /** 售后单列表 */
-  getAftersaleCount(storeId: string) {
-    return get<any>('/wechat-store/shop/aftersale', { store_id: storeId })
+  getAftersaleCount(
+    storeId: string,
+    params?: { begin_create_time?: number; end_create_time?: number; next_key?: string },
+  ) {
+    return get<any>('/wechat-store/shop/aftersale', { store_id: storeId, ...params })
   },
 
   // ── 店铺 ──
