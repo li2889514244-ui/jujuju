@@ -480,11 +480,15 @@ export class WechatStoreService implements OnModuleInit {
   private async collectOrderIds(storeId: string) {
     const ids: string[] = []
     let nextKey: string | undefined
+    const endTime = Math.floor(Date.now() / 1000)
+    const startTime = endTime - 7 * 86400
 
     for (let page = 0; page < 20; page++) {
       const res: any = await this.fetchOrderListRemote(storeId, {
         page_size: 100,
         next_key: nextKey,
+        start_time: startTime,
+        end_time: endTime,
       })
       if (res.errcode !== 0) throw new Error(res.errmsg || `order list error ${res.errcode}`)
       ids.push(...((res.order_id_list || []) as string[]).map(String))
@@ -516,10 +520,14 @@ export class WechatStoreService implements OnModuleInit {
   private async collectAftersaleIds(storeId: string) {
     const ids: string[] = []
     let nextKey: string | undefined
+    const endTime = Math.floor(Date.now() / 1000)
+    const beginTime = endTime - 7 * 24 * 3600
 
     for (let page = 0; page < 20; page++) {
       const res: any = await this.fetchAftersaleListRemote(storeId, {
         next_key: nextKey,
+        begin_create_time: beginTime,
+        end_create_time: endTime,
       })
       if (res.errcode !== 0) throw new Error(res.errmsg || `aftersale list error ${res.errcode}`)
       ids.push(...((res.after_sale_order_id_list || []) as string[]).map(String))
