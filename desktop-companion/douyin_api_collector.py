@@ -475,7 +475,7 @@ class DouyinCollectionResult:
 
 async def collect_douyin_data(
     page,
-    max_posts: int = 200,
+    max_posts: int = 2000,
     fetch_comments: bool = False,
     override_sec_user_id: Optional[str] = None,
     account_label: str = "",
@@ -596,7 +596,7 @@ async def collect_douyin_data(
             break
 
         # 翻页间隔（避免触发频率限制）
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
 
     # ── Step 5: 格式化作品数据 ──
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]
@@ -696,7 +696,7 @@ async def collect_target_user(
         cursor = posts_data.get("max_cursor", 0)
         if not has_more or cursor == 0:
             break
-        await asyncio.sleep(1.5)
+        await asyncio.sleep(2.0)
 
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]
     result.success = True

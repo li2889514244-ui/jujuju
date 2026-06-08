@@ -1836,7 +1836,7 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '')
                 await page.wait_for_timeout(3000)
 
                 api_result = await collect_douyin_data(
-                    page, max_posts=200, fetch_comments=False,
+                    page, fetch_comments=False,
                     account_label=account_label  # 身份验证：多账号场景确认没串号
                 )
                 if api_result.success:
