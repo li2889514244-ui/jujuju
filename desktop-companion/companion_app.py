@@ -1685,9 +1685,10 @@ async def _scrape_store_dashboard(page, platform: str) -> dict:
     return result
 
 
-async def _scrape_account_pages(context, platform: str) -> dict:
+async def _scrape_account_pages(context, platform: str, account_label: str = '') -> dict:
     """Scan once, grab all pages in a single authenticated session.
     Navigates dashboard → data center → video list → monetization.
+    account_label: 账号标签(如"唐商披星"), 用于日志审计防止多账号串号
     Returns {'metrics': {...}, 'video_stats': [...]}"""
     global _collector_progress
     entry = PLATFORM_DASHBOARDS.get(platform)
@@ -1820,8 +1821,18 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                 await page.goto('https://www.douyin.com', wait_until='domcontentloaded', timeout=30000)
                 await page.wait_for_timeout(3000)
 
-                api_result = await collect_douyin_data(page, max_posts=200, fetch_comments=False)
+                api_result = await collect_douyin_data(
+                    page, max_posts=200, fetch_comments=False,
+                    account_label=account_label  # 身份验证：多账号场景确认没串号
+                )
                 if api_result.success:
+                    # Log identity for audit
+                    if api_result.detected_nickname:
+                        ident_msg = f'[DouyinAPI] Detected: [{api_result.detected_nickname}]'
+                        if account_label:
+                            match_status = 'MATCH' if api_result.detected_nickname == account_label else 'MISMATCH'
+                            ident_msg += f' (expected: [{account_label}], {match_status})'
+                        print(ident_msg)
                     # Merge API data into metrics (API data is richer, prefer it over screen-scraped)
                     for k, v in api_result.metrics.items():
                         if v is not None and v != 0:
@@ -1898,7 +1909,7 @@ async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: P
 
         label = nickname or account_id[:12]
         print(f'[DC] Scraping {label} ({platform})...')
-        result = await _scrape_account_pages(context, platform)
+        result = await _scrape_account_pages(context, platform, account_label=label)
         # After successful scrape, keep account active and mark collection time.
         if result.get('metrics') or result.get('video_stats'):
             try:

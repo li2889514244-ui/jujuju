@@ -194,25 +194,94 @@ async def _douyin_api_call(
 # ═══════════════════════════════════════════════════════════════
 
 async def get_sec_user_id(page) -> Optional[str]:
-    """从当前 douyin.com 页面提取 sec_user_id（用于后续 API 调用）。"""
+    """从当前 douyin.com 页面提取 sec_user_id（用于后续 API 调用）。
+
+    多级回退策略（按可靠性排序）：
+    1. window.__STORE__ (douyin.com 的 Redux store)
+    2. /user/self 重定向 → 从 URL 提取
+    3. document.cookie 中的 ss_uid
+    4. localStorage 中缓存的用户 ID
+    """
+    import re as _re
+
+    # ── 策略 1: 从页面全局变量提取 ──
     try:
         result = await page.evaluate("""
         (() => {
-            // 尝试从 cookie 或 localStorage 获取
-            const cookies = document.cookie;
-            // 优先从页面全局变量获取
-            if (window.__STORE__ && window.__STORE__.userInfo) {
-                return window.__STORE__.userInfo.secUserId || window.__STORE__.userInfo.sec_uid;
-            }
+            try {
+                const store = window.__STORE__ || window.__INITIAL_STATE__;
+                if (store && store.userInfo) {
+                    return store.userInfo.secUserId || store.userInfo.sec_uid;
+                }
+                if (store && store.user && store.user.userInfo) {
+                    return store.user.userInfo.secUserId || store.user.userInfo.sec_uid;
+                }
+            } catch(e) {}
             if (window.SS_SEC_USER_ID) return window.SS_SEC_USER_ID;
-            // fallback: 从 cookie 提取
-            const match = cookies.match(/ss_uid[=]([^;]+)/);
-            return match ? match[1] : null;
+            return null;
         })()
         """)
-        return result if result else None
+        if result:
+            logger.info(f"[DouyinAPI] sec_user_id from __STORE__: {result[:30]}...")
+            return result
     except Exception:
-        return None
+        pass
+
+    # ── 策略 2: 从 /user/self 重定向 URL 提取 ──
+    try:
+        logger.info("[DouyinAPI] Trying /user/self redirect...")
+        await page.goto("https://www.douyin.com/user/self", wait_until="domcontentloaded", timeout=15000)
+        await asyncio.sleep(2)
+        current_url = page.url
+        # /user/self redirects to /user/{sec_user_id}
+        m = _re.search(r'/user/([A-Za-z0-9_-]+)', current_url)
+        if m:
+            uid = m.group(1)
+            logger.info(f"[DouyinAPI] sec_user_id from /user/self: {uid[:30]}...")
+            return uid
+    except Exception as e:
+        logger.warning(f"[DouyinAPI] /user/self redirect failed: {e}")
+
+    # ── 策略 3: 从 cookie 提取 ──
+    try:
+        result = await page.evaluate("""
+        (() => {
+            const match = document.cookie.match(/ss_uid[=]([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : null;
+        })()
+        """)
+        if result:
+            logger.info(f"[DouyinAPI] sec_user_id from cookie: {str(result)[:30]}...")
+            return result
+    except Exception:
+        pass
+
+    # ── 策略 4: 从 localStorage 提取 ──
+    try:
+        result = await page.evaluate("""
+        (() => {
+            const keys = ['douyin_user_id', 'uid', 'sec_user_id', 'user_info'];
+            for (const k of keys) {
+                try {
+                    const raw = localStorage.getItem(k);
+                    if (raw) {
+                        const parsed = JSON.parse(raw);
+                        const uid = parsed.secUserId || parsed.sec_uid || parsed.uid;
+                        if (uid) return uid;
+                    }
+                } catch(e) {}
+            }
+            return null;
+        })()
+        """)
+        if result:
+            logger.info(f"[DouyinAPI] sec_user_id from localStorage: {str(result)[:30]}...")
+            return result
+    except Exception:
+        pass
+
+    logger.warning("[DouyinAPI] All sec_user_id extraction strategies failed")
+    return None
 
 
 async def get_user_profile(page, sec_user_id: str) -> Optional[Dict[str, Any]]:
@@ -393,17 +462,27 @@ class DouyinCollectionResult:
     success: bool = False
     # 错误信息
     error: str = ""
+    # 采集到的身份信息（用于审计多账号是否串号）
+    detected_nickname: str = ""
+    detected_sec_uid: str = ""
 
 
 async def collect_douyin_data(
     page,
     max_posts: int = 200,
     fetch_comments: bool = False,
+    override_sec_user_id: Optional[str] = None,
+    account_label: str = "",
 ) -> DouyinCollectionResult:
     """
     抖音全量数据采集主函数。
 
     参数:
+        page: Playwright page（需已在 douyin.com 上，已登录）
+        max_posts: 最大采集作品数
+        fetch_comments: 是否采集评论（耗时长，默认关闭）
+        override_sec_user_id: 手动指定 sec_user_id（跳过自动检测，防止多账号时串号）
+        account_label: 账号标签（如"唐商披星"），用于日志审计
         page: Playwright Page 对象，必须已在 douyin.com 上（已登录）
         max_posts: 最多采集作品数
         fetch_comments: 是否同时采集评论（耗时）
@@ -424,35 +503,44 @@ async def collect_douyin_data(
             return result
 
     # ── Step 2: 获取 sec_user_id ──
-    sec_user_id = await get_sec_user_id(page)
+    sec_user_id = override_sec_user_id  # 手动指定优先（防止多账号串号）
     if not sec_user_id:
-        # 如果没能从页面获取，尝试从 URL 提取
-        logger.warning("[DouyinAPI] Cannot detect sec_user_id, trying alternative methods...")
-        # 作为最后的尝试，从个人主页 URL 格式推断
-        try:
-            await page.goto("https://www.douyin.com/user/self", wait_until="domcontentloaded", timeout=30000)
-            await asyncio.sleep(3)
-            sec_user_id = await get_sec_user_id(page)
-        except Exception:
-            pass
-
-    if not sec_user_id:
-        # Fallback: 从当前页面 URL 提取
-        import re
-        url_match = re.search(r'/user/([A-Za-z0-9_-]+)', current_url)
-        if url_match:
-            sec_user_id = url_match.group(1)
+        sec_user_id = await get_sec_user_id(page)
 
     if not sec_user_id:
         result.error = "Cannot determine sec_user_id"
-        logger.error("[DouyinAPI] Cannot determine sec_user_id — please open douyin.com first or provide manually")
+        logger.error(
+            f"[DouyinAPI] Cannot determine sec_user_id for [{account_label}]"
+            f" — please ensure douyin.com is logged in,"
+            f" or set override_sec_user_id"
+        )
         return result
 
-    logger.info(f"[DouyinAPI] Detected sec_user_id: {sec_user_id[:40]}...")
+    logger.info(
+        f"[DouyinAPI] Using sec_user_id: {sec_user_id[:40]}..."
+        f"{' (target: ' + account_label + ')' if account_label else ''}"
+    )
 
     # ── Step 3: 采集用户信息 ──
     profile = await get_user_profile(page, sec_user_id)
     if profile:
+        result.detected_nickname = profile["nickname"]
+        result.detected_sec_uid = sec_user_id
+
+        # ⚠️ 身份验证日志：多账号场景下确认没串号
+        if account_label and profile["nickname"] != account_label:
+            logger.warning(
+                f"[DouyinAPI] IDENTITY MISMATCH! "
+                f"Expected account: [{account_label}], "
+                f"Detected: [{profile['nickname']}] (sec_uid={sec_user_id[:30]})"
+                f" — data may belong to wrong account!"
+            )
+        else:
+            logger.info(
+                f"[DouyinAPI] Identity confirmed: [{profile['nickname']}]"
+                f"{' matches ' + account_label if account_label else ''}"
+            )
+
         result.metrics.update({
             # 使用 companion 期望的字段名（followers/views/comments/shares/likes）
             "followers": profile["follower_count"],
