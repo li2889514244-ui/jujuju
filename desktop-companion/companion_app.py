@@ -545,8 +545,22 @@ mounted(){
 
 # ══════════════════════════════════════════════════════════════════
 # Config persistence (for data collector)
+# When running as frozen EXE, check source dir (parent of dist) for
+# existing config so saved credentials aren't lost after repackaging.
 # ══════════════════════════════════════════════════════════════════
-CONFIG_FILE = BASE_DIR / 'companion_config.json'
+if getattr(sys, 'frozen', False):
+    _exe_dir = Path(sys.executable).parent
+    _config_candidate = _exe_dir / 'companion_config.json'
+    if not _config_candidate.exists():
+        _src_dir = _exe_dir.parent  # dist/pixingyun-mate/ -> desktop-companion/
+        _src_config = _src_dir / 'companion_config.json'
+        if _src_config.exists():
+            _config_candidate.parent.mkdir(parents=True, exist_ok=True)
+            import shutil
+            shutil.copy2(str(_src_config), str(_config_candidate))
+    CONFIG_FILE = _config_candidate
+else:
+    CONFIG_FILE = BASE_DIR / 'companion_config.json'
 
 
 def _load_config() -> dict:
