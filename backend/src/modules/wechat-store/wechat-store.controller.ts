@@ -29,6 +29,7 @@ export class WechatStoreController {
     return this.wechatStoreService.deleteStore(id)
   }
 
+  @Public()
   @Get('shop/orders')
   async getOrderList(
     @Query('store_id') storeId: string,
@@ -43,11 +44,13 @@ export class WechatStoreController {
     })
   }
 
+  @Public()
   @Get('shop/orders/:orderId')
   async getOrderDetail(@Query('store_id') storeId: string, @Param('orderId') orderId: string) {
     return this.wechatStoreService.getOrderDetail(storeId, orderId)
   }
 
+  @Public()
   @Get('shop/products')
   async getProductList(
     @Query('store_id') storeId: string,
@@ -60,6 +63,7 @@ export class WechatStoreController {
     })
   }
 
+  @Public()
   @Get('shop/aftersale')
   async getAftersaleList(
     @Query('store_id') storeId: string,
@@ -74,6 +78,7 @@ export class WechatStoreController {
     })
   }
 
+  @Public()
   @Get('shop/info')
   async getShopInfo(@Query('store_id') storeId: string) {
     return this.wechatStoreService.getShopInfo(storeId)
