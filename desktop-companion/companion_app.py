@@ -8,6 +8,7 @@ from queue import Queue, Empty
 from flask import Flask, request, jsonify, Response, make_response, send_from_directory
 from pixing_worker import start_worker, stop_worker, get_status as get_worker_status
 from chrome_cdp import ChromeCDP
+from douyin_api_collector import collect_douyin_data
 
 # ── AES-256-GCM encryption helpers ─────────────────────────────
 try:
@@ -1811,6 +1812,33 @@ async def _scrape_account_pages(context, platform: str) -> dict:
                                     break
             except Exception as e:
                 print(f'[DC] extra-page error {extra_url}: {e}')
+
+        # 6. Douyin API collection (richer data via internal APIs, no signature needed in browser context)
+        if platform.upper() == 'DOUYIN':
+            try:
+                print(f'[DouyinAPI] Starting API-based collection...')
+                await page.goto('https://www.douyin.com', wait_until='domcontentloaded', timeout=30000)
+                await page.wait_for_timeout(3000)
+
+                api_result = await collect_douyin_data(page, max_posts=200, fetch_comments=False)
+                if api_result.success:
+                    # Merge API data into metrics (API data is richer, prefer it over screen-scraped)
+                    for k, v in api_result.metrics.items():
+                        if v is not None and v != 0:
+                            metrics[k] = v
+                    # Replace video_stats if API returned more data
+                    old_count = len(video_stats)
+                    if api_result.video_stats and len(api_result.video_stats) > old_count:
+                        video_stats = api_result.video_stats
+                        print(f'[DouyinAPI] Replaced video_stats: {len(video_stats)} posts from API (was {old_count} from DOM)')
+                    # Store extra data (hot search etc.)
+                    if api_result.extra:
+                        metrics['_api_extra'] = api_result.extra
+                    print(f'[DouyinAPI] API collection SUCCESS: {len(api_result.video_stats)} posts, metrics={list(api_result.metrics.keys())}')
+                else:
+                    print(f'[DouyinAPI] API collection FAILED: {api_result.error}, keeping screen-scraped data')
+            except Exception as e:
+                print(f'[DouyinAPI] API collection exception: {e}, falling back to screen-scraped data')
 
     finally:
         try: await page.close()
