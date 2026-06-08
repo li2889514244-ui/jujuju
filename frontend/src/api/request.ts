@@ -8,6 +8,8 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import type { ApiResponse } from '@/types'
 
+type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+
 const service: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
@@ -33,8 +35,26 @@ let pendingRequests: Array<{
   reject: (error: Error) => void
 }> = []
 
-function handleTokenRefresh(response: AxiosResponse<ApiResponse>): Promise<AxiosResponse> {
+function isAuthEndpoint(url = '') {
+  return ['/auth/login', '/auth/register', '/auth/refresh', '/auth/logout'].some((path) =>
+    url.includes(path),
+  )
+}
+
+function rejectExpiredSession(error?: unknown): Promise<never> {
   const userStore = useUserStore()
+  userStore.logout()
+  return Promise.reject(error instanceof Error ? error : new Error('登录已过期，请重新登录'))
+}
+
+function handleTokenRefresh(config?: RetriableRequestConfig): Promise<AxiosResponse> {
+  const userStore = useUserStore()
+
+  if (!config || config._retry || isAuthEndpoint(config.url) || !userStore.refreshToken) {
+    return rejectExpiredSession()
+  }
+
+  config._retry = true
 
   if (!isRefreshing) {
     isRefreshing = true
@@ -58,8 +78,8 @@ function handleTokenRefresh(response: AxiosResponse<ApiResponse>): Promise<Axios
   return new Promise<AxiosResponse>((resolve, reject) => {
     pendingRequests.push({
       resolve: (token: string) => {
-        response.config.headers.Authorization = `Bearer ${token}`
-        resolve(service(response.config))
+        config.headers.Authorization = `Bearer ${token}`
+        resolve(service(config))
       },
       reject: (error: Error) => {
         reject(error)
@@ -76,7 +96,7 @@ service.interceptors.response.use(
         ElMessage.error(res.message || '请求失败')
       }
       if (res.code === 401) {
-        return handleTokenRefresh(response)
+        return handleTokenRefresh(response.config as RetriableRequestConfig)
       }
       return Promise.reject(new Error(res.message || '请求失败'))
     }
@@ -84,7 +104,7 @@ service.interceptors.response.use(
   },
   (error) => {
     if (error.response?.status === 401) {
-      return handleTokenRefresh(error.response)
+      return handleTokenRefresh(error.config as RetriableRequestConfig | undefined)
     }
     const isNotif = error.config?.url?.includes('/notifications')
     if (!isNotif) {
