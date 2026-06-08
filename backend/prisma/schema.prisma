@@ -387,13 +387,94 @@ model TeamPermission {
 }
 
 model WechatStore {
-  id        String   @id @default(cuid())
-  name      String
-  appId     String   @unique
-  appSecret String
-  status    AccountStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String
+  appId        String   @unique
+  appSecret    String
+  status       AccountStatus @default(ACTIVE)
+  lastSyncedAt DateTime?
+  syncStatus   String   @default("pending")
+  syncError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders     WechatStoreOrder[]
+  products   WechatStoreProduct[]
+  aftersales WechatStoreAftersale[]
+}
+
+model WechatStoreOrder {
+  id            String   @id @default(cuid())
+  storeId       String
+  orderId       String
+  productId     String?
+  skuId         String?
+  status        Int      @default(0)
+  payAmount     Int      @default(0)
+  createTime    Int      @default(0)
+  settleTime    Int      @default(0)
+  productTitle  String   @default("")
+  productImg    String   @default("")
+  shipTime      Int      @default(0)
+  deliveryList  Json?
+  raw           Json
+  syncedAt      DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  store WechatStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, orderId])
+  @@index([storeId, createTime])
+  @@index([storeId, status])
+  @@index([syncedAt])
+}
+
+model WechatStoreProduct {
+  id           String   @id @default(cuid())
+  storeId      String
+  productId    String
+  title        String   @default("")
+  imgUrl       String   @default("")
+  sellingPrice Int      @default(0)
+  sales        Int      @default(0)
+  stock        Int      @default(0)
+  status       Int      @default(0)
+  raw          Json
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store WechatStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@index([storeId, status])
+  @@index([syncedAt])
+}
+
+model WechatStoreAftersale {
+  id               String   @id @default(cuid())
+  storeId          String
+  afterSaleOrderId String
+  type             String   @default("")
+  status           String   @default("")
+  amount           Int      @default(0)
+  reason           String   @default("")
+  product          String   @default("")
+  productId        String?
+  completeTime     Int      @default(0)
+  createTime       Int      @default(0)
+  raw              Json
+  syncedAt         DateTime @default(now())
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  store WechatStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, afterSaleOrderId])
+  @@index([storeId, createTime])
+  @@index([storeId, status])
+  @@index([syncedAt])
 }
 
 model PixingVideoTask {

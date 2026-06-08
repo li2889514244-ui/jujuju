@@ -29,6 +29,17 @@ export class WechatStoreController {
     return this.wechatStoreService.deleteStore(id)
   }
 
+  @Post('stores/:id/sync')
+  async syncStore(@Param('id') id: string) {
+    await this.wechatStoreService.syncStore(id)
+    return { success: true }
+  }
+
+  @Post('sync')
+  async syncAllStores() {
+    return this.wechatStoreService.syncAllStores()
+  }
+
   @Public()
   @Get('shop/orders')
   async getOrderList(
