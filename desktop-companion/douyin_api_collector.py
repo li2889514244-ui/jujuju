@@ -479,6 +479,7 @@ async def collect_douyin_data(
     fetch_comments: bool = False,
     override_sec_user_id: Optional[str] = None,
     account_label: str = "",
+    sleep_sec: float = 1.5,
 ) -> DouyinCollectionResult:
     """
     抖音全量数据采集主函数。
@@ -596,7 +597,7 @@ async def collect_douyin_data(
             break
 
         # 翻页间隔（避免触发频率限制）
-        await asyncio.sleep(2.0)
+        await asyncio.sleep(sleep_sec)
 
     # ── Step 5: 格式化作品数据 ──
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]

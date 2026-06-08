@@ -1699,7 +1699,7 @@ async def _scrape_store_dashboard(page, platform: str) -> dict:
     return result
 
 
-async def _scrape_account_pages(context, platform: str, account_label: str = '', max_posts: int = 200) -> dict:
+async def _scrape_account_pages(context, platform: str, account_label: str = '', max_posts: int = 200, sleep_sec: float = 1.5) -> dict:
     """Scan once, grab all pages in a single authenticated session.
     Navigates dashboard → data center → video list → monetization.
     account_label: 账号标签(如"唐商披星"), 用于日志审计防止多账号串号
@@ -1836,7 +1836,7 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                 await page.wait_for_timeout(3000)
 
                 api_result = await collect_douyin_data(
-                    page, max_posts=max_posts, fetch_comments=False,
+                    page, max_posts=max_posts, sleep_sec=sleep_sec, fetch_comments=False,
                     account_label=account_label  # 身份验证：多账号场景确认没串号
                 )
                 if api_result.success:
@@ -1925,14 +1925,16 @@ async def _scrape_one_account(pw, account_id: str, platform: str, profile_dir: P
         print(f'[DC] Scraping {label} ({platform})...')
         # Determine max_posts: 2000 for first collection, 200 for existing
         douyin_max_posts = 200
+        douyin_sleep = 1.5
         try:
             from local_db import is_first_collection
             if is_first_collection(account_id):
                 douyin_max_posts = 2000
-                print(f'[DC] First collection for {label}, max_posts=2000')
+                douyin_sleep = 2.0
+                print(f'[DC] First collection for {label}, max_posts=2000 sleep=2.0s')
         except Exception as e:
             print(f'[DC] Error checking first collection for {label}: {e}')
-        result = await _scrape_account_pages(context, platform, account_label=label, max_posts=douyin_max_posts)
+        result = await _scrape_account_pages(context, platform, account_label=label, max_posts=douyin_max_posts, sleep_sec=douyin_sleep)
         # After successful scrape, keep account active and mark collection time.
         if result.get('metrics') or result.get('video_stats'):
             try:
