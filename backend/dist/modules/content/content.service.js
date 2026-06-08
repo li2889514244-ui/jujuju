@@ -23,11 +23,10 @@ let ContentService = ContentService_1 = class ContentService {
         const account = await this.prisma.account.findUnique({ where: { id: dto.accountId } });
         if (!account)
             throw new common_1.NotFoundException('账号不存在');
-        if (account.userId !== userId)
-            throw new common_1.ForbiddenException('无权操作该内容');
         return this.prisma.post.create({
             data: {
-                title: dto.title, content: dto.content,
+                title: dto.title,
+                content: dto.content,
                 mediaUrls: dto.mediaUrls ? JSON.stringify(dto.mediaUrls) : undefined,
                 tags: dto.tags ? JSON.stringify(dto.tags) : '[]',
                 publishAt: dto.publishAt ? new Date(dto.publishAt) : null,
@@ -42,20 +41,35 @@ let ContentService = ContentService_1 = class ContentService {
         const where = {};
         if (accountId)
             where.accountId = accountId;
-        else if (userId)
-            where.account = { userId };
         if (status)
             where.status = status;
         if (platform)
             where.account = { ...where.account, platform: platform };
         const [posts, total] = await Promise.all([
-            this.prisma.post.findMany({ where, skip, take, include: { account: { select: { id: true, platform: true, nickname: true, avatar: true } }, stats: true }, orderBy: { createdAt: 'desc' } }),
+            this.prisma.post.findMany({
+                where,
+                skip,
+                take,
+                include: {
+                    account: { select: { id: true, platform: true, nickname: true, avatar: true } },
+                    stats: true,
+                },
+                orderBy: { createdAt: 'desc' },
+            }),
             this.prisma.post.count({ where }),
         ]);
         return { posts, total, skip, take };
     }
     async findById(id, userId) {
-        const post = await this.prisma.post.findUnique({ where: { id }, include: { account: { select: { id: true, platform: true, nickname: true, avatar: true, userId: true } }, stats: true } });
+        const post = await this.prisma.post.findUnique({
+            where: { id },
+            include: {
+                account: {
+                    select: { id: true, platform: true, nickname: true, avatar: true, userId: true },
+                },
+                stats: true,
+            },
+        });
         if (!post)
             throw new common_1.NotFoundException('内容不存在');
         if (userId) {
@@ -69,8 +83,6 @@ let ContentService = ContentService_1 = class ContentService {
             throw new common_1.NotFoundException('内容不存在');
         if (!['DRAFT', 'SCHEDULED'].includes(post.status))
             throw new common_1.BadRequestException('仅草稿和定时内容可编辑');
-        if (post.account.userId !== userId)
-            throw new common_1.ForbiddenException('无权操作该内容');
         const updateData = {};
         if (data.title !== undefined)
             updateData.title = data.title;
@@ -84,48 +96,72 @@ let ContentService = ContentService_1 = class ContentService {
             updateData.publishAt = data.publishAt ? new Date(data.publishAt) : null;
             updateData.status = data.publishAt ? 'SCHEDULED' : 'DRAFT';
         }
-        return this.prisma.post.update({ where: { id }, data: updateData, include: { account: { select: { id: true, platform: true, nickname: true } } } });
+        return this.prisma.post.update({
+            where: { id },
+            data: updateData,
+            include: { account: { select: { id: true, platform: true, nickname: true } } },
+        });
     }
     async remove(id, userId) {
         const post = await this.prisma.post.findUnique({ where: { id }, include: { account: true } });
         if (!post)
             throw new common_1.NotFoundException('内容不存在');
-        if (post.account.userId !== userId)
-            throw new common_1.ForbiddenException('无权操作该内容');
         if (post.status === 'PUBLISHING')
             throw new common_1.BadRequestException('发布中的内容无法删除');
         await this.prisma.post.delete({ where: { id } });
         return { success: true };
     }
     async publish(contentId, userId) {
-        const post = await this.prisma.post.findUnique({ where: { id: contentId }, include: { account: true } });
+        const post = await this.prisma.post.findUnique({
+            where: { id: contentId },
+            include: { account: true },
+        });
         if (!post)
             throw new common_1.NotFoundException('内容不存在');
-        if (post.account.userId !== userId)
-            throw new common_1.ForbiddenException('无权操作该内容');
         if (!['DRAFT', 'SCHEDULED', 'FAILED'].includes(post.status))
             throw new common_1.BadRequestException(`当前状态 ${post.status} 不允许发布`);
         return this.prisma.post.update({ where: { id: contentId }, data: { status: 'PUBLISHING' } });
     }
     async updatePublishStatus(contentId, status, platformUrl, errorMsg) {
-        return this.prisma.post.update({ where: { id: contentId }, data: { status, platformUrl: platformUrl || undefined, errorMsg: errorMsg || undefined } });
+        return this.prisma.post.update({
+            where: { id: contentId },
+            data: { status, platformUrl: platformUrl || undefined, errorMsg: errorMsg || undefined },
+        });
     }
     async getScheduledPosts() {
-        return this.prisma.post.findMany({ where: { status: 'SCHEDULED', publishAt: { lte: new Date() } }, include: { account: { select: { id: true, platform: true, nickname: true, userId: true } } }, orderBy: { publishAt: 'asc' } });
+        return this.prisma.post.findMany({
+            where: { status: 'SCHEDULED', publishAt: { lte: new Date() } },
+            include: { account: { select: { id: true, platform: true, nickname: true, userId: true } } },
+            orderBy: { publishAt: 'asc' },
+        });
     }
     async claimForPublish(postId) {
-        const result = await this.prisma.post.updateMany({ where: { id: postId, status: 'SCHEDULED' }, data: { status: 'PUBLISHING' } });
+        const result = await this.prisma.post.updateMany({
+            where: { id: postId, status: 'SCHEDULED' },
+            data: { status: 'PUBLISHING' },
+        });
         return result.count > 0;
     }
     async batchPublish(dto, userId) {
         const { accountIds, ...contentData } = dto;
         if (!accountIds || accountIds.length === 0)
             throw new common_1.BadRequestException('请至少选择一个发布账号');
-        const accounts = await this.prisma.account.findMany({ where: { id: { in: accountIds }, userId }, select: { id: true, platform: true, nickname: true } });
+        const accounts = await this.prisma.account.findMany({
+            where: { id: { in: accountIds } },
+            select: { id: true, platform: true, nickname: true },
+        });
         if (accounts.length !== accountIds.length)
             throw new common_1.ForbiddenException('部分发布账号不存在或无权操作');
         const posts = await Promise.all(accounts.map((account) => this.prisma.post.create({
-            data: { title: contentData.title, content: contentData.content, mediaUrls: contentData.mediaUrls ? JSON.stringify(contentData.mediaUrls) : undefined, tags: contentData.tags ? JSON.stringify(contentData.tags) : '[]', publishAt: contentData.publishAt ? new Date(contentData.publishAt) : null, status: contentData.publishAt ? 'SCHEDULED' : 'PUBLISHING', accountId: account.id },
+            data: {
+                title: contentData.title,
+                content: contentData.content,
+                mediaUrls: contentData.mediaUrls ? JSON.stringify(contentData.mediaUrls) : undefined,
+                tags: contentData.tags ? JSON.stringify(contentData.tags) : '[]',
+                publishAt: contentData.publishAt ? new Date(contentData.publishAt) : null,
+                status: contentData.publishAt ? 'SCHEDULED' : 'PUBLISHING',
+                accountId: account.id,
+            },
             include: { account: { select: { id: true, platform: true, nickname: true } } },
         })));
         this.logger.log(`一键分发: ${posts.length} 条内容已创建 (用户: ${userId})`);

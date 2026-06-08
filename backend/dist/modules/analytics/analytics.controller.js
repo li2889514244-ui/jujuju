@@ -28,6 +28,9 @@ let AnalyticsController = class AnalyticsController {
     async getFollowerTrend(userId, days, platform, groupId) {
         return this.analyticsService.getFollowersTrend(userId, days || 7, platform, groupId);
     }
+    async getViewsTrend(userId, days, platform, groupId) {
+        return this.analyticsService.getViewsTrend(userId, days || 7, platform, groupId);
+    }
     async getOverview(userId, groupId) {
         return this.analyticsService.getOverview(userId, groupId);
     }
@@ -78,7 +81,9 @@ let AnalyticsController = class AnalyticsController {
         });
         return {
             ...result,
-            ranking: result.ranking.sort((a, b) => b.engagementRate - a.engagementRate),
+            ranking: [...result.ranking]
+                .sort((a, b) => b.engagementRate - a.engagementRate)
+                .map((item, index) => ({ ...item, rank: index + 1 })),
         };
     }
     async getLikesTrend(userId, days, platform) {
@@ -138,6 +143,17 @@ __decorate([
     __metadata("design:paramtypes", [String, Number, String, String]),
     __metadata("design:returntype", Promise)
 ], AnalyticsController.prototype, "getFollowerTrend", null);
+__decorate([
+    (0, common_1.Get)('views/trend'),
+    (0, swagger_1.ApiOperation)({ summary: '鑾峰彇鎾斁澧為暱瓒嬪娍' }),
+    __param(0, (0, current_user_decorator_1.CurrentUser)('id')),
+    __param(1, (0, common_1.Query)('days')),
+    __param(2, (0, common_1.Query)('platform')),
+    __param(3, (0, common_1.Query)('groupId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Number, String, String]),
+    __metadata("design:returntype", Promise)
+], AnalyticsController.prototype, "getViewsTrend", null);
 __decorate([
     (0, common_1.Get)('overview'),
     (0, swagger_1.ApiOperation)({ summary: '获取数据概览' }),

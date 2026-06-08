@@ -2,10 +2,19 @@ import { AccountsService } from './accounts.service';
 import { CreateAccountDto } from './dto/create-account.dto';
 import { UpdateAccountDto } from './dto/update-account.dto';
 import { Platform } from '../../common/prisma-enums';
+import { PrismaService } from '../../prisma/prisma.service';
 export declare class AccountsController {
     private readonly accountsService;
-    constructor(accountsService: AccountsService);
+    private readonly prisma;
+    constructor(accountsService: AccountsService, prisma: PrismaService);
     create(dto: CreateAccountDto, userId: string): Promise<any>;
+    bulkMove(dto: {
+        ids: string[];
+        groupId: string;
+    }, _userId: string): Promise<{
+        success: boolean;
+        count: number;
+    }>;
     findAll(platform?: Platform, teamId?: string, groupId?: string, page?: number, limit?: number, userId?: string): Promise<{
         accounts: any[];
         total: number;

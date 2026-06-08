@@ -57,22 +57,15 @@ let AccountsService = AccountsService_1 = class AccountsService {
         return decrypted;
     }
     async create(dto, userId) {
-        const existing = await this.prisma.account.findUnique({
+        const encryptedCookies = dto.cookies ? this.encryptCookie(dto.cookies) : null;
+        const account = await this.prisma.account.upsert({
             where: {
                 platform_platformUserId: {
                     platform: dto.platform,
                     platformUserId: dto.platformUserId,
                 },
             },
-        });
-        if (existing) {
-            throw new common_1.ConflictException('平台账号已存在');
-        }
-        const encryptedCookies = dto.cookies
-            ? this.encryptCookie(dto.cookies)
-            : null;
-        const account = await this.prisma.account.create({
-            data: {
+            create: {
                 platform: dto.platform,
                 platformUserId: dto.platformUserId,
                 nickname: dto.nickname,
@@ -81,6 +74,14 @@ let AccountsService = AccountsService_1 = class AccountsService {
                 cookies: encryptedCookies,
                 proxyConfig: dto.proxyConfig ? JSON.stringify(dto.proxyConfig) : undefined,
                 teamId: dto.teamId,
+                userId,
+            },
+            update: {
+                nickname: dto.nickname,
+                avatar: dto.avatar,
+                bio: dto.bio,
+                cookies: encryptedCookies ?? undefined,
+                proxyConfig: dto.proxyConfig ? JSON.stringify(dto.proxyConfig) : undefined,
                 userId,
             },
             include: {
@@ -98,8 +99,6 @@ let AccountsService = AccountsService_1 = class AccountsService {
     async findAll(params) {
         const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params;
         const where = {};
-        if (userId)
-            where.userId = userId;
         if (teamId)
             where.teamId = teamId;
         if (groupId)
@@ -197,7 +196,12 @@ let AccountsService = AccountsService_1 = class AccountsService {
             throw new common_1.NotFoundException('账号不存在');
         }
         await ownership_helper_1.OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
-        await this.prisma.account.delete({ where: { id } });
+        await this.prisma.$transaction([
+            this.prisma.postStats.deleteMany({ where: { post: { accountId: id } } }),
+            this.prisma.post.deleteMany({ where: { accountId: id } }),
+            this.prisma.dailyStats.deleteMany({ where: { accountId: id } }),
+            this.prisma.account.delete({ where: { id } }),
+        ]);
         this.logger.log(`账号已删除: ${id}`);
         return { success: true };
     }

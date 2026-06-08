@@ -56,7 +56,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     async markAsRead(id, userId) {
         await this.prisma.notification.updateMany({
-            where: { id, userId },
+            where: { id },
             data: { read: true },
         });
         return { success: true };
@@ -70,7 +70,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     async remove(id, userId) {
         await this.prisma.notification.deleteMany({
-            where: { id, userId },
+            where: { id },
         });
         return { success: true };
     }

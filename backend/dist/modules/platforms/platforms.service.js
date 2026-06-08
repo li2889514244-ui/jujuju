@@ -155,24 +155,64 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
         }
         const platform = account.platform;
         try {
+            const pickNumber = (value) => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
             const statData = {
-                followers: metrics.followers || 0,
-                views: metrics.views || 0,
-                likes: metrics.likes || 0,
-                comments: metrics.comments || 0,
-                shares: metrics.shares || 0,
-                revenue: metrics.revenue || 0,
-                gmv: metrics.gmv || 0,
-                orders: metrics.orders || 0,
-                commission: metrics.commission || 0,
-                buyerCount: metrics.buyerCount || 0,
-                productCount: metrics.productCount || 0,
-                avgOrderValue: metrics.avgOrderValue || 0,
+                followers: pickNumber(metrics.followers),
+                views: pickNumber(metrics.views),
+                likes: pickNumber(metrics.likes),
+                comments: pickNumber(metrics.comments),
+                shares: pickNumber(metrics.shares),
+                revenue: pickNumber(metrics.revenue),
+                gmv: pickNumber(metrics.gmv),
+                orders: pickNumber(metrics.orders),
+                commission: pickNumber(metrics.commission),
+                buyerCount: pickNumber(metrics.buyerCount),
+                productCount: pickNumber(metrics.productCount),
+                avgOrderValue: pickNumber(metrics.avgOrderValue),
+                followersIncrement: pickNumber(metrics.newFollowers),
+                viewsIncrement: pickNumber(metrics.newViews),
+                likesIncrement: pickNumber(metrics.newLikes),
+                commentsIncrement: pickNumber(metrics.newComments),
+                sharesIncrement: pickNumber(metrics.newShares),
+                unfollows: pickNumber(metrics.unfollows),
             };
+            const hasAnyIncrement = (statData.followersIncrement !== undefined ||
+                statData.viewsIncrement !== undefined ||
+                statData.likesIncrement !== undefined ||
+                statData.commentsIncrement !== undefined ||
+                statData.sharesIncrement !== undefined);
+            if (!hasAnyIncrement) {
+                const yesterdayDate = new Date(targetDate);
+                yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+                const yesterdayStats = await this.prisma.dailyStats.findUnique({
+                    where: { accountId_date: { accountId, date: yesterdayDate } },
+                    select: { followers: true, views: true, likes: true, comments: true, shares: true },
+                });
+                if (yesterdayStats) {
+                    const diff = (today, prev) => {
+                        if (today === undefined || today === null)
+                            return 0;
+                        return Math.max(0, today - (prev ?? 0));
+                    };
+                    statData.followersIncrement = diff(statData.followers, yesterdayStats.followers);
+                    statData.viewsIncrement = diff(statData.views, yesterdayStats.views);
+                    statData.likesIncrement = diff(statData.likes, yesterdayStats.likes);
+                    statData.commentsIncrement = diff(statData.comments, yesterdayStats.comments);
+                    statData.sharesIncrement = diff(statData.shares, yesterdayStats.shares);
+                    this.logger.log(`reportMetrics: auto-computed increments account=${accountId} ` +
+                        `followers+${statData.followersIncrement} views+${statData.viewsIncrement} ` +
+                        `likes+${statData.likesIncrement} comments+${statData.commentsIncrement} shares+${statData.sharesIncrement}`);
+                }
+                else {
+                    this.logger.debug(`reportMetrics: no yesterday stats for ${accountId}, increments stay 0 (first collection)`);
+                }
+            }
+            const statUpdateData = Object.fromEntries(Object.entries(statData).filter(([, value]) => value !== undefined));
+            const statCreateData = Object.fromEntries(Object.entries(statData).map(([key, value]) => [key, value ?? 0]));
             await this.prisma.dailyStats.upsert({
                 where: { accountId_date: { accountId, date: targetDate } },
-                update: statData,
-                create: { accountId, platform, date: targetDate, ...statData },
+                update: statUpdateData,
+                create: { accountId, platform, date: targetDate, ...statCreateData },
             });
             const accountUpdates = {};
             if (metrics.followers && metrics.followers > 0)
@@ -184,6 +224,9 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             const nickname = metrics._nickname;
             if (nickname && typeof nickname === 'string' && nickname.length >= 2)
                 accountUpdates.nickname = nickname;
+            const avatar = metrics._avatar;
+            if (avatar && typeof avatar === 'string')
+                accountUpdates.avatar = avatar;
             if (metrics.storeScore !== undefined)
                 accountUpdates.storeScore = metrics.storeScore;
             if (metrics.storeDiagnosis !== undefined)
@@ -202,6 +245,35 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
             return { success: false, error: e.message };
         }
     }
+    parseReportedPostDate(value) {
+        if (typeof value === 'number') {
+            const seconds = value > 1e12 ? value / 1000 : value;
+            const d = new Date(seconds * 1000);
+            if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000)
+                return d;
+            return undefined;
+        }
+        if (typeof value === 'string' && /^\d{9,13}$/.test(value.trim())) {
+            const num = Number(value.trim());
+            const seconds = num > 1e12 ? num / 1000 : num;
+            const d = new Date(seconds * 1000);
+            if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000)
+                return d;
+            return undefined;
+        }
+        if (typeof value !== 'string' || !value.trim())
+            return undefined;
+        const raw = value.trim();
+        const direct = new Date(raw);
+        if (!Number.isNaN(direct.getTime()))
+            return direct;
+        const match = raw.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+        if (!match)
+            return undefined;
+        const [, year, month, day] = match;
+        const parsed = new Date(Number(year), Number(month) - 1, Number(day));
+        return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    }
     async reportPostStats(dto) {
         const { accountId, posts } = dto;
         const account = await this.prisma.account.findUnique({ where: { id: accountId } });
@@ -214,6 +286,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
         for (const p of posts) {
             try {
                 const title = p.title || '';
+                const publishAt = this.parseReportedPostDate(p.publishedAt || p.date);
                 const postId = `${accountId}_${title.substring(0, 40)}`;
                 const existing = await this.prisma.post.findFirst({
                     where: { accountId, title },
@@ -221,10 +294,15 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                 let post;
                 if (existing) {
                     post = existing;
-                    if (p.coverUrl) {
+                    const postUpdates = {};
+                    if (p.coverUrl)
+                        postUpdates.coverUrl = p.coverUrl;
+                    if (publishAt && !existing.publishAt)
+                        postUpdates.publishAt = publishAt;
+                    if (Object.keys(postUpdates).length > 0) {
                         post = await this.prisma.post.update({
                             where: { id: existing.id },
-                            data: { coverUrl: p.coverUrl },
+                            data: postUpdates,
                         });
                     }
                     updated++;
@@ -236,6 +314,7 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
                             title,
                             status: 'PUBLISHED',
                             coverUrl: p.coverUrl,
+                            publishAt,
                         },
                     });
                     created++;
@@ -292,8 +371,6 @@ let PlatformsService = PlatformsService_1 = class PlatformsService {
     async getAuthorizedAccounts(params) {
         const { userId, teamId, platform, skip = 0, take = 20 } = params;
         const where = { status: 'ACTIVE' };
-        if (userId)
-            where.userId = userId;
         if (teamId)
             where.teamId = teamId;
         if (platform)

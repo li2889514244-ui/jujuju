@@ -21,12 +21,22 @@ const update_account_dto_1 = require("./dto/update-account.dto");
 const jwt_auth_guard_1 = require("../auth/guards/jwt-auth.guard");
 const current_user_decorator_1 = require("../../common/decorators/current-user.decorator");
 const prisma_enums_1 = require("../../common/prisma-enums");
+const prisma_service_1 = require("../../prisma/prisma.service");
 let AccountsController = class AccountsController {
-    constructor(accountsService) {
+    constructor(accountsService, prisma) {
         this.accountsService = accountsService;
+        this.prisma = prisma;
     }
     async create(dto, userId) {
         return this.accountsService.create(dto, userId);
+    }
+    async bulkMove(dto, _userId) {
+        const { ids, groupId } = dto;
+        await this.prisma.account.updateMany({
+            where: { id: { in: ids } },
+            data: { groupId: groupId || null },
+        });
+        return { success: true, count: ids.length };
     }
     async findAll(platform, teamId, groupId, page, limit, userId) {
         const pageNum = Math.max(1, Number(page) || 1);
@@ -59,6 +69,15 @@ __decorate([
     __metadata("design:paramtypes", [create_account_dto_1.CreateAccountDto, String]),
     __metadata("design:returntype", Promise)
 ], AccountsController.prototype, "create", null);
+__decorate([
+    (0, common_1.Post)('bulk-move'),
+    (0, swagger_1.ApiOperation)({ summary: '批量移动账号到分组' }),
+    __param(0, (0, common_1.Body)()),
+    __param(1, (0, current_user_decorator_1.CurrentUser)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, String]),
+    __metadata("design:returntype", Promise)
+], AccountsController.prototype, "bulkMove", null);
 __decorate([
     (0, common_1.Get)(),
     (0, swagger_1.ApiQuery)({ name: 'platform', required: false, enum: prisma_enums_1.Platform }),
@@ -123,6 +142,7 @@ exports.AccountsController = AccountsController = __decorate([
     (0, swagger_1.ApiBearerAuth)('access-token'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
     (0, common_1.Controller)('accounts'),
-    __metadata("design:paramtypes", [accounts_service_1.AccountsService])
+    __metadata("design:paramtypes", [accounts_service_1.AccountsService,
+        prisma_service_1.PrismaService])
 ], AccountsController);
 //# sourceMappingURL=accounts.controller.js.map

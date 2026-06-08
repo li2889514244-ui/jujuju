@@ -43,11 +43,23 @@ let PrismaService = PrismaService_1 = class PrismaService extends client_1.Prism
             throw new Error('Cannot clean database in production');
         }
         const modelNames = client_1.PrismaClient.prototype.constructor.name === 'PrismaClient'
-            ? this._dmmf?.datamodel?.models?.map((m) => m.name) ?? []
+            ? (this._dmmf?.datamodel?.models?.map((m) => m.name) ?? [])
             : [];
         const models = modelNames.length > 0
             ? modelNames
-            : ['AuditLog', 'PostStats', 'DailyStats', 'Post', 'Account', 'Team', 'User', 'Organization'];
+            : [
+                'WechatStoreAftersale',
+                'WechatStoreProduct',
+                'WechatStoreOrder',
+                'AuditLog',
+                'PostStats',
+                'DailyStats',
+                'Post',
+                'Account',
+                'Team',
+                'User',
+                'Organization',
+            ];
         for (const modelName of models) {
             const modelKey = modelName.charAt(0).toLowerCase() + modelName.slice(1);
             const model = this[modelKey];

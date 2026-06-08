@@ -8,6 +8,10 @@ export declare class AnalyticsService {
         date: string;
         value: number;
     }[]>;
+    getViewsTrend(userId: string, days?: number, platform?: string, groupId?: string): Promise<{
+        date: string;
+        value: number;
+    }[]>;
     createManualMonetization(userId: string, dto: {
         date: string;
         platform: string;
@@ -219,36 +223,14 @@ export declare class AnalyticsService {
             saves: number;
             publishedAt: Date;
         }[];
-        dailyTrend: ({
-            account: {
-                platform: import(".prisma/client").$Enums.PlatformEnum;
-                nickname: string;
-            };
-        } & {
-            id: string;
-            date: Date;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
+        dailyTrend: {
+            date: string;
             followers: number;
             views: number;
             likes: number;
             comments: number;
             shares: number;
-            revenue: number;
-            gmv: number;
-            orders: number;
-            commission: number;
-            buyerCount: number;
-            productCount: number;
-            avgOrderValue: number;
-            followersIncrement: number;
-            viewsIncrement: number;
-            likesIncrement: number;
-            commentsIncrement: number;
-            sharesIncrement: number;
-            unfollows: number;
-            createdAt: Date;
-            accountId: string;
-        })[];
+        }[];
     }>;
     getComparison(userId: string, groupId?: string): Promise<{
         weekOverWeek: {
@@ -439,36 +421,14 @@ export declare class AnalyticsService {
             saves: number;
             publishedAt: Date;
         }[];
-        dailyTrend: ({
-            account: {
-                platform: import(".prisma/client").$Enums.PlatformEnum;
-                nickname: string;
-            };
-        } & {
-            id: string;
-            date: Date;
-            platform: import(".prisma/client").$Enums.PlatformEnum;
+        dailyTrend: {
+            date: string;
             followers: number;
             views: number;
             likes: number;
             comments: number;
             shares: number;
-            revenue: number;
-            gmv: number;
-            orders: number;
-            commission: number;
-            buyerCount: number;
-            productCount: number;
-            avgOrderValue: number;
-            followersIncrement: number;
-            viewsIncrement: number;
-            likesIncrement: number;
-            commentsIncrement: number;
-            sharesIncrement: number;
-            unfollows: number;
-            createdAt: Date;
-            accountId: string;
-        })[];
+        }[];
     }>;
     getMonetization(userId: string, days?: number, platform?: string): Promise<{
         totalRevenue: number;
@@ -478,7 +438,15 @@ export declare class AnalyticsService {
         totalBuyerCount: number;
         totalAvgOrderValue: number;
         byPlatform: any[];
-        dailyTrend: any[];
+        dailyTrend: {
+            avgOrderValue: number;
+            date: string;
+            revenue: number;
+            gmv: number;
+            orders: number;
+            commission: number;
+            buyerCount: number;
+        }[];
     }>;
     getAccountAnalytics(accountId: string): Promise<{
         totalViews: number;

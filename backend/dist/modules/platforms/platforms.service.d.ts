@@ -49,6 +49,7 @@ export declare class PlatformsService {
         success: boolean;
         error: any;
     }>;
+    private parseReportedPostDate;
     reportPostStats(dto: ReportPostStatsDto): Promise<{
         success: boolean;
         error: string;

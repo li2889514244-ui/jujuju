@@ -19,39 +19,88 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         this.logger = new common_1.Logger(AnalyticsService_1.name);
     }
     async getFollowersTrend(userId, days = 7, platform, groupId) {
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-        startDate.setHours(0, 0, 0, 0);
+        const safeDays = Math.max(1, Number(days) || 7);
+        const endDate = new Date();
+        endDate.setHours(0, 0, 0, 0);
+        const dateKeys = Array.from({ length: safeDays }, (_, index) => {
+            const d = new Date(endDate);
+            d.setDate(endDate.getDate() - (safeDays - 1 - index));
+            return d.toISOString().slice(0, 10);
+        });
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
-            select: { id: true },
+            where: {
+                ...(platform ? { platform: platform } : {}),
+                ...(groupId ? { groupId } : {}),
+            },
+            select: { id: true, followers: true },
         });
         const accountIds = accounts.map((a) => a.id);
+        if (accountIds.length === 0) {
+            return dateKeys.map((date) => ({ date, value: 0 }));
+        }
         const stats = await this.prisma.dailyStats.findMany({
             where: {
                 accountId: { in: accountIds },
-                date: { gte: startDate },
+                date: { lte: endDate },
             },
-            select: { date: true, followers: true },
-            orderBy: { date: 'asc' },
+            select: { accountId: true, date: true, followers: true },
+            orderBy: [{ accountId: 'asc' }, { date: 'asc' }],
         });
+        const statsByAccount = {};
+        for (const s of stats) {
+            if (!statsByAccount[s.accountId])
+                statsByAccount[s.accountId] = [];
+            statsByAccount[s.accountId].push({
+                date: s.date.toISOString().slice(0, 10),
+                followers: s.followers || 0,
+            });
+        }
+        return dateKeys.map((date) => {
+            let value = 0;
+            for (const account of accounts) {
+                const rows = statsByAccount[account.id] || [];
+                const latestAtOrBefore = [...rows].reverse().find((row) => row.date <= date);
+                const firstKnown = rows[0];
+                value += latestAtOrBefore?.followers ?? firstKnown?.followers ?? account.followers ?? 0;
+            }
+            return { date, value };
+        });
+    }
+    async getViewsTrend(userId, days = 7, platform, groupId) {
+        const safeDays = Math.max(1, Number(days) || 7);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - (safeDays - 1));
+        startDate.setHours(0, 0, 0, 0);
+        const accounts = await this.prisma.account.findMany({
+            where: {
+                ...(platform ? { platform: platform } : {}),
+                ...(groupId ? { groupId } : {}),
+            },
+            select: { id: true },
+        });
+        const accountIds = accounts.map((a) => a.id);
+        const stats = accountIds.length
+            ? await this.prisma.dailyStats.findMany({
+                where: { accountId: { in: accountIds }, date: { gte: startDate } },
+                select: { date: true, views: true, viewsIncrement: true },
+                orderBy: { date: 'asc' },
+            })
+            : [];
         const byDate = {};
         for (const s of stats) {
-            const key = s.date.toISOString().slice(0, 10);
-            byDate[key] = (byDate[key] || 0) + s.followers;
+            const date = s.date.toISOString().slice(0, 10);
+            byDate[date] = (byDate[date] || 0) + (s.viewsIncrement || s.views || 0);
         }
-        const result = [];
-        for (let i = days - 1; i >= 0; i--) {
+        return Array.from({ length: safeDays }, (_, index) => {
             const d = new Date();
-            d.setDate(d.getDate() - i);
-            const key = d.toISOString().slice(0, 10);
-            result.push({ date: key, value: byDate[key] || 0 });
-        }
-        return result;
+            d.setDate(d.getDate() - (safeDays - 1 - index));
+            const date = d.toISOString().slice(0, 10);
+            return { date, value: byDate[date] || 0 };
+        });
     }
     async createManualMonetization(userId, dto) {
         const account = await this.prisma.account.findFirst({
-            where: { userId, platform: dto.platform },
+            where: { platform: dto.platform },
             select: { id: true },
         });
         if (!account)
@@ -83,8 +132,6 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             where.accountId = dto.accountId;
         if (dto.platform)
             where.platform = dto.platform;
-        if (userId)
-            where.account = { userId };
         if (dto.startDate || dto.endDate) {
             where.date = {};
             if (dto.startDate)
@@ -112,10 +159,9 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         where.post = {};
         if (dto.accountId)
             where.post.accountId = dto.accountId;
-        if (userId || dto.platform) {
+        if (dto.platform) {
             where.post.account = {
-                ...(userId ? { userId } : {}),
-                ...(dto.platform ? { platform: dto.platform } : {}),
+                platform: dto.platform,
             };
         }
         const stats = await this.prisma.postStats.findMany({
@@ -143,7 +189,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getOverview(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(groupId ? { groupId } : {}) },
+            where: { ...(groupId ? { groupId } : {}) },
             select: { id: true, platform: true, followers: true, likes: true, status: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -204,7 +250,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getPlatformComparison(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(groupId ? { groupId } : {}) },
+            where: { ...(groupId ? { groupId } : {}) },
             select: { id: true, platform: true, followers: true, likes: true },
         });
         const platforms = [...new Set(accounts.map((a) => a.platform))];
@@ -248,7 +294,6 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
         const accounts = await this.prisma.account.findMany({
             where: {
-                userId,
                 ...(platform ? { platform: platform } : {}),
             },
             select: { id: true, platform: true, nickname: true, followers: true, likes: true },
@@ -296,6 +341,51 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             orderBy: { stats: { views: 'desc' } },
             take: 10,
         });
+        const postStatsAgg = await this.prisma.postStats.aggregate({
+            where: {
+                post: {
+                    accountId: { in: accountIds },
+                    status: 'PUBLISHED',
+                    createdAt: { gte: start, lte: end },
+                },
+            },
+            _sum: {
+                views: true,
+                likes: true,
+                comments: true,
+                shares: true,
+                saves: true,
+                danmakuCount: true,
+            },
+            _avg: { completionRate: true },
+        });
+        const rowsByAccount = {};
+        for (const stat of dailyStats) {
+            if (!rowsByAccount[stat.accountId])
+                rowsByAccount[stat.accountId] = [];
+            rowsByAccount[stat.accountId].push(stat);
+        }
+        const dateKeys = Array.from(new Set(dailyStats.map((stat) => stat.date.toISOString().slice(0, 10)))).sort();
+        const dailyTrend = dateKeys.map((date) => {
+            const rowsForDate = dailyStats.filter((stat) => stat.date.toISOString().slice(0, 10) === date);
+            let followers = 0;
+            for (const account of accounts) {
+                const rows = rowsByAccount[account.id] || [];
+                const latestAtOrBefore = [...rows]
+                    .reverse()
+                    .find((row) => row.date.toISOString().slice(0, 10) <= date);
+                const firstKnown = rows[0];
+                followers += latestAtOrBefore?.followers ?? firstKnown?.followers ?? account.followers ?? 0;
+            }
+            return {
+                date,
+                followers,
+                views: rowsForDate.reduce((sum, stat) => sum + (stat.viewsIncrement || stat.views || 0), 0),
+                likes: rowsForDate.reduce((sum, stat) => sum + (stat.likesIncrement || stat.likes || 0), 0),
+                comments: rowsForDate.reduce((sum, stat) => sum + (stat.commentsIncrement || stat.comments || 0), 0),
+                shares: rowsForDate.reduce((sum, stat) => sum + (stat.sharesIncrement || stat.shares || 0), 0),
+            };
+        });
         const scopedOverview = {
             accounts: {
                 total: accounts.length,
@@ -313,13 +403,13 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 failed: failedPosts,
             },
             engagement: {
-                totalViews: dailyStats.reduce((sum, stat) => sum + (stat.views || 0), 0),
-                totalLikes: dailyStats.reduce((sum, stat) => sum + (stat.likes || 0), 0),
-                totalComments: dailyStats.reduce((sum, stat) => sum + (stat.comments || 0), 0),
-                totalShares: dailyStats.reduce((sum, stat) => sum + (stat.shares || 0), 0),
-                totalSaves: 0,
-                totalDanmaku: 0,
-                avgCompletionRate: 0,
+                totalViews: postStatsAgg._sum.views || 0,
+                totalLikes: postStatsAgg._sum.likes || 0,
+                totalComments: postStatsAgg._sum.comments || 0,
+                totalShares: postStatsAgg._sum.shares || 0,
+                totalSaves: postStatsAgg._sum.saves || 0,
+                totalDanmaku: postStatsAgg._sum.danmakuCount || 0,
+                avgCompletionRate: postStatsAgg._avg.completionRate || 0,
             },
         };
         return {
@@ -341,12 +431,12 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                 saves: p.stats?.saves || 0,
                 publishedAt: p.updatedAt,
             })),
-            dailyTrend: dailyStats,
+            dailyTrend,
         };
     }
     async getComparison(userId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(groupId ? { groupId } : {}) },
+            where: { ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -388,7 +478,6 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const { limit = 50, period = 'all', platform, groupId } = params;
         const accounts = await this.prisma.account.findMany({
             where: {
-                userId,
                 ...(platform ? { platform: platform } : {}),
                 ...(groupId ? { groupId } : {}),
             },
@@ -397,11 +486,18 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const accountIds = accounts.map((a) => a.id);
         let dateFilter = {};
         const now = new Date();
-        if (period === 'week') {
-            dateFilter = { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } };
-        }
-        else if (period === 'month') {
-            dateFilter = { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } };
+        if (period === 'week' || period === 'month') {
+            const days = period === 'week' ? 7 : 30;
+            const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            dateFilter = {
+                OR: [
+                    { publishAt: { gte: cutoff } },
+                    {
+                        publishAt: null,
+                        createdAt: { gte: cutoff },
+                    },
+                ],
+            };
         }
         const posts = await this.prisma.post.findMany({
             where: {
@@ -437,7 +533,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                     completionRate: p.stats?.completionRate || 0,
                     avgPlayDuration: p.stats?.avgPlayDuration || 0,
                     engagementRate: pviews > 0 ? Math.round((plikes / pviews) * 10000) / 100 : 0,
-                    publishedAt: p.updatedAt,
+                    publishedAt: p.publishAt || p.createdAt,
                 };
             }),
             total: posts.length,
@@ -454,7 +550,13 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
                     accountId: { in: accountIds },
                     date: { gte: start, lte: end },
                 },
-                _sum: { views: true, likes: true, comments: true, shares: true },
+                _sum: {
+                    viewsIncrement: true,
+                    likesIncrement: true,
+                    commentsIncrement: true,
+                    sharesIncrement: true,
+                    followersIncrement: true,
+                },
             }),
             this.prisma.post.count({
                 where: {
@@ -486,11 +588,11 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             return sum + Math.max(0, last - first);
         }, 0);
         return {
-            views: dailyAgg._sum.views || 0,
-            likes: dailyAgg._sum.likes || 0,
-            comments: dailyAgg._sum.comments || 0,
-            shares: dailyAgg._sum.shares || 0,
-            followers: Math.max(0, followerGrowth),
+            views: dailyAgg._sum.viewsIncrement || 0,
+            likes: dailyAgg._sum.likesIncrement || 0,
+            comments: dailyAgg._sum.commentsIncrement || 0,
+            shares: dailyAgg._sum.sharesIncrement || 0,
+            followers: dailyAgg._sum.followersIncrement || 0,
             posts: postCount,
         };
     }
@@ -519,7 +621,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getLikesTrend(userId, days = 7, platform) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}) },
+            where: { ...(platform ? { platform: platform } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -544,7 +646,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getPublishEffect(userId, days, contentId, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(groupId ? { groupId } : {}) },
+            where: { ...(groupId ? { groupId } : {}) },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -583,28 +685,54 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getEngagementRate(userId, days = 7, platform, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
+            where: {
+                ...(platform ? { platform: platform } : {}),
+                ...(groupId ? { groupId } : {}),
+            },
             select: { id: true },
         });
         const accountIds = accounts.map((a) => a.id);
-        const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+        const safeDays = Math.max(1, Number(days) || 7);
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - (safeDays - 1));
+        startDate.setHours(0, 0, 0, 0);
         const stats = await this.prisma.dailyStats.findMany({
             where: { accountId: { in: accountIds }, date: { gte: startDate } },
             orderBy: { date: 'asc' },
-            select: { date: true, views: true, likes: true, comments: true, shares: true },
+            select: {
+                date: true,
+                views: true,
+                likes: true,
+                comments: true,
+                shares: true,
+                viewsIncrement: true,
+                likesIncrement: true,
+                commentsIncrement: true,
+                sharesIncrement: true,
+            },
         });
         const byDate = {};
         for (const s of stats) {
             const d = s.date.toISOString().slice(0, 10);
             if (!byDate[d])
                 byDate[d] = { views: 0, interactions: 0 };
-            byDate[d].views += s.views;
-            byDate[d].interactions += s.likes + s.comments + s.shares;
+            const views = s.viewsIncrement || s.views || 0;
+            const interactions = (s.likesIncrement || s.likes || 0) +
+                (s.commentsIncrement || s.comments || 0) +
+                (s.sharesIncrement || s.shares || 0);
+            byDate[d].views += views;
+            byDate[d].interactions += interactions;
         }
-        return Object.entries(byDate).map(([date, data]) => ({
-            date,
-            value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
-        }));
+        return Array.from({ length: safeDays }, (_, index) => {
+            const date = new Date();
+            date.setDate(date.getDate() - (safeDays - 1 - index));
+            const key = date.toISOString().slice(0, 10);
+            const data = byDate[key] || { views: 0, interactions: 0 };
+            return {
+                date: key,
+                value: data.views > 0 ? Math.round((data.interactions / data.views) * 10000) / 100 : 0,
+            };
+        });
     }
     async exportReport(userId, startDate, endDate, format = 'json') {
         const report = await this.generateReport(userId, {
@@ -620,7 +748,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getMonetization(userId, days = 30, platform) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}) },
+            where: { ...(platform ? { platform: platform } : {}) },
             select: { id: true, platform: true },
         });
         const accountIds = accounts.map((a) => a.id);
@@ -633,7 +761,7 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
         const totals = { revenue: 0, gmv: 0, orders: 0, commission: 0, buyerCount: 0, avgOrderValue: 0 };
         let avgCount = 0;
         const byPlatform = {};
-        const dailyTrend = [];
+        const dailyTrendByDate = {};
         for (const s of stats) {
             totals.revenue += s.revenue;
             totals.gmv += s.gmv;
@@ -664,18 +792,37 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
             if (s.avgOrderValue > 0) {
                 byPlatform[p].avgOrderValue = Math.round((byPlatform[p].avgOrderValue + s.avgOrderValue) / 2);
             }
-            dailyTrend.push({
-                date: s.date.toISOString().slice(0, 10),
-                revenue: s.revenue,
-                gmv: s.gmv,
-                orders: s.orders,
-                commission: s.commission,
-                buyerCount: s.buyerCount,
-                avgOrderValue: s.avgOrderValue,
-            });
+            const date = s.date.toISOString().slice(0, 10);
+            if (!dailyTrendByDate[date]) {
+                dailyTrendByDate[date] = {
+                    date,
+                    revenue: 0,
+                    gmv: 0,
+                    orders: 0,
+                    commission: 0,
+                    buyerCount: 0,
+                    avgOrderValue: 0,
+                    avgOrderValueCount: 0,
+                };
+            }
+            dailyTrendByDate[date].revenue += s.revenue;
+            dailyTrendByDate[date].gmv += s.gmv;
+            dailyTrendByDate[date].orders += s.orders;
+            dailyTrendByDate[date].commission += s.commission;
+            dailyTrendByDate[date].buyerCount += s.buyerCount;
+            if (s.avgOrderValue > 0) {
+                dailyTrendByDate[date].avgOrderValue += s.avgOrderValue;
+                dailyTrendByDate[date].avgOrderValueCount += 1;
+            }
         }
         if (avgCount > 0)
             totals.avgOrderValue = Math.round(totals.avgOrderValue / avgCount);
+        const dailyTrend = Object.values(dailyTrendByDate)
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .map(({ avgOrderValueCount, ...row }) => ({
+            ...row,
+            avgOrderValue: avgOrderValueCount > 0 ? Math.round(row.avgOrderValue / avgOrderValueCount) : 0,
+        }));
         return {
             totalRevenue: totals.revenue,
             totalGmv: totals.gmv,
@@ -831,7 +978,10 @@ let AnalyticsService = AnalyticsService_1 = class AnalyticsService {
     }
     async getAccountDetailList(userId, platform, groupId) {
         const accounts = await this.prisma.account.findMany({
-            where: { userId, ...(platform ? { platform: platform } : {}), ...(groupId ? { groupId } : {}) },
+            where: {
+                ...(platform ? { platform: platform } : {}),
+                ...(groupId ? { groupId } : {}),
+            },
             select: { id: true, platform: true, nickname: true, avatar: true, followers: true },
             orderBy: { createdAt: 'desc' },
         });

@@ -31,6 +31,8 @@ export declare class ReportPostStatItem {
     dislikes?: number;
     followsFromPost?: number;
     coverUrl?: string;
+    publishedAt?: string;
+    date?: string;
 }
 export declare class ReportPostStatsDto {
     accountId: string;

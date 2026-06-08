@@ -17,7 +17,10 @@ class AuthorizePlatformDto {
 }
 exports.AuthorizePlatformDto = AuthorizePlatformDto;
 __decorate([
-    (0, swagger_1.ApiProperty)({ description: '平台标识', enum: ['DOUYIN', 'KUAISHOU', 'XIAOHONGSHU', 'WECHAT_VIDEO', 'BILIBILI', 'WEIBO'] }),
+    (0, swagger_1.ApiProperty)({
+        description: '平台标识',
+        enum: ['DOUYIN', 'KUAISHOU', 'XIAOHONGSHU', 'WECHAT_VIDEO', 'BILIBILI', 'WEIBO'],
+    }),
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], AuthorizePlatformDto.prototype, "platform", void 0);
@@ -155,6 +158,18 @@ __decorate([
     (0, class_validator_1.IsString)(),
     __metadata("design:type", String)
 ], ReportPostStatItem.prototype, "coverUrl", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '发布时间' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportPostStatItem.prototype, "publishedAt", void 0);
+__decorate([
+    (0, swagger_1.ApiPropertyOptional)({ description: '发布时间' }),
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    __metadata("design:type", String)
+], ReportPostStatItem.prototype, "date", void 0);
 class ReportPostStatsDto {
 }
 exports.ReportPostStatsDto = ReportPostStatsDto;

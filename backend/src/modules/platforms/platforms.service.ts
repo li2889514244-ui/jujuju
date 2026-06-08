@@ -222,7 +222,7 @@ export class PlatformsService {
         typeof value === 'number' && Number.isFinite(value) ? value : undefined
 
       // Upsert DailyStats for the target date (including monetization + store fields)
-      const statData = {
+      const statData: Record<string, number | undefined> = {
         followers: pickNumber(metrics.followers),
         views: pickNumber(metrics.views),
         likes: pickNumber(metrics.likes),
@@ -243,6 +243,44 @@ export class PlatformsService {
         sharesIncrement: pickNumber(metrics.newShares),
         unfollows: pickNumber(metrics.unfollows),
       }
+
+      // 伴侣端未提供增量字段时，自动从前后两天快照差值计算
+      const hasAnyIncrement = (
+        statData.followersIncrement !== undefined ||
+        statData.viewsIncrement !== undefined ||
+        statData.likesIncrement !== undefined ||
+        statData.commentsIncrement !== undefined ||
+        statData.sharesIncrement !== undefined
+      )
+      if (!hasAnyIncrement) {
+        const yesterdayDate = new Date(targetDate)
+        yesterdayDate.setDate(yesterdayDate.getDate() - 1)
+        const yesterdayStats = await this.prisma.dailyStats.findUnique({
+          where: { accountId_date: { accountId, date: yesterdayDate } },
+          select: { followers: true, views: true, likes: true, comments: true, shares: true },
+        })
+        if (yesterdayStats) {
+          const diff = (today: number | undefined, prev: number | null) => {
+            if (today === undefined || today === null) return 0
+            return Math.max(0, today - (prev ?? 0))
+          }
+          statData.followersIncrement = diff(statData.followers, yesterdayStats.followers)
+          statData.viewsIncrement = diff(statData.views, yesterdayStats.views)
+          statData.likesIncrement = diff(statData.likes, yesterdayStats.likes)
+          statData.commentsIncrement = diff(statData.comments, yesterdayStats.comments)
+          statData.sharesIncrement = diff(statData.shares, yesterdayStats.shares)
+          this.logger.log(
+            `reportMetrics: auto-computed increments account=${accountId} ` +
+            `followers+${statData.followersIncrement} views+${statData.viewsIncrement} ` +
+            `likes+${statData.likesIncrement} comments+${statData.commentsIncrement} shares+${statData.sharesIncrement}`,
+          )
+        } else {
+          this.logger.debug(
+            `reportMetrics: no yesterday stats for ${accountId}, increments stay 0 (first collection)`,
+          )
+        }
+      }
+
       const statUpdateData = Object.fromEntries(
         Object.entries(statData).filter(([, value]) => value !== undefined),
       )
