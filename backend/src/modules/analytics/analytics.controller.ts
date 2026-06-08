@@ -7,9 +7,7 @@ import {
   Param,
   UseGuards,
   BadRequestException,
-  Res,
 } from '@nestjs/common'
-import { Response } from 'express'
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger'
 import { AnalyticsService } from './analytics.service'
 import { QueryAnalyticsDto } from './dto/query-analytics.dto'
@@ -222,34 +220,6 @@ export class AnalyticsController {
     @Query('groupId') groupId?: string,
   ) {
     return this.analyticsService.getEngagementRate(userId, days || 7, platform, groupId)
-  }
-
-  @Get('export')
-  @ApiOperation({ summary: '导出数据报表（CSV/JSON）' })
-  async exportReport(
-    @CurrentUser('id') userId: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('format') format?: string,
-    @Res() res?: Response,
-  ) {
-    const result = await this.analyticsService.exportReport(
-      userId,
-      startDate,
-      endDate,
-      format || 'json',
-    )
-    if (format === 'csv' && res) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8')
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="analytics-report-${new Date().toISOString().slice(0, 10)}.csv"`,
-      )
-      // Add BOM for Excel UTF-8 compatibility
-      res.send('\uFEFF' + result)
-      return
-    }
-    return result
   }
 
   @Get('monetization')

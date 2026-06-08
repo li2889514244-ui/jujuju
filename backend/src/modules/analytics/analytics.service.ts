@@ -914,28 +914,6 @@ export class AnalyticsService {
     })
   }
 
-  async exportReport(
-    userId: string,
-    startDate?: string,
-    endDate?: string,
-    format: string = 'json',
-  ) {
-    const report = await this.generateReport(userId, {
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
-    })
-
-    if (format === 'csv') {
-      const headers = 'date,platform,account,views,likes,comments,shares,followers'
-      const rows = (report.dailyTrend || []).map(
-        (d: any) =>
-          `${d.date},${d.account?.platform || ''},${d.account?.nickname || ''},${d.views || 0},${d.likes || 0},${d.comments || 0},${d.shares || 0},${d.followers || 0}`,
-      )
-      return [headers, ...rows].join('\n')
-    }
-    return report
-  }
-
   async getMonetization(userId: string, days: number = 30, platform?: string) {
     // shared mode: 不按 userId 过滤
     const accounts = await this.prisma.account.findMany({
