@@ -20,6 +20,10 @@
       </div>
     </div>
 
+    <div v-if="!loading && stores.length === 0" class="empty-hint monetization__empty-store">
+      <p>暂无可用微信小店，或当前登录态无法读取店铺。</p>
+    </div>
+
     <!-- Shop Info -->
     <div v-if="shopInfo" class="shop-info">
       <img
@@ -183,6 +187,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import {
   wechatStoreApi,
@@ -330,9 +335,16 @@ function aftersaleStatus(s: string) {
 
 // ── API ──
 async function loadStores() {
-  const res = await wechatStoreApi.getStores()
-  if (Array.isArray(res.data)) stores.value = res.data
-  if (stores.value.length > 0 && !activeStoreId.value) activeStoreId.value = stores.value[0].id
+  try {
+    const res = await wechatStoreApi.getStores()
+    const list = Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : []
+    stores.value = list
+    if (stores.value.length > 0 && !activeStoreId.value) activeStoreId.value = stores.value[0].id
+  } catch (error: any) {
+    stores.value = []
+    activeStoreId.value = ''
+    ElMessage.error(error?.message || '微信小店店铺加载失败，请重新登录后再试')
+  }
 }
 
 async function loadStoreData() {
@@ -369,8 +381,8 @@ async function loadStoreData() {
       aftersaleTotal.value = filtered.reduce((s: number, a: any) => s + (a.amount || 0), 0)
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
-  } catch {
-    /* silent */
+  } catch (error: any) {
+    ElMessage.error(error?.message || '微信小店数据同步失败')
   } finally {
     loading.value = false
   }
