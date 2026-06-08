@@ -8,7 +8,6 @@
       </div>
       <div class="data-center__links">
         <router-link to="/analytics">内容分析</router-link>
-        <router-link to="/report">报表导出</router-link>
         <router-link to="/monetization">微信小店销售</router-link>
       </div>
     </div>

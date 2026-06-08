@@ -8,7 +8,6 @@
       </div>
       <div class="analytics__links">
         <router-link to="/data-center">矩阵总览</router-link>
-        <router-link to="/report">报表导出</router-link>
       </div>
     </div>
 
@@ -92,9 +91,6 @@
             <el-button :loading="collecting" type="success" @click="handleCollect"
               >手动采集真实数据</el-button
             >
-          </el-form-item>
-          <el-form-item>
-            <el-button @click="handleExport">导出报表</el-button>
           </el-form-item>
         </el-form>
       </el-card>
@@ -474,26 +470,6 @@ async function handleCollect() {
     ElMessage.warning(e.message || '请先启动桌面伴侣，然后重试')
   }
   collecting.value = false
-}
-
-function handleExport() {
-  const startDate = dayjs().subtract(days.value, 'day').format('YYYY-MM-DD')
-  const endDate = dayjs().format('YYYY-MM-DD')
-  analyticsApi
-    .exportReport({ startDate, endDate, format: 'csv' })
-    .then((res: any) => {
-      const blob = new Blob(['﻿' + (typeof res === 'string' ? res : JSON.stringify(res))], {
-        type: 'text/csv;charset=utf-8',
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `数据报表_${startDate}_${endDate}.csv`
-      a.click()
-      URL.revokeObjectURL(url)
-      ElMessage.success('导出成功')
-    })
-    .catch(() => ElMessage.error('导出失败'))
 }
 
 onMounted(() => {

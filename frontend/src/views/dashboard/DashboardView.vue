@@ -76,18 +76,6 @@
             }}</span>
             <span class="command-action__hint">扫码绑定与分组</span>
           </router-link>
-          <router-link to="/content" class="command-action">
-            <span class="command-action__label">制作内容</span>
-            <span class="command-action__hint">{{
-              accountRows.length > 0 ? '上传素材与审核文案' : '可先保存草稿'
-            }}</span>
-          </router-link>
-          <router-link to="/publish" class="command-action">
-            <span class="command-action__label">安排发布</span>
-            <span class="command-action__hint">{{
-              accountRows.length > 0 ? '多平台排期' : '接入账号后排期'
-            }}</span>
-          </router-link>
         </div>
       </section>
 
@@ -138,16 +126,6 @@
           <strong>销售、订单与售后</strong>
           <span>查看 GMV、订单状态、商品销量和退款提醒</span>
         </router-link>
-        <router-link to="/publish" class="capability-card">
-          <span class="capability-card__tag">发布排期</span>
-          <strong>多平台一键发布</strong>
-          <span>选择内容、账号和发布时间，跟踪发布结果</span>
-        </router-link>
-        <router-link to="/report" class="capability-card">
-          <span class="capability-card__tag">管理汇报</span>
-          <strong>报表导出</strong>
-          <span>按时间和平台生成 Excel，用于复盘和汇报</span>
-        </router-link>
       </section>
 
       <!-- Hero KPI -->
@@ -172,9 +150,6 @@
             <el-radio-button value="day">日</el-radio-button>
             <el-radio-button value="week">周</el-radio-button>
           </el-radio-group>
-          <el-button size="small" :disabled="accountRows.length === 0" @click="exportCSV"
-            >导出</el-button
-          >
           <el-button :icon="Refresh" size="small" circle :loading="loading" @click="refreshAll" />
         </div>
       </div>
@@ -294,13 +269,12 @@
 </template>
 
 <script setup lang="ts">
-import dayjs from 'dayjs'
 import { Refresh, ArrowRight } from '@element-plus/icons-vue'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import StatCard from '@/components/common/StatCard.vue'
 import { useDashboard } from '@/composables/useDashboard'
-import { formatLargeNum, tokenStatusLabel } from '@/utils/format'
+import { formatLargeNum } from '@/utils/format'
 
 const {
   period,
@@ -320,29 +294,6 @@ const {
   followerChartOption,
   platformChartOption,
 } = useDashboard()
-
-function exportCSV() {
-  const headers = ['账号', '平台', '粉丝', '播放量', '点赞', '评论', '分享', '内容数', '状态']
-  const rows = accountRows.value.map((r) => [
-    r.nickname,
-    r.platform,
-    r.followers,
-    r.views,
-    r.likes,
-    r.comments,
-    r.shares,
-    r.postCount,
-    tokenStatusLabel(r),
-  ])
-  const csv = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `账号数据_${dayjs().format('YYYY-MM-DD')}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
 </script>
 
 <style lang="scss" scoped>

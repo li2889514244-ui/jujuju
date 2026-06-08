@@ -37,28 +37,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '账号详情', hidden: true },
       },
       {
-        path: 'content',
-        name: 'ContentEditor',
-        component: () => import('@/views/content/ContentEditorView.vue'),
-        meta: { title: '内容制作', icon: 'EditPen', section: '运营流程' },
-      },
-      {
-        path: 'publish',
-        name: 'Publish',
-        component: () => import('@/views/content/PublishView.vue'),
-        meta: { title: '发布排期', icon: 'Promotion', section: '运营流程' },
-      },
-      {
         path: 'monetization',
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
         meta: { title: '微信小店', icon: 'Money', section: '商业转化' },
-      },
-      {
-        path: 'report',
-        name: 'Report',
-        component: () => import('@/views/report/ReportView.vue'),
-        meta: { title: '报表导出', icon: 'Document', section: '数据复盘' },
       },
       {
         path: 'team',
