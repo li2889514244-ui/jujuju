@@ -475,7 +475,7 @@ class DouyinCollectionResult:
 
 async def collect_douyin_data(
     page,
-    max_posts: int = 2000,
+    max_posts: int = 200,
     fetch_comments: bool = False,
     override_sec_user_id: Optional[str] = None,
     account_label: str = "",

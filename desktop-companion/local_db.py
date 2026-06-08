@@ -218,6 +218,19 @@ def get_accounts_by_platform(platform: str) -> list[dict]:
     return [dict(r) for r in rows]
 
 
+def is_first_collection(account_id: str) -> bool:
+    """判断是否为首次采集（last_collected_at 为空即为首次）"""
+    conn = _get_conn()
+    row = conn.execute(
+        "SELECT last_collected_at FROM accounts WHERE id = ?", (account_id,)
+    ).fetchone()
+    conn.close()
+    if not row:
+        return True
+    val = row[0]
+    return not val or val.strip() == ''
+
+
 def update_collection_time(account_id: str):
     """更新最后采集时间"""
     conn = _get_conn()
@@ -285,7 +298,7 @@ def save_contents(account_id: str, posts: list):
         like_count = p.get('like_count', 0) or p.get('likes', 0) or 0
         comment_count = p.get('comment_count', 0) or p.get('comments', 0) or 0
         share_count = p.get('share_count', 0) or p.get('shares', 0) or 0
-        publish_time = p.get('publish_time', '') or p.get('create_time', '') or p.get('date', '') or ''
+        publish_time = p.get('publish_time', '') or p.get('create_time', '') or p.get('date', '') or p.get('publishedAt', '') or ''
 
         existing = None
         if content_id:
