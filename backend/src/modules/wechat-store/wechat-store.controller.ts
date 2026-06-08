@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query, Post, Delete, Body } from '@nestjs/common'
 import { ApiTags } from '@nestjs/swagger'
+import { Public } from '../../common/decorators/public.decorator'
 import { WechatStoreService } from './wechat-store.service'
 @ApiTags('wechat-store')
 @Controller('wechat-store')
@@ -12,6 +13,7 @@ export class WechatStoreController {
     return Number.isFinite(parsed) ? parsed : undefined
   }
 
+  @Public()
   @Get('stores')
   async getStores() {
     return this.wechatStoreService.getStores()
