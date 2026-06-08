@@ -68,8 +68,8 @@ async def test_with_cdp():
             if result.success:
                 print(f"[Test 2] ✅ SUCCESS")
                 print(f"  Nickname: {result.metrics.get('_nickname', 'N/A')}")
-                print(f"  Followers: {result.metrics.get('follower_count', 0)}")
-                print(f"  Videos: {result.metrics.get('video_count', 0)}")
+                print(f"  Followers: {result.metrics.get('followers', 0)}")
+                print(f"  Videos: {result.metrics.get('posts_count', 0)}")
                 print(f"  Collected posts: {len(result.video_stats)}")
                 if result.video_stats:
                     first = result.video_stats[0]
