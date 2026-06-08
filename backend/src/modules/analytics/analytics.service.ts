@@ -612,13 +612,22 @@ export class AnalyticsService {
     })
     const accountIds = accounts.map((a) => a.id)
 
-    // 鏃堕棿鑼冨洿
+    // 时间范围 — 优先用 publishAt，fallback 到 createdAt
     let dateFilter: Prisma.PostWhereInput = {}
     const now = new Date()
-    if (period === 'week') {
-      dateFilter = { createdAt: { gte: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000) } }
-    } else if (period === 'month') {
-      dateFilter = { createdAt: { gte: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000) } }
+    if (period === 'week' || period === 'month') {
+      const days = period === 'week' ? 7 : 30
+      const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+      // COALESCE 语义: publishAt >= cutoff OR (publishAt IS NULL AND createdAt >= cutoff)
+      dateFilter = {
+        OR: [
+          { publishAt: { gte: cutoff } },
+          {
+            publishAt: null,
+            createdAt: { gte: cutoff },
+          },
+        ],
+      }
     }
 
     const posts = await this.prisma.post.findMany({
@@ -656,7 +665,7 @@ export class AnalyticsService {
           completionRate: p.stats?.completionRate || 0,
           avgPlayDuration: p.stats?.avgPlayDuration || 0,
           engagementRate: pviews > 0 ? Math.round((plikes / pviews) * 10000) / 100 : 0,
-          publishedAt: p.updatedAt,
+          publishedAt: p.publishAt || p.createdAt,
         }
       }),
       total: posts.length,

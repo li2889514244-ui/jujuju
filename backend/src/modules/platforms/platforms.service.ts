@@ -290,12 +290,31 @@ export class PlatformsService {
    * 接收桌面伴侣上报的视频/帖子数据，写入 Post + PostStats
    */
   private parseReportedPostDate(value: unknown): Date | undefined {
-    if (typeof value !== 'string' || !value.trim()) return undefined
+    // 1. Unix timestamp (number) — 抖音 create_time 是秒级
+    if (typeof value === 'number') {
+      // 秒级 (10位, ~2001–2286) vs 毫秒级 (13位)
+      const seconds = value > 1e12 ? value / 1000 : value
+      const d = new Date(seconds * 1000)
+      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) return d
+      return undefined
+    }
 
+    // 2. 纯数字字符串 "1749171600"
+    if (typeof value === 'string' && /^\d{9,13}$/.test(value.trim())) {
+      const num = Number(value.trim())
+      const seconds = num > 1e12 ? num / 1000 : num
+      const d = new Date(seconds * 1000)
+      if (!Number.isNaN(d.getTime()) && d.getFullYear() > 2000) return d
+      return undefined
+    }
+
+    // 3. 字符串日期
+    if (typeof value !== 'string' || !value.trim()) return undefined
     const raw = value.trim()
     const direct = new Date(raw)
     if (!Number.isNaN(direct.getTime())) return direct
 
+    // 4. 中文日期 "2024年06月08日"
     const match = raw.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/)
     if (!match) return undefined
 
