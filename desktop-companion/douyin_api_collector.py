@@ -221,9 +221,11 @@ async def get_sec_user_id(page) -> Optional[str]:
             return null;
         })()
         """)
-        if result:
+        if result and result not in ("self", "undefined", "null", ""):
             logger.info(f"[DouyinAPI] sec_user_id from __STORE__: {result[:30]}...")
             return result
+        if result in ("self", "undefined", "null", ""):
+            logger.info(f"[DouyinAPI] __STORE__ gave '{result}' (unauthenticated), falling back...")
     except Exception:
         pass
 
@@ -237,8 +239,12 @@ async def get_sec_user_id(page) -> Optional[str]:
         m = _re.search(r'/user/([A-Za-z0-9_-]+)', current_url)
         if m:
             uid = m.group(1)
-            logger.info(f"[DouyinAPI] sec_user_id from /user/self: {uid[:30]}...")
-            return uid
+            # Filter: "self" is the literal path when redirect fails (not logged in)
+            if uid.lower() in ("self",):
+                logger.info("[DouyinAPI] /user/self returned 'self' (not logged in), trying next strategy...")
+            else:
+                logger.info(f"[DouyinAPI] sec_user_id from /user/self: {uid[:30]}...")
+                return uid
     except Exception as e:
         logger.warning(f"[DouyinAPI] /user/self redirect failed: {e}")
 
