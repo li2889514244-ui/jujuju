@@ -5,6 +5,7 @@
       <div class="monetization__actions">
         <el-radio-group v-model="viewMode" size="small" @change="loadStoreData">
           <el-radio-button value="today">今天</el-radio-button>
+          <el-radio-button value="yesterday">昨天</el-radio-button>
           <el-radio-button value="week">近7天</el-radio-button>
         </el-radio-group>
         <el-select
@@ -41,7 +42,7 @@
     <!-- KPI -->
     <div class="monetization__kpi monetization__kpi--primary">
       <div class="kpi-card">
-        <div class="kpi-card__label">{{ viewMode === 'today' ? '今天销售额' : '近7天销售额' }}</div>
+        <div class="kpi-card__label">{{ rangeSalesLabel }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
         <div class="kpi-card__sub">{{ orderStats.count }} 笔订单</div>
       </div>
@@ -199,7 +200,7 @@ import dayjs from 'dayjs'
 
 const loading = ref(false)
 const trendMetric = ref('gmv')
-const viewMode = ref<'today' | 'week'>('today')
+const viewMode = ref<'today' | 'yesterday' | 'week'>('today')
 const stores = ref<WechatStore[]>([])
 const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
@@ -214,10 +215,20 @@ const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: stri
 let timer: ReturnType<typeof setInterval> | null = null
 
 // ── Stats ──
+const rangeSalesLabel = computed(() => {
+  const labels = {
+    today: '今天销售额',
+    yesterday: '昨天销售额',
+    week: '近7天销售额',
+  }
+  return labels[viewMode.value]
+})
+
 const displayOrders = computed(() => {
-  if (viewMode.value === 'today') {
-    const start = dayjs().startOf('day').unix()
-    const end = dayjs().endOf('day').unix()
+  if (viewMode.value === 'today' || viewMode.value === 'yesterday') {
+    const day = viewMode.value === 'yesterday' ? dayjs().subtract(1, 'day') : dayjs()
+    const start = day.startOf('day').unix()
+    const end = day.endOf('day').unix()
     return orders.value.filter((o) => o.create_time >= start && o.create_time <= end)
   }
   return orders.value
@@ -261,7 +272,7 @@ const filteredOrderCount = computed(() => filteredOrders.value.length)
 
 const trendOption = computed(() => {
   const dailyMap: Record<string, { gmv: number; orders: number }> = {}
-  orders.value.forEach((o) => {
+  displayOrders.value.forEach((o) => {
     const d = dayjs.unix(o.create_time).format('MM-DD')
     if (!dailyMap[d]) dailyMap[d] = { gmv: 0, orders: 0 }
     dailyMap[d].gmv += o.pay_amount
