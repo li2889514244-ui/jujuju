@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { analyticsApi, type AccountDetailItem, type DailyMetrics } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
 import { formatLargeNum } from '@/utils/format'
+import { toBackend } from '@/utils/platform'
 import type { AnalyticsOverview, PlatformStats, TrendData } from '@/types'
 
 export interface KpiCard {
@@ -290,8 +291,9 @@ export function useMatrixDashboard() {
     error.value = null
     try {
       const gid = groupId.value || undefined
-      const filter = { days: days.value, platform: platform.value || undefined, groupId: gid }
-      const pFilter = { platform: platform.value || undefined, groupId: gid }
+      const bp = platform.value ? toBackend(platform.value) : undefined
+      const filter = { days: days.value, platform: bp, groupId: gid }
+      const pFilter = { platform: bp, groupId: gid }
       const [ov, comp, ps, ft, vt, er, vr, tg, adl, grps] = await Promise.all([
         analyticsApi.getOverview(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getComparison(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
@@ -303,7 +305,7 @@ export function useMatrixDashboard() {
           .getViewsRanking({
             limit: 50,
             period: rankingPeriod.value,
-            platform: platform.value || undefined,
+            platform: bp,
             groupId: gid,
           })
           .then((r: any) => r.data),
@@ -328,7 +330,7 @@ export function useMatrixDashboard() {
           .getEngagementRanking({
             limit: 50,
             period: rankingPeriod.value,
-            platform: platform.value || undefined,
+            platform: bp,
             groupId: gid,
           })
           .then((r: any) => r.data)
