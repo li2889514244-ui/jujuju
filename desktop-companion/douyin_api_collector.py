@@ -364,7 +364,7 @@ def _parse_aweme_stats(aweme: Dict[str, Any]) -> Dict[str, Any]:
         "contentId": aweme.get("aweme_id", ""),
         "coverUrl": cover_url,
         "contentType": content_type,
-        "duration": duration,
+        "videoDuration": duration,  # companion/backend 期望 videoDuration，非 duration
         "views": stats.get("play_count", 0),
         "likes": stats.get("digg_count", 0),
         "comments": stats.get("comment_count", 0),
@@ -454,10 +454,11 @@ async def collect_douyin_data(
     profile = await get_user_profile(page, sec_user_id)
     if profile:
         result.metrics.update({
-            "follower_count": profile["follower_count"],
-            "following_count": profile["following_count"],
-            "video_count": profile["video_count"],
-            "like_count": profile["like_count"],
+            # 使用 companion 期望的字段名（followers/views/comments/shares/likes）
+            "followers": profile["follower_count"],
+            "following": profile["following_count"],
+            "posts_count": profile["video_count"],
+            "likes": profile["like_count"],
             "_nickname": profile["nickname"],
             "_avatar": profile["avatar_url"],
             "bio": profile["bio"],
@@ -466,7 +467,8 @@ async def collect_douyin_data(
         logger.info(
             f"[DouyinAPI] Profile: {profile['nickname']}, "
             f"followers={profile['follower_count']}, "
-            f"videos={profile['video_count']}"
+            f"videos={profile['video_count']}, "
+            f"likes={profile['like_count']}"
         )
 
     # ── Step 4: 采集作品列表（分页循环） ──
@@ -505,16 +507,17 @@ async def collect_douyin_data(
     # ── Step 5: 格式化作品数据 ──
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]
 
-    # 从作品聚合计算总指标
+    # 从作品聚合计算总指标（companion 字段名：followers/views/comments/shares/likes）
     if all_awemes:
         total_plays = sum(vs.get("views", 0) for vs in result.video_stats)
         total_likes = sum(vs.get("likes", 0) for vs in result.video_stats)
         total_comments = sum(vs.get("comments", 0) for vs in result.video_stats)
         total_shares = sum(vs.get("shares", 0) for vs in result.video_stats)
         result.metrics.update({
-            "play_count": total_plays,
-            "comment_count": total_comments,
-            "share_count": total_shares,
+            "views": total_plays,
+            "comments": total_comments,
+            "shares": total_shares,
+            "likes": total_likes,  # 如果 profile 没拿到，从作品聚合
         })
 
     # ── Step 6 (可选): 采集评论 ──
@@ -575,10 +578,10 @@ async def collect_target_user(
     profile = await get_user_profile(page, target_sec_user_id)
     if profile:
         result.metrics.update({
-            "follower_count": profile["follower_count"],
-            "following_count": profile["following_count"],
-            "video_count": profile["video_count"],
-            "like_count": profile["like_count"],
+            "followers": profile["follower_count"],
+            "following": profile["following_count"],
+            "posts_count": profile["video_count"],
+            "likes": profile["like_count"],
             "_nickname": profile["nickname"],
             "_avatar": profile["avatar_url"],
             "bio": profile["bio"],
