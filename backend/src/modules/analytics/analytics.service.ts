@@ -7,8 +7,20 @@ import { Prisma } from '@prisma/client'
 @Injectable()
 export class AnalyticsService {
   private readonly logger = new Logger(AnalyticsService.name)
+  private readonly beijingOffsetMs = 8 * 60 * 60 * 1000
 
   constructor(private prisma: PrismaService) {}
+
+  private getBeijingDayStart(offsetDays = 0): Date {
+    const beijingNow = new Date(Date.now() + this.beijingOffsetMs)
+    return new Date(
+      Date.UTC(
+        beijingNow.getUTCFullYear(),
+        beijingNow.getUTCMonth(),
+        beijingNow.getUTCDate() + offsetDays,
+      ) - this.beijingOffsetMs,
+    )
+  }
 
   async getFollowersTrend(userId: string, days: number = 7, platform?: string, groupId?: string) {
     const safeDays = Math.max(1, Number(days) || 7)
@@ -1214,22 +1226,15 @@ export class AnalyticsService {
     const accountIds = accounts.map((a) => a.id)
 
     // 查询最近30天的 DailyStats
-    const thirtyDaysAgo = new Date()
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    thirtyDaysAgo.setHours(0, 0, 0, 0)
-
-    const yesterday = new Date()
-    yesterday.setDate(yesterday.getDate() - 1)
-    yesterday.setHours(0, 0, 0, 0)
-
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    sevenDaysAgo.setHours(0, 0, 0, 0)
+    const tomorrow = this.getBeijingDayStart(1)
+    const thirtyDaysAgo = this.getBeijingDayStart(-30)
+    const yesterday = this.getBeijingDayStart(-1)
+    const sevenDaysAgo = this.getBeijingDayStart(-7)
 
     const allStats = await this.prisma.dailyStats.findMany({
       where: {
         accountId: { in: accountIds },
-        date: { gte: thirtyDaysAgo },
+        date: { gte: thirtyDaysAgo, lt: tomorrow },
       },
       select: {
         accountId: true,
@@ -1253,11 +1258,7 @@ export class AnalyticsService {
 
     // 计算每个账号的日/周/月聚合
     const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
-    const isYesterday = (d: Date) => {
-      const ds = d.toISOString().slice(0, 10)
-      const ys = yesterday.toISOString().slice(0, 10)
-      return ds === ys
-    }
+    const isYesterday = (d: Date) => d.getTime() === yesterday.getTime()
 
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []

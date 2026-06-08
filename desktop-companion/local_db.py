@@ -9,11 +9,17 @@ local_db.py — 本地 SQLite 数据库，1账号1Profile1Cookie
 import sqlite3
 import time
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # Profile 根目录（跟 companion_app.py 一致）
 PROFILE_ROOT = Path.home() / 'AppData' / 'Local' / 'MatrixFlow' / 'browser-profiles'
 DB_PATH = PROFILE_ROOT / 'accounts.db'
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+
+def _beijing_today() -> str:
+    return datetime.now(BEIJING_TZ).strftime('%Y-%m-%d')
 
 
 def _get_conn() -> sqlite3.Connection:
@@ -270,14 +276,41 @@ def update_metrics(account_id: str, metrics: dict):
         'nickname': 'nickname', 'avatar_url': 'avatar_url',
         'bio': 'bio', 'verified': 'verified',
     }
+    conn = _get_conn()
+    try:
+        today = _beijing_today()
+        prev = conn.execute(
+            """SELECT * FROM accounts_history
+               WHERE account_id = ? AND date < ?
+               ORDER BY date DESC
+               LIMIT 1""",
+            (account_id, today),
+        ).fetchone()
+        if prev:
+            diff_pairs = [
+                ('newFollowers', 'followers', 'follower_count'),
+                ('newViews', 'views', 'play_count'),
+                ('newLikes', 'likes', 'like_count'),
+                ('newComments', 'comments', 'comment_count'),
+                ('newShares', 'shares', 'share_count'),
+            ]
+            for new_key, total_key, prev_col in diff_pairs:
+                if metrics.get(new_key) is not None:
+                    continue
+                current = metrics.get(total_key)
+                if isinstance(current, (int, float)):
+                    metrics[new_key] = max(0, int(current) - int(prev[prev_col] or 0))
+    except Exception as e:
+        print(f'[LocalDB] increment compute warning {account_id}: {e}')
+
     updates = {}
     for k, v in metrics.items():
         db_key = valid_keys.get(k)
         if db_key and v is not None:
             updates[db_key] = v
     if not updates:
+        conn.close()
         return
-    conn = _get_conn()
     sets = ', '.join(f'{k} = ?' for k in updates)
     vals = list(updates.values()) + [account_id]
     conn.execute(f"UPDATE accounts SET {sets} WHERE id = ?", vals)
@@ -406,7 +439,7 @@ def save_history_snapshot(account_id: str):
         return
 
     conn = _get_conn()
-    today = time.strftime('%Y-%m-%d')
+    today = _beijing_today()
     conn.execute(
         """INSERT OR REPLACE INTO accounts_history
            (account_id, date, follower_count, video_count, like_count,

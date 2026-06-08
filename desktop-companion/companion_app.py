@@ -1019,11 +1019,44 @@ def _sanitize_text(s: str) -> str:
 def _parse_metric_num(s: str) -> int:
     s = s.strip().replace(',', '').replace(' ', '')
     if s.endswith(('万', 'w', 'W')):
-        return int(float(s[:-1]) * 10000)
+        return round(float(s[:-1]) * 10000)
     try:
         return int(float(s))
     except ValueError:
         return 0
+
+
+def _extract_douyin_overview_metrics(text: str) -> dict:
+    """Extract the creator-center overview card when its time filter is set to yesterday.
+
+    Douyin currently shows these labels on the home dashboard:
+    播放量 / 作品点赞 / 作品分享 / 作品评论 / 净增粉丝. They are yesterday
+    metrics when the card's time selector reads "昨日", so map them to backend
+    increment fields directly.
+    """
+    if not text or '数据总览' not in text:
+        return {}
+
+    start = text.find('数据总览')
+    scope = text[start:start + 2500]
+    if '昨日' not in scope[:800]:
+        return {}
+
+    num = r'([+-]?\d[\d,.]*[万wW]?)'
+    label_map = {
+        '播放量': 'newViews',
+        '作品点赞': 'newLikes',
+        '作品分享': 'newShares',
+        '作品评论': 'newComments',
+        '净增粉丝': 'newFollowers',
+    }
+
+    result = {}
+    for label, key in label_map.items():
+        match = re.search(rf'{label}\s*{num}', scope)
+        if match:
+            result[key] = _parse_metric_num(match.group(1))
+    return result
 
 
 async def _get_page_text(page) -> str:
@@ -1071,6 +1104,7 @@ async def _scrape_dashboard(page) -> dict:
     if idx > 0:
         text = text[:idx]
     metrics = {}
+    metrics.update(_extract_douyin_overview_metrics(text))
 
     profile_section = text[:8000] if len(text) > 8000 else text
     
@@ -1235,6 +1269,7 @@ async def _scrape_data_center(page, platform: str) -> dict:
 
     # --- Step 1: Full page text for metric extraction ---
     text = await _get_page_text(page)
+    result.update(_extract_douyin_overview_metrics(text))
 
     # Try to find yesterday's data section first (most reliable)
     yd_match = re.search(r'昨日数据([\s\S]*?)(?:近7天|近30天|$)', text[:8000])
@@ -2573,11 +2608,12 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             extra_metrics = extra.get('metrics', {})
                             if extra_metrics or extra.get('video_stats'):
                                 try:
-                                    from local_db import update_metrics, save_contents, update_collection_time
+                                    from local_db import update_metrics, save_contents, save_history_snapshot, update_collection_time
                                     update_metrics(account_id, extra_metrics)
                                     vstats = extra.get('video_stats') or []
                                     if vstats:
                                         save_contents(account_id, vstats)
+                                    save_history_snapshot(account_id)
                                     update_collection_time(account_id)
                                 except Exception as e:
                                     print(f'[DC] Local DB save error {account_id}: {e}')

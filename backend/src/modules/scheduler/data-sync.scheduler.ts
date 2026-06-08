@@ -1,17 +1,17 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import { BrowserPool } from '../uploader/browser-pool';
-import { CookieManager } from '../uploader/cookie-manager';
-import { Platform } from '../../common/prisma-enums';
+import { Injectable, Logger } from '@nestjs/common'
+import { Cron, CronExpression } from '@nestjs/schedule'
+import { PrismaService } from '../../prisma/prisma.service'
+import { BrowserPool } from '../uploader/browser-pool'
+import { CookieManager } from '../uploader/cookie-manager'
+import { Platform } from '../../common/prisma-enums'
 
 interface AccountMetrics {
-  followers: number;
-  likes: number;
-  views: number;
-  comments: number;
-  shares?: number;
-  unfollows?: number;
+  followers: number
+  likes: number
+  views: number
+  comments: number
+  shares?: number
+  unfollows?: number
 }
 
 /**
@@ -20,8 +20,9 @@ interface AccountMetrics {
  */
 @Injectable()
 export class DataSyncScheduler {
-  private readonly logger = new Logger(DataSyncScheduler.name);
-  private isRunning = false;
+  private readonly logger = new Logger(DataSyncScheduler.name)
+  private isRunning = false
+  private readonly beijingOffsetMs = 8 * 60 * 60 * 1000
 
   constructor(
     private prisma: PrismaService,
@@ -29,61 +30,70 @@ export class DataSyncScheduler {
     private cookieManager: CookieManager,
   ) {}
 
+  private getBeijingDayStart(offsetDays = 0): Date {
+    const beijingNow = new Date(Date.now() + this.beijingOffsetMs)
+    return new Date(
+      Date.UTC(
+        beijingNow.getUTCFullYear(),
+        beijingNow.getUTCMonth(),
+        beijingNow.getUTCDate() + offsetDays,
+      ) - this.beijingOffsetMs,
+    )
+  }
+
   /**
    * 姣忓ぉ鍑屾櫒 2:00 鎵ц鏁版嵁閲囬泦
    */
   @Cron('0 2 * * *')
   async handleDailySync() {
     if (this.isRunning) {
-      this.logger.warn('[garbled]');
-      return;
+      this.logger.warn('[garbled]')
+      return
     }
 
-    this.isRunning = true;
-    this.logger.log('');
+    this.isRunning = true
+    this.logger.log('')
 
     try {
       const accounts = await this.prisma.account.findMany({
         where: { status: 'ACTIVE' },
         select: { id: true, platform: true, cookies: true, nickname: true },
-      });
+      })
 
-      this.logger.log(`Data sync: ${accounts.length} accounts to collect`);
+      this.logger.log(`Data sync: ${accounts.length} accounts to collect`)
 
-      let successCount = 0;
-      let failCount = 0;
+      let successCount = 0
+      let failCount = 0
 
       for (const account of accounts) {
         try {
-          const cookies = account.cookies
-            ? this.cookieManager.decryptCookie(account.cookies)
-            : [];
+          const cookies = account.cookies ? this.cookieManager.decryptCookie(account.cookies) : []
 
           if (cookies.length === 0) {
-            this.logger.debug(`Skipping account without cookies: ${account.nickname}`);
-            continue;
+            this.logger.debug(`Skipping account without cookies: ${account.nickname}`)
+            continue
           }
 
-          const metrics = await this.collectMetrics(account.platform, cookies);
+          const metrics = await this.collectMetrics(account.platform, cookies)
 
           if (metrics) {
-            await this.saveMetrics(account.id, account.platform, metrics);
-            successCount++;
+            await this.saveMetrics(account.id, account.platform, metrics)
+            successCount++
           }
 
           // 姣忎釜璐﹀彿闂撮殧 5-10 绉掞紝閬垮厤棰戠巼杩囬珮
-          await this.delay(5000 + Math.random() * 5000);
+          await this.delay(5000 + Math.random() * 5000)
         } catch (error: any) {
-          failCount++;
-          this.logger.warn(`Collection failed [${account.nickname}]: ${error.message}`);
+          failCount++
+          this.logger.warn(`Collection failed [${account.nickname}]: ${error.message}`)
         }
       }
 
-      this.logger.log(`Data collection complete: ${successCount} success, ${failCount} failed`);
+      this.logger.log(`Data collection complete: ${successCount} success, ${failCount} failed`)
     } catch (error: any) {
-      this.logger.error('', error.stack);
+      this.logger.error('', error.stack)
     } finally {
-      this.isRunning = false;
+      this.isRunning = false
     }
   }
 
@@ -91,117 +101,117 @@ export class DataSyncScheduler {
    * 鏍规嵁骞冲彴閲囬泦鏁版嵁
    */
   private async collectMetrics(platform: Platform, cookies: any[]): Promise<AccountMetrics | null> {
-    const context = await this.browserPool.createContext({ cookies });
-    const page = await this.browserPool.createPage(context);
+    const context = await this.browserPool.createContext({ cookies })
+    const page = await this.browserPool.createPage(context)
 
     try {
       switch (platform) {
         case Platform.DOUYIN:
-          return await this.collectDouyin(page);
+          return await this.collectDouyin(page)
         case Platform.XIAOHONGSHU:
-          return await this.collectXiaohongshu(page);
+          return await this.collectXiaohongshu(page)
         case Platform.KUAISHOU:
-          return await this.collectKuaishou(page);
+          return await this.collectKuaishou(page)
         case Platform.BILIBILI:
-          return await this.collectBilibili(page);
+          return await this.collectBilibili(page)
         case Platform.WEIBO:
-          return await this.collectWeibo(page);
+          return await this.collectWeibo(page)
         case Platform.WECHAT_VIDEO:
-          return await this.collectWechatVideo(page);
+          return await this.collectWechatVideo(page)
         default:
-          return null;
+          return null
       }
     } finally {
-      await context.close();
+      await context.close()
     }
   }
 
   private async collectDouyin(page: any): Promise<AccountMetrics | null> {
     await page.goto('https://creator.douyin.com/creator-micro/data/overview', {
       waitUntil: 'domcontentloaded',
-    });
-    await page.waitForTimeout(3000);
+    })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('login')) return null;
+    if (page.url().includes('login')) return null
 
     // 灏濊瘯浠庢暟鎹瑙堥〉鎻愬彇鏁板瓧
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '');
-    const views = await this.extractNumber(page, '');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '')
+    const views = await this.extractNumber(page, '')
 
-    return { followers, likes, views, comments: 0 };
+    return { followers, likes, views, comments: 0 }
   }
 
   private async collectXiaohongshu(page: any): Promise<AccountMetrics | null> {
     await page.goto('https://creator.xiaohongshu.com/statistics', {
       waitUntil: 'domcontentloaded',
-    });
-    await page.waitForTimeout(3000);
+    })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('login')) return null;
+    if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '');
-    const views = await this.extractNumber(page, '');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '')
+    const views = await this.extractNumber(page, '')
 
-    return { followers, likes, views, comments: 0 };
+    return { followers, likes, views, comments: 0 }
   }
 
   private async collectKuaishou(page: any): Promise<AccountMetrics | null> {
     await page.goto('https://cp.kuaishou.com/profile', {
       waitUntil: 'domcontentloaded',
-    });
-    await page.waitForTimeout(3000);
+    })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('login')) return null;
+    if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '');
-    const views = await this.extractNumber(page, '');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '')
+    const views = await this.extractNumber(page, '')
 
-    return { followers, likes, views, comments: 0 };
+    return { followers, likes, views, comments: 0 }
   }
 
   private async collectBilibili(page: any): Promise<AccountMetrics | null> {
     await page.goto('https://member.bilibili.com/platform/home', {
       waitUntil: 'domcontentloaded',
-    });
-    await page.waitForTimeout(3000);
+    })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('passport')) return null;
+    if (page.url().includes('passport')) return null
 
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '');
-    const views = await this.extractNumber(page, '');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '')
+    const views = await this.extractNumber(page, '')
 
-    return { followers, likes, views, comments: 0 };
+    return { followers, likes, views, comments: 0 }
   }
 
   private async collectWeibo(page: any): Promise<AccountMetrics | null> {
-    await page.goto('https://weibo.com', { waitUntil: 'domcontentloaded' });
-    await page.waitForTimeout(3000);
+    await page.goto('https://weibo.com', { waitUntil: 'domcontentloaded' })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('login')) return null;
+    if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '[class*="like"]');
-    const views = await this.extractNumber(page, '[class*="read"]');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '[class*="like"]')
+    const views = await this.extractNumber(page, '[class*="read"]')
 
-    return { followers, likes, views: views || 0, comments: 0 };
+    return { followers, likes, views: views || 0, comments: 0 }
   }
 
   private async collectWechatVideo(page: any): Promise<AccountMetrics | null> {
     await page.goto('https://channels.weixin.qq.com/platform/post/list', {
       waitUntil: 'domcontentloaded',
-    });
-    await page.waitForTimeout(3000);
+    })
+    await page.waitForTimeout(3000)
 
-    if (page.url().includes('login')) return null;
+    if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '');
-    const likes = await this.extractNumber(page, '');
+    const followers = await this.extractNumber(page, '')
+    const likes = await this.extractNumber(page, '')
 
-    return { followers, likes, views: 0, comments: 0 };
+    return { followers, likes, views: 0, comments: 0 }
   }
 
   /**
@@ -210,68 +220,62 @@ export class DataSyncScheduler {
   private async extractNumber(page: any, ...selectors: string[]): Promise<number> {
     for (const selector of selectors) {
       try {
-        const el = page.locator(selector).first();
+        const el = page.locator(selector).first()
         if (await el.isVisible().catch(() => false)) {
-          const text = await el.textContent();
+          const text = await el.textContent()
           if (text) {
             // 澶勭悊 ""12.5w"[garbled]"
-            return this.parseChineseNumber(text.trim());
+            return this.parseChineseNumber(text.trim())
           }
         }
       } catch {
-        continue;
+        continue
       }
     }
-    return 0;
+    return 0
   }
 
   /**
    * 瑙ｆ瀽涓枃鏁板瓧鏍煎紡
    */
   private parseChineseNumber(text: string): number {
-    const cleaned = text.replace(/[,锛孿s]/g, '');
+    const cleaned = text.replace(/[,锛孿s]/g, '')
     if (cleaned.includes('万')) {
-      const num = parseFloat(cleaned.replace(/[万亿]/g, ''));
-      return Math.round(num * 10000);
+      const num = parseFloat(cleaned.replace(/[万亿]/g, ''))
+      return Math.round(num * 10000)
     }
     if (cleaned.includes('亿')) {
-      const num = parseFloat(cleaned.replace(/[万亿]/g, ''));
-      return Math.round(num * 100000000);
+      const num = parseFloat(cleaned.replace(/[万亿]/g, ''))
+      return Math.round(num * 100000000)
     }
-    const num = parseFloat(cleaned);
-    return isNaN(num) ? 0 : Math.round(num);
+    const num = parseFloat(cleaned)
+    return isNaN(num) ? 0 : Math.round(num)
   }
 
   /**
    * 淇濆瓨閲囬泦鏁版嵁鍒?DailyStats 琛?
    */
   private async saveMetrics(accountId: string, platform: Platform, metrics: AccountMetrics) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = this.getBeijingDayStart()
 
-    // 查询昨日数据用于计算增量
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStats = await this.prisma.dailyStats.findUnique({
-      where: { accountId_date: { accountId, date: yesterday } },
+    // 查询相邻上一条快照用于计算增量
+    const previousStats = await this.prisma.dailyStats.findFirst({
+      where: { accountId, date: { lt: today } },
       select: { followers: true, views: true, likes: true, comments: true, shares: true },
-    });
+      orderBy: { date: 'desc' },
+    })
 
-    const followersIncrement = yesterdayStats
-      ? Math.max(0, metrics.followers - yesterdayStats.followers)
-      : 0;
-    const viewsIncrement = yesterdayStats
-      ? Math.max(0, metrics.views - yesterdayStats.views)
-      : 0;
-    const likesIncrement = yesterdayStats
-      ? Math.max(0, metrics.likes - yesterdayStats.likes)
-      : 0;
-    const commentsIncrement = yesterdayStats
-      ? Math.max(0, metrics.comments - yesterdayStats.comments)
-      : 0;
-    const sharesIncrement = yesterdayStats
-      ? Math.max(0, (metrics.shares || 0) - yesterdayStats.shares)
-      : 0;
+    const followersIncrement = previousStats
+      ? Math.max(0, metrics.followers - previousStats.followers)
+      : 0
+    const viewsIncrement = previousStats ? Math.max(0, metrics.views - previousStats.views) : 0
+    const likesIncrement = previousStats ? Math.max(0, metrics.likes - previousStats.likes) : 0
+    const commentsIncrement = previousStats
+      ? Math.max(0, metrics.comments - previousStats.comments)
+      : 0
+    const sharesIncrement = previousStats
+      ? Math.max(0, (metrics.shares || 0) - previousStats.shares)
+      : 0
 
     await this.prisma.dailyStats.upsert({
       where: { accountId_date: { accountId, date: today } },
@@ -304,16 +308,16 @@ export class DataSyncScheduler {
         sharesIncrement,
         unfollows: metrics.unfollows || 0,
       },
-    });
+    })
 
     // 鍚屾椂鏇存柊 Account 琛ㄧ殑鏈€鏂扮矇涓濇暟
     await this.prisma.account.update({
       where: { id: accountId },
       data: { followers: metrics.followers, likes: metrics.likes },
-    });
+    })
   }
 
   private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms))
   }
 }

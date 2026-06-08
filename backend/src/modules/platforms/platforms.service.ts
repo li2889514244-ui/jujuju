@@ -20,6 +20,7 @@ import { WeiboCollector } from './collectors/weibo.collector'
 export class PlatformsService {
   private readonly logger = new Logger(PlatformsService.name)
   private readonly collectors: Map<string, IDataCollector>
+  private readonly beijingOffsetMs = 8 * 60 * 60 * 1000
 
   constructor(
     private prisma: PrismaService,
@@ -39,6 +40,31 @@ export class PlatformsService {
       ['BILIBILI', bilibiliCollector],
       ['WEIBO', weiboCollector],
     ])
+  }
+
+  private getBeijingDayStart(offsetDays = 0): Date {
+    const beijingNow = new Date(Date.now() + this.beijingOffsetMs)
+    return new Date(
+      Date.UTC(
+        beijingNow.getUTCFullYear(),
+        beijingNow.getUTCMonth(),
+        beijingNow.getUTCDate() + offsetDays,
+      ) - this.beijingOffsetMs,
+    )
+  }
+
+  private getBeijingDayStartFromDate(value: string): Date {
+    const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (match) {
+      const [, year, month, day] = match
+      return new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)) - this.beijingOffsetMs)
+    }
+    const date = new Date(value)
+    const beijingDate = new Date(date.getTime() + this.beijingOffsetMs)
+    return new Date(
+      Date.UTC(beijingDate.getUTCFullYear(), beijingDate.getUTCMonth(), beijingDate.getUTCDate()) -
+        this.beijingOffsetMs,
+    )
   }
 
   // ==================== 平台信息 ====================
@@ -206,15 +232,17 @@ export class PlatformsService {
       return { success: false, error: 'Account not found' }
     }
 
-    // Use provided date or default to today
-    let targetDate: Date
-    if (date) {
-      targetDate = new Date(date)
-      targetDate.setHours(0, 0, 0, 0)
-    } else {
-      targetDate = new Date()
-      targetDate.setHours(0, 0, 0, 0)
-    }
+    const hasReportedIncrement = [
+      metrics.newFollowers,
+      metrics.newViews,
+      metrics.newLikes,
+      metrics.newComments,
+      metrics.newShares,
+    ].some((value) => typeof value === 'number' && Number.isFinite(value))
+
+    const targetDate = date
+      ? this.getBeijingDayStartFromDate(date)
+      : this.getBeijingDayStart(hasReportedIncrement ? -1 : 0)
     const platform = account.platform as any
 
     try {
@@ -245,38 +273,36 @@ export class PlatformsService {
       }
 
       // 伴侣端未提供增量字段时，自动从前后两天快照差值计算
-      const hasAnyIncrement = (
+      const hasAnyIncrement =
         statData.followersIncrement !== undefined ||
         statData.viewsIncrement !== undefined ||
         statData.likesIncrement !== undefined ||
         statData.commentsIncrement !== undefined ||
         statData.sharesIncrement !== undefined
-      )
       if (!hasAnyIncrement) {
-        const yesterdayDate = new Date(targetDate)
-        yesterdayDate.setDate(yesterdayDate.getDate() - 1)
-        const yesterdayStats = await this.prisma.dailyStats.findUnique({
-          where: { accountId_date: { accountId, date: yesterdayDate } },
+        const previousStats = await this.prisma.dailyStats.findFirst({
+          where: { accountId, date: { lt: targetDate } },
           select: { followers: true, views: true, likes: true, comments: true, shares: true },
+          orderBy: { date: 'desc' },
         })
-        if (yesterdayStats) {
+        if (previousStats) {
           const diff = (today: number | undefined, prev: number | null) => {
             if (today === undefined || today === null) return 0
             return Math.max(0, today - (prev ?? 0))
           }
-          statData.followersIncrement = diff(statData.followers, yesterdayStats.followers)
-          statData.viewsIncrement = diff(statData.views, yesterdayStats.views)
-          statData.likesIncrement = diff(statData.likes, yesterdayStats.likes)
-          statData.commentsIncrement = diff(statData.comments, yesterdayStats.comments)
-          statData.sharesIncrement = diff(statData.shares, yesterdayStats.shares)
+          statData.followersIncrement = diff(statData.followers, previousStats.followers)
+          statData.viewsIncrement = diff(statData.views, previousStats.views)
+          statData.likesIncrement = diff(statData.likes, previousStats.likes)
+          statData.commentsIncrement = diff(statData.comments, previousStats.comments)
+          statData.sharesIncrement = diff(statData.shares, previousStats.shares)
           this.logger.log(
             `reportMetrics: auto-computed increments account=${accountId} ` +
-            `followers+${statData.followersIncrement} views+${statData.viewsIncrement} ` +
-            `likes+${statData.likesIncrement} comments+${statData.commentsIncrement} shares+${statData.sharesIncrement}`,
+              `followers+${statData.followersIncrement} views+${statData.viewsIncrement} ` +
+              `likes+${statData.likesIncrement} comments+${statData.commentsIncrement} shares+${statData.sharesIncrement}`,
           )
         } else {
           this.logger.debug(
-            `reportMetrics: no yesterday stats for ${accountId}, increments stay 0 (first collection)`,
+            `reportMetrics: no previous stats for ${accountId}, increments stay 0 (first collection)`,
           )
         }
       }
