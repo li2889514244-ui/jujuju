@@ -2,9 +2,15 @@
   <!-- Logo -->
   <div class="sidebar-inner__logo" @click="onLogoClick">
     <div class="sidebar-inner__logo-mark">
-      <svg viewBox="0 0 28 28" fill="none" width="20" height="20">
-        <rect width="28" height="28" rx="8" fill="#c7ff45" />
-        <path d="M9 20V8l10 6-10 6z" fill="#071008" opacity="0.96" />
+      <svg viewBox="0 0 28 28" fill="none" width="22" height="22" aria-hidden="true">
+        <defs>
+          <linearGradient id="mfLogoGrad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#818cf8" />
+            <stop offset="100%" stop-color="#6366f1" />
+          </linearGradient>
+        </defs>
+        <rect width="28" height="28" rx="8" fill="url(#mfLogoGrad)" />
+        <path d="M9 20V8l10 6-10 6z" fill="#ffffff" opacity="0.96" />
       </svg>
     </div>
     <div v-if="!collapsed" class="sidebar-inner__brand">
@@ -47,12 +53,7 @@
         ><Refresh
       /></el-icon>
     </div>
-    <div
-      v-if="!collapsed"
-      class="sidebar-inner__toggle"
-      :title="'收起菜单'"
-      @click="$emit('toggle')"
-    >
+    <div v-if="!collapsed" class="sidebar-inner__toggle" title="收起菜单" @click="$emit('toggle')">
       <el-icon :size="16"><Fold /></el-icon>
     </div>
   </div>
@@ -152,49 +153,41 @@ function getIcon(name: unknown): Component {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .sidebar-inner {
+  position: relative;
+  z-index: 1;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+
   &__logo {
-    height: 78px;
+    height: 64px;
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 0 18px;
+    padding: 0 20px;
     cursor: pointer;
-    border-bottom: 1px solid rgba(199, 255, 69, 0.11);
-    position: relative;
-
-    &::after {
-      content: '';
-      position: absolute;
-      right: 18px;
-      bottom: -1px;
-      left: 18px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba($color-accent, 0.65), transparent);
-    }
+    border-bottom: 1px solid $border-subtle;
+    flex-shrink: 0;
 
     &-mark {
-      width: 36px;
-      height: 36px;
+      width: 32px;
+      height: 32px;
       flex-shrink: 0;
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: 12px;
-      background: rgba($color-accent, 0.08);
-      box-shadow:
-        0 0 24px rgba($color-accent, 0.18),
-        inset 0 0 0 1px rgba($color-accent, 0.12);
+      border-radius: 10px;
+      background: rgba(99, 102, 241, 0.12);
+      box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
     }
 
     &-subtitle {
-      color: $color-text-tertiary;
+      color: $text-tertiary;
       font-family: $font-mono;
       font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.16em;
+      font-weight: 500;
+      letter-spacing: 0.12em;
       text-transform: uppercase;
     }
   }
@@ -202,42 +195,42 @@ function getIcon(name: unknown): Component {
   &__brand {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 1px;
     min-width: 0;
   }
 
   &__logo {
     &-text {
-      font-family: $font-heading;
-      font-size: 18px;
-      font-weight: 860;
-      color: $color-text-primary;
+      font-family: $font-sans;
+      font-size: 15px;
+      font-weight: 600;
+      color: $text-primary;
       white-space: nowrap;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.01em;
     }
   }
 
   &__menu {
     overflow-y: auto;
-    padding: 18px 12px;
+    padding: 16px 12px;
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
     flex: 1;
   }
 
   &__section {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 2px;
   }
 
   &__section-label {
-    padding: 0 10px 2px;
-    color: rgba($color-accent, 0.62);
-    font-size: 10px;
-    font-weight: 860;
-    letter-spacing: 0.16em;
+    padding: 0 12px 6px;
+    color: $text-tertiary;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
   }
 
@@ -245,58 +238,52 @@ function getIcon(name: unknown): Component {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 11px 12px;
-    border-radius: $radius-md;
-    color: $color-text-secondary;
+    padding: 9px 12px;
+    border-radius: $radius-sm;
+    color: $text-secondary;
     text-decoration: none;
-    font-size: 14px;
-    font-weight: 720;
-    transition: all 0.18s $ease-out;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.15s $ease-out;
     white-space: nowrap;
-    border: 1px solid transparent;
     position: relative;
-    overflow: hidden;
 
     &:hover {
-      background: rgba($color-accent, 0.07);
-      border-color: rgba($color-accent, 0.13);
-      color: $color-text-primary;
+      background: rgba(255, 255, 255, 0.04);
+      color: $text-primary;
     }
 
     &--active {
-      background:
-        linear-gradient(90deg, rgba($color-accent, 0.18), rgba($color-accent-alt, 0.05)),
-        rgba(199, 255, 69, 0.045);
-      border-color: rgba($color-accent, 0.3);
-      color: $color-accent;
-      box-shadow:
-        inset 3px 0 0 $color-accent,
-        0 0 22px rgba($color-accent, 0.08);
-      font-weight: 840;
+      background: rgba(99, 102, 241, 0.1);
+      color: $accent-300;
+      font-weight: 600;
 
-      &::after {
+      // 左侧 2px 竖条
+      &::before {
         content: '';
         position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          115deg,
-          transparent 0%,
-          rgba(255, 255, 255, 0.08) 45%,
-          transparent 70%
-        );
-        transform: translateX(-55%);
+        left: -8px;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 3px;
+        height: 18px;
+        background: $accent-500;
+        border-radius: 0 2px 2px 0;
       }
 
       .sidebar-inner__item-icon {
-        color: $color-accent;
+        color: $accent-400;
       }
     }
+
     &-icon {
       font-size: 18px;
-      width: 24px;
+      width: 20px;
       text-align: center;
       flex-shrink: 0;
+      transition: color 0.15s $ease-out;
     }
+
     &-label {
       overflow: hidden;
       text-overflow: ellipsis;
@@ -304,65 +291,73 @@ function getIcon(name: unknown): Component {
   }
 
   &__bottom {
-    padding: 14px 12px 16px;
-    border-top: 1px solid rgba(199, 255, 69, 0.11);
+    padding: 12px 16px 16px;
+    border-top: 1px solid $border-subtle;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 4px;
+    gap: 8px;
+    flex-shrink: 0;
   }
 
   &__status {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 11px;
+    padding: 5px 10px;
     border-radius: $radius-full;
-    background: rgba($color-danger, 0.08);
-    border: 1px solid rgba($color-danger, 0.16);
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.16);
 
     &--ok {
-      background: rgba($color-success, 0.08);
-      border-color: rgba($color-success, 0.16);
+      background: rgba(16, 185, 129, 0.08);
+      border-color: rgba(16, 185, 129, 0.16);
     }
+
     &-dot {
       width: 5px;
       height: 5px;
       border-radius: 50%;
       background: $color-danger;
     }
+
     &--ok &-dot {
       background: $color-success;
     }
+
     &-text {
-      font-size: $text-micro;
-      color: $color-text-secondary;
+      font-size: 11px;
+      color: $text-secondary;
       font-family: $font-mono;
+      font-weight: 500;
     }
+
     &-retry {
-      color: $color-text-tertiary;
+      color: $text-tertiary;
       cursor: pointer;
-      transition: color 0.15s;
+      transition: color 0.15s $ease-out;
+
       &:hover {
-        color: $color-accent;
+        color: $accent-400;
       }
     }
   }
 
   &__toggle {
-    width: 34px;
-    height: 34px;
+    width: 28px;
+    height: 28px;
     border-radius: $radius-sm;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    color: $color-text-tertiary;
-    transition: all 0.15s;
+    color: $text-tertiary;
+    transition: all 0.15s $ease-out;
     flex-shrink: 0;
+
     &:hover {
-      background: rgba($color-accent, 0.08);
-      color: $color-text-primary;
+      background: rgba(255, 255, 255, 0.04);
+      color: $text-primary;
     }
   }
 }

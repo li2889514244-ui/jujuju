@@ -262,20 +262,18 @@ function scrollToBottom() {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .mcp-page {
   display: flex;
   height: 100%;
-  gap: $space-md;
+  gap: $space-4;
 }
 
 // ---- Tools Panel ----
 .mcp-page__tools {
-  width: 260px;
+  width: 280px;
   flex-shrink: 0;
-  background: $color-bg-secondary;
-  border: 1px solid $color-border;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
   border-radius: $radius-lg;
   display: flex;
   flex-direction: column;
@@ -295,31 +293,33 @@ function scrollToBottom() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: $space-sm $space-md;
-  border-bottom: 1px solid $color-border;
+  padding: $space-3 $space-4;
+  border-bottom: 1px solid $border-subtle;
   flex-shrink: 0;
 
   h3 {
     margin: 0;
-    font-size: $text-caption;
-    font-weight: 500;
-    color: $color-text-secondary;
+    font-size: $text-xs;
+    font-weight: 600;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
     white-space: nowrap;
   }
 }
 
 .tools-toggle {
-  color: $color-text-tertiary;
+  color: $text-tertiary;
   padding: 4px;
   &:hover {
-    color: $color-text-primary;
+    color: $text-primary;
   }
 }
 
 .tools-body {
   flex: 1;
   overflow-y: auto;
-  padding: $space-sm;
+  padding: $space-3;
 }
 
 .tools-loading,
@@ -328,9 +328,9 @@ function scrollToBottom() {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: $space-md;
-  color: $color-text-tertiary;
-  font-size: $text-caption;
+  padding: $space-4;
+  color: $text-tertiary;
+  font-size: $text-xs;
 }
 
 .tools-error {
@@ -345,30 +345,32 @@ function scrollToBottom() {
 }
 
 .tool-card {
-  padding: $space-sm;
+  padding: $space-3;
   border-radius: $radius-sm;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: all 0.2s;
+  background: rgba(255, 255, 255, 0.015);
+  transition: all 0.2s $ease-out;
 
   &:hover {
-    background: rgba(0, 204, 153, 0.05);
-    border-color: rgba(0, 204, 153, 0.12);
+    background: rgba($accent-500, 0.06);
+    border-color: rgba($accent-500, 0.2);
   }
 
   &__name {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: $text-caption;
-    font-weight: 500;
-    color: $color-accent;
+    font-size: $text-body;
+    font-weight: 600;
+    color: $accent-400;
     margin-bottom: 4px;
+    font-family: $font-mono;
   }
 
   &__desc {
-    font-size: $text-micro;
-    color: $color-text-tertiary;
+    font-size: $text-xs;
+    color: $text-tertiary;
     line-height: 1.5;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -382,8 +384,8 @@ function scrollToBottom() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: $color-bg-secondary;
-  border: 1px solid $color-border;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
   border-radius: $radius-lg;
   overflow: hidden;
   min-width: 0;
@@ -393,21 +395,22 @@ function scrollToBottom() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: $space-sm $space-lg;
-  border-bottom: 1px solid $color-border;
+  padding: $space-3 $space-5;
+  border-bottom: 1px solid $border-subtle;
   flex-shrink: 0;
 
   &__title {
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: $color-accent;
+    gap: $space-2;
+    color: $accent-400;
 
     h2 {
       margin: 0;
-      font-size: $text-title;
-      font-weight: 500;
-      color: $color-text-primary;
+      font-size: $text-h3;
+      font-weight: 600;
+      color: $text-primary;
+      letter-spacing: -0.01em;
     }
   }
 }
@@ -416,10 +419,10 @@ function scrollToBottom() {
 .chat-messages {
   flex: 1;
   overflow-y: auto;
-  padding: $space-lg;
+  padding: $space-5;
   display: flex;
   flex-direction: column;
-  gap: $space-md;
+  gap: $space-4;
 }
 
 .chat-empty {
@@ -428,23 +431,27 @@ function scrollToBottom() {
   align-items: center;
   justify-content: center;
   flex: 1;
-  color: $color-text-tertiary;
+  color: $text-tertiary;
+  text-align: center;
 
   &__icon {
-    margin-bottom: $space-md;
+    margin-bottom: $space-4;
     opacity: 0.4;
+    color: $accent-400;
   }
 
   &__title {
-    font-size: $text-title;
-    font-weight: 500;
-    margin: 0 0 8px;
-    color: $color-text-secondary;
+    font-size: $text-h3;
+    font-weight: 600;
+    margin: 0 0 $space-2;
+    color: $text-secondary;
+    letter-spacing: -0.01em;
   }
 
   &__hint {
-    font-size: $text-caption;
+    font-size: $text-body;
     margin: 0;
+    color: $text-tertiary;
   }
 }
 
@@ -461,23 +468,23 @@ function scrollToBottom() {
 
 .message-bubble {
   max-width: 80%;
-  padding: $space-sm $space-md;
+  padding: $space-3 $space-4;
   border-radius: $radius-lg;
   font-size: $text-body;
   line-height: 1.7;
   word-break: break-word;
 
   &--user {
-    background: linear-gradient(135deg, rgba(0, 204, 153, 0.15), rgba(59, 130, 246, 0.1));
-    border: 1px solid rgba(0, 204, 153, 0.2);
-    color: $color-text-primary;
+    background: rgba($accent-500, 0.12);
+    border: 1px solid rgba($accent-500, 0.25);
+    color: $text-primary;
     border-bottom-right-radius: $radius-sm;
   }
 
   &--assistant {
-    background: $color-bg-tertiary;
-    border: 1px solid $color-border;
-    color: $color-text-primary;
+    background: $bg-overlay;
+    border: 1px solid $border-base;
+    color: $text-primary;
     border-bottom-left-radius: $radius-sm;
     min-width: 120px;
   }
@@ -486,9 +493,9 @@ function scrollToBottom() {
 .message-loading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  color: $color-text-tertiary;
-  font-size: $text-caption;
+  gap: $space-2;
+  color: $text-tertiary;
+  font-size: $text-body;
 }
 
 .message-error {
@@ -496,7 +503,7 @@ function scrollToBottom() {
   align-items: center;
   gap: 6px;
   color: $color-danger;
-  font-size: $text-caption;
+  font-size: $text-body;
 }
 
 .message-text {
@@ -504,48 +511,51 @@ function scrollToBottom() {
 }
 
 .message-table {
-  margin-top: $space-sm;
+  margin-top: $space-3;
+  border-radius: $radius-md;
+  overflow: hidden;
 
   :deep(.el-table) {
-    --el-table-bg-color: #{$color-bg-elevated};
-    --el-table-tr-bg-color: #{$color-bg-elevated};
-    --el-table-header-bg-color: #{$color-bg-tertiary};
-    --el-table-border-color: #{$color-border};
-    --el-table-text-color: #{$color-text-primary};
-    --el-table-header-text-color: #{$color-text-secondary};
+    background: $bg-elevated;
+    color: $text-primary;
 
     th.el-table__cell {
-      font-weight: 500;
-      font-size: $text-caption;
+      font-weight: 600;
+      font-size: $text-xs;
+      color: $text-secondary;
+      background: $bg-hover;
     }
   }
 }
 
 .message-csv {
-  margin-top: $space-sm;
-  padding-top: $space-sm;
-  border-top: 1px solid $color-border;
+  margin-top: $space-3;
+  padding-top: $space-3;
+  border-top: 1px solid $border-subtle;
 }
 
 // ---- Input ----
 .chat-input {
   display: flex;
   align-items: flex-end;
-  gap: $space-sm;
-  padding: $space-md $space-lg;
-  border-top: 1px solid $color-border;
+  gap: $space-3;
+  padding: $space-4 $space-5;
+  border-top: 1px solid $border-subtle;
   flex-shrink: 0;
 
   :deep(.el-textarea__inner) {
-    background: $color-bg-tertiary;
-    border-color: $color-border;
-    color: $color-text-primary;
+    background: $bg-base;
+    border-color: $border-base;
+    color: $text-primary;
+    border-radius: $radius-md;
+    font-family: $font-sans;
 
     &::placeholder {
-      color: $color-text-placeholder;
+      color: $text-placeholder;
     }
     &:focus {
-      border-color: $color-accent;
+      border-color: $accent-500;
+      box-shadow: 0 0 0 3px rgba($accent-500, 0.12);
     }
   }
 }

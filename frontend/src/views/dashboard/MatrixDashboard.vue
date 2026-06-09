@@ -40,11 +40,12 @@
     </div>
 
     <!-- Empty State -->
-    <div v-else-if="!loading && !overview && !error" class="md-empty">
-      <div class="md-empty__icon">📊</div>
-      <h3>暂无数据</h3>
-      <p>请确保伴侣正在运行，或添加账号后等待数据采集</p>
-    </div>
+    <el-empty
+      v-else-if="!loading && !overview && !error"
+      class="md-empty"
+      :image-size="120"
+      description="暂无数据，请确保伴侣正在运行，或添加账号后等待数据采集"
+    />
 
     <template v-else>
       <!-- Error State -->
@@ -297,12 +298,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useMatrixDashboard } from '@/composables/useMatrixDashboard'
+import { useChartTheme } from '@/composables/useChartTheme'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
 import type { EChartsOption } from 'echarts'
+
+const { accent, info, mergeOption } = useChartTheme()
 
 const {
   loading,
@@ -341,48 +345,64 @@ const trendChartOption = computed<EChartsOption>(() => {
     views: '播放量',
     engagement: '互动率(%)',
   }
-  return {
+  return mergeOption({
     tooltip: { trigger: 'axis' },
-    grid: { left: 50, right: 20, top: 10, bottom: 30 },
-    xAxis: { type: 'category', data: labels, axisLabel: { color: '#888', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: '#888', fontSize: 11 } },
+    xAxis: { type: 'category', data: labels, boundaryGap: false },
+    yAxis: { type: 'value' },
     series: [
       {
         name: nameMap[trendMetric.value] || '',
         type: 'line',
         data: values,
         smooth: true,
-        areaStyle: { opacity: 0.15 },
-        lineStyle: { width: 2 },
-        itemStyle: { color: '#4ade80' },
+        symbol: 'circle',
+        symbolSize: 6,
+        showSymbol: false,
+        areaStyle: {
+          opacity: 0.18,
+          color: {
+            type: 'linear',
+            x: 0,
+            y: 0,
+            x2: 0,
+            y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(99, 102, 241, 0.4)' },
+              { offset: 1, color: 'rgba(99, 102, 241, 0)' },
+            ],
+          },
+        },
+        lineStyle: { width: 2.5, color: accent },
+        itemStyle: { color: accent },
       },
     ],
-  }
+  })
 })
 
 const platformChartOption = computed<EChartsOption>(() => {
   const d = platformChartData.value
-  return {
+  return mergeOption({
     tooltip: { trigger: 'axis' },
-    legend: { textStyle: { color: '#aaa', fontSize: 11 } },
-    grid: { left: 50, right: 20, top: 40, bottom: 30 },
-    xAxis: { type: 'category', data: d.platforms, axisLabel: { color: '#888', fontSize: 11 } },
-    yAxis: { type: 'value', axisLabel: { color: '#888', fontSize: 11 } },
+    legend: { top: 0 },
+    xAxis: { type: 'category', data: d.platforms },
+    yAxis: { type: 'value' },
     series: [
       {
         name: '播放量',
         type: 'bar',
         data: d.views,
-        itemStyle: { color: '#4ade80', borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 32,
+        itemStyle: { color: accent, borderRadius: [6, 6, 0, 0] },
       },
       {
         name: '互动',
         type: 'bar',
         data: d.likes,
-        itemStyle: { color: '#60a5fa', borderRadius: [4, 4, 0, 0] },
+        barMaxWidth: 32,
+        itemStyle: { color: info, borderRadius: [6, 6, 0, 0] },
       },
     ],
-  }
+  })
 })
 
 // ─── Helpers ───
@@ -410,9 +430,11 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .matrix-dashboard {
-  padding: 24px;
-  max-width: 1400px;
+  padding: 32px;
+  max-width: 1440px;
   margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
 }
 
 // ─── Header ───
@@ -420,24 +442,26 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 16px;
   &__left {
     h2 {
       margin: 0;
       font-size: 24px;
-      font-weight: 700;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--color-text-primary);
     }
   }
   &__sub {
-    margin: 4px 0 0;
-    color: var(--color-text-secondary);
+    margin: 6px 0 0;
+    color: var(--color-text-tertiary);
     font-size: 13px;
   }
   &__right {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     align-items: center;
   }
 }
@@ -449,25 +473,11 @@ onMounted(() => {
 }
 
 // ─── Skeleton / Empty / Error ───
-.md-skeleton,
-.md-empty {
+.md-skeleton {
   padding: 48px 0;
 }
 .md-empty {
-  text-align: center;
-  color: var(--color-text-secondary);
-  &__icon {
-    font-size: 48px;
-    margin-bottom: 16px;
-  }
-  h3 {
-    margin: 0 0 8px;
-    font-size: 18px;
-  }
-  p {
-    margin: 0;
-    font-size: 14px;
-  }
+  padding: 64px 0;
 }
 .md-error {
   margin-bottom: 16px;
@@ -486,21 +496,43 @@ onMounted(() => {
 .md-kpi-card {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
-  padding: 20px;
-  transition: border-color 0.2s;
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  transition: all 0.2s var(--ease-out);
+  position: relative;
+  overflow: hidden;
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.06), transparent 60%);
+    opacity: 0;
+    transition: opacity 0.25s var(--ease-out);
+    pointer-events: none;
+  }
   &:hover {
     border-color: var(--color-border-hover);
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+    &::before {
+      opacity: 1;
+    }
   }
   &__label {
-    font-size: 13px;
-    color: var(--color-text-secondary);
-    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--color-text-tertiary);
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
   }
   &__value {
-    font-size: 28px;
-    font-weight: 700;
+    font-size: 30px;
+    font-weight: 600;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    color: var(--color-text-primary);
+    font-family: var(--font-mono);
   }
   &__trend {
     margin-top: 8px;

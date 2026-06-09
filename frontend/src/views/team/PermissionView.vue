@@ -1,6 +1,6 @@
 <template>
   <div class="permission">
-    <el-page-header @back="$router.push('/team')" title="返回团队管理">
+    <el-page-header title="返回团队管理" @back="$router.push('/team')">
       <template #content>权限管理</template>
     </el-page-header>
 
@@ -64,10 +64,28 @@ interface PermEntry {
 // 内置默认值（作为 API 返回为空时的 fallback）
 const ADMIN_DEFAULTS: PermEntry[] = [
   { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: true },
-  { id: 'view_content', name: '查看内容', description: '查看团队内所有内容', enabled: true, alwaysEnabled: true },
-  { id: 'create_content', name: '创建内容', description: '创建和编辑内容', enabled: true, alwaysEnabled: true },
+  {
+    id: 'view_content',
+    name: '查看内容',
+    description: '查看团队内所有内容',
+    enabled: true,
+    alwaysEnabled: true,
+  },
+  {
+    id: 'create_content',
+    name: '创建内容',
+    description: '创建和编辑内容',
+    enabled: true,
+    alwaysEnabled: true,
+  },
   { id: 'publish_content', name: '发布内容', description: '发布内容到各平台', enabled: true },
-  { id: 'view_analytics', name: '查看数据', description: '查看数据分析报告', enabled: true, alwaysEnabled: true },
+  {
+    id: 'view_analytics',
+    name: '查看数据',
+    description: '查看数据分析报告',
+    enabled: true,
+    alwaysEnabled: true,
+  },
   { id: 'export_data', name: '导出数据', description: '导出分析报告和数据', enabled: true },
   { id: 'manage_browser', name: '管理浏览器', description: '管理内置浏览器会话', enabled: true },
   { id: 'manage_team', name: '管理团队', description: '邀请/移除成员、修改角色', enabled: true },
@@ -75,9 +93,21 @@ const ADMIN_DEFAULTS: PermEntry[] = [
 ]
 
 const MEMBER_DEFAULTS: PermEntry[] = [
-  { id: 'view_accounts', name: '查看账号', description: '查看团队内所有账号信息', enabled: true, alwaysEnabled: true },
+  {
+    id: 'view_accounts',
+    name: '查看账号',
+    description: '查看团队内所有账号信息',
+    enabled: true,
+    alwaysEnabled: true,
+  },
   { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: false },
-  { id: 'view_content', name: '查看内容', description: '查看团队内所有内容', enabled: true, alwaysEnabled: true },
+  {
+    id: 'view_content',
+    name: '查看内容',
+    description: '查看团队内所有内容',
+    enabled: true,
+    alwaysEnabled: true,
+  },
   { id: 'create_content', name: '创建内容', description: '创建和编辑内容', enabled: true },
   { id: 'publish_content', name: '发布内容', description: '发布内容到各平台', enabled: false },
   { id: 'view_analytics', name: '查看数据', description: '查看数据分析报告', enabled: true },
@@ -181,14 +211,17 @@ onMounted(async () => {
 
 <style lang="scss" scoped>
 .permission {
-  max-width: 900px;
+  max-width: 960px;
+  display: flex;
+  flex-direction: column;
+  gap: $space-4;
 
   &__card {
-    margin-top: 20px;
+    border-radius: $radius-lg;
   }
 
   &__tip {
-    margin-bottom: 20px;
+    margin-bottom: $space-5;
   }
 
   &__tabs {
@@ -196,12 +229,12 @@ onMounted(async () => {
   }
 
   &__table {
-    margin-bottom: 20px;
+    margin-bottom: $space-4;
   }
 
   &__footer {
     display: flex;
-    gap: 8px;
+    gap: $space-2;
     justify-content: flex-end;
   }
 }

@@ -97,7 +97,7 @@
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
-          <el-icon v-if="selectedIds.includes(acc.id)" :size="20" color="#c7ff45"
+          <el-icon v-if="selectedIds.includes(acc.id)" :size="20" color="var(--color-accent)"
             ><CircleCheckFilled
           /></el-icon>
           <span v-else class="account-card__check-empty" />
@@ -143,17 +143,27 @@
           width="48"
           height="40"
           rx="6"
-          stroke="#c7ff45"
-          stroke-width="2"
+          stroke="var(--color-accent)"
+          stroke-width="1.5"
           fill="none"
+          opacity="0.5"
         />
-        <circle cx="32" cy="30" r="8" stroke="#c7ff45" stroke-width="2" fill="none" />
+        <circle
+          cx="32"
+          cy="30"
+          r="8"
+          stroke="var(--color-accent)"
+          stroke-width="1.5"
+          fill="none"
+          opacity="0.5"
+        />
         <path
           d="M18 48c4-6 10-10 16-10s12 4 16 10"
-          stroke="#c7ff45"
-          stroke-width="2"
+          stroke="var(--color-accent)"
+          stroke-width="1.5"
           fill="none"
           stroke-linecap="round"
+          opacity="0.5"
         />
       </svg>
       <h3>连接你的第一个账号</h3>
@@ -514,66 +524,57 @@ function openManualAdd() {
 .account-list {
   display: flex;
   flex-direction: column;
-  gap: $space-xl;
+  gap: $space-6;
 
   &__header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: $space-lg;
-    padding: 30px;
-    border: 1px solid rgba($color-accent, 0.18);
+    gap: $space-5;
+    padding: $space-8;
+    border: 1px solid $border-base;
     border-radius: $radius-xl;
     background:
-      radial-gradient(circle at 8% 10%, rgba($color-accent, 0.16), transparent 34%),
-      linear-gradient(135deg, rgba(243, 240, 223, 0.065), rgba(243, 240, 223, 0.012)),
-      rgba(8, 11, 8, 0.72);
-    box-shadow: $shadow-md;
+      radial-gradient(circle at 8% 10%, rgba($accent-500, 0.14), transparent 40%), $bg-elevated;
+    box-shadow: $shadow-sm;
     position: relative;
     overflow: hidden;
 
-    &::after {
-      content: '';
-      position: absolute;
-      right: -60px;
-      bottom: -90px;
-      width: 260px;
-      height: 260px;
-      border: 1px solid rgba($color-accent, 0.15);
-      border-radius: 50%;
-      pointer-events: none;
-    }
-
     h2 {
-      margin: 10px 0 10px;
-      font-size: clamp(30px, 3vw, 44px);
-      letter-spacing: -0.06em;
+      margin: $space-3 0;
+      font-size: $text-h1;
+      letter-spacing: -0.025em;
+      font-weight: 600;
+      color: $text-primary;
     }
 
     p {
       max-width: 620px;
-      color: $color-text-secondary;
+      color: $text-secondary;
       margin: 0;
-      font-size: 15px;
+      font-size: $text-body;
+      line-height: 1.6;
     }
   }
 
   &__header-link {
     position: relative;
     z-index: 1;
-    padding: 11px 16px;
-    border: 1px solid rgba($color-accent, 0.26);
+    padding: 9px 16px;
+    border: 1px solid $border-strong;
     border-radius: $radius-full;
-    background: rgba($color-accent, 0.08);
-    color: $color-accent;
-    font-size: $text-caption;
-    font-weight: 820;
-    white-space: nowrap;
+    background: rgba($accent-500, 0.08);
+    color: $accent-400;
+    font-size: $text-xs;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    transition: all 0.2s $ease-out;
 
     &:hover {
-      color: #071008;
-      background: $color-accent;
-      border-color: $color-border-hover;
+      color: $bg-deep;
+      background: $accent-500;
+      border-color: $accent-500;
     }
   }
 
@@ -581,18 +582,19 @@ function openManualAdd() {
     border-radius: $radius-lg;
 
     :deep(.el-form--inline .el-form-item) {
-      margin-right: $space-sm;
+      margin-right: $space-3;
     }
   }
 
   &__actions {
     display: flex;
-    gap: $space-sm;
+    gap: $space-2;
     flex-wrap: wrap;
-    padding: $space-sm;
-    border: 1px solid rgba(243, 240, 223, 0.08);
+    align-items: center;
+    padding: $space-3;
+    border: 1px solid $border-subtle;
     border-radius: $radius-lg;
-    background: rgba(8, 11, 8, 0.52);
+    background: rgba(255, 255, 255, 0.015);
 
     .ml-auto {
       margin-left: auto;
@@ -602,7 +604,7 @@ function openManualAdd() {
   &__pagination {
     display: flex;
     justify-content: center;
-    padding-top: $space-lg;
+    padding-top: $space-6;
   }
 }
 
@@ -616,25 +618,26 @@ function openManualAdd() {
 // === Account card grid ===
 .account-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: $space-lg;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: $space-4;
 }
 
 .account-card {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 14px;
-  min-height: 282px;
-  padding: 28px 22px 22px;
-  background:
-    linear-gradient(145deg, rgba(243, 240, 223, 0.06), rgba(243, 240, 223, 0.012)),
-    rgba(13, 19, 15, 0.78);
-  border: 1px solid rgba(243, 240, 223, 0.1);
+  gap: $space-3;
+  min-height: 260px;
+  padding: $space-6 $space-5 $space-5;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
   border-radius: $radius-xl;
   box-shadow: $shadow-sm;
   cursor: pointer;
-  transition: all 0.25s $ease-out;
+  transition:
+    transform 0.25s $ease-out,
+    border-color 0.2s $ease-out,
+    box-shadow 0.25s $ease-out;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -643,60 +646,67 @@ function openManualAdd() {
     content: '';
     position: absolute;
     top: 0;
-    right: 22px;
-    left: 22px;
-    height: 3px;
-    background: linear-gradient(90deg, transparent, $color-accent, transparent);
+    right: 0;
+    left: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, $accent-500, transparent);
     opacity: 0;
     transition: opacity 0.25s $ease-out;
   }
 
   &:hover {
-    transform: translateY(-5px);
-    border-color: $color-border-hover;
+    transform: translateY(-2px);
+    border-color: $border-strong;
     box-shadow: $shadow-md;
+
+    &::before {
+      opacity: 0.6;
+    }
+  }
+
+  &--selected {
+    border-color: $accent-500;
+    background: linear-gradient(180deg, rgba($accent-500, 0.06), transparent 60%), $bg-elevated;
 
     &::before {
       opacity: 1;
     }
   }
 
-  &--selected {
-    border-color: $color-accent;
-    background:
-      linear-gradient(145deg, rgba($color-accent, 0.12), rgba($color-accent-alt, 0.045)),
-      rgba(13, 19, 15, 0.78);
-  }
-
   &__check {
     position: absolute;
-    top: $space-sm;
-    right: $space-sm;
+    top: $space-3;
+    right: $space-3;
   }
   &__check-empty {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border-radius: 50%;
-    border: 2px solid rgba(243, 240, 223, 0.16);
+    border: 1.5px solid $border-strong;
     display: block;
+    transition: border-color 0.15s $ease-out;
+  }
+  &:hover &__check-empty {
+    border-color: $accent-400;
   }
 
   &__info {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 2px;
+    gap: 6px;
     min-width: 0;
     width: 100%;
   }
   &__name {
-    font-size: 17px;
-    font-weight: 860;
-    color: $color-text-primary;
+    font-size: 16px;
+    font-weight: 600;
+    color: $text-primary;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
+    letter-spacing: -0.01em;
   }
   &__stats {
     display: flex;
@@ -706,49 +716,52 @@ function openManualAdd() {
   }
   &__stat-value {
     font-family: $font-mono;
-    font-size: 34px;
-    font-weight: 860;
-    color: $color-accent;
-    font-feature-settings: 'tnum';
-    letter-spacing: -0.06em;
+    font-size: 28px;
+    font-weight: 600;
+    color: $text-primary;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
   }
   &__stat-label {
     font-size: $text-micro;
-    color: $color-text-tertiary;
-    font-weight: 760;
-    letter-spacing: 0.12em;
+    color: $text-tertiary;
+    font-weight: 500;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
+    margin-top: 2px;
   }
   &__group {
     font-size: $text-micro;
-    color: $color-text-secondary;
-    background: rgba(243, 240, 223, 0.07);
-    border: 1px solid rgba(243, 240, 223, 0.08);
+    color: $text-secondary;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid $border-subtle;
     padding: 3px 10px;
     border-radius: $radius-full;
   }
   &__status {
     font-size: $text-micro;
-    font-weight: 820;
-    padding: 4px 10px;
+    font-weight: 600;
+    padding: 3px 10px;
     border-radius: $radius-full;
     &.status--valid {
-      background: rgba($color-success, 0.1);
+      background: rgba($color-success, 0.12);
       color: $color-success;
     }
     &.status--expiring_soon {
-      background: rgba($color-warning, 0.15);
+      background: rgba($color-warning, 0.14);
       color: $color-warning;
     }
     &.status--expired,
     &.status--unknown {
-      background: rgba($color-danger, 0.1);
+      background: rgba($color-danger, 0.12);
       color: $color-danger;
     }
   }
   &__actions {
     display: flex;
-    gap: $space-xs;
+    gap: $space-2;
     margin-top: auto;
   }
 }
@@ -757,64 +770,68 @@ function openManualAdd() {
 .add-dialog {
   display: flex;
   flex-direction: column;
-  gap: $space-md;
-  padding: $space-sm 0;
+  gap: $space-4;
+  padding: $space-2 0;
   .add-dialog__title {
-    font-size: $text-title;
-    color: $color-text-primary;
-    font-weight: 700;
+    font-size: $text-h3;
+    color: $text-primary;
+    font-weight: 600;
     margin: 0;
+    letter-spacing: -0.01em;
   }
   .add-dialog__eyebrow {
-    color: $color-accent;
+    color: $accent-400;
     font-size: $text-micro;
-    font-weight: 700;
+    font-weight: 600;
     letter-spacing: 0.08em;
     margin: 0 0 4px;
     text-transform: uppercase;
   }
   .add-dialog__desc {
-    color: $color-text-secondary;
-    font-size: $text-caption;
+    color: $text-secondary;
+    font-size: $text-body;
     margin: 6px 0 0;
+    line-height: 1.6;
   }
 }
 .companion-online-box {
-  background: rgba(243, 240, 223, 0.055);
-  border: 1px solid rgba(243, 240, 223, 0.09);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid $border-base;
   border-radius: $radius-md;
-  padding: $space-md;
+  padding: $space-4;
   .companion-online-box__status {
     color: $color-success;
     font-weight: 600;
-    margin-bottom: $space-sm;
+    margin-bottom: $space-2;
+    font-size: $text-body;
   }
   .companion-online-box__hint {
-    color: $color-text-secondary;
-    font-size: $text-caption;
-    margin-bottom: $space-sm;
+    color: $text-secondary;
+    font-size: $text-body;
+    margin-bottom: $space-3;
   }
   .companion-online-box__btns {
     display: flex;
-    gap: $space-sm;
+    gap: $space-2;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
   }
 }
 .companion-offline-box {
-  background: rgba(243, 240, 223, 0.055);
-  border: 1px solid rgba(243, 240, 223, 0.09);
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid $border-base;
   border-radius: $radius-md;
-  padding: $space-md;
+  padding: $space-4;
   text-align: left;
   p {
-    margin: 4px 0;
-    font-size: $text-caption;
-    color: $color-text-secondary;
+    margin: 6px 0;
+    font-size: $text-body;
+    color: $text-secondary;
+    line-height: 1.6;
   }
 }
 .download-btn {
-  margin-bottom: $space-md;
+  margin-bottom: $space-4;
 }
 
 // === Float bar ===
@@ -825,22 +842,25 @@ function openManualAdd() {
   transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: $space-lg;
-  background: rgba(8, 11, 8, 0.92);
-  border: 1px solid rgba($color-accent, 0.18);
-  border-radius: $radius-lg;
+  gap: $space-5;
+  background: rgba(15, 16, 24, 0.92);
+  border: 1px solid $border-strong;
+  border-radius: $radius-full;
   box-shadow: $shadow-lg;
-  backdrop-filter: blur(18px);
-  padding: $space-sm $space-lg;
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  padding: $space-3 $space-5;
   z-index: 100;
   &__count {
     font-size: $text-body;
-    font-weight: 600;
-    color: $color-text-primary;
+    font-weight: 500;
+    color: $text-primary;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
   }
   &__actions {
     display: flex;
-    gap: $space-sm;
+    gap: $space-2;
   }
 }
 
@@ -849,18 +869,19 @@ function openManualAdd() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: $space-md;
-  padding: $space-4xl 0;
+  gap: $space-3;
+  padding: $space-16 0;
   text-align: center;
   h3 {
-    font-size: $text-headline;
+    font-size: $text-h3;
     font-weight: 600;
-    color: $color-text-primary;
+    color: $text-primary;
     margin: 0;
+    letter-spacing: -0.01em;
   }
   p {
     font-size: $text-body;
-    color: $color-text-tertiary;
+    color: $text-tertiary;
     margin: 0;
   }
 }

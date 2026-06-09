@@ -273,54 +273,84 @@ function formatNum(n: any): string {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .account-detail {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
   &__title {
-    font-size: $text-title;
+    font-size: $text-h3;
     font-weight: 600;
+    color: $text-primary;
+    margin-left: $space-3;
   }
   &__content {
-    margin-top: $space-lg;
+    margin-top: 0;
   }
   &__profile {
     text-align: center;
-    padding: $space-lg 0;
+    padding: $space-6 0 $space-4;
     h3 {
-      margin: $space-sm 0 $space-xs;
-      font-size: $text-title;
+      margin: $space-3 0 $space-2;
+      font-size: $text-h3;
+      font-weight: 600;
+      color: $text-primary;
+      letter-spacing: -0.01em;
     }
   }
   &__platform {
-    margin: $space-xs 0;
+    margin: $space-2 0;
     display: flex;
     justify-content: center;
   }
   &__actions {
-    margin-top: $space-lg;
+    margin-top: $space-5;
     display: flex;
     flex-direction: column;
-    gap: $space-xs;
+    gap: $space-2;
     .el-button {
       width: 100%;
     }
   }
   &__analytics {
-    margin-bottom: $space-md;
+    margin-bottom: $space-4;
   }
 }
 
 .analytics-mini-card {
   text-align: center;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
+  border-radius: $radius-lg;
+  transition:
+    border-color 0.2s $ease-out,
+    transform 0.2s $ease-out;
+
+  &:hover {
+    border-color: $border-strong;
+    transform: translateY(-1px);
+  }
+
+  :deep(.el-card__body) {
+    padding: $space-4 $space-3;
+  }
+
   &__label {
-    font-size: $text-caption;
-    color: $color-text-tertiary;
-    margin-bottom: 6px;
+    font-size: $text-xs;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    margin-bottom: $space-2;
   }
   &__value {
-    font-size: $text-headline;
+    font-size: $text-h2;
     font-weight: 600;
-    color: $color-text-primary;
+    color: $text-primary;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -333,6 +363,6 @@ function formatNum(n: any): string {
 .post-pagination {
   display: flex;
   justify-content: center;
-  margin-top: $space-md;
+  margin-top: $space-4;
 }
 </style>

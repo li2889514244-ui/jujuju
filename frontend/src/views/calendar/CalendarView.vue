@@ -164,19 +164,19 @@ const weekDays = ['日', '一', '二', '三', '四', '五', '六']
 
 const dialogVisible = ref(false)
 const editingEvent = ref<CalendarEvent | null>(null)
-const form = ref({ title: '', allDay: false, color: '#00cc99', description: '' })
+const form = ref({ title: '', allDay: false, color: '#6366f1', description: '' })
 const formDate = ref<Date | null>(null)
 const formTime = ref<[Date, Date] | null>(null)
 
 const predefineColors = [
-  '#00cc99',
-  '#22c55e',
+  '#6366f1',
+  '#10b981',
   '#f59e0b',
   '#ef4444',
-  '#3b82f6',
-  '#6366f1',
-  '#9aa4b8',
-  '#6b7390',
+  '#06b6d4',
+  '#a855f7',
+  '#64748b',
+  '#94a3b8',
 ]
 
 const periodLabel = computed(() => {
@@ -225,7 +225,7 @@ function nextPeriod() {
 
 function openAddDialog() {
   editingEvent.value = null
-  form.value = { title: '', allDay: false, color: '#00cc99', description: '' }
+  form.value = { title: '', allDay: false, color: '#6366f1', description: '' }
   formDate.value = new Date()
   formTime.value = null
   dialogVisible.value = true
@@ -295,22 +295,26 @@ async function deleteEvent() {
 
 <style lang="scss" scoped>
 .calendar-page {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
     h2 {
       margin: 0;
-      font-size: $text-headline;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      font-size: $text-h1;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: $text-primary;
     }
   }
   &__controls {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: $space-3;
   }
 }
 
@@ -319,133 +323,167 @@ async function deleteEvent() {
   align-items: center;
   justify-content: center;
   min-width: 160px;
-  padding: 5px 12px;
-  font-size: 13px;
+  padding: 6px 14px;
+  font-size: $text-body;
   font-weight: 500;
-  color: $color-text-primary;
-  background: $color-bg-tertiary;
-  border: 1px solid $color-border;
+  color: $text-primary;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
   border-radius: $radius-sm;
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 .cal-empty {
   text-align: center;
-  padding: 48px 20px;
-  color: $color-text-tertiary;
-  font-size: 14px;
+  padding: $space-12 $space-5;
+  color: $text-tertiary;
+  font-size: $text-body;
   p {
-    margin-bottom: 16px;
+    margin-bottom: $space-4;
   }
 }
 
 .cal-month {
   @include card;
   overflow: hidden;
+  padding: 0;
 }
 .cal-weekdays {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  border-bottom: 1px solid var(--el-border-color);
+  border-bottom: 1px solid $border-subtle;
   text-align: center;
-  padding: $space-sm 0;
-  font-size: 13px;
-  color: var(--el-text-color-placeholder);
-  font-weight: 500;
-  background: transparent;
+  padding: $space-3 0;
+  font-size: $text-xs;
+  color: $text-tertiary;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(255, 255, 255, 0.015);
 }
 .cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  grid-auto-rows: minmax(80px, auto);
+  grid-auto-rows: minmax(96px, auto);
 }
 .cal-day {
-  padding: 4px;
-  border-right: 1px solid var(--el-border-color-light);
-  border-bottom: 1px solid var(--el-border-color-light);
+  padding: 6px;
+  border-right: 1px solid $border-subtle;
+  border-bottom: 1px solid $border-subtle;
   min-height: 100px;
+  background: transparent;
+  transition: background 0.15s $ease-out;
+  &:hover {
+    background: rgba(255, 255, 255, 0.015);
+  }
   &:nth-child(7n) {
     border-right: none;
   }
   &--other {
-    background: var(--el-bg-color-page);
-    color: var(--el-text-color-placeholder);
+    background: rgba(0, 0, 0, 0.15);
+    color: $text-placeholder;
+    .cal-day__num {
+      color: $text-placeholder;
+    }
   }
   &--today {
-    background: rgba(#00cc99, 0.06);
+    background: rgba($accent-500, 0.06);
     .cal-day__num {
-      color: #00cc99;
+      color: $accent-400;
       font-weight: 700;
     }
   }
   &__num {
     padding: 2px 6px;
-    font-size: 13px;
-    color: var(--el-text-color-secondary);
+    font-size: $text-body;
+    color: $text-secondary;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
   }
   &__items {
     display: flex;
     flex-direction: column;
-    gap: 1px;
-    margin-top: 2px;
+    gap: 2px;
+    margin-top: 4px;
   }
 }
 
 .cal-event {
-  padding: 2px 6px;
-  border-radius: 3px;
-  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: $radius-sm;
+  font-size: $text-xs;
   cursor: pointer;
   border-left: 3px solid;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+  font-weight: 500;
+  transition:
+    transform 0.15s $ease-out,
+    filter 0.15s $ease-out;
+  &:hover {
+    transform: translateX(2px);
+    filter: brightness(1.15);
+  }
   &__time {
     font-size: $text-micro;
-    color: var(--el-text-color-placeholder);
-    margin-right: 2px;
-  }
-  &__title {
+    color: inherit;
+    opacity: 0.7;
+    margin-right: 4px;
+    font-family: $font-mono;
   }
   &--week {
-    margin-bottom: 2px;
+    margin-bottom: 3px;
   }
 }
 
 .cal-week {
   @include card;
+  padding: 0;
   &__header {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    border-bottom: 1px solid var(--el-border-color);
+    border-bottom: 1px solid $border-subtle;
   }
   &__col-header {
     text-align: center;
-    padding: 8px 0;
-    font-size: 13px;
-    color: var(--el-text-color-secondary);
+    padding: $space-3 0;
+    font-size: $text-xs;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
     &.is-today {
-      color: #00cc99;
+      color: $accent-400;
       font-weight: 600;
+      background: rgba($accent-500, 0.06);
     }
   }
   &__date {
-    font-size: $text-headline;
-    font-weight: 500;
+    font-size: $text-h2;
+    font-weight: 600;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
+    margin-top: 4px;
   }
   &__body {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
+    min-height: 480px;
   }
   &__col {
-    padding: 6px 4px;
-    min-height: 100px;
-    border-right: 1px solid var(--el-border-color-light);
+    padding: $space-2;
+    border-right: 1px solid $border-subtle;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
     &:last-child {
       border-right: none;
     }
     &.is-today {
-      background: rgba(#00cc99, 0.06);
+      background: rgba($accent-500, 0.05);
     }
   }
 }

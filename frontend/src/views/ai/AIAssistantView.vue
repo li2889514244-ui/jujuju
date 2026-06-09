@@ -806,13 +806,15 @@ function copyContent() {
 // ===== Init (see onMounted above) =====
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .ai-assistant {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
 }
 
 .ai-assistant__header {
-  margin-bottom: 20px;
+  // header
 }
 
 .header-content {
@@ -821,15 +823,21 @@ function copyContent() {
   align-items: center;
 }
 
-.header-info h2 {
-  margin: 0 0 4px;
-  font-size: $text-headline;
+.header-info {
+  h2 {
+    margin: 0 0 $space-1;
+    font-size: $text-h1;
+    font-weight: 600;
+    color: $text-primary;
+    letter-spacing: -0.025em;
+  }
 }
 
 .subtitle {
-  color: $color-text-placeholder;
+  color: $text-tertiary;
   margin: 0;
   font-size: $text-body;
+  line-height: 1.6;
 }
 
 .ai-assistant__tabs {
@@ -838,6 +846,7 @@ function copyContent() {
 
 .result-card {
   min-height: 400px;
+  border-radius: $radius-lg;
 }
 
 .result-header {
@@ -851,25 +860,31 @@ function copyContent() {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 60px;
-  color: $color-text-placeholder;
+  padding: $space-16;
+  color: $text-tertiary;
+  gap: $space-3;
 }
 
 .result-text {
   line-height: 1.8;
   font-size: $text-body;
-  color: $color-text-primary;
+  color: $text-primary;
+  white-space: pre-wrap;
 }
 
 .result-keywords {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: $space-4;
+  padding-top: $space-4;
+  border-top: 1px solid $border-subtle;
 }
 
 .result-keywords .label {
-  color: $color-text-placeholder;
-  margin-right: 8px;
+  color: $text-tertiary;
+  margin-right: $space-2;
+  font-size: $text-xs;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 .keyword-tag {
@@ -878,72 +893,106 @@ function copyContent() {
 
 /* Publish Time Slots */
 .time-slots {
-  margin-bottom: 16px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: $space-3;
+  margin-bottom: $space-4;
 }
 
 .time-slot {
   text-align: center;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
-  transition: all 0.3s;
+  padding: $space-4;
+  border: 1px solid $border-base;
+  border-radius: $radius-md;
+  background: $bg-elevated;
+  transition: all 0.2s $ease-out;
 }
 
 .time-slot.is-best {
-  border-color: $color-accent;
-  background: rgba($color-accent, 0.06);
+  border-color: rgba($accent-500, 0.5);
+  background: linear-gradient(180deg, rgba($accent-500, 0.08), transparent 70%), $bg-elevated;
 }
 
 .slot-rank {
-  font-size: $text-caption;
-  color: $color-text-placeholder;
+  font-size: $text-xs;
+  color: $text-tertiary;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 .slot-time {
   font-size: 18px;
   font-weight: 600;
-  margin: 8px 0;
+  margin: $space-2 0;
+  color: $text-primary;
+  font-family: $font-mono;
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .slot-score {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  font-size: $text-caption;
+  gap: $space-2;
+  font-size: $text-xs;
   color: $color-success;
+  font-weight: 500;
 }
 
 .slot-reason {
-  font-size: $text-caption;
-  color: $color-text-placeholder;
-  margin-top: 8px;
+  font-size: $text-xs;
+  color: $text-tertiary;
+  margin-top: $space-2;
+  line-height: 1.5;
 }
 
 .publish-info h4,
 .publish-tips h4 {
-  margin: 0 0 8px;
+  margin: 0 0 $space-2;
+  font-size: $text-h3;
+  font-weight: 600;
+  color: $text-primary;
 }
 
 .publish-tips ul {
-  padding-left: 20px;
-  color: $color-text-tertiary;
+  padding-left: $space-5;
+  color: $text-secondary;
+  line-height: 1.7;
+  font-size: $text-body;
 }
 
 /* Stats */
 .stat-card {
   text-align: center;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
+  border-radius: $radius-md;
+  padding: $space-4;
+  transition: border-color 0.2s $ease-out;
+  &:hover {
+    border-color: $border-strong;
+  }
 }
 
 .stat-label {
-  color: $color-text-placeholder;
-  font-size: 13px;
-  margin-bottom: 8px;
+  color: $text-tertiary;
+  font-size: $text-xs;
+  margin-bottom: $space-2;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: $text-h2;
   font-weight: 600;
+  font-family: $font-mono;
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  color: $text-primary;
 }
 
 .text-success {
@@ -958,20 +1007,23 @@ function copyContent() {
 .insights-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: $space-2;
 }
 
 .insight-item {
   display: flex;
   align-items: flex-start;
-  gap: 8px;
-  color: $color-text-tertiary;
+  gap: $space-2;
+  color: $text-secondary;
   font-size: $text-body;
+  line-height: 1.6;
 }
 
 .recommendations-list {
-  padding-left: 20px;
-  color: $color-text-tertiary;
+  padding-left: $space-5;
+  color: $text-secondary;
+  line-height: 1.7;
+  font-size: $text-body;
 }
 
 .recommendations-list li {
@@ -982,9 +1034,11 @@ function copyContent() {
 .anomaly-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba($color-border-active, 0.08);
+  gap: $space-2;
+  padding: $space-2 0;
+  border-bottom: 1px solid $border-subtle;
+  font-size: $text-body;
+  color: $text-primary;
 }
 
 .anomaly-item:last-child {
@@ -992,38 +1046,46 @@ function copyContent() {
 }
 
 .empty-text {
-  color: $color-text-placeholder;
+  color: $text-tertiary;
   text-align: center;
-  padding: $space-lg;
+  padding: $space-6;
+  font-size: $text-body;
 }
 
 /* Review */
 .review-result-card {
   margin-bottom: 0;
+  border-radius: $radius-lg;
 }
 
 .review-status {
   display: flex;
   align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.review-status h3 {
-  margin: 0 0 8px;
+  gap: $space-4;
+  margin-bottom: $space-4;
+  h3 {
+    margin: 0 0 $space-2;
+    font-size: $text-h3;
+    font-weight: 600;
+    color: $text-primary;
+  }
 }
 
 .review-summary {
-  color: $color-text-tertiary;
+  color: $text-secondary;
   margin: 0;
+  font-size: $text-body;
+  line-height: 1.6;
 }
 
 .review-issue {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 0;
-  border-bottom: 1px solid rgba($color-border-active, 0.08);
+  gap: $space-2;
+  padding: $space-2 0;
+  border-bottom: 1px solid $border-subtle;
+  font-size: $text-body;
+  color: $text-primary;
 }
 
 .review-issue:last-child {
@@ -1032,17 +1094,27 @@ function copyContent() {
 
 .sentiment-item {
   text-align: center;
-  padding: 12px;
+  padding: $space-3;
+  background: rgba(255, 255, 255, 0.015);
+  border-radius: $radius-md;
+  border: 1px solid $border-subtle;
 }
 
 .sentiment-label {
-  color: $color-text-placeholder;
-  font-size: 13px;
-  margin-bottom: 8px;
+  color: $text-tertiary;
+  font-size: $text-xs;
+  margin-bottom: $space-2;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 .sentiment-value {
   font-size: 18px;
   font-weight: 600;
+  color: $text-primary;
+  font-family: $font-mono;
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
 }
 </style>

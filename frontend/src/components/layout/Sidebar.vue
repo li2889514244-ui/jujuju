@@ -1,7 +1,7 @@
 <template>
   <!-- Mobile hamburger -->
   <div v-if="isMobile" class="sidebar__hamburger" @click="drawerVisible = true">
-    <el-icon :size="22"><Expand /></el-icon>
+    <el-icon :size="20"><Expand /></el-icon>
   </div>
 
   <!-- Mobile drawer -->
@@ -57,51 +57,65 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .sidebar__hamburger {
   position: fixed;
   top: 12px;
   left: 12px;
   z-index: 1001;
-  width: 42px;
-  height: 42px;
+  width: 40px;
+  height: 40px;
   border-radius: $radius-md;
-  background: rgba(8, 11, 8, 0.9);
-  border: 1px solid $color-border;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
   box-shadow: $shadow-md;
   backdrop-filter: blur(18px);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: $color-accent;
-  transition: all 0.2s;
+  color: $text-secondary;
+  transition: all 0.2s $ease-out;
+
   &:hover {
-    background: $color-bg-hover;
+    color: $accent-400;
+    border-color: $border-strong;
   }
 }
 
 .sidebar {
   width: $sidebar-width;
   height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(199, 255, 69, 0.08), transparent 22%), rgba(5, 7, 5, 0.86);
-  border-right: 1px solid rgba(199, 255, 69, 0.12);
-  box-shadow: 20px 0 70px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(26px);
+  background-color: $bg-base;
+  border-right: 1px solid $border-subtle;
   display: flex;
   flex-direction: column;
   transition: width 0.25s $ease-out;
   flex-shrink: 0;
   z-index: 10;
   user-select: none;
+  position: relative;
+
+  // 顶部极轻 indigo glow（不抢戏）
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 240px;
+    background: radial-gradient(
+      ellipse 100% 80% at 50% 0%,
+      rgba(99, 102, 241, 0.06),
+      transparent 70%
+    );
+    pointer-events: none;
+  }
 
   &--collapsed {
     width: $sidebar-collapsed-width;
   }
   &--drawer {
-    background: $color-bg-primary;
+    background: $bg-base;
     border-right: none;
   }
 }
@@ -109,7 +123,7 @@ onUnmounted(() => {
 
 <style lang="scss">
 .sidebar-drawer {
-  background: $color-bg-primary !important;
+  background: $bg-base !important;
   .el-drawer__body {
     padding: 0;
     height: 100%;

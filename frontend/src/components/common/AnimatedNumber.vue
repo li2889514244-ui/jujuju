@@ -1,5 +1,5 @@
 <template>
-  <span>{{ displayValue }}</span>
+  <span class="animated-number">{{ displayValue }}</span>
 </template>
 
 <script setup lang="ts">
@@ -46,3 +46,14 @@ const displayValue = computed(() => {
   return props.format ? props.format(n) : n.toLocaleString()
 })
 </script>
+
+<style lang="scss" scoped>
+.animated-number {
+  font-family: $font-mono;
+  font-feature-settings:
+    'tnum' 1,
+    'cv11' 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+</style>

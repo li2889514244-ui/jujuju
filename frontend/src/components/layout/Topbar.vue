@@ -1,7 +1,7 @@
 <template>
   <div class="topbar">
     <div class="topbar__left">
-      <el-breadcrumb separator="›">
+      <el-breadcrumb separator="/">
         <el-breadcrumb-item :to="{ path: '/dashboard' }">首页</el-breadcrumb-item>
         <el-breadcrumb-item v-if="currentRoute?.meta?.title">
           {{ currentRoute.meta.title }}
@@ -13,7 +13,7 @@
       <!-- Tools -->
       <el-dropdown trigger="click" class="topbar__tools">
         <div class="topbar__tool-button" role="button" aria-label="工具">
-          <el-icon :size="16"><MoreFilled /></el-icon>
+          <el-icon :size="14"><MoreFilled /></el-icon>
           <span class="topbar__desktop">工具</span>
         </div>
         <template #dropdown>
@@ -23,17 +23,17 @@
                 href="/downloads/pixingyun-mate-portable.zip"
                 target="_blank"
                 class="topbar__tool-link"
-                ><el-icon :size="16"><Download /></el-icon> 下载桌面伴侣</a
+                ><el-icon :size="14"><Download /></el-icon> 下载桌面伴侣</a
               >
             </el-dropdown-item>
             <el-dropdown-item>
               <router-link to="/ai" class="topbar__tool-link">
-                <el-icon :size="16"><MagicStick /></el-icon> AI 助手
+                <el-icon :size="14"><MagicStick /></el-icon> AI 助手
               </router-link>
             </el-dropdown-item>
             <el-dropdown-item>
               <router-link to="/mcp" class="topbar__tool-link">
-                <el-icon :size="16"><ChatDotRound /></el-icon> MCP 查询
+                <el-icon :size="14"><ChatDotRound /></el-icon> MCP 查询
               </router-link>
             </el-dropdown-item>
           </el-dropdown-menu>
@@ -43,11 +43,11 @@
       <!-- Team Switcher -->
       <el-dropdown trigger="click" class="topbar__team-wrap" @command="handleTeamSwitch">
         <div class="topbar__team">
-          <el-icon :size="15"><OfficeBuilding /></el-icon>
+          <el-icon :size="14"><OfficeBuilding /></el-icon>
           <span class="topbar__team-name topbar__desktop">{{
             teamStore.currentTeam?.name || '选择团队'
           }}</span>
-          <el-icon :size="12"><ArrowDown /></el-icon>
+          <el-icon :size="11"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -71,15 +71,9 @@
       >
         <template #reference>
           <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="topbar__notification">
-            <el-icon
-              :size="18"
-              class="topbar__icon-btn"
-              role="button"
-              aria-label="通知"
-              tabindex="0"
-            >
-              <Bell />
-            </el-icon>
+            <div class="topbar__icon-btn" role="button" aria-label="通知" tabindex="0">
+              <el-icon :size="16"><Bell /></el-icon>
+            </div>
           </el-badge>
         </template>
         <div class="notification-panel">
@@ -120,10 +114,11 @@
       <!-- User Menu -->
       <el-dropdown trigger="click" @command="handleUserCommand">
         <div class="topbar__user">
-          <el-avatar :size="28" :src="userStore.avatar">
+          <el-avatar :size="26" :src="userStore.avatar">
             {{ userStore.username?.charAt(0)?.toUpperCase() }}
           </el-avatar>
           <span class="topbar__username topbar__desktop">{{ userStore.username }}</span>
+          <el-icon :size="11"><ArrowDown /></el-icon>
         </div>
         <template #dropdown>
           <el-dropdown-menu>
@@ -263,14 +258,12 @@ function handleUserCommand(command: string) {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .topbar {
   height: $topbar-height;
-  background:
-    linear-gradient(90deg, rgba(199, 255, 69, 0.055), transparent 32%), rgba(8, 11, 8, 0.72);
-  border-bottom: 1px solid rgba(199, 255, 69, 0.11);
-  backdrop-filter: blur(22px);
+  background-color: rgba(15, 16, 24, 0.8);
+  border-bottom: 1px solid $border-subtle;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -278,26 +271,22 @@ function handleUserCommand(command: string) {
   flex-shrink: 0;
   z-index: 5;
   position: relative;
-
-  &::after {
-    content: '';
-    position: absolute;
-    right: 24px;
-    bottom: -1px;
-    left: 24px;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba($color-accent, 0.3), transparent);
-  }
 }
 
 .topbar__left {
+  flex: 1;
+  min-width: 0;
+
   :deep(.el-breadcrumb) {
-    font-size: 12px;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    font-size: 13px;
+
+    .el-breadcrumb__inner {
+      font-weight: 500;
+    }
+
     .el-breadcrumb__separator {
-      color: $color-text-tertiary;
-      margin: 0 6px;
+      color: $text-placeholder;
+      margin: 0 8px;
     }
   }
 }
@@ -305,114 +294,120 @@ function handleUserCommand(command: string) {
 .topbar__right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .topbar__desktop {
-  display: flex;
+  display: inline;
 }
 
 .topbar__tools {
   display: flex;
 }
 
-.topbar__tool-button {
+// 统一的胶囊按钮样式
+%pill-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
-  color: $color-text-secondary;
+  gap: 6px;
+  color: $text-secondary;
   font-size: 13px;
-  font-weight: 760;
-  padding: 8px 12px;
-  border: 1px solid rgba(243, 240, 223, 0.1);
-  border-radius: $radius-full;
-  background: rgba(13, 19, 15, 0.62);
+  font-weight: 500;
+  padding: 6px 12px;
+  height: 32px;
+  border: 1px solid $border-base;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
-  transition: all 0.18s $ease-out;
+  transition: all 0.16s $ease-out;
+
   &:hover {
-    background: rgba($color-accent, 0.09);
-    border-color: rgba($color-accent, 0.22);
-    color: $color-accent;
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: $accent-300;
   }
+}
+
+.topbar__tool-button {
+  @extend %pill-btn;
 }
 
 .topbar__tool-link {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: $color-text-secondary;
+  color: $text-secondary;
   text-decoration: none;
+
   &:hover {
-    color: $color-accent;
+    color: $accent-300;
   }
 }
 
 .topbar__team {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-  color: $color-text-secondary;
-  font-size: 13px;
-  font-weight: 760;
-  padding: 8px 12px;
-  border: 1px solid rgba(243, 240, 223, 0.1);
-  border-radius: $radius-full;
-  background: rgba(13, 19, 15, 0.62);
-  transition: all 0.18s $ease-out;
-  &:hover {
-    background: rgba($color-accent, 0.08);
-    border-color: rgba($color-accent, 0.2);
-    color: $color-text-primary;
-  }
+  @extend %pill-btn;
 }
 
 .topbar__icon-btn {
-  color: $color-text-secondary;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid $border-base;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.02);
+  color: $text-secondary;
   cursor: pointer;
-  width: 36px;
-  height: 36px;
-  padding: 9px;
-  border: 1px solid rgba(243, 240, 223, 0.1);
-  border-radius: $radius-full;
-  background: rgba(13, 19, 15, 0.62);
-  transition: all 0.18s $ease-out;
+  transition: all 0.16s $ease-out;
+
   &:hover {
-    color: $color-accent;
-    border-color: rgba($color-accent, 0.2);
-    background: rgba($color-accent, 0.08);
+    color: $accent-300;
+    background: rgba(99, 102, 241, 0.08);
+    border-color: rgba(99, 102, 241, 0.3);
   }
 }
 
 .topbar__notification {
   cursor: pointer;
+
   :deep(.el-badge__content) {
     font-size: 10px;
     height: 16px;
-    line-height: 16px;
-    padding: 0 4px;
+    line-height: 14px;
+    padding: 0 5px;
+    background-color: $color-danger;
+    border: 2px solid $bg-base;
   }
 }
 
 .topbar__user {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   cursor: pointer;
-  padding: 4px 12px 4px 4px;
+  padding: 3px 10px 3px 3px;
+  height: 32px;
   border-radius: $radius-full;
-  border: 1px solid rgba(243, 240, 223, 0.1);
-  background: rgba(13, 19, 15, 0.62);
-  transition: all 0.18s $ease-out;
+  border: 1px solid $border-base;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.16s $ease-out;
+
   &:hover {
-    background: rgba($color-accent, 0.08);
-    border-color: rgba($color-accent, 0.2);
+    background: rgba(99, 102, 241, 0.06);
+    border-color: rgba(99, 102, 241, 0.24);
   }
 }
+
 .topbar__username {
   font-size: 13px;
-  color: $color-text-primary;
-  font-weight: 760;
+  color: $text-primary;
+  font-weight: 500;
+  max-width: 90px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 // Notification panel
@@ -422,18 +417,21 @@ function handleUserCommand(command: string) {
     justify-content: space-between;
     align-items: center;
     padding-bottom: 12px;
-    border-bottom: 1px solid $color-border;
-    font-weight: 800;
+    border-bottom: 1px solid $border-subtle;
+    font-weight: 600;
     font-size: 14px;
+    color: $text-primary;
   }
+
   &__body {
     max-height: 360px;
     overflow-y: auto;
     padding-top: 6px;
   }
+
   &__empty {
     text-align: center;
-    color: $color-text-tertiary;
+    color: $text-tertiary;
     padding: 40px 0;
     font-size: 13px;
   }
@@ -443,34 +441,40 @@ function handleUserCommand(command: string) {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 6px;
+  padding: 10px 8px;
   border-radius: $radius-sm;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background 0.15s $ease-out;
+
   &:hover {
-    background: rgba($color-accent, 0.06);
+    background: rgba(99, 102, 241, 0.06);
   }
+
   &--unread {
-    background: rgba($color-accent, 0.08);
+    background: rgba(99, 102, 241, 0.05);
   }
+
   &__icon {
-    padding-top: 1px;
+    padding-top: 2px;
   }
+
   &__content {
     flex: 1;
     min-width: 0;
   }
+
   &__title {
     font-size: 13px;
-    color: $color-text-primary;
+    color: $text-primary;
     line-height: 1.4;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+
   &__time {
-    font-size: 12px;
-    color: $color-text-tertiary;
+    font-size: 11px;
+    color: $text-tertiary;
     margin-top: 2px;
   }
 }
@@ -478,7 +482,7 @@ function handleUserCommand(command: string) {
 // Mobile
 @media (max-width: 768px) {
   .topbar {
-    padding: 0 10px;
+    padding: 0 12px;
     &__right {
       gap: 6px;
     }
@@ -489,13 +493,13 @@ function handleUserCommand(command: string) {
       display: none !important;
     }
     &__team {
-      padding: 5px 6px;
+      padding: 0 8px;
     }
     &__tool-button {
-      padding: 8px;
+      padding: 0 8px;
     }
     &__user {
-      padding: 2px;
+      padding: 3px;
     }
     &__left {
       padding-left: 44px;

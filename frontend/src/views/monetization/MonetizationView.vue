@@ -414,29 +414,29 @@ onUnmounted(() => {
 </script>
 
 <style lang="scss" scoped>
-@import '@/assets/styles/variables';
-
 .monetization {
   max-width: 1200px;
   margin: 0 auto;
-  padding-bottom: 40px;
+  padding-bottom: $space-12;
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
 
   &__header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: $space-lg;
   }
   &__title {
-    font-size: $text-headline;
-    font-weight: 700;
-    color: $color-text-primary;
+    font-size: $text-h1;
+    font-weight: 600;
+    color: $text-primary;
     margin: 0;
-    font-family: $font-heading;
+    letter-spacing: -0.025em;
   }
   &__actions {
     display: flex;
-    gap: $space-xs;
+    gap: $space-2;
     align-items: center;
   }
   &__store-select {
@@ -450,8 +450,8 @@ onUnmounted(() => {
 
   &__kpi {
     display: grid;
-    gap: $space-md;
-    margin-bottom: $space-lg;
+    gap: $space-4;
+    margin-bottom: 0;
 
     &--primary {
       grid-template-columns: repeat(2, 1fr);
@@ -462,13 +462,17 @@ onUnmounted(() => {
   }
 
   &__chart {
-    margin-bottom: $space-lg;
+    border-radius: $radius-lg;
   }
 
   &__grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: $space-lg;
+    gap: $space-5;
+  }
+
+  &__empty-store {
+    text-align: center;
   }
 
   @media (max-width: 960px) {
@@ -485,24 +489,25 @@ onUnmounted(() => {
 .shop-info {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: $space-lg;
-  padding: $space-md $space-lg;
+  gap: $space-3;
+  padding: $space-4 $space-5;
   @include card;
   &__avatar {
     width: 48px;
     height: 48px;
     border-radius: $radius-md;
     object-fit: cover;
+    background: $bg-hover;
   }
   &__name {
     font-size: 16px;
     font-weight: 600;
-    color: $color-text-primary;
+    color: $text-primary;
+    letter-spacing: -0.01em;
   }
   &__meta {
-    font-size: 12px;
-    color: $color-text-tertiary;
+    font-size: $text-xs;
+    color: $text-tertiary;
     margin-top: 2px;
   }
 }
@@ -510,27 +515,30 @@ onUnmounted(() => {
 // KPI cards
 .kpi-card {
   @include card;
-  padding: $space-lg $space-md;
-  text-align: center;
+  padding: $space-5 $space-4;
+  text-align: left;
 
   &--sm {
-    padding: $space-sm;
+    padding: $space-3;
   }
 
   &__label {
-    font-size: 12px;
-    color: $color-text-tertiary;
-    margin-bottom: 6px;
+    font-size: $text-xs;
+    color: $text-tertiary;
+    margin-bottom: $space-2;
     font-weight: 500;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.06em;
   }
   &__value {
-    font-size: 24px;
-    font-weight: 700;
-    color: $color-text-primary;
-    font-feature-settings: 'tnum';
+    font-size: 26px;
+    font-weight: 600;
+    color: $text-primary;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
     font-family: $font-mono;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
     &--sm {
       font-size: 18px;
     }
@@ -539,13 +547,13 @@ onUnmounted(() => {
     }
   }
   &__sub {
-    font-size: 11px;
-    color: $color-text-tertiary;
-    margin-top: 4px;
+    font-size: $text-micro;
+    color: $text-tertiary;
+    margin-top: $space-2;
   }
 }
 
-// Section cards (orders, products, chart containers)
+// Section cards
 .section-card {
   @include card;
   overflow: hidden;
@@ -554,52 +562,57 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px $space-lg;
-    border-bottom: 1px solid $color-border;
-    font-size: 14px;
+    padding: $space-3 $space-5;
+    border-bottom: 1px solid $border-subtle;
+    font-size: $text-body;
     font-weight: 600;
-    color: $color-text-primary;
+    color: $text-primary;
+    letter-spacing: -0.005em;
   }
   &__header-right {
     display: flex;
     align-items: center;
-    gap: $space-xs;
+    gap: $space-2;
   }
   &__meta {
-    font-size: 12px;
-    color: $color-text-tertiary;
+    font-size: $text-xs;
+    color: $text-tertiary;
     font-weight: 400;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
   }
   &__toggle {
-    font-size: 12px;
-    color: $color-accent;
+    font-size: $text-xs;
+    color: $accent-400;
     cursor: pointer;
+    font-weight: 500;
+    margin-left: $space-2;
   }
 }
 
 // Empty state
 .empty-hint {
-  padding: 40px;
+  padding: $space-12 $space-6;
   text-align: center;
-  color: $color-text-tertiary;
-  font-size: 14px;
+  color: $text-tertiary;
+  font-size: $text-body;
   p {
-    margin-bottom: 16px;
+    margin-bottom: $space-4;
   }
 }
 
 // Order list
 .order-list {
-  padding: 10px $space-lg;
+  padding: $space-2 $space-5;
   max-height: 450px;
   overflow-y: auto;
 }
 .order-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 0;
-  border-bottom: 1px solid $color-border;
+  gap: $space-3;
+  padding: $space-3 0;
+  border-bottom: 1px solid $border-subtle;
   &:last-child {
     border-bottom: none;
   }
@@ -609,14 +622,16 @@ onUnmounted(() => {
     border-radius: $radius-sm;
     object-fit: cover;
     flex-shrink: 0;
+    background: $bg-hover;
   }
   &__info {
     flex: 1;
     min-width: 0;
   }
   &__title {
-    font-size: 13px;
-    color: $color-text-primary;
+    font-size: $text-body;
+    color: $text-primary;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -624,33 +639,34 @@ onUnmounted(() => {
   }
   &__meta {
     display: flex;
-    gap: $space-xs;
+    gap: $space-2;
     align-items: center;
   }
   &__time {
-    font-size: 11px;
-    color: $color-text-tertiary;
+    font-size: $text-micro;
+    color: $text-tertiary;
+    font-family: $font-mono;
   }
   &__status {
-    font-size: 10px;
-    padding: 1px 6px;
-    border-radius: 3px;
+    font-size: $text-micro;
+    padding: 2px 7px;
+    border-radius: $radius-full;
     font-weight: 500;
     &.is-done {
       color: $color-success;
       background: rgba($color-success, 0.12);
     }
     &.is-shipping {
-      color: $color-accent-alt;
-      background: rgba($color-accent-alt, 0.12);
+      color: $color-info;
+      background: rgba($color-info, 0.12);
     }
     &.is-paid {
       color: $color-warning;
-      background: rgba($color-warning, 0.12);
+      background: rgba($color-warning, 0.14);
     }
     &.is-pending {
-      color: $color-text-tertiary;
-      background: rgba($color-text-tertiary, 0.12);
+      color: $text-tertiary;
+      background: rgba($text-tertiary, 0.12);
     }
     &.is-cancel {
       color: $color-danger;
@@ -658,14 +674,15 @@ onUnmounted(() => {
     }
   }
   &__shipped {
-    font-size: 10px;
-    color: $color-accent-alt;
+    font-size: $text-micro;
+    color: $color-info;
   }
   &__price {
-    font-size: 14px;
+    font-size: $text-body;
     font-weight: 600;
-    color: $color-text-primary;
-    font-feature-settings: 'tnum';
+    color: $text-primary;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
     flex-shrink: 0;
     &--refund {
       color: $color-danger;
@@ -675,23 +692,23 @@ onUnmounted(() => {
 
 // Product grid
 .product-grid {
-  padding: 10px $space-lg;
+  padding: $space-2 $space-5;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
+  gap: $space-2;
   max-height: 450px;
   overflow-y: auto;
 }
 .product-card {
   display: flex;
-  gap: 10px;
-  padding: 10px;
-  background: $color-bg-tertiary;
-  border: 1px solid $color-border;
+  gap: $space-2;
+  padding: $space-2;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid $border-subtle;
   border-radius: $radius-md;
-  transition: border-color 0.2s;
+  transition: border-color 0.2s $ease-out;
   &:hover {
-    border-color: $color-border-hover;
+    border-color: $border-strong;
   }
   &__img {
     width: 44px;
@@ -699,6 +716,7 @@ onUnmounted(() => {
     border-radius: $radius-sm;
     object-fit: cover;
     flex-shrink: 0;
+    background: $bg-hover;
   }
   &__info {
     flex: 1;
@@ -708,26 +726,28 @@ onUnmounted(() => {
     justify-content: center;
   }
   &__title {
-    font-size: 12px;
-    color: $color-text-primary;
+    font-size: $text-xs;
+    color: $text-primary;
+    font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
   &__stats {
     display: flex;
-    gap: $space-xs;
+    gap: $space-2;
     align-items: baseline;
     margin-top: 4px;
     flex-wrap: wrap;
-    font-size: 11px;
-    color: $color-text-tertiary;
+    font-size: $text-micro;
+    color: $text-tertiary;
   }
   &__price {
-    font-size: 13px;
+    font-size: $text-body;
     font-weight: 600;
-    color: $color-text-primary;
-    font-feature-settings: 'tnum';
+    color: $text-primary;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
   }
 }
 </style>

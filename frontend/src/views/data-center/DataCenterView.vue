@@ -367,92 +367,127 @@ onMounted(() => {
 
 <style lang="scss" scoped>
 .data-center {
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
+
   &__header {
     display: flex;
     align-items: flex-end;
     justify-content: space-between;
-    gap: $space-lg;
-    margin-bottom: $space-xl;
-    padding: 28px 30px;
-    border: 1px solid rgba($color-accent, 0.16);
+    gap: $space-5;
+    padding: $space-8;
+    border: 1px solid $border-base;
     border-radius: $radius-xl;
     background:
-      radial-gradient(circle at 12% 12%, rgba($color-accent, 0.12), transparent 34%),
-      linear-gradient(135deg, rgba(243, 240, 223, 0.055), rgba(243, 240, 223, 0.012)),
-      rgba(8, 11, 8, 0.68);
+      radial-gradient(circle at 12% 12%, rgba($accent-500, 0.14), transparent 40%), $bg-elevated;
     box-shadow: $shadow-sm;
 
     h2 {
-      margin: 10px 0;
-      font-size: clamp(30px, 3vw, 42px);
-      letter-spacing: -0.06em;
+      margin: $space-3 0;
+      font-size: $text-h1;
+      letter-spacing: -0.025em;
+      font-weight: 600;
+      color: $text-primary;
     }
 
     p {
-      color: $color-text-secondary;
+      color: $text-secondary;
       margin: 0;
+      font-size: $text-body;
+      line-height: 1.6;
     }
   }
 
   &__links {
     display: flex;
     flex-wrap: wrap;
-    gap: $space-xs;
+    gap: $space-2;
 
     a {
-      padding: 9px 13px;
-      border: 1px solid rgba($color-accent, 0.18);
+      padding: 9px 14px;
+      border: 1px solid $border-strong;
       border-radius: $radius-full;
-      background: rgba($color-accent, 0.065);
-      color: $color-accent;
-      font-size: $text-caption;
-      font-weight: 760;
+      background: rgba($accent-500, 0.08);
+      color: $accent-400;
+      font-size: $text-xs;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s $ease-out;
 
       &:hover {
-        color: #071008;
-        background: $color-accent;
-        border-color: $color-border-hover;
+        color: $bg-deep;
+        background: $accent-500;
+        border-color: $accent-500;
       }
     }
   }
 
-  &__filter {
-    margin-bottom: 20px;
-  }
-  &__overview {
-    margin-bottom: 20px;
-  }
+  &__filter,
+  &__overview,
   &__chart {
-    margin-bottom: 20px;
-  }
-  &__body {
+    border-radius: $radius-lg;
   }
 }
 
 .overview-card {
-  text-align: center;
+  text-align: left;
+  background: $bg-elevated;
+  border: 1px solid $border-base;
+  border-radius: $radius-lg;
+  padding: $space-4;
+  transition:
+    border-color 0.2s $ease-out,
+    transform 0.2s $ease-out;
+
+  &:hover {
+    border-color: $border-strong;
+    transform: translateY(-1px);
+  }
+
+  :deep(.el-card__body) {
+    padding: 0;
+  }
+
   &__label {
-    font-size: 13px;
-    color: $color-text-secondary;
-    margin-bottom: 8px;
+    font-size: $text-xs;
+    color: $text-tertiary;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 500;
+    margin-bottom: $space-2;
   }
   &__value {
-    font-size: 24px;
+    font-size: 26px;
     font-weight: 600;
-    color: $color-text-primary;
+    color: $text-primary;
+    font-family: $font-mono;
+    font-feature-settings: 'tnum' 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
   }
   &__change {
-    font-size: $text-caption;
-    margin-top: 6px;
-    font-weight: 500;
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    font-size: $text-xs;
+    margin-top: $space-2;
+    font-weight: 600;
+    font-family: $font-mono;
+    padding: 2px 8px;
+    border-radius: $radius-full;
+    background: rgba($color-success, 0.12);
   }
 }
 
 .trend--up {
   color: $color-success;
+  background: rgba($color-success, 0.12);
 }
 .trend--down {
   color: $color-danger;
+  background: rgba($color-danger, 0.12);
 }
 
 .chart-header {
@@ -463,16 +498,17 @@ onMounted(() => {
 }
 
 .ranking-title {
-  font-size: 13px;
-  color: $color-text-primary;
+  font-size: $text-body;
+  color: $text-primary;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 180px;
+  font-weight: 500;
 }
 .ranking-meta {
-  font-size: 11px;
-  color: $color-text-secondary;
+  font-size: $text-xs;
+  color: $text-tertiary;
   margin-top: 2px;
 }
 
@@ -482,19 +518,24 @@ onMounted(() => {
   justify-content: center;
   width: 22px;
   height: 22px;
-  border-radius: 50%;
-  font-size: 11px;
-  font-weight: bold;
-  color: #fff;
+  border-radius: $radius-full;
+  font-size: $text-xs;
+  font-weight: 600;
+  font-family: $font-mono;
+  color: $bg-deep;
+  background: $border-strong;
 }
 .rank-1 {
   background: $color-warning;
+  color: $bg-deep;
 }
 .rank-2 {
-  background: $color-text-tertiary;
+  background: $text-tertiary;
+  color: $text-primary;
 }
 .rank-3 {
-  background: $color-accent-alt;
+  background: $accent-500;
+  color: #fff;
 }
 
 @media (max-width: 768px) {

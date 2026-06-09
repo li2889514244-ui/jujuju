@@ -412,68 +412,79 @@ onMounted(async () => {
 </script>
 
 <style scoped lang="scss">
-@import '@/assets/styles/variables';
-
 .platform-manage {
-  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: $space-5;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: $space-lg;
 
   .header-left {
     h2 {
       margin: 0 0 4px 0;
-      font-size: $text-headline;
+      font-size: $text-h1;
       font-weight: 600;
-      color: $color-text-primary;
-      font-family: $font-heading;
+      color: $text-primary;
+      letter-spacing: -0.025em;
     }
     .subtitle {
       font-size: $text-body;
-      color: $color-text-tertiary;
+      color: $text-tertiary;
     }
   }
   .header-actions {
     display: flex;
-    gap: $space-xs;
+    gap: $space-2;
   }
 }
 
 .platform-stats {
-  margin-bottom: $space-lg;
-
   .stat-card {
     text-align: center;
     cursor: pointer;
     transition: all 0.2s $ease-out;
-    border: 1px solid $color-border;
+    background: $bg-elevated;
+    border: 1px solid $border-base;
+    border-radius: $radius-lg;
 
     &:hover {
-      border-color: $color-border-hover;
+      border-color: $border-strong;
+      transform: translateY(-1px);
     }
 
     &.active {
-      border-color: $color-accent;
+      border-color: rgba($accent-500, 0.5);
+      background: linear-gradient(180deg, rgba($accent-500, 0.06), transparent 70%), $bg-elevated;
+    }
+
+    :deep(.el-card__body) {
+      padding: $space-4 $space-3;
     }
 
     .stat-icon {
-      margin-bottom: $space-xs;
+      margin-bottom: $space-2;
+      display: flex;
+      justify-content: center;
     }
 
     .stat-info {
       .stat-name {
         font-size: $text-body;
-        font-weight: 500;
-        color: $color-text-primary;
+        font-weight: 600;
+        color: $text-primary;
+        letter-spacing: -0.005em;
       }
       .stat-count {
-        font-size: $text-caption;
-        color: $color-text-secondary;
+        font-size: $text-xs;
+        color: $text-tertiary;
         margin-top: 4px;
+        font-family: $font-mono;
+        font-feature-settings: 'tnum' 1;
+        font-variant-numeric: tabular-nums;
       }
     }
   }
@@ -482,8 +493,7 @@ onMounted(async () => {
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: $space-sm;
-  margin-bottom: $space-md;
+  gap: $space-3;
   &__search {
     width: 240px;
   }
@@ -492,70 +502,81 @@ onMounted(async () => {
 .platform-cell {
   display: flex;
   align-items: center;
-  gap: $space-xs;
+  gap: $space-2;
+  font-size: $text-body;
+  color: $text-primary;
+  font-weight: 500;
 }
 
 .account-cell {
   display: flex;
   align-items: center;
-  gap: $space-sm;
+  gap: $space-3;
   .account-info {
     .nickname {
-      font-weight: 500;
-      color: $color-text-primary;
+      font-weight: 600;
+      color: $text-primary;
+      font-size: $text-body;
     }
     .uid {
-      font-size: $text-caption;
-      color: $color-text-secondary;
+      font-size: $text-xs;
+      color: $text-tertiary;
+      font-family: $font-mono;
+      margin-top: 2px;
     }
   }
 }
 
 .metric {
   font-weight: 500;
-  color: $color-text-primary;
+  color: $text-primary;
+  font-family: $font-mono;
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
 }
 .time-text {
-  font-size: 13px;
-  color: $color-text-secondary;
+  font-size: $text-body;
+  color: $text-tertiary;
 }
 
 .pagination-wrapper {
   display: flex;
   justify-content: flex-end;
-  margin-top: $space-md;
+  margin-top: $space-4;
 }
 
 .platform-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: $space-md;
+  gap: $space-3;
 
   .platform-option {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: $space-xs;
-    padding: $space-lg;
-    border: 1px solid $color-border;
+    gap: $space-2;
+    padding: $space-5;
+    border: 1px solid $border-base;
     border-radius: $radius-md;
     cursor: pointer;
+    background: $bg-elevated;
     transition: all 0.2s $ease-out;
 
     &:hover {
-      border-color: $color-accent;
-      background: rgba($color-accent, 0.04);
+      border-color: $accent-500;
+      background: rgba($accent-500, 0.04);
     }
 
     &.authorized {
-      border-color: rgba($color-success, 0.3);
-      background: rgba($color-success, 0.05);
+      border-color: rgba($color-success, 0.4);
+      background: rgba($color-success, 0.04);
     }
 
     .platform-name {
       font-size: $text-body;
-      font-weight: 500;
-      color: $color-text-primary;
+      font-weight: 600;
+      color: $text-primary;
+      letter-spacing: -0.005em;
     }
   }
 }

@@ -144,31 +144,38 @@ function formatTime(time: string) {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: $space-3;
   }
 
   &__member {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: $space-3;
   }
 
   &__member-name {
     font-size: $text-body;
-    font-weight: 500;
-    color: $color-text-primary;
+    font-weight: 600;
+    color: $text-primary;
+    letter-spacing: -0.005em;
   }
   &__member-email {
-    font-size: $text-caption;
-    color: $color-text-secondary;
+    font-size: $text-xs;
+    color: $text-tertiary;
   }
 
   &__owner-label {
-    font-size: $text-caption;
-    color: var(--el-text-color-placeholder);
+    font-size: $text-xs;
+    color: $text-tertiary;
+    font-weight: 500;
+    padding: 3px 10px;
+    background: rgba($accent-500, 0.1);
+    color: $accent-400;
+    border-radius: $radius-full;
   }
 }
 .team__role-select {
   width: 100px;
-  margin-right: $space-sm;
+  margin-right: $space-2;
 }
 </style>

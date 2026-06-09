@@ -15,7 +15,7 @@ export const PLATFORM_COLORS: Record<string, string> = {
   doudian: '#FF7700',
   xiaohongshu_shop: '#FF2442',
   wechat_shop: '#07C160',
-  default: '#00cc99',
+  default: '#6366f1',
 }
 
 export const PLATFORM_LABELS = {
