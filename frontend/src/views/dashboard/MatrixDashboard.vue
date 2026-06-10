@@ -117,7 +117,24 @@
           <el-table-column type="index" width="50" label="#" align="center" />
           <el-table-column prop="avatar" label="头像" width="60" align="center">
             <template #default="{ row }">
-              <el-avatar :size="32" :src="row.avatar" />
+              <el-avatar :size="32" :src="row.avatar">
+                <span
+                  :style="{
+                    width: '32px',
+                    height: '32px',
+                    lineHeight: '32px',
+                    fontSize: '14px',
+                    fontWeight: 600,
+                    color: '#fff',
+                    background: avatarColor(row.nickname),
+                    borderRadius: '50%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }"
+                  >{{ (row.nickname || '?').charAt(0) }}</span
+                >
+              </el-avatar>
             </template>
           </el-table-column>
           <el-table-column prop="nickname" label="账号名称" min-width="120">
@@ -410,6 +427,24 @@ function formatNum(n: number): string {
   if (n == null) return '-'
   if (n >= 10000) return (n / 10000).toFixed(1) + '万'
   return n.toLocaleString()
+}
+
+const AVATAR_PALETTE = [
+  '#6366f1',
+  '#06b6d4',
+  '#10b981',
+  '#f59e0b',
+  '#a855f7',
+  '#ec4899',
+  '#14b8a6',
+  '#f97316',
+]
+function avatarColor(name: string): string {
+  let hash = 0
+  for (let i = 0; i < (name || '').length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]
 }
 
 function tagSize(count: number): number {
