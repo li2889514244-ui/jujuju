@@ -677,18 +677,23 @@ onMounted(() => {
 }
 .md-stat-item {
   text-align: center;
-  padding: 16px 12px;
-  background: var(--color-bg-tertiary);
-  border-radius: 8px;
+  padding: 20px 14px;
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
   &__label {
-    font-size: 12px;
-    color: var(--color-text-secondary);
-    margin-bottom: 6px;
+    font-size: 13px;
+    color: var(--color-text-tertiary);
+    margin-bottom: 10px;
+    letter-spacing: 0.02em;
   }
   &__value {
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 700;
     font-variant-numeric: tabular-nums;
+    color: var(--color-text-primary);
+    font-family: var(--font-mono);
+    letter-spacing: -0.02em;
   }
 }
 
