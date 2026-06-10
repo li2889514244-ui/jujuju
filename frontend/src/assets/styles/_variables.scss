@@ -1,4 +1,4 @@
-// MatrixFlow v6 - Deep Space Quiet design tokens
+﻿// MatrixFlow v6 - Deep Space Quiet design tokens
 // 注意：本文件仅暴露 SCSS 变量与 mixin，由 vite additionalData 自动注入。
 // 任何 CSS 输出（:root、html、body 等）请放在 global.scss / _element-overrides.scss。
 
@@ -23,9 +23,9 @@ $color-bg-hover:     $bg-hover;
 // 2. 文本层次（4 阶）
 // ============================================================
 $text-primary:     #e6e8f0;
-$text-secondary:   #a0a4b8;
-$text-tertiary:    #6b7290;
-$text-placeholder: #4a4f6b;
+$text-secondary:   #c0c4d4;
+$text-tertiary:    #8a90a8;
+$text-placeholder: #5e6480;
 
 $color-text-primary:     $text-primary;
 $color-text-secondary:   $text-secondary;
