@@ -61,6 +61,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '平台配置', icon: 'Connection', section: '组织设置' },
       },
       {
+        path: 'mcp',
+        name: 'MCPConnection',
+        component: () => import('@/views/mcp/MCPConnectionView.vue'),
+        meta: { title: 'MCP 接入', icon: 'Connection', section: '组织设置' },
+      },
+      {
         path: 'calendar',
         name: 'Calendar',
         component: () => import('@/views/calendar/CalendarView.vue'),
@@ -71,12 +77,6 @@ const routes: RouteRecordRaw[] = [
         name: 'AIAssistant',
         component: () => import('@/views/ai/AIAssistantView.vue'),
         meta: { title: 'AI 助手', icon: 'MagicStick', hidden: true },
-      },
-      {
-        path: 'mcp',
-        name: 'MCPAssistant',
-        component: () => import('@/views/mcp/MCPAssistantView.vue'),
-        meta: { title: 'MCP 查询', icon: 'ChatDotSquare', hidden: true },
       },
     ],
   },

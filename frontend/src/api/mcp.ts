@@ -1,28 +1,46 @@
-import { get, post } from './request'
+import { get } from './request'
 
-export interface MCPTool {
+export interface McpCatalogEntry {
   name: string
+  title: string
   description: string
-  parameters?: Record<string, unknown>
 }
 
-export interface MCPTableData {
-  columns: string[]
-  rows: Record<string, unknown>[]
-}
-
-export interface MCPQueryResult {
-  text?: string
-  table?: MCPTableData
-  csv_url?: string
+export interface McpConnectionInfo {
+  enabled: boolean
+  serverName: string
+  transport: 'streamable-http'
+  endpoint: string
+  endpointPath: string
+  auth: {
+    type: 'bearer'
+    header: string
+    keyCount: number
+    clients: Array<{ clientId: string }>
+  }
+  limits: {
+    maxRows: number
+    maxRangeDays: number
+  }
+  originPolicy: {
+    mode: 'any' | 'allowlist'
+    allowedOrigins: string[]
+  }
+  tools: McpCatalogEntry[]
+  resources: McpCatalogEntry[]
+  examples: {
+    genericHttp: {
+      type: 'http'
+      url: string
+      headers: {
+        Authorization: string
+      }
+    }
+  }
 }
 
 export const mcpApi = {
-  getTools(): Promise<MCPTool[]> {
-    return get<MCPTool[]>('/mcp/tools').then((res) => res.data)
-  },
-
-  query(query: string): Promise<MCPQueryResult> {
-    return post<MCPQueryResult>('/mcp/query', { query }).then((res) => res.data)
+  getConnectionInfo() {
+    return get<McpConnectionInfo>('/mcp/connection')
   },
 }

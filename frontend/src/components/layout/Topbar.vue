@@ -33,7 +33,7 @@
             </el-dropdown-item>
             <el-dropdown-item>
               <router-link to="/mcp" class="topbar__tool-link">
-                <el-icon :size="14"><ChatDotRound /></el-icon> MCP 查询
+                <el-icon :size="14"><Connection /></el-icon> MCP 接入
               </router-link>
             </el-dropdown-item>
           </el-dropdown-menu>
@@ -149,8 +149,8 @@ import {
   SuccessFilled,
   InfoFilled,
   MagicStick,
-  ChatDotRound,
   MoreFilled,
+  Connection,
 } from '@element-plus/icons-vue'
 import { getNotificationColor } from '@/composables/usePlatform'
 import type { Team } from '@/types'

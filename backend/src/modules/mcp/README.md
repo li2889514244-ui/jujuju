@@ -1,99 +1,87 @@
-# MCP 数据查询模块 (MatrixFlow MCP Server)
+# MatrixFlow MCP Server
 
-## 概述
+This module exposes MatrixFlow data through a standard read-only MCP server.
 
-基于 Model Context Protocol (MCP) 的数据查询服务，集成在 MatrixFlow 后端中。用户通过自然语言即可查询数据库中的账号数据、排行榜、生成报表、导出 CSV，所有操作均为只读。
+## Endpoint
 
-## 目录结构
+The Nest global prefix is `api/v1`, so MCP clients should connect to:
 
-```
-src/modules/mcp/
-├── mcp.module.ts      # NestJS Module 定义
-├── mcp.controller.ts  # HTTP REST 端点
-├── mcp.service.ts     # 核心逻辑：自然语言匹配、Tool 调度、数据查询
-├── mcp-tools.ts       # MCP Tool 定义（5 个 Tool）
-└── README.md          # 本文档
+```text
+POST https://<host>/api/v1/mcp
 ```
 
-## API 端点
+The endpoint uses the MCP Streamable HTTP transport in stateless JSON-response mode.
+`GET` and `DELETE` return MCP JSON-RPC errors because the server does not keep sessions.
 
-### POST `/api/mcp/query`
+## Authentication
 
-处理自然语言查询或直接 Tool 调用。
+Set one or more bearer tokens before enabling the endpoint:
 
-**请求体**：
-
-```json
-{
-  "query": "查询张三最近一周的数据",
-  "toolName": "query_account_data",  // 可选：直接指定 Tool
-  "params": {}                        // 可选：额外参数
-}
+```env
+MCP_API_KEYS=claude:change_me_32_bytes,cursor:another_secret
 ```
 
-**响应格式**：
+Requests must include:
 
-```json
-{
-  "success": true,
-  "data": { ... },
-  "toolUsed": "query_account_data"
-}
+```http
+Authorization: Bearer change_me_32_bytes
 ```
 
-### GET `/api/mcp/tools`
+If `MCP_API_KEYS` is not set, the endpoint returns `503` and no data is exposed.
 
-返回所有已注册的 MCP Tool 定义。
+Optional hardening:
 
-## 支持的 Tool
+```env
+MCP_ALLOWED_ORIGINS=https://example.com,https://another-client.example
+MCP_MAX_ROWS=500
+MCP_MAX_RANGE_DAYS=366
+```
 
-| # | Tool 名称 | 功能 | 必填参数 |
-|---|----------|------|---------|
-| 1 | `query_account_data` | 查询账号在时间段内的详细数据 | accountName, startDate, endDate |
-| 2 | `get_top_rankings` | 获取排行榜（GMV/粉丝/点赞/播放） | metric, period |
-| 3 | `compare_accounts` | 对比多个账号的指标表现 | accountNames(≥2), metric, startDate, endDate |
-| 4 | `generate_report` | 生成周报/月报（支持全平台） | period |
-| 5 | `export_data` | 导出 CSV 格式数据 | startDate, endDate |
+Server-to-server MCP clients often do not send an `Origin` header. When no origin is present,
+the request is allowed. When `MCP_ALLOWED_ORIGINS` is set and an origin is present, it must match.
 
-## 自然语言示例
+## Resources
 
-| 输入 | 匹配 Tool |
-|------|----------|
-| "查张三最近一周的数据" | query_account_data |
-| "小红书本月数据明细" | query_account_data |
-| "Top10 粉丝最多的账号" | get_top_rankings |
-| "本月GMV排行前20" | get_top_rankings |
-| "对比张三和李四的粉丝数 2025-05-01 到 2025-05-31" | compare_accounts |
-| "生成周报" / "本月汇总" | generate_report |
-| "生成本周数据报表" | generate_report |
-| "导出5月1日到5月31日的数据" | export_data |
-| "下载抖音账号数据CSV" | export_data |
+- `matrixflow://schema` - safe read-only table and field catalog.
+- `matrixflow://metrics` - accepted metric, platform, and period values.
 
-## 安全设计
+## Tools
 
-- **只读保证**：所有 Prisma 查询仅使用 `findMany` / `findFirst`，不涉及 `create` / `update` / `delete` / `deleteMany`
-- **参数化查询**：所有数据库操作通过 Prisma ORM 参数绑定，杜绝 SQL 注入
-- **统一错误处理**：`try/catch` 包裹所有查询逻辑，返回 `{ success: false, error: "..." }` 格式
-- **JWT 认证**：本模块受全局 `JwtAuthGuard` 保护，需携带有效 Bearer Token 访问
+- `list_accounts`
+- `query_account_data`
+- `get_top_rankings`
+- `compare_accounts`
+- `generate_report`
+- `export_data`
 
-## 依赖
+All tools are read-only. The service never returns account cookies, OAuth tokens, proxy config,
+or raw metadata.
 
-- `@modelcontextprotocol/sdk`: MCP 协议 SDK
-- `@prisma/client`: 数据库 ORM（已存在）
-
-## 测试
+## Example initialize request
 
 ```bash
-# 启动后端
-cd backend && npm run dev
-
-# 列出所有 Tool
-curl http://localhost:3000/api/mcp/tools \
-  -H "Authorization: Bearer <token>"
-
-# 自然语言查询
-curl -X POST http://localhost:3000/api/mcp/query \
-  -H "Authorization: Bearer <token>" \
+curl -X POST https://<host>/api/v1/mcp \
+  -H "Authorization: Bearer change_me_32_bytes" \
   -H "Content-Type: application/json" \
-  -d '{"query": "本月GMV排行前5"}'
+  -H "Accept: application/json, text/event-stream" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": { "name": "curl", "version": "1.0.0" }
+    }
+  }'
+```
+
+## Example tool list request
+
+```bash
+curl -X POST https://<host>/api/v1/mcp \
+  -H "Authorization: Bearer change_me_32_bytes" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
+  -d '{ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }'
 ```

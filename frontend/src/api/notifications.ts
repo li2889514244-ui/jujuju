@@ -32,6 +32,12 @@ export const notificationApi = {
     return get<{ unreadCount: number }>('/notifications/unread-count')
   },
 
+  testFeishu() {
+    return post<{ enabled: boolean; sent: boolean; message: string; status?: number }>(
+      '/notifications/feishu/test',
+    )
+  },
+
   markAsRead(id: string) {
     return post(`/notifications/${id}/read`)
   },

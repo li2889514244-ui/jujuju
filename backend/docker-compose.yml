@@ -3,7 +3,6 @@ version: '3.8'
 # MatrixFlow ERP — 阿里云 ECS 生产部署配置
 # 用法: docker compose up -d
 services:
-
   # ========== PostgreSQL 16 ==========
   db:
     image: postgres:16-alpine
@@ -107,6 +106,16 @@ services:
       JWT_REFRESH_EXPIRES_IN: 30d
       # CORS
       CORS_ORIGIN: ${CORS_ORIGIN:-https://ddddkiii.com,https://www.ddddkiii.com}
+      # MCP read-only server
+      MCP_API_KEYS: ${MCP_API_KEYS:-}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_MAX_ROWS: ${MCP_MAX_ROWS:-500}
+      MCP_MAX_RANGE_DAYS: ${MCP_MAX_RANGE_DAYS:-366}
+      # Feishu / Lark notifications
+      FEISHU_WEBHOOK_URL: ${FEISHU_WEBHOOK_URL:-}
+      FEISHU_WEBHOOK_SECRET: ${FEISHU_WEBHOOK_SECRET:-}
+      FEISHU_NOTIFY_ENABLED: ${FEISHU_NOTIFY_ENABLED:-true}
+      FEISHU_NOTIFY_TYPES: ${FEISHU_NOTIFY_TYPES:-}
       # Python Bridge
       PYTHON_BRIDGE_URL: http://localhost:8000
       # 日志

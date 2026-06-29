@@ -52,11 +52,14 @@ async function main() {
   if (!ok1) { console.log('Git failed, continuing...'); }
 
   console.log('\n--- install + build ---');
-  const ok2 = await run(`cd ${PROJECT}/backend && npm install --omit=dev 2>&1 | tail -3 && npx prisma generate && npx prisma migrate deploy && npm run build 2>&1 | tail -5`, 600);
+  const ok2 = await run(`cd ${PROJECT} && npm ci && npm run db:generate --workspace=backend && npm run db:migrate --workspace=backend && npm run build --workspace=backend && npm run build --workspace=frontend`, 900);
   if (!ok2) process.exit(1);
 
   console.log('\n--- restart ---');
   await run('pm2 restart all || (cd /opt/matrixflow/backend && pm2 start dist/main.js --name matrixflow)', 30);
+
+  console.log('\n--- frontend static files ---');
+  await run(`[ -d /var/www/matrixflow ] && rm -rf /var/www/matrixflow/* && cp -r ${PROJECT}/frontend/dist/* /var/www/matrixflow/ || true`, 60);
 
   console.log('\n--- health ---');
   await run('sleep 5 && curl -sf http://localhost:3000/api/v1/health && echo "OK" || echo "FAIL"', 20);

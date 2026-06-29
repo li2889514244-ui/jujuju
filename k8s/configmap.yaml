@@ -7,23 +7,30 @@ metadata:
     app.kubernetes.io/name: backend
     app.kubernetes.io/part-of: matrixflow-erp
 data:
-  NODE_ENV: "production"
-  PORT: "3000"
-  LOG_LEVEL: "info"
-  CORS_ORIGIN: "https://ddddkiii.com"
+  NODE_ENV: 'production'
+  PORT: '3000'
+  LOG_LEVEL: 'info'
+  CORS_ORIGIN: 'https://ddddkiii.com'
   # PostgreSQL connection (host references the k8s service)
-  DATABASE_HOST: "postgres"
-  DATABASE_PORT: "5432"
-  DATABASE_NAME: "matrixflow"
+  DATABASE_HOST: 'postgres'
+  DATABASE_PORT: '5432'
+  DATABASE_NAME: 'matrixflow'
   # Redis connection
-  REDIS_HOST: "redis"
-  REDIS_PORT: "6379"
+  REDIS_HOST: 'redis'
+  REDIS_PORT: '6379'
   # Rate limiting
-  THROTTLE_TTL: "60"
-  THROTTLE_LIMIT: "100"
+  THROTTLE_TTL: '60'
+  THROTTLE_LIMIT: '100'
   # JWT
-  JWT_EXPIRES_IN: "1h"
-  JWT_REFRESH_EXPIRES_IN: "7d"
+  JWT_EXPIRES_IN: '1h'
+  JWT_REFRESH_EXPIRES_IN: '7d'
+  # MCP read-only server
+  MCP_ALLOWED_ORIGINS: 'https://ddddkiii.com'
+  MCP_MAX_ROWS: '500'
+  MCP_MAX_RANGE_DAYS: '366'
+  # Feishu / Lark notifications
+  FEISHU_NOTIFY_ENABLED: 'true'
+  FEISHU_NOTIFY_TYPES: ''
 ---
 apiVersion: v1
 kind: ConfigMap

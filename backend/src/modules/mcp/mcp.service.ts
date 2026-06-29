@@ -1,774 +1,1002 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { ALL_MCP_TOOLS, getToolByName, McpTool } from './mcp-tools';
+import { Injectable } from '@nestjs/common'
+import { Prisma } from '@prisma/client'
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
+import * as z from 'zod/v4'
+import { PrismaService } from '../../prisma/prisma.service'
 
-// ==================== 类型定义 ====================
-
-export interface McpQueryRequest {
-  /** 自然语言查询文本 */
-  query: string;
-  /** 可选：直接指定 toolName + params，跳过自然语言匹配 */
-  toolName?: string;
-  params?: Record<string, unknown>;
+export interface McpClientAuth {
+  clientId: string
+  token: string
+  scopes: string[]
 }
 
-export interface McpQueryResponse {
-  success: boolean;
-  data?: unknown;
-  error?: string;
-  /** 匹配到的 Tool 名称（调试用） */
-  toolUsed?: string;
+export interface McpCatalogEntry {
+  name: string
+  title: string
+  description: string
 }
 
-interface ToolMatchResult {
-  tool: McpTool;
-  extractedParams: Record<string, unknown>;
-  confidence: number;
+export interface McpCatalog {
+  tools: McpCatalogEntry[]
+  resources: McpCatalogEntry[]
 }
 
-// ==================== Service ====================
+type RankingMetric =
+  | 'followers'
+  | 'views'
+  | 'likes'
+  | 'comments'
+  | 'shares'
+  | 'gmv'
+  | 'orders'
+  | 'revenue'
+  | 'commission'
+  | 'buyerCount'
+
+const PLATFORMS = [
+  'DOUYIN',
+  'KUAISHOU',
+  'XIAOHONGSHU',
+  'BILIBILI',
+  'WEIBO',
+  'WECHAT_VIDEO',
+  'TIKTOK',
+  'DOUDIAN',
+  'XIAOHONGSHU_SHOP',
+  'WECHAT_SHOP',
+] as const
+
+const ACCOUNT_STATUSES = ['ACTIVE', 'EXPIRED', 'DISABLED'] as const
+
+const EXPORT_COLUMNS = [
+  'date',
+  'platform',
+  'nickname',
+  'followers',
+  'views',
+  'likes',
+  'comments',
+  'shares',
+  'followersIncrement',
+  'viewsIncrement',
+  'likesIncrement',
+  'commentsIncrement',
+  'sharesIncrement',
+  'unfollows',
+  'revenue',
+  'gmv',
+  'orders',
+  'commission',
+  'buyerCount',
+  'productCount',
+  'avgOrderValue',
+] as const
 
 @Injectable()
 export class McpService {
-  private readonly logger = new Logger(McpService.name);
-
   constructor(private readonly prisma: PrismaService) {}
 
-  // ---- 公开入口 ----
-
-  /** 获取所有已注册的 Tool 定义 */
-  getTools(): McpTool[] {
-    return ALL_MCP_TOOLS;
-  }
-
-  /** 处理查询请求：自然语言 → Tool 匹配 → 执行 → 返回结果 */
-  async handleQuery(req: McpQueryRequest): Promise<McpQueryResponse> {
-    try {
-      // 如果直接指定了 toolName，跳过自然语言匹配
-      let toolName = req.toolName;
-      let params = req.params || {};
-
-      if (!toolName && req.query) {
-        const match = this.matchTool(req.query);
-        if (!match) {
-          return {
-            success: false,
-            error: `无法理解查询意图。支持的操作：${ALL_MCP_TOOLS.map((t) => t.name).join('、')}`,
-          };
-        }
-        toolName = match.tool.name;
-        params = { ...match.extractedParams, ...params };
-      }
-
-      if (!toolName) {
-        return { success: false, error: '请提供 query 或 toolName' };
-      }
-
-      // 执行对应 Tool
-      const result = await this.executeTool(toolName, params);
-
-      return {
-        success: true,
-        data: result,
-        toolUsed: toolName,
-      };
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : '未知错误';
-      this.logger.error(`Query failed: ${message}`, error instanceof Error ? error.stack : '');
-      return { success: false, error: message };
-    }
-  }
-
-  // ---- 自然语言匹配 ----
-
-  private matchTool(query: string): ToolMatchResult | null {
-    const q = query.toLowerCase();
-
-    const patterns: Array<{
-      keywords: string[];
-      toolName: string;
-      paramExtractor: (q: string) => Record<string, unknown>;
-    }> = [
-      // query_account_data: "查XXX账号7月数据" "张三最近一周的数据"
-      {
-        keywords: ['数据', '账号', '查询', '明细', '表现'],
-        toolName: 'query_account_data',
-        paramExtractor: (q) => {
-          const params: Record<string, unknown> = {};
-          // 尝试提取账号名
-          const accountMatch = q.match(/[""](.+?)[""]|'(.+?)'|账号[：:]?\s*(\S+)/);
-          if (accountMatch) {
-            params.accountName = accountMatch[1] || accountMatch[2] || accountMatch[3];
-          }
-          // 尝试提取日期
-          const dateRange = this.extractDateRange(q);
-          if (dateRange.startDate) params.startDate = dateRange.startDate;
-          if (dateRange.endDate) params.endDate = dateRange.endDate;
-          // 平台
-          const platform = this.extractPlatform(q);
-          if (platform) params.platform = platform;
-          return params;
-        },
-      },
-      // get_top_rankings: "排行榜" "GMV排名" "粉丝最多的账号"
-      {
-        keywords: ['排行', '排名', 'top', '榜', '最多', '最高', '前十'],
-        toolName: 'get_top_rankings',
-        paramExtractor: (q) => {
-          const params: Record<string, unknown> = { limit: 10 };
-          if (q.includes('gmv') || q.includes('交易') || q.includes('销售额'))
-            params.metric = 'gmv';
-          else if (q.includes('粉丝') || q.includes('关注'))
-            params.metric = 'followers';
-          else if (q.includes('点赞') || q.includes('赞'))
-            params.metric = 'likes';
-          else if (q.includes('播放') || q.includes('观看'))
-            params.metric = 'views';
-          else params.metric = 'followers';
-
-          if (q.includes('周') || q.includes('7天') || q.includes('七天')) params.period = 'week';
-          else if (q.includes('月') || q.includes('30天')) params.period = 'month';
-          else params.period = 'total';
-
-          const numMatch = q.match(/(\d+)\s*(个|名|条|位)/);
-          if (numMatch) params.limit = parseInt(numMatch[1], 10);
-          return params;
-        },
-      },
-      // compare_accounts: "对比张三和李四" "A和B的数据对比"
-      {
-        keywords: ['对比', '比较', 'vs', '对比分析', '竞品'],
-        toolName: 'compare_accounts',
-        paramExtractor: (q) => {
-          const params: Record<string, unknown> = {};
-          // 提取对比指标
-          if (q.includes('粉丝')) params.metric = 'followers';
-          else if (q.includes('gmv') || q.includes('销售额')) params.metric = 'gmv';
-          else if (q.includes('点赞')) params.metric = 'likes';
-          else if (q.includes('播放')) params.metric = 'views';
-          else params.metric = 'followers';
-
-          const dateRange = this.extractDateRange(q);
-          if (dateRange.startDate) params.startDate = dateRange.startDate;
-          if (dateRange.endDate) params.endDate = dateRange.endDate;
-
-          // 提取账号名列表
-          const names: string[] = [];
-          // 匹配 "张三和李四" "对比A和B" 格式
-          const andMatch = q.match(/对比\s*(\S+?)\s*[和与vs]\s*(\S+)/);
-          if (andMatch) {
-            names.push(andMatch[1], andMatch[2]);
-          }
-          params.accountNames = names.length >= 2 ? names : [];
-          return params;
-        },
-      },
-      // generate_report: "生成周报" "月报" "本周总结"
-      {
-        keywords: ['报告', '报表', '周报', '月报', '总结', '汇总', '概览'],
-        toolName: 'generate_report',
-        paramExtractor: (q) => {
-          const params: Record<string, unknown> = {};
-          params.period = q.includes('月') || q.includes('30天') ? 'month' : 'week';
-          // 尝试提取账号名
-          const accountMatch = q.match(/[""](.+?)[""]|'(.+?)'|账号[：:]?\s*(\S+)/);
-          if (accountMatch) {
-            params.accountName = accountMatch[1] || accountMatch[2] || accountMatch[3];
-          }
-          return params;
-        },
-      },
-      // export_data: "导出" "下载CSV"
-      {
-        keywords: ['导出', '下载', 'csv', 'excel', '表格'],
-        toolName: 'export_data',
-        paramExtractor: (q) => {
-          const params: Record<string, unknown> = {};
-          const dateRange = this.extractDateRange(q);
-          if (dateRange.startDate) params.startDate = dateRange.startDate;
-          if (dateRange.endDate) params.endDate = dateRange.endDate;
-          const accountMatch = q.match(/[""](.+?)[""]|'(.+?)'|账号[：:]?\s*(\S+)/);
-          if (accountMatch) {
-            params.accountName = accountMatch[1] || accountMatch[2] || accountMatch[3];
-          }
-          return params;
-        },
-      },
-    ];
-
-    let bestMatch: ToolMatchResult | null = null;
-    let bestScore = 0;
-
-    for (const pattern of patterns) {
-      const hits = pattern.keywords.filter((kw) => q.includes(kw)).length;
-      const score = hits / pattern.keywords.length;
-      if (score > bestScore) {
-        bestScore = score;
-        bestMatch = {
-          tool: getToolByName(pattern.toolName)!,
-          extractedParams: pattern.paramExtractor(q),
-          confidence: score,
-        };
-      }
-    }
-
-    // 只有匹配分数 > 0 才返回
-    return bestScore > 0 ? bestMatch : null;
-  }
-
-  private extractDateRange(q: string): { startDate?: string; endDate?: string } {
-    const result: { startDate?: string; endDate?: string } = {};
-
-    const now = new Date();
-
-    // 匹配自然语言时间
-    if (q.includes('今天')) {
-      result.startDate = this.formatDate(now);
-      result.endDate = this.formatDate(now);
-    } else if (q.includes('昨天')) {
-      const yesterday = new Date(now);
-      yesterday.setDate(yesterday.getDate() - 1);
-      result.startDate = this.formatDate(yesterday);
-      result.endDate = this.formatDate(yesterday);
-    } else if (q.includes('本周') || q.includes('这周') || q.includes('7天') || q.includes('七天')) {
-      const weekAgo = new Date(now);
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      result.startDate = this.formatDate(weekAgo);
-      result.endDate = this.formatDate(now);
-    } else if (q.includes('本月') || q.includes('这个月') || q.includes('30天')) {
-      const monthAgo = new Date(now);
-      monthAgo.setDate(monthAgo.getDate() - 30);
-      result.startDate = this.formatDate(monthAgo);
-      result.endDate = this.formatDate(now);
-    } else if (q.includes('上月') || q.includes('上个月')) {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const end = new Date(now.getFullYear(), now.getMonth(), 0);
-      result.startDate = this.formatDate(start);
-      result.endDate = this.formatDate(end);
-    }
-
-    // 匹配 ISO 日期格式 YYYY-MM-DD
-    const isoMatch = q.match(/(\d{4}-\d{2}-\d{2})\s*[到至-]\s*(\d{4}-\d{2}-\d{2})/);
-    if (isoMatch) {
-      result.startDate = isoMatch[1];
-      result.endDate = isoMatch[2];
-    }
-
-    return result;
-  }
-
-  private extractPlatform(q: string): string | undefined {
-    const map: Record<string, string> = {
-      抖音: 'DOUYIN',
-      douyin: 'DOUYIN',
-      快手: 'KUAISHOU',
-      kuaishou: 'KUAISHOU',
-      小红书: 'XIAOHONGSHU',
-      小红薯: 'XIAOHONGSHU',
-      xiaohongshu: 'XIAOHONGSHU',
-      b站: 'BILIBILI',
-      bilibili: 'BILIBILI',
-      哔哩哔哩: 'BILIBILI',
-      微博: 'WEIBO',
-      weibo: 'WEIBO',
-      视频号: 'WECHAT_VIDEO',
-      tiktok: 'TIKTOK',
-    };
-    for (const [keyword, platform] of Object.entries(map)) {
-      if (q.toLowerCase().includes(keyword.toLowerCase())) return platform;
-    }
-    return undefined;
-  }
-
-  private formatDate(d: Date): string {
-    return d.toISOString().slice(0, 10);
-  }
-
-  // ---- Tool 执行器 ----
-
-  private async executeTool(
-    toolName: string,
-    params: Record<string, unknown>,
-  ): Promise<unknown> {
-    switch (toolName) {
-      case 'query_account_data':
-        return this.queryAccountData(params);
-      case 'get_top_rankings':
-        return this.getTopRankings(params);
-      case 'compare_accounts':
-        return this.compareAccounts(params);
-      case 'generate_report':
-        return this.generateReport(params);
-      case 'export_data':
-        return this.exportData(params);
-      default:
-        throw new Error(`未知的 Tool: ${toolName}`);
-    }
-  }
-
-  // ==================== Tool 1: query_account_data ====================
-
-  private async queryAccountData(params: Record<string, unknown>) {
-    const accountName = String(params.accountName || '');
-    const platform = params.platform ? String(params.platform).toUpperCase() : undefined;
-    const startDate = String(params.startDate || '');
-    const endDate = String(params.endDate || '');
-
-    if (!accountName) throw new Error('accountName 参数为必填');
-    if (!startDate || !endDate) throw new Error('startDate 和 endDate 参数为必填');
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    // 参数化查询：查找匹配账号
-    const accounts = await this.prisma.account.findMany({
-      where: {
-        nickname: { contains: accountName },
-        ...(platform ? { platform: platform as any } : {}),
-      },
-      select: {
-        id: true,
-        nickname: true,
-        platform: true,
-        avatar: true,
-        followers: true,
-        likes: true,
-        following: true,
-      },
-    });
-
-    if (accounts.length === 0) {
-      return { accounts: [], message: `未找到匹配 "${accountName}" 的账号` };
-    }
-
-    // 查询 DailyStats
-    const accountIds = accounts.map((a) => a.id);
-    const stats = await this.prisma.dailyStats.findMany({
-      where: {
-        accountId: { in: accountIds },
-        date: { gte: start, lte: end },
-      },
-      orderBy: { date: 'asc' },
-    });
-
-    // 按账号聚合
-    const result = accounts.map((acc) => {
-      const accStats = stats.filter((s) => s.accountId === acc.id);
-      const aggregated = {
-        totalViews: accStats.reduce((sum, s) => sum + s.views, 0),
-        totalLikes: accStats.reduce((sum, s) => sum + s.likes, 0),
-        totalComments: accStats.reduce((sum, s) => sum + s.comments, 0),
-        totalShares: accStats.reduce((sum, s) => sum + s.shares, 0),
-        totalRevenue: accStats.reduce((sum, s) => sum + s.revenue, 0),
-        totalGmv: accStats.reduce((sum, s) => sum + s.gmv, 0),
-        totalOrders: accStats.reduce((sum, s) => sum + s.orders, 0),
-        totalBuyerCount: accStats.reduce((sum, s) => sum + s.buyerCount, 0),
-        followerChange:
-          accStats.length > 0 ? accStats[accStats.length - 1].followers - accStats[0].followers : 0,
-      };
-      return {
-        id: acc.id,
-        nickname: acc.nickname,
-        platform: acc.platform,
-        avatar: acc.avatar,
-        currentFollowers: acc.followers,
-        ...aggregated,
-        dailyStats: accStats.map((s) => ({
-          date: this.formatDate(s.date),
-          followers: s.followers,
-          views: s.views,
-          likes: s.likes,
-          comments: s.comments,
-          shares: s.shares,
-          followersIncrement: s.followersIncrement,
-          viewsIncrement: s.viewsIncrement,
-          likesIncrement: s.likesIncrement,
-          commentsIncrement: s.commentsIncrement,
-          sharesIncrement: s.sharesIncrement,
-          unfollows: s.unfollows,
-          revenue: s.revenue,
-          gmv: s.gmv,
-          orders: s.orders,
-        })),
-      };
-    });
-
-    return { accounts: result, total: result.length, period: { start: startDate, end: endDate } };
-  }
-
-  // ==================== Tool 2: get_top_rankings ====================
-
-  private async getTopRankings(params: Record<string, unknown>) {
-    const metric = String(params.metric || 'followers');
-    const period = String(params.period || 'total');
-    const limit = Math.min(Number(params.limit) || 10, 100);
-
-    let startDate: Date;
-
-    if (period === 'week') {
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 7);
-    } else if (period === 'month') {
-      startDate = new Date();
-      startDate.setDate(startDate.getDate() - 30);
-    } else {
-      // total: 不限时间
-      startDate = new Date(0);
-    }
-
-    const allAccounts = await this.prisma.account.findMany({
-      where: { status: 'ACTIVE' },
-      select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
-    });
-
-    if (metric === 'followers') {
-      // 粉丝直接取 account.followers
-      const sorted = allAccounts
-        .sort((a, b) => b.followers - a.followers)
-        .slice(0, limit)
-        .map((a, i) => ({
-          rank: i + 1,
-          accountId: a.id,
-          nickname: a.nickname,
-          platform: a.platform,
-          avatar: a.avatar,
-          value: a.followers,
-        }));
-      return { metric: 'followers', period, rankings: sorted, total: allAccounts.length };
-    }
-
-    // 其他指标从 DailyStats 聚合
-    const accountIds = allAccounts.map((a) => a.id);
-    const stats = await this.prisma.dailyStats.findMany({
-      where: {
-        accountId: { in: accountIds },
-        date: period !== 'total' ? { gte: startDate } : undefined,
-      },
-    });
-
-    const aggMap: Record<string, number> = {};
-    for (const s of stats) {
-      const val =
-        metric === 'views'
-          ? s.views
-          : metric === 'likes'
-            ? s.likes
-            : metric === 'gmv'
-              ? s.gmv
-              : 0;
-      aggMap[s.accountId] = (aggMap[s.accountId] || 0) + val;
-    }
-
-    const sorted = allAccounts
-      .map((a) => ({ ...a, aggValue: aggMap[a.id] || 0 }))
-      .sort((a, b) => b.aggValue - a.aggValue)
-      .slice(0, limit)
-      .map((a, i) => ({
-        rank: i + 1,
-        accountId: a.id,
-        nickname: a.nickname,
-        platform: a.platform,
-        avatar: a.avatar,
-        value: a.aggValue,
-      }));
-
-    return { metric, period, rankings: sorted, total: allAccounts.length };
-  }
-
-  // ==================== Tool 3: compare_accounts ====================
-
-  private async compareAccounts(params: Record<string, unknown>) {
-    const accountNames = (params.accountNames as string[]) || [];
-    const metric = String(params.metric || 'followers');
-    const startDate = String(params.startDate || '');
-    const endDate = String(params.endDate || '');
-
-    if (accountNames.length < 2) throw new Error('至少需要 2 个账号进行对比');
-    if (accountNames.length > 10) throw new Error('最多对比 10 个账号');
-
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
-
-    const accounts = await this.prisma.account.findMany({
-      where: {
-        nickname: { in: accountNames },
-      },
-      select: { id: true, nickname: true, platform: true, followers: true, likes: true },
-    });
-
-    if (accounts.length === 0) {
-      return { message: '未找到匹配的账号', accounts: [] };
-    }
-
-    const accountIds = accounts.map((a) => a.id);
-
-    const stats = await this.prisma.dailyStats.findMany({
-      where: { accountId: { in: accountIds }, date: { gte: start, lte: end } },
-      orderBy: { date: 'asc' },
-    });
-
-    const results = accounts.map((acc) => {
-      const accStats = stats.filter((s) => s.accountId === acc.id);
-      const value = accStats.reduce((sum, s) => {
-        const key = metric as keyof typeof s;
-        const val = typeof s[key] === 'number' ? (s[key] as number) : 0;
-        return sum + val;
-      }, 0);
-      return { nickname: acc.nickname, platform: acc.platform, metric, value };
-    });
-
-    // 计算差异
-    if (results.length >= 2) {
-      const max = Math.max(...results.map((r) => r.value));
-      const min = Math.min(...results.map((r) => r.value));
-      const diff = max - min;
-      const maxAccount = results.find((r) => r.value === max)?.nickname;
-      results.forEach((r) => {
-        (r as any).diffFromTop = max - r.value;
-        (r as any).percentageOfTop = max > 0 ? ((r.value / max) * 100).toFixed(1) + '%' : '0%';
-      });
-    }
-
-    return { metric, period: { start: startDate, end: endDate }, comparison: results };
-  }
-
-  // ==================== Tool 4: generate_report ====================
-
-  private async generateReport(params: Record<string, unknown>) {
-    const accountName = params.accountName ? String(params.accountName) : undefined;
-    const period = String(params.period || 'week');
-
-    const now = new Date();
-    const startDate = new Date();
-    const days = period === 'month' ? 30 : 7;
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
-
-    // 上周/上月同期用于环比
-    const prevStart = new Date(startDate);
-    prevStart.setDate(prevStart.getDate() - days);
-    const prevEnd = new Date(startDate);
-    prevEnd.setDate(prevEnd.getDate() - 1);
-    prevEnd.setHours(23, 59, 59, 999);
-
-    const endDate = new Date();
-    endDate.setHours(23, 59, 59, 999);
-
-    // 查账号
-    const accountWhere = accountName
-      ? { nickname: { contains: accountName } }
-      : { status: 'ACTIVE' as const };
-
-    const accounts = await this.prisma.account.findMany({
-      where: accountWhere,
-      select: { id: true, nickname: true, platform: true, avatar: true, followers: true, likes: true },
-    });
-
-    if (accounts.length === 0) {
-      return { message: '没有找到匹配的账号', report: null };
-    }
-
-    const accountIds = accounts.map((a) => a.id);
-
-    // 当期数据
-    const currentStats = await this.prisma.dailyStats.findMany({
-      where: { accountId: { in: accountIds }, date: { gte: startDate, lte: endDate } },
-    });
-
-    // 上期数据（环比）
-    const prevStats = await this.prisma.dailyStats.findMany({
-      where: { accountId: { in: accountIds }, date: { gte: prevStart, lte: prevEnd } },
-    });
-
-    const aggregate = (stats: typeof currentStats) => ({
-      totalViews: stats.reduce((s, x) => s + x.views, 0),
-      totalLikes: stats.reduce((s, x) => s + x.likes, 0),
-      totalComments: stats.reduce((s, x) => s + x.comments, 0),
-      totalShares: stats.reduce((s, x) => s + x.shares, 0),
-      totalRevenue: stats.reduce((s, x) => s + x.revenue, 0),
-      totalGmv: stats.reduce((s, x) => s + x.gmv, 0),
-      totalOrders: stats.reduce((s, x) => s + x.orders, 0),
-      totalBuyerCount: stats.reduce((s, x) => s + x.buyerCount, 0),
-      followerChange: stats.length > 0
-        ? stats.reduce((sum, s) => sum + s.followers, 0) / stats.length - (stats[0]?.followers || 0)
-        : 0,
-    });
-
-    const current = aggregate(currentStats);
-    const prev = aggregate(prevStats);
-
-    const wowChange = {
-      views: prev.totalViews > 0 ? ((current.totalViews - prev.totalViews) / prev.totalViews * 100).toFixed(1) : 'N/A',
-      likes: prev.totalLikes > 0 ? ((current.totalLikes - prev.totalLikes) / prev.totalLikes * 100).toFixed(1) : 'N/A',
-      gmv: prev.totalGmv > 0 ? ((current.totalGmv - prev.totalGmv) / prev.totalGmv * 100).toFixed(1) : 'N/A',
-      revenue: prev.totalRevenue > 0 ? ((current.totalRevenue - prev.totalRevenue) / prev.totalRevenue * 100).toFixed(1) : 'N/A',
-    };
-
-    // Top 内容（PostStats）
-    const topPosts = await this.prisma.post.findMany({
-      where: {
-        accountId: { in: accountIds },
-        status: 'PUBLISHED',
-        publishAt: { gte: startDate, lte: endDate },
-      },
-      include: { stats: true },
-      orderBy: { publishAt: 'desc' },
-      take: 10,
-    });
-
-    const topByViews = topPosts
-      .filter((p) => p.stats)
-      .sort((a, b) => (b.stats?.views || 0) - (a.stats?.views || 0))
-      .slice(0, 5)
-      .map((p) => ({
-        title: p.title,
-        views: p.stats?.views || 0,
-        likes: p.stats?.likes || 0,
-        completionRate: p.stats?.completionRate || 0,
-        danmakuCount: p.stats?.danmakuCount || 0,
-        avgPlayDuration: p.stats?.avgPlayDuration || 0,
-        publishedAt: p.publishAt,
-      }));
-
+  getCatalog(): McpCatalog {
     return {
-      reportType: period === 'month' ? '月报' : '周报',
-      period: {
-        start: this.formatDate(startDate),
-        end: this.formatDate(endDate),
-      },
-      accountCount: accounts.length,
-      accounts: accounts.map((a) => ({ id: a.id, nickname: a.nickname, platform: a.platform })),
-      summary: {
-        current,
-        previous: prev,
-        weekOverWeekChange: wowChange,
-      },
-      topContent: topByViews,
-      platformBreakdown: accounts.reduce(
-        (acc, a) => {
-          acc[a.platform] = (acc[a.platform] || 0) + 1;
-          return acc;
+      tools: [
+        {
+          name: 'list_accounts',
+          title: 'List accounts',
+          description: 'List MatrixFlow accounts without returning credentials or tokens.',
         },
-        {} as Record<string, number>,
-      ),
-    };
+        {
+          name: 'query_account_data',
+          title: 'Query account daily data',
+          description:
+            'Read daily account stats for an account id, account name, or platform within a date range.',
+        },
+        {
+          name: 'get_top_rankings',
+          title: 'Get top rankings',
+          description: 'Rank accounts by followers or aggregated daily metrics.',
+        },
+        {
+          name: 'compare_accounts',
+          title: 'Compare accounts',
+          description: 'Compare 2 to 10 accounts over a date range for one metric.',
+        },
+        {
+          name: 'generate_report',
+          title: 'Generate account report',
+          description: 'Generate a weekly or monthly read-only summary for matching accounts.',
+        },
+        {
+          name: 'export_data',
+          title: 'Export daily stats CSV',
+          description: 'Return daily stats as CSV text. The result is capped by MCP_MAX_ROWS.',
+        },
+      ],
+      resources: [
+        {
+          name: 'matrixflow-schema',
+          title: 'MatrixFlow read schema',
+          description: 'matrixflow://schema',
+        },
+        {
+          name: 'matrixflow-metrics',
+          title: 'MatrixFlow metrics catalog',
+          description: 'matrixflow://metrics',
+        },
+      ],
+    }
   }
 
-  // ==================== Tool 5: export_data ====================
+  createServer(auth: McpClientAuth): McpServer {
+    const server = new McpServer(
+      {
+        name: 'matrixflow-readonly',
+        version: '1.0.0',
+      },
+      {
+        capabilities: {
+          resources: {},
+          tools: {},
+        },
+      },
+    )
 
-  private async exportData(params: Record<string, unknown>) {
-    const accountName = params.accountName ? String(params.accountName) : undefined;
-    const startDate = String(params.startDate || '');
-    const endDate = String(params.endDate || '');
-    const columns = (params.columns as string[]) || [];
+    this.registerResources(server)
+    this.registerTools(server, auth)
+    return server
+  }
 
-    if (!startDate || !endDate) throw new Error('startDate 和 endDate 参数为必填');
+  private registerResources(server: McpServer) {
+    server.registerResource(
+      'matrixflow-schema',
+      'matrixflow://schema',
+      {
+        title: 'MatrixFlow read schema',
+        description: 'Safe read-only schema exposed to MCP clients.',
+        mimeType: 'application/json',
+      },
+      async (uri) => ({
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'application/json',
+            text: JSON.stringify(this.getSchemaResource(), null, 2),
+          },
+        ],
+      }),
+    )
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    end.setHours(23, 59, 59, 999);
+    server.registerResource(
+      'matrixflow-metrics',
+      'matrixflow://metrics',
+      {
+        title: 'MatrixFlow metrics catalog',
+        description: 'Metric names accepted by the read-only MCP tools.',
+        mimeType: 'application/json',
+      },
+      async (uri) => ({
+        contents: [
+          {
+            uri: uri.href,
+            mimeType: 'application/json',
+            text: JSON.stringify(this.getMetricsResource(), null, 2),
+          },
+        ],
+      }),
+    )
+  }
 
-    const accountWhere = accountName
-      ? { nickname: { contains: accountName } }
-      : { status: 'ACTIVE' as const };
+  private registerTools(server: McpServer, _auth: McpClientAuth) {
+    server.registerTool(
+      'list_accounts',
+      {
+        title: 'List accounts',
+        description: 'List MatrixFlow accounts without returning credentials or tokens.',
+        inputSchema: {
+          platform: z.enum(PLATFORMS).optional(),
+          status: z.enum(ACCOUNT_STATUSES).optional(),
+          search: z.string().min(1).max(80).optional(),
+          limit: z.number().int().min(1).max(200).optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.listAccounts(args)),
+    )
 
-    const accounts = await this.prisma.account.findMany({
-      where: accountWhere,
-      select: { id: true, nickname: true, platform: true },
-    });
+    server.registerTool(
+      'query_account_data',
+      {
+        title: 'Query account daily data',
+        description:
+          'Read daily account stats for an account id, account name, or platform within a date range.',
+        inputSchema: {
+          accountId: z.string().min(1).max(100).optional(),
+          accountName: z.string().min(1).max(120).optional(),
+          platform: z.enum(PLATFORMS).optional(),
+          startDate: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          endDate: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          limit: z.number().int().min(1).max(1000).optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.queryAccountData(args)),
+    )
 
-    const accountIds = accounts.map((a) => a.id);
-    const stats = await this.prisma.dailyStats.findMany({
-      where: { accountId: { in: accountIds }, date: { gte: start, lte: end } },
-      orderBy: [{ accountId: 'asc' }, { date: 'asc' }],
-    });
-
-    // 构建行数据
-    const rows = stats.map((s) => {
-      const acc = accounts.find((a) => a.id === s.accountId);
-      const row: Record<string, unknown> = {
-        date: this.formatDate(s.date),
-        platform: acc?.platform || '',
-        nickname: acc?.nickname || '',
-        followers: s.followers,
-        views: s.views,
-        likes: s.likes,
-        comments: s.comments,
-        shares: s.shares,
-        followersIncrement: s.followersIncrement,
-        viewsIncrement: s.viewsIncrement,
-        likesIncrement: s.likesIncrement,
-        commentsIncrement: s.commentsIncrement,
-        sharesIncrement: s.sharesIncrement,
-        unfollows: s.unfollows,
-        revenue: s.revenue,
-        gmv: s.gmv,
-        orders: s.orders,
-        commission: s.commission,
-        buyerCount: s.buyerCount,
-      };
-
-      // 如果指定了列，只保留指定列
-      if (columns.length > 0) {
-        const filtered: Record<string, unknown> = {};
-        for (const col of columns) {
-          if (col in row) filtered[col] = row[col];
-        }
-        return filtered;
-      }
-      return row;
-    });
-
-    // 生成 CSV 字符串
-    const allColumns =
-      columns.length > 0
-        ? columns
-        : [
-            'date',
-            'platform',
-            'nickname',
+    server.registerTool(
+      'get_top_rankings',
+      {
+        title: 'Get top rankings',
+        description: 'Rank accounts by followers or aggregated daily metrics.',
+        inputSchema: {
+          metric: z.enum([
             'followers',
             'views',
             'likes',
             'comments',
             'shares',
-            'followersIncrement',
-            'viewsIncrement',
-            'likesIncrement',
-            'commentsIncrement',
-            'sharesIncrement',
-            'unfollows',
-            'revenue',
             'gmv',
             'orders',
+            'revenue',
             'commission',
             'buyerCount',
-          ];
+          ]),
+          period: z.enum(['week', 'month', 'total']).default('week'),
+          platform: z.enum(PLATFORMS).optional(),
+          limit: z.number().int().min(1).max(100).optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.getTopRankings(args)),
+    )
 
-    const header = allColumns.join(',');
-    const csvRows = rows.map((row) =>
-      allColumns.map((col) => {
-        const val = row[col];
-        if (val === null || val === undefined) return '';
-        const str = String(val);
-        // CSV 转义：包含逗号、引号或换行的字段需要加引号
-        if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-          return `"${str.replace(/"/g, '""')}"`;
-        }
-        return str;
-      }).join(','),
-    );
+    server.registerTool(
+      'compare_accounts',
+      {
+        title: 'Compare accounts',
+        description: 'Compare 2 to 10 accounts over a date range for one metric.',
+        inputSchema: {
+          accountNames: z.array(z.string().min(1).max(120)).min(2).max(10),
+          metric: z.enum([
+            'followers',
+            'views',
+            'likes',
+            'comments',
+            'shares',
+            'gmv',
+            'orders',
+            'revenue',
+            'commission',
+            'buyerCount',
+          ]),
+          startDate: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          endDate: z
+            .string()
+            .regex(/^\d{4}-\d{2}-\d{2}$/)
+            .optional(),
+          platform: z.enum(PLATFORMS).optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.compareAccounts(args)),
+    )
 
-    const csv = [header, ...csvRows].join('\n');
+    server.registerTool(
+      'generate_report',
+      {
+        title: 'Generate account report',
+        description: 'Generate a weekly or monthly read-only summary for matching accounts.',
+        inputSchema: {
+          accountName: z.string().min(1).max(120).optional(),
+          platform: z.enum(PLATFORMS).optional(),
+          period: z.enum(['week', 'month']).default('week'),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.generateReport(args)),
+    )
+
+    server.registerTool(
+      'export_data',
+      {
+        title: 'Export daily stats CSV',
+        description: 'Return daily stats as CSV text. The result is capped by MCP_MAX_ROWS.',
+        inputSchema: {
+          accountName: z.string().min(1).max(120).optional(),
+          platform: z.enum(PLATFORMS).optional(),
+          startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          columns: z.array(z.enum(EXPORT_COLUMNS)).optional(),
+          limit: z.number().int().min(1).max(5000).optional(),
+        },
+        annotations: { readOnlyHint: true },
+      },
+      async (args) => this.asToolResult(await this.exportData(args)),
+    )
+  }
+
+  private async listAccounts(args: {
+    platform?: string
+    status?: string
+    search?: string
+    limit?: number
+  }) {
+    const limit = this.clampLimit(args.limit, 100, 200)
+    const where: Prisma.AccountWhereInput = {
+      ...(args.platform ? { platform: this.normalizePlatform(args.platform) } : {}),
+      ...(args.status
+        ? { status: this.normalizeStatus(args.status) }
+        : { status: 'ACTIVE' as any }),
+      ...(args.search ? { nickname: { contains: args.search } } : {}),
+    }
+
+    const accounts = await this.prisma.account.findMany({
+      where,
+      select: this.accountSelect(),
+      orderBy: [{ platform: 'asc' }, { followers: 'desc' }],
+      take: limit,
+    })
+
+    return {
+      accounts: accounts.map((account) => this.sanitizeAccount(account)),
+      limit,
+      returned: accounts.length,
+    }
+  }
+
+  private async queryAccountData(args: {
+    accountId?: string
+    accountName?: string
+    platform?: string
+    startDate?: string
+    endDate?: string
+    limit?: number
+  }) {
+    const limit = this.clampLimit(args.limit, this.getMaxRows(), this.getMaxRows())
+    const range = this.buildDateRange(args.startDate, args.endDate, 30)
+    const accounts = await this.findMatchingAccounts({
+      accountId: args.accountId,
+      accountName: args.accountName,
+      platform: args.platform,
+      limit: 100,
+    })
+
+    if (accounts.length === 0) {
+      return {
+        accounts: [],
+        dailyStats: [],
+        period: { startDate: range.startDate, endDate: range.endDate },
+        message: 'No matching accounts found.',
+      }
+    }
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accounts.map((account) => account.id) },
+        date: { gte: range.start, lte: range.end },
+      },
+      include: {
+        account: { select: { id: true, nickname: true, platform: true } },
+      },
+      orderBy: [{ date: 'desc' }, { accountId: 'asc' }],
+      take: limit,
+    })
+
+    const rows = stats
+      .map((stat) => this.sanitizeDailyStat(stat))
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+
+    return {
+      accounts: accounts.map((account) => this.sanitizeAccount(account)),
+      dailyStats: rows,
+      period: { startDate: range.startDate, endDate: range.endDate },
+      limit,
+      returned: rows.length,
+      truncated: stats.length === limit,
+    }
+  }
+
+  private async getTopRankings(args: {
+    metric: RankingMetric
+    period?: 'week' | 'month' | 'total'
+    platform?: string
+    limit?: number
+  }) {
+    const limit = this.clampLimit(args.limit, 10, 100)
+    const period = args.period || 'week'
+    const range = this.periodToRange(period)
+    const accountWhere: Prisma.AccountWhereInput = {
+      status: 'ACTIVE' as any,
+      ...(args.platform ? { platform: this.normalizePlatform(args.platform) } : {}),
+    }
+
+    const accounts = await this.prisma.account.findMany({
+      where: accountWhere,
+      select: this.accountSelect(),
+    })
+
+    if (args.metric === 'followers') {
+      const rankings = accounts
+        .sort((a, b) => b.followers - a.followers)
+        .slice(0, limit)
+        .map((account, index) => ({
+          rank: index + 1,
+          account: this.sanitizeAccount(account),
+          value: account.followers,
+        }))
+
+      return { metric: args.metric, period, rankings, totalAccounts: accounts.length }
+    }
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accounts.map((account) => account.id) },
+        ...(range.start ? { date: { gte: range.start, lte: range.end } } : {}),
+      },
+      select: {
+        accountId: true,
+        views: true,
+        likes: true,
+        comments: true,
+        shares: true,
+        gmv: true,
+        orders: true,
+        revenue: true,
+        commission: true,
+        buyerCount: true,
+      },
+    })
+
+    const totals = new Map<string, number>()
+    for (const stat of stats) {
+      totals.set(
+        stat.accountId,
+        (totals.get(stat.accountId) || 0) + this.metricValue(stat, args.metric),
+      )
+    }
+
+    const rankings = accounts
+      .map((account) => ({ account, value: totals.get(account.id) || 0 }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, limit)
+      .map((row, index) => ({
+        rank: index + 1,
+        account: this.sanitizeAccount(row.account),
+        value: row.value,
+      }))
+
+    return {
+      metric: args.metric,
+      period,
+      periodRange: range.start
+        ? { startDate: this.formatDate(range.start), endDate: this.formatDate(range.end) }
+        : null,
+      rankings,
+      totalAccounts: accounts.length,
+    }
+  }
+
+  private async compareAccounts(args: {
+    accountNames: string[]
+    metric: RankingMetric
+    startDate?: string
+    endDate?: string
+    platform?: string
+  }) {
+    const range = this.buildDateRange(args.startDate, args.endDate, 30)
+    const platform = args.platform ? this.normalizePlatform(args.platform) : undefined
+
+    const found = await Promise.all(
+      args.accountNames.map((name) =>
+        this.prisma.account.findFirst({
+          where: {
+            nickname: { contains: name },
+            status: 'ACTIVE' as any,
+            ...(platform ? { platform } : {}),
+          },
+          select: this.accountSelect(),
+          orderBy: { followers: 'desc' },
+        }),
+      ),
+    )
+
+    const accounts = found.filter((account): account is NonNullable<typeof account> =>
+      Boolean(account),
+    )
+    const missing = args.accountNames.filter((_, index) => !found[index])
+
+    if (accounts.length < 2) {
+      return {
+        metric: args.metric,
+        period: { startDate: range.startDate, endDate: range.endDate },
+        comparison: accounts.map((account) => ({
+          account: this.sanitizeAccount(account),
+          value: 0,
+        })),
+        missing,
+        message: 'Fewer than two matching accounts were found.',
+      }
+    }
+
+    if (args.metric === 'followers') {
+      return this.compareRows(
+        args.metric,
+        range,
+        accounts.map((account) => ({
+          account: this.sanitizeAccount(account),
+          value: account.followers,
+        })),
+        missing,
+      )
+    }
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accounts.map((account) => account.id) },
+        date: { gte: range.start, lte: range.end },
+      },
+    })
+
+    const totals = new Map<string, number>()
+    for (const stat of stats) {
+      totals.set(
+        stat.accountId,
+        (totals.get(stat.accountId) || 0) + this.metricValue(stat, args.metric),
+      )
+    }
+
+    return this.compareRows(
+      args.metric,
+      range,
+      accounts.map((account) => ({
+        account: this.sanitizeAccount(account),
+        value: totals.get(account.id) || 0,
+      })),
+      missing,
+    )
+  }
+
+  private async generateReport(args: {
+    accountName?: string
+    platform?: string
+    period?: 'week' | 'month'
+  }) {
+    const period = args.period || 'week'
+    const days = period === 'month' ? 30 : 7
+    const current = this.buildDateRange(undefined, undefined, days)
+    const previousEnd = new Date(current.start)
+    previousEnd.setDate(previousEnd.getDate() - 1)
+    previousEnd.setHours(23, 59, 59, 999)
+    const previousStart = new Date(previousEnd)
+    previousStart.setDate(previousStart.getDate() - (days - 1))
+    previousStart.setHours(0, 0, 0, 0)
+
+    const accounts = await this.findMatchingAccounts({
+      accountName: args.accountName,
+      platform: args.platform,
+      limit: 500,
+    })
+
+    if (accounts.length === 0) {
+      return {
+        reportType: period,
+        accounts: [],
+        message: 'No matching active accounts found.',
+      }
+    }
+
+    const accountIds = accounts.map((account) => account.id)
+    const [currentStats, previousStats, topPosts] = await Promise.all([
+      this.prisma.dailyStats.findMany({
+        where: { accountId: { in: accountIds }, date: { gte: current.start, lte: current.end } },
+      }),
+      this.prisma.dailyStats.findMany({
+        where: { accountId: { in: accountIds }, date: { gte: previousStart, lte: previousEnd } },
+      }),
+      this.prisma.post.findMany({
+        where: {
+          accountId: { in: accountIds },
+          status: 'PUBLISHED' as any,
+          publishAt: { gte: current.start, lte: current.end },
+        },
+        include: { stats: true, account: { select: { id: true, nickname: true, platform: true } } },
+        orderBy: { publishAt: 'desc' },
+        take: 20,
+      }),
+    ])
+
+    const currentSummary = this.aggregateStats(currentStats)
+    const previousSummary = this.aggregateStats(previousStats)
+
+    return {
+      reportType: period,
+      period: { startDate: current.startDate, endDate: current.endDate },
+      accountCount: accounts.length,
+      accounts: accounts.map((account) => this.sanitizeAccount(account)),
+      summary: {
+        current: currentSummary,
+        previous: previousSummary,
+        changePercent: this.changePercent(currentSummary, previousSummary),
+      },
+      topContent: topPosts
+        .filter((post) => post.stats)
+        .sort((a, b) => (b.stats?.views || 0) - (a.stats?.views || 0))
+        .slice(0, 10)
+        .map((post) => ({
+          id: post.id,
+          title: post.title,
+          account: post.account,
+          publishAt: post.publishAt?.toISOString() || null,
+          views: post.stats?.views || 0,
+          likes: post.stats?.likes || 0,
+          comments: post.stats?.comments || 0,
+          shares: post.stats?.shares || 0,
+        })),
+      platformBreakdown: this.platformBreakdown(accounts),
+    }
+  }
+
+  private async exportData(args: {
+    accountName?: string
+    platform?: string
+    startDate: string
+    endDate: string
+    columns?: string[]
+    limit?: number
+  }) {
+    const limit = this.clampLimit(args.limit, this.getMaxRows(), this.getMaxRows())
+    const range = this.buildDateRange(args.startDate, args.endDate, 30)
+    const accounts = await this.findMatchingAccounts({
+      accountName: args.accountName,
+      platform: args.platform,
+      limit: 500,
+    })
+    const accountIds = accounts.map((account) => account.id)
+    const columns = args.columns?.length ? args.columns : [...EXPORT_COLUMNS]
+
+    if (accountIds.length === 0) {
+      return {
+        format: 'csv',
+        filename: `matrixflow_export_${range.startDate}_${range.endDate}.csv`,
+        rowCount: 0,
+        columns,
+        csvContent: columns.join(','),
+      }
+    }
+
+    const stats = await this.prisma.dailyStats.findMany({
+      where: {
+        accountId: { in: accountIds },
+        date: { gte: range.start, lte: range.end },
+      },
+      include: { account: { select: { id: true, nickname: true, platform: true } } },
+      orderBy: [{ date: 'asc' }, { accountId: 'asc' }],
+      take: limit,
+    })
+
+    const rows = stats.map((stat) => this.sanitizeDailyStat(stat))
+    const csvRows = [
+      columns.join(','),
+      ...rows.map((row) => columns.map((column) => this.csvCell(row[column])).join(',')),
+    ]
 
     return {
       format: 'csv',
-      filename: `export_${startDate}_${endDate}.csv`,
+      filename: `matrixflow_export_${range.startDate}_${range.endDate}.csv`,
+      period: { startDate: range.startDate, endDate: range.endDate },
       rowCount: rows.length,
-      columns: allColumns,
-      csvContent: csv,
-    };
+      columns,
+      truncated: rows.length === limit,
+      csvContent: csvRows.join('\n'),
+    }
+  }
+
+  private async findMatchingAccounts(args: {
+    accountId?: string
+    accountName?: string
+    platform?: string
+    limit: number
+  }) {
+    const where: Prisma.AccountWhereInput = {
+      status: 'ACTIVE' as any,
+      ...(args.accountId ? { id: args.accountId } : {}),
+      ...(args.accountName ? { nickname: { contains: args.accountName } } : {}),
+      ...(args.platform ? { platform: this.normalizePlatform(args.platform) } : {}),
+    }
+
+    return this.prisma.account.findMany({
+      where,
+      select: this.accountSelect(),
+      orderBy: [{ platform: 'asc' }, { followers: 'desc' }],
+      take: args.limit,
+    })
+  }
+
+  private accountSelect() {
+    return {
+      id: true,
+      platform: true,
+      platformUserId: true,
+      nickname: true,
+      avatar: true,
+      bio: true,
+      followers: true,
+      likes: true,
+      following: true,
+      status: true,
+      lastActiveAt: true,
+      storeScore: true,
+      teamId: true,
+      groupId: true,
+      createdAt: true,
+      updatedAt: true,
+    } satisfies Prisma.AccountSelect
+  }
+
+  private sanitizeAccount(
+    account: Prisma.AccountGetPayload<{ select: ReturnType<McpService['accountSelect']> }>,
+  ) {
+    return {
+      ...account,
+      lastActiveAt: account.lastActiveAt?.toISOString() || null,
+      createdAt: account.createdAt.toISOString(),
+      updatedAt: account.updatedAt.toISOString(),
+    }
+  }
+
+  private sanitizeDailyStat(stat: any): Record<string, unknown> {
+    return {
+      date: this.formatDate(stat.date),
+      accountId: stat.accountId,
+      platform: stat.platform,
+      nickname: stat.account?.nickname || '',
+      followers: stat.followers,
+      views: stat.views,
+      likes: stat.likes,
+      comments: stat.comments,
+      shares: stat.shares,
+      followersIncrement: stat.followersIncrement,
+      viewsIncrement: stat.viewsIncrement,
+      likesIncrement: stat.likesIncrement,
+      commentsIncrement: stat.commentsIncrement,
+      sharesIncrement: stat.sharesIncrement,
+      unfollows: stat.unfollows,
+      revenue: stat.revenue,
+      gmv: stat.gmv,
+      orders: stat.orders,
+      commission: stat.commission,
+      buyerCount: stat.buyerCount,
+      productCount: stat.productCount,
+      avgOrderValue: stat.avgOrderValue,
+    }
+  }
+
+  private aggregateStats(stats: Array<Record<string, any>>) {
+    return {
+      views: stats.reduce((sum, stat) => sum + (stat.views || 0), 0),
+      likes: stats.reduce((sum, stat) => sum + (stat.likes || 0), 0),
+      comments: stats.reduce((sum, stat) => sum + (stat.comments || 0), 0),
+      shares: stats.reduce((sum, stat) => sum + (stat.shares || 0), 0),
+      revenue: stats.reduce((sum, stat) => sum + (stat.revenue || 0), 0),
+      gmv: stats.reduce((sum, stat) => sum + (stat.gmv || 0), 0),
+      orders: stats.reduce((sum, stat) => sum + (stat.orders || 0), 0),
+      commission: stats.reduce((sum, stat) => sum + (stat.commission || 0), 0),
+      buyerCount: stats.reduce((sum, stat) => sum + (stat.buyerCount || 0), 0),
+    }
+  }
+
+  private compareRows(
+    metric: RankingMetric,
+    range: { startDate: string; endDate: string },
+    rows: Array<{ account: Record<string, unknown>; value: number }>,
+    missing: string[],
+  ) {
+    const max = Math.max(...rows.map((row) => row.value), 0)
+
+    return {
+      metric,
+      period: { startDate: range.startDate, endDate: range.endDate },
+      comparison: rows
+        .sort((a, b) => b.value - a.value)
+        .map((row, index) => ({
+          rank: index + 1,
+          ...row,
+          diffFromTop: max - row.value,
+          percentageOfTop: max > 0 ? Number(((row.value / max) * 100).toFixed(1)) : 0,
+        })),
+      missing,
+    }
+  }
+
+  private changePercent(current: Record<string, number>, previous: Record<string, number>) {
+    return Object.fromEntries(
+      Object.entries(current).map(([key, value]) => {
+        const base = previous[key] || 0
+        return [key, base > 0 ? Number((((value - base) / base) * 100).toFixed(1)) : null]
+      }),
+    )
+  }
+
+  private platformBreakdown(accounts: Array<{ platform: unknown }>) {
+    return accounts.reduce(
+      (acc, account) => {
+        const platform = String(account.platform)
+        acc[platform] = (acc[platform] || 0) + 1
+        return acc
+      },
+      {} as Record<string, number>,
+    )
+  }
+
+  private metricValue(stat: Record<string, any>, metric: RankingMetric): number {
+    return Number(stat[metric] || 0)
+  }
+
+  private buildDateRange(startDate?: string, endDate?: string, defaultDays = 30) {
+    const end = endDate ? this.parseDate(endDate, 'endDate') : new Date()
+    end.setHours(23, 59, 59, 999)
+
+    const start = startDate ? this.parseDate(startDate, 'startDate') : new Date(end)
+    if (!startDate) start.setDate(start.getDate() - (defaultDays - 1))
+    start.setHours(0, 0, 0, 0)
+
+    if (start.getTime() > end.getTime()) {
+      throw new Error('startDate must be before or equal to endDate.')
+    }
+
+    const rangeDays = Math.ceil((end.getTime() - start.getTime()) / 86400000) + 1
+    const maxDays = this.getMaxRangeDays()
+    if (rangeDays > maxDays) {
+      throw new Error(`Date range is too large. Maximum allowed range is ${maxDays} days.`)
+    }
+
+    return {
+      start,
+      end,
+      startDate: this.formatDate(start),
+      endDate: this.formatDate(end),
+    }
+  }
+
+  private periodToRange(period: 'week' | 'month' | 'total') {
+    if (period === 'total') return { start: null, end: null }
+    const days = period === 'month' ? 30 : 7
+    const range = this.buildDateRange(undefined, undefined, days)
+    return { start: range.start, end: range.end }
+  }
+
+  private parseDate(value: string, field: string): Date {
+    const date = new Date(`${value}T00:00:00.000Z`)
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`${field} must be a valid YYYY-MM-DD date.`)
+    }
+    return date
+  }
+
+  private normalizePlatform(platform: string) {
+    const normalized = platform.trim().toUpperCase()
+    if (!PLATFORMS.includes(normalized as any)) {
+      throw new Error(`Unsupported platform: ${platform}`)
+    }
+    return normalized as any
+  }
+
+  private normalizeStatus(status: string) {
+    const normalized = status.trim().toUpperCase()
+    if (!ACCOUNT_STATUSES.includes(normalized as any)) {
+      throw new Error(`Unsupported account status: ${status}`)
+    }
+    return normalized as any
+  }
+
+  private clampLimit(value: number | undefined, fallback: number, max: number): number {
+    const parsed = Number(value || fallback)
+    if (!Number.isFinite(parsed)) return fallback
+    return Math.max(1, Math.min(Math.floor(parsed), max))
+  }
+
+  private getMaxRows(): number {
+    return this.clampLimit(Number(process.env.MCP_MAX_ROWS || 500), 500, 5000)
+  }
+
+  private getMaxRangeDays(): number {
+    return this.clampLimit(Number(process.env.MCP_MAX_RANGE_DAYS || 366), 366, 3660)
+  }
+
+  private formatDate(date: Date): string {
+    return date.toISOString().slice(0, 10)
+  }
+
+  private csvCell(value: unknown): string {
+    if (value === null || value === undefined) return ''
+    const text = String(value)
+    if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+      return `"${text.replace(/"/g, '""')}"`
+    }
+    return text
+  }
+
+  private asToolResult(data: Record<string, unknown>): CallToolResult {
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+      structuredContent: data,
+    }
+  }
+
+  private getSchemaResource() {
+    return {
+      tables: {
+        Account: {
+          description:
+            'Public account profile and current counters. Credentials are never exposed.',
+          fields: [
+            'id',
+            'platform',
+            'platformUserId',
+            'nickname',
+            'avatar',
+            'bio',
+            'followers',
+            'likes',
+            'following',
+            'status',
+            'lastActiveAt',
+            'storeScore',
+            'teamId',
+            'groupId',
+            'createdAt',
+            'updatedAt',
+          ],
+        },
+        DailyStats: {
+          description: 'Daily account performance and commerce metrics.',
+          fields: [...EXPORT_COLUMNS],
+        },
+        Post: {
+          description: 'Published content metadata used by generate_report.',
+          fields: ['id', 'title', 'publishAt', 'status', 'platformUrl', 'accountId'],
+        },
+        PostStats: {
+          description: 'Content performance metrics used by generate_report.',
+          fields: ['views', 'likes', 'comments', 'shares', 'completionRate', 'avgPlayDuration'],
+        },
+      },
+      limits: {
+        maxRows: this.getMaxRows(),
+        maxRangeDays: this.getMaxRangeDays(),
+      },
+    }
+  }
+
+  private getMetricsResource() {
+    return {
+      rankingMetrics: [
+        'followers',
+        'views',
+        'likes',
+        'comments',
+        'shares',
+        'gmv',
+        'orders',
+        'revenue',
+        'commission',
+        'buyerCount',
+      ],
+      platforms: [...PLATFORMS],
+      periods: ['week', 'month', 'total'],
+    }
   }
 }
