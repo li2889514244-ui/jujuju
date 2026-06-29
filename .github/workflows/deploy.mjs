@@ -54,7 +54,7 @@ async function main() {
 
   // 2. Install + build
   console.log('\n--- install + build ---');
-  const ok2 = await run(`cd ${PROJECT} && npm ci && npm run db:generate --workspace=backend && npm run db:migrate --workspace=backend && npm run build --workspace=backend && npm run build --workspace=frontend`, 900);
+  const ok2 = await run(`cd ${PROJECT} && npm ci --include=dev && npm run db:generate --workspace=backend && npm run db:migrate --workspace=backend && npm run build --workspace=backend && npm run build --workspace=frontend`, 900);
   if (!ok2) process.exit(1);
 
   // 3. Restart

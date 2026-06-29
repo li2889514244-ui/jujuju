@@ -9,7 +9,7 @@ cd "$APP_DIR"
 git fetch origin "$BRANCH"
 git reset --hard "origin/$BRANCH"
 
-npm ci
+npm ci --include=dev
 npm run build --workspace=backend
 npm run build --workspace=frontend
 
