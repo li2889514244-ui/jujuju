@@ -1,11 +1,13 @@
 import {
   Controller,
   Delete,
+  Body,
   Get,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Put,
   Query,
   UseGuards,
 } from '@nestjs/common'
@@ -13,6 +15,13 @@ import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger'
 import { CurrentUser } from '../../common/decorators/current-user.decorator'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { NotificationsService } from './notifications.service'
+
+interface UpdateFeishuSettingsDto {
+  webhookUrl?: string
+  webhookSecret?: string
+  notifyTypes?: string[]
+  enabled?: boolean
+}
 
 @ApiTags('notifications')
 @ApiBearerAuth('access-token')
@@ -46,6 +55,18 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get unread notification count' })
   async getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId)
+  }
+
+  @Get('feishu/settings')
+  @ApiOperation({ summary: 'Get Feishu notification settings' })
+  async getFeishuSettings() {
+    return this.notificationsService.getFeishuSettings()
+  }
+
+  @Put('feishu/settings')
+  @ApiOperation({ summary: 'Update Feishu notification settings' })
+  async updateFeishuSettings(@Body() body: UpdateFeishuSettingsDto) {
+    return this.notificationsService.updateFeishuSettings(body)
   }
 
   @Post('feishu/test')

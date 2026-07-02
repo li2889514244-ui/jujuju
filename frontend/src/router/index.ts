@@ -67,6 +67,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'MCP 接入', icon: 'Connection', section: '组织设置' },
       },
       {
+        path: 'feishu',
+        name: 'FeishuSettings',
+        component: () => import('@/views/settings/FeishuSettingsView.vue'),
+        meta: { title: '飞书通知', icon: 'Bell', section: '组织设置' },
+      },
+      {
         path: 'calendar',
         name: 'Calendar',
         component: () => import('@/views/calendar/CalendarView.vue'),

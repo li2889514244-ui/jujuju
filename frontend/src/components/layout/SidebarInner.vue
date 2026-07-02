@@ -78,6 +78,7 @@ import {
   Money,
   VideoCamera,
   Refresh,
+  Bell,
 } from '@element-plus/icons-vue'
 
 defineProps<{ collapsed: boolean }>()
@@ -145,6 +146,7 @@ const iconMap: Record<string, Component> = {
   ChatDotSquare: markRaw(MagicStick),
   Money: markRaw(Money),
   VideoCamera: markRaw(VideoCamera),
+  Bell: markRaw(Bell),
 }
 
 function getIcon(name: unknown): Component {

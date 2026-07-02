@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common'
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
 import axios from 'axios'
 import { createHmac } from 'crypto'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
 import { NotificationType } from '../../common/prisma-enums'
 import { PrismaService } from '../../prisma/prisma.service'
 
@@ -17,6 +19,22 @@ export interface FeishuPushResult {
   sent: boolean
   message: string
   status?: number
+}
+
+export interface FeishuSettings {
+  enabled: boolean
+  configured: boolean
+  webhookUrl: string
+  webhookSecretConfigured: boolean
+  notifyTypes: NotificationType[]
+  envFileWritable: boolean
+}
+
+interface UpdateFeishuSettingsParams {
+  webhookUrl?: string
+  webhookSecret?: string
+  notifyTypes?: string[]
+  enabled?: boolean
 }
 
 @Injectable()
@@ -56,6 +74,49 @@ export class NotificationsService {
       },
       true,
     )
+  }
+
+  getFeishuSettings(): FeishuSettings {
+    return {
+      enabled: this.isFeishuEnabled(),
+      configured: Boolean(this.getFeishuWebhookUrl()),
+      webhookUrl: this.maskWebhookUrl(this.getFeishuWebhookUrl()),
+      webhookSecretConfigured: Boolean(this.getFeishuWebhookSecret()),
+      notifyTypes: this.getAllowedFeishuTypes(),
+      envFileWritable: this.isEnvFileWritable(),
+    }
+  }
+
+  updateFeishuSettings(params: UpdateFeishuSettingsParams): FeishuSettings {
+    const webhookUrl = typeof params.webhookUrl === 'string' ? params.webhookUrl.trim() : undefined
+    const webhookSecret =
+      typeof params.webhookSecret === 'string' ? params.webhookSecret.trim() : undefined
+    const enabled = params.enabled !== false
+    const notifyTypes = this.normalizeNotifyTypes(params.notifyTypes)
+
+    if (webhookUrl !== undefined && webhookUrl && !this.isValidFeishuWebhookUrl(webhookUrl)) {
+      throw new BadRequestException('Invalid Feishu webhook URL.')
+    }
+
+    const updates: Record<string, string> = {
+      FEISHU_NOTIFY_ENABLED: enabled ? 'true' : 'false',
+      FEISHU_NOTIFY_TYPES: notifyTypes.join(','),
+    }
+
+    if (webhookUrl !== undefined) {
+      updates.FEISHU_WEBHOOK_URL = webhookUrl
+    }
+
+    if (webhookSecret !== undefined) {
+      updates.FEISHU_WEBHOOK_SECRET = webhookSecret
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+      process.env[key] = value
+    })
+
+    this.persistEnvUpdates(updates)
+    return this.getFeishuSettings()
   }
 
   async findAll(userId: string, params: { skip?: number; take?: number; unreadOnly?: boolean }) {
@@ -187,13 +248,81 @@ export class NotificationsService {
   }
 
   private isAllowedFeishuType(type: NotificationType): boolean {
-    const raw = process.env.FEISHU_NOTIFY_TYPES || process.env.LARK_NOTIFY_TYPES || ''
-    const allowed = raw
-      .split(',')
-      .map((item) => item.trim())
-      .filter(Boolean)
+    const allowed = this.getAllowedFeishuTypes()
 
     return allowed.length === 0 || allowed.includes(type)
+  }
+
+  private getAllowedFeishuTypes(): NotificationType[] {
+    return this.normalizeNotifyTypes(
+      (process.env.FEISHU_NOTIFY_TYPES || process.env.LARK_NOTIFY_TYPES || '')
+        .split(',')
+        .map((item) => item.trim()),
+    )
+  }
+
+  private normalizeNotifyTypes(types?: string[]): NotificationType[] {
+    const valid = new Set(Object.values(NotificationType))
+    return Array.from(
+      new Set((types || []).map((item) => item.trim()).filter((item) => valid.has(item as any))),
+    ) as NotificationType[]
+  }
+
+  private isValidFeishuWebhookUrl(value: string): boolean {
+    try {
+      const url = new URL(value)
+      return (
+        url.protocol === 'https:' &&
+        (url.hostname === 'open.feishu.cn' || url.hostname === 'open.larksuite.com') &&
+        url.pathname.includes('/open-apis/bot/')
+      )
+    } catch {
+      return false
+    }
+  }
+
+  private maskWebhookUrl(value: string): string {
+    if (!value) return ''
+    const visible = 12
+    if (value.length <= visible * 2) return value
+    return `${value.slice(0, visible)}...${value.slice(-visible)}`
+  }
+
+  private isEnvFileWritable(): boolean {
+    try {
+      const envPath = this.getEnvFilePath()
+      return existsSync(envPath) || existsSync(process.cwd())
+    } catch {
+      return false
+    }
+  }
+
+  private persistEnvUpdates(updates: Record<string, string>) {
+    const envPath = this.getEnvFilePath()
+    try {
+      const lines = existsSync(envPath) ? readFileSync(envPath, 'utf8').split(/\r?\n/) : []
+      const seen = new Set<string>()
+      const next = lines.map((line) => {
+        if (!line || line.trimStart().startsWith('#') || !line.includes('=')) return line
+        const key = line.split('=', 1)[0].trim()
+        if (!(key in updates)) return line
+        seen.add(key)
+        return `${key}=${updates[key]}`
+      })
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (!seen.has(key)) next.push(`${key}=${value}`)
+      })
+
+      writeFileSync(envPath, `${next.join('\n').replace(/\n+$/, '')}\n`, 'utf8')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.warn(`Failed to persist Feishu settings to .env: ${message}`)
+    }
+  }
+
+  private getEnvFilePath(): string {
+    return join(process.cwd(), '.env')
   }
 
   private createFeishuSignature(secret: string) {

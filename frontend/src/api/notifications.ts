@@ -1,4 +1,4 @@
-import { get, post, del } from './request'
+import { get, post, put, del } from './request'
 
 export interface Notification {
   id: string
@@ -18,6 +18,31 @@ export interface NotificationListResponse {
   take: number
 }
 
+export type FeishuNotifyType =
+  | 'SYSTEM'
+  | 'ACCOUNT'
+  | 'CONTENT'
+  | 'REPORT'
+  | 'PUBLISH_SUCCESS'
+  | 'PUBLISH_FAILED'
+  | 'CREDENTIAL_EXPIRED'
+
+export interface FeishuSettings {
+  enabled: boolean
+  configured: boolean
+  webhookUrl: string
+  webhookSecretConfigured: boolean
+  notifyTypes: FeishuNotifyType[]
+  envFileWritable: boolean
+}
+
+export interface UpdateFeishuSettingsPayload {
+  webhookUrl?: string
+  webhookSecret?: string
+  notifyTypes?: FeishuNotifyType[]
+  enabled?: boolean
+}
+
 export const notificationApi = {
   getAll(params?: { page?: number; limit?: number; unreadOnly?: boolean }) {
     const query = new URLSearchParams()
@@ -30,6 +55,14 @@ export const notificationApi = {
 
   getUnreadCount() {
     return get<{ unreadCount: number }>('/notifications/unread-count')
+  },
+
+  getFeishuSettings() {
+    return get<FeishuSettings>('/notifications/feishu/settings')
+  },
+
+  updateFeishuSettings(payload: UpdateFeishuSettingsPayload) {
+    return put<FeishuSettings>('/notifications/feishu/settings', payload)
   },
 
   testFeishu() {
