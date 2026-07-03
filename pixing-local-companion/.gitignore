@@ -1,7 +1,0 @@
-companion_data.db
-chrome_profile/
-cookies/
-logs/
-__pycache__/
-*.pyc
-.nicegui/
