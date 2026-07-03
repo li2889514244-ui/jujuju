@@ -95,3 +95,15 @@ export interface WechatProduct {
   stock: number
   status: number
 }
+
+export interface WechatAftersale {
+  id: string
+  order_id?: string
+  type: string
+  status: string
+  amount: number
+  reason: string
+  product: string
+  complete_time: number
+  create_time: number
+}

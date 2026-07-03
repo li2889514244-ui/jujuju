@@ -23,6 +23,7 @@ def _beijing_today() -> str:
 
 
 def _get_conn() -> sqlite3.Connection:
+    _ensure_db()
     PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
@@ -32,7 +33,10 @@ def _get_conn() -> sqlite3.Connection:
 
 def init_db():
     """建表（幂等）"""
-    conn = _get_conn()
+    PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             id              TEXT PRIMARY KEY,        -- 后端 accountId
@@ -103,6 +107,21 @@ def init_db():
             publish_time    TEXT DEFAULT '',
             collected_at    TEXT DEFAULT (datetime('now')),
             FOREIGN KEY (account_id) REFERENCES accounts(id)
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS collection_runs (
+            id                INTEGER PRIMARY KEY AUTOINCREMENT,
+            trigger_type      TEXT DEFAULT 'manual',
+            mode              TEXT DEFAULT 'quick',
+            max_posts         INTEGER DEFAULT 20,
+            status            TEXT DEFAULT 'running',
+            started_at        TEXT DEFAULT (datetime('now')),
+            finished_at       TEXT DEFAULT '',
+            accounts_total    INTEGER DEFAULT 0,
+            accounts_reported INTEGER DEFAULT 0,
+            videos_reported   INTEGER DEFAULT 0,
+            error             TEXT DEFAULT ''
         )
     """)
     # Migration: add new columns to existing accounts table if missing
@@ -394,6 +413,56 @@ def update_status(account_id: str, status: str):
     conn.close()
 
 
+def start_collection_run(mode: str = 'quick', max_posts: int = 20, trigger_type: str = 'manual') -> int:
+    """Create a local collection run record and return its id."""
+    conn = _get_conn()
+    cur = conn.execute(
+        """INSERT INTO collection_runs (trigger_type, mode, max_posts, status)
+           VALUES (?, ?, ?, 'running')""",
+        (trigger_type, mode, max_posts),
+    )
+    conn.commit()
+    run_id = int(cur.lastrowid)
+    conn.close()
+    return run_id
+
+
+def finish_collection_run(
+    run_id: int,
+    status: str,
+    accounts_total: int = 0,
+    accounts_reported: int = 0,
+    videos_reported: int = 0,
+    error: str = '',
+):
+    """Mark a collection run as success/error and store summary counts."""
+    if not run_id:
+        return
+    conn = _get_conn()
+    conn.execute(
+        """UPDATE collection_runs
+           SET status = ?, finished_at = datetime('now'), accounts_total = ?,
+               accounts_reported = ?, videos_reported = ?, error = ?
+           WHERE id = ?""",
+        (status, accounts_total, accounts_reported, videos_reported, error[:1000], run_id),
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_recent_collection_runs(limit: int = 5) -> list[dict]:
+    """Return recent collection run summaries, newest first."""
+    conn = _get_conn()
+    rows = conn.execute(
+        """SELECT * FROM collection_runs
+           ORDER BY COALESCE(NULLIF(finished_at, ''), started_at) DESC, id DESC
+           LIMIT ?""",
+        (max(1, min(int(limit or 5), 50)),),
+    ).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
 def update_nickname(account_id: str, nickname: str):
     conn = _get_conn()
     conn.execute("UPDATE accounts SET nickname = ? WHERE id = ?", (nickname, account_id))
@@ -484,5 +553,22 @@ def get_history(account_id: str, days: int = 30) -> list[dict]:
     return [dict(r) for r in rows]
 
 
-# 初始化
-init_db()
+_db_initialized = False
+_db_init_lock = None  # set on first use
+
+import threading as _threading
+
+def _ensure_db():
+    global _db_initialized, _db_init_lock
+    if _db_initialized:
+        return
+    if _db_init_lock is None:
+        _db_init_lock = _threading.RLock()  # Reentrant lock to avoid init_db->get_conn->ensure_db deadlock
+    with _db_init_lock:
+        if _db_initialized:
+            return
+        try:
+            init_db()
+            _db_initialized = True
+        except Exception as e:
+            print(f"[LocalDB] DB init failed: {e}")

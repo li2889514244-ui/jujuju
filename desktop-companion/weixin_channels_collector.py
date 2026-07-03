@@ -116,12 +116,46 @@ async def _click_sidebar(page, text: str):
     return result
 
 
-async def _ensure_wechat_page(page):
-    """确保浏览器在视频号页面，如不在则导航"""
+async def _ensure_wechat_page(page, captured: dict = None):
+    """确保浏览器在视频号页面，如不在则导航。
+    
+    导航时注册响应拦截，捕获 auth_data API（头像/昵称/粉丝数）。
+    页面自动加载时 API 带有效 cookie，比手动 fetch 可靠。
+    支持多账号：每个 profile 各自有有效 session。
+    """
+    if captured is None:
+        captured = {}
+
+    async def _on_response(response):
+        if "auth" not in captured and "auth_data" in response.url and response.status == 200:
+            try:
+                ct = response.headers.get("content-type", "")
+                if "json" in ct or "text" in ct:
+                    text = await response.text()
+                    if text.startswith("{"):
+                        data = json.loads(text)
+                        if data.get("errCode") == 0:
+                            captured["auth"] = data.get("data", {})
+                            # 捕获成功，移除监听器
+                            page.remove_listener("response", _on_response)
+            except Exception:
+                pass
+
+    page.on("response", _on_response)
+
     if 'channels.weixin.qq.com' not in page.url():
         print("[WeChat] 导航到视频号助手首页...")
         await page.goto(PAGES["home"], wait_until="domcontentloaded", timeout=30000)
         await asyncio.sleep(3)
+    else:
+        # 已在视频号页面，reload 触发 auth_data API 重新发送
+        print("[WeChat] 已在视频号页面，刷新以触发 API 拦截...")
+        await page.reload(wait_until="domcontentloaded", timeout=30000)
+        await asyncio.sleep(3)
+    
+    # 给拦截一点时间处理已发出的 API 响应
+    await asyncio.sleep(2)
+    return captured
 
 
 # ── 主入口 ─────────────────────────────────────────────
@@ -156,7 +190,20 @@ async def collect_wechat_channels(cdp_url: str = "http://127.0.0.1:9222",
             page = await ctx.new_page()
             print("[WeChat] 新建标签页")
 
-        await _ensure_wechat_page(page)
+        # ── 导航 + 响应拦截（捕获 auth_data API 获取头像/昵称/粉丝） ──
+        captured = {}
+        captured = await _ensure_wechat_page(page, captured)
+        await asyncio.sleep(2)  # 确保拦截器有时间捕获响应
+
+        auth = captured.get("auth", {})
+        fu = auth.get("finderUser", {})
+        avatar_url = fu.get("headImgUrl", "")
+        if avatar_url:
+            from local_db import update_metrics as _um
+            _um(account_id, {"avatar_url": avatar_url})
+            print(f"[WeChat] ✓ 头像已采集(API拦截): {avatar_url[:60]}...")
+        else:
+            print("[WeChat] ⚠ auth_data 未拦截到头像")
 
         # ── 采集关注者数据 ──
         try:

@@ -8,6 +8,8 @@ import { NotificationsModule } from '../notifications/notifications.module'
 import { PrismaModule } from '../../prisma/prisma.module'
 import { WechatStoreModule } from '../wechat-store/wechat-store.module'
 import { WechatStoreSyncScheduler } from './wechat-store-sync.scheduler'
+import { DoudianBrowserModule } from '../doudian-browser/doudian-browser.module'
+import { DoudianBrowserSyncScheduler } from './doudian-browser-sync.scheduler'
 
 @Module({
   imports: [
@@ -17,8 +19,19 @@ import { WechatStoreSyncScheduler } from './wechat-store-sync.scheduler'
     UploaderModule,
     NotificationsModule,
     WechatStoreModule,
+    DoudianBrowserModule,
   ],
-  providers: [PublishScheduler, DataSyncScheduler, WechatStoreSyncScheduler],
-  exports: [PublishScheduler, DataSyncScheduler, WechatStoreSyncScheduler],
+  providers: [
+    PublishScheduler,
+    DataSyncScheduler,
+    WechatStoreSyncScheduler,
+    DoudianBrowserSyncScheduler,
+  ],
+  exports: [
+    PublishScheduler,
+    DataSyncScheduler,
+    WechatStoreSyncScheduler,
+    DoudianBrowserSyncScheduler,
+  ],
 })
 export class SchedulerModule {}

@@ -57,20 +57,25 @@ class ChromeCDP:
         return _check_port(self.port)
 
     def start(self, open_url=None, app_mode=False):
-        """启动 Chrome。如果旧实例残留（上次未正常退出），先 kill 再启动"""
-        # ── 先干掉旧 Chrome 残留 ──
-        if _check_port(self.port):
+        """Start Chrome. Kill stale instances first, with retry logic."""
+        # --- Clean up stale Chrome instances ---
+        cleanup_attempts = 0
+        while _check_port(self.port) and cleanup_attempts < 3:
+            cleanup_attempts += 1
             old_pid = _get_cdp_pid(self.port)
-            print(f'[CDP] 检测到旧 Chrome 残留 (PID={old_pid})，清理中...')
+            print(f'[CDP] Stale Chrome detected (PID={old_pid}), attempt {cleanup_attempts}/3...')
             _kill_chrome(self.port)
-            # 等待端口释放
-            deadline = time.time() + 10
+            # Wait for port release
+            deadline = time.time() + 15
             while time.time() < deadline:
                 if not _check_port(self.port):
                     break
                 time.sleep(0.5)
-            if _check_port(self.port):
-                raise RuntimeError(f'无法释放端口 {self.port}，请手动关闭 Chrome 后重试')
+        if _check_port(self.port):
+            raise RuntimeError(f'Cannot release port {self.port}. Please close all Chrome windows manually.')
+
+        # --- Clean profile lock files from previous crashed session ---
+        _clean_profile_locks(self._user_data_dir)
 
         if self._chrome_exe is None:
             raise RuntimeError('未找到 Chrome/Edge 浏览器')
@@ -115,28 +120,40 @@ class ChromeCDP:
             stderr=subprocess.DEVNULL,
         )
 
-        # 等待 CDP 端口就绪
+        # Wait for CDP port with health check
         deadline = time.time() + 90
         started = False
         while time.time() < deadline:
             if _check_port(self.port):
                 started = True
                 break
+            # Check if process died
+            if self._process and self._process.poll() is not None:
+                exit_code = self._process.returncode
+                print(f'[CDP] Chrome exited unexpectedly (code={exit_code}), retrying with clean profile...')
+                break
             time.sleep(0.5)
         if not started:
-            print('[CDP] 首次启动超时，清理 Profile 重试...')
-            self._process.terminate()
-            try: self._process.wait(timeout=5)
-            except: self._process.kill()
+            print('[CDP] First launch timed out, cleaning Profile and retrying...')
+            if self._process:
+                try: self._process.terminate()
+                except: pass
+                try: self._process.wait(timeout=5)
+                except: self._process.kill()
             _rmtree(self._user_data_dir)
             self._user_data_dir.mkdir(parents=True, exist_ok=True)
             (self._user_data_dir / 'First Run').touch()
             (self._user_data_dir / 'Local State').write_text('{}', encoding='utf-8')
+            _clean_profile_locks(self._user_data_dir)
             self._process = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             deadline = time.time() + 90
             while time.time() < deadline:
                 if _check_port(self.port):
                     started = True
+                    break
+                if self._process and self._process.poll() is not None:
+                    exit_code = self._process.returncode
+                    print(f'[CDP] Chrome exited on retry (code={exit_code})')
                     break
                 time.sleep(0.5)
         if started:
@@ -165,14 +182,36 @@ class ChromeCDP:
         return self.url
 
 
+
+def _clean_profile_locks(profile_dir):
+    """Remove stale lock files that prevent Chrome from starting."""
+    for name in ['lockfile', 'SingletonLock', 'SingletonSocket', 'SingletonCookie']:
+        p = profile_dir / name
+        if p.exists():
+            try:
+                p.unlink()
+                print(f'[CDP] Cleaned stale lock: {name}')
+            except Exception:
+                pass
+
 def _check_port(port):
-    """检查 CDP 端口是否已就绪"""
+    """Check if CDP port is alive. Uses /json/version but falls back to plain HTTP check."""
     try:
         resp = urllib.request.urlopen(f'http://127.0.0.1:{port}/json/version', timeout=2)
-        json.loads(resp.read())
+        # Accept both JSON and HTML responses (Chrome --app mode may return HTML initially)
+        data = resp.read()
+        if data.startswith(b'{'):
+            json.loads(data.decode('utf-8'))
         return True
     except Exception:
-        return False
+        pass
+    # Fallback: try /json/list
+    try:
+        resp = urllib.request.urlopen(f'http://127.0.0.1:{port}/json/list', timeout=2)
+        return True
+    except Exception:
+        pass
+    return False
 
 
 def _get_cdp_pid(port):

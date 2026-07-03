@@ -3,7 +3,7 @@
  * 提供标准化的测试数据，用于各测试用例
  */
 
-import { Platform, Role, PostStatus, AccountStatus } from '@prisma/client';
+import { Platform, Role, PostStatus, AccountStatus } from '../../src/common/prisma-enums';
 
 // ==================== 用户 Fixtures ====================
 

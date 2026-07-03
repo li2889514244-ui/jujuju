@@ -3,7 +3,7 @@
  * 模拟 Prisma ORM 的所有数据库操作
  */
 
-export const mockPrismaService = {
+export const mockPrismaService: any = {
   // 用户相关
   user: {
     findUnique: jest.fn(),

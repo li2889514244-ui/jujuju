@@ -23,6 +23,7 @@ import { McpModule } from './modules/mcp/mcp.module'
 import { CalendarModule } from './modules/calendar/calendar.module'
 import { ScanBindModule } from './modules/scan-bind/scan-bind.module'
 import { WechatStoreModule } from './modules/wechat-store/wechat-store.module'
+import { DoudianBrowserModule } from './modules/doudian-browser/doudian-browser.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
 import jwtConfig from './config/jwt.config'
@@ -62,6 +63,7 @@ import databaseConfig from './config/database.config'
     CalendarModule,
     ScanBindModule,
     WechatStoreModule,
+    DoudianBrowserModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },

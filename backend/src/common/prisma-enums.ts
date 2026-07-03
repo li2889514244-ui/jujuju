@@ -31,5 +31,6 @@ export type EventType = (typeof EventType)[keyof typeof EventType];
 
 export const NotificationType = {
   SYSTEM: 'SYSTEM', ACCOUNT: 'ACCOUNT', CONTENT: 'CONTENT', REPORT: 'REPORT', PUBLISH_SUCCESS: 'PUBLISH_SUCCESS', PUBLISH_FAILED: 'PUBLISH_FAILED',
+  CREDENTIAL_EXPIRED: 'CREDENTIAL_EXPIRED',
 } as const;
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];

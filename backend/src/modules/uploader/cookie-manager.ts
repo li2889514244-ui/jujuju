@@ -56,12 +56,13 @@ export class CookieManager {
 
   /**
    * 保存 Cookie 到数据库（加密存储在 Account.cookies 字段）
+   * 同时更新 cookieSavedAt 时间戳，用于凭据健康监控
    */
   async saveCookies(accountId: string, cookies: StoredCookie[]): Promise<void> {
     const encrypted = this.encrypt(JSON.stringify(cookies));
     await this.prisma.account.update({
       where: { id: accountId },
-      data: { cookies: encrypted },
+      data: { cookies: encrypted, cookieSavedAt: new Date() },
     });
     this.logger.log(`Cookie 已保存: accountId=${accountId}, count=${cookies.length}`);
   }

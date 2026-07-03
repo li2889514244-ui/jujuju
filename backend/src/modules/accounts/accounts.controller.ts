@@ -10,6 +10,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -25,6 +26,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Platform } from '../../common/prisma-enums';
 import { PrismaService } from '../../prisma/prisma.service';
+import { CookieManager } from '../uploader/cookie-manager';
+import { OwnershipHelper } from '../../common/utils/ownership.helper';
 
 @ApiTags('accounts')
 @ApiBearerAuth('access-token')
@@ -34,6 +37,7 @@ export class AccountsController {
   constructor(
     private readonly accountsService: AccountsService,
     private readonly prisma: PrismaService,
+    private readonly cookieManager: CookieManager,
   ) {}
 
   @Post()
@@ -87,6 +91,28 @@ export class AccountsController {
     @CurrentUser('id') userId: string,
   ) {
     return this.accountsService.getCookies(id, userId);
+  }
+
+  @Post(':id/cookies')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '上传/更新账号 Cookie（由桌面伴侣调用）' })
+  async uploadCookies(
+    @Param('id') id: string,
+    @Body() body: { cookies: any[] },
+    @CurrentUser('id') userId: string,
+  ) {
+    const account = await this.prisma.account.findUnique({ where: { id } });
+    if (!account) {
+      throw new NotFoundException('账号不存在');
+    }
+    await OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号');
+
+    if (!body.cookies || !Array.isArray(body.cookies) || body.cookies.length === 0) {
+      return { success: false, message: 'Cookie 数据为空' };
+    }
+
+    await this.cookieManager.saveCookies(id, body.cookies);
+    return { success: true, count: body.cookies.length };
   }
 
   @Put(':id')

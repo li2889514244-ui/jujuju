@@ -18,7 +18,7 @@
     <div class="platform-stats">
       <el-row :gutter="16">
         <el-col v-for="stat in platformStats" :key="stat.platform" :xs="12" :sm="6" :md="4" :lg="3">
-          <el-card shadow="hover" class="stat-card" :class="{ active: stat.count > 0 }">
+          <el-card shadow="hover" class="stat-card" :class="{ active: filterPlatform === stat.platform }" @click="filterByPlatform(stat.platform)">
             <div class="stat-icon">
               <PlatformIcon :platform="stat.platform" :size="32" />
             </div>
@@ -81,7 +81,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="状态" width="120">
+      <el-table-column label="凭证状态" width="120">
         <template #default="{ row }">
           <el-tag
             v-if="isCookiePlatform(row.platform) && row.tokenStatus === 'expired'"
@@ -110,7 +110,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="状态" width="100">
+      <el-table-column label="账号状态" width="100">
         <template #default="{ row }">
           <StatusBadge :status="row.status === 'ACTIVE' ? 'active' : 'inactive'" />
         </template>
@@ -288,6 +288,12 @@ function getTokenStatusText(status: string): string {
     unknown: '未知',
   }
   return map[status] || '未知'
+}
+
+function filterByPlatform(platformKey: string) {
+  filterPlatform.value = filterPlatform.value === platformKey ? '' : platformKey
+  currentPage.value = 1
+  loadAccounts()
 }
 
 async function loadPlatforms() {

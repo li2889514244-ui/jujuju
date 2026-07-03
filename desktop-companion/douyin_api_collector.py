@@ -475,7 +475,7 @@ class DouyinCollectionResult:
 
 async def collect_douyin_data(
     page,
-    max_posts: int = 200,
+    max_posts: int = 0,
     fetch_comments: bool = False,
     override_sec_user_id: Optional[str] = None,
     account_label: str = "",
@@ -486,12 +486,12 @@ async def collect_douyin_data(
 
     参数:
         page: Playwright page（需已在 douyin.com 上，已登录）
-        max_posts: 最大采集作品数
+        max_posts: 最大采集作品数；0 表示不设条数上限，按接口翻页信号自然结束
         fetch_comments: 是否采集评论（耗时长，默认关闭）
         override_sec_user_id: 手动指定 sec_user_id（跳过自动检测，防止多账号时串号）
         account_label: 账号标签（如"唐商披星"），用于日志审计
         page: Playwright Page 对象，必须已在 douyin.com 上（已登录）
-        max_posts: 最多采集作品数
+        max_posts: 最多采集作品数；0 表示不设条数上限，按接口翻页信号自然结束
         fetch_comments: 是否同时采集评论（耗时）
 
     返回:
@@ -570,10 +570,20 @@ async def collect_douyin_data(
     cursor = 0
     all_awemes = []
     page_num = 0
+    page_size = 18
+    limit = max_posts if isinstance(max_posts, int) and max_posts > 0 else None
+    seen_aweme_ids = set()
+    seen_cursors = set()
 
-    while len(all_awemes) < max_posts:
+    while page_num < 1000:
+        cursor_key = str(cursor)
+        if cursor_key in seen_cursors and page_num > 0:
+            logger.info(f"[DouyinAPI] Repeated cursor {cursor_key}, stopping")
+            break
+        seen_cursors.add(cursor_key)
+
         page_num += 1
-        posts_data = await get_user_posts(page, sec_user_id, cursor, count=18)
+        posts_data = await get_user_posts(page, sec_user_id, cursor, count=page_size)
         if not posts_data:
             logger.warning(f"[DouyinAPI] get_user_posts failed at page {page_num}")
             break
@@ -583,18 +593,47 @@ async def collect_douyin_data(
             logger.info(f"[DouyinAPI] No more posts at page {page_num}")
             break
 
-        all_awemes.extend(aweme_list)
+        added = 0
+        for aweme in aweme_list:
+            aweme_id = str(
+                aweme.get("aweme_id")
+                or aweme.get("group_id")
+                or aweme.get("item_id")
+                or aweme.get("desc", "")
+            )
+            if not aweme_id:
+                aweme_id = json.dumps(aweme, ensure_ascii=False, sort_keys=True)[:200]
+            if aweme_id in seen_aweme_ids:
+                continue
+            seen_aweme_ids.add(aweme_id)
+            all_awemes.append(aweme)
+            added += 1
+            if limit and len(all_awemes) >= limit:
+                break
         has_more = posts_data.get("has_more", 0)
-        cursor = posts_data.get("max_cursor", 0)
+        next_cursor = posts_data.get("max_cursor", 0)
 
         logger.info(
             f"[DouyinAPI] Posts page {page_num}: "
-            f"fetched {len(aweme_list)}, total={len(all_awemes)}, "
-            f"has_more={has_more}"
+            f"fetched {len(aweme_list)}, added={added}, total={len(all_awemes)}, "
+            f"has_more={has_more}, next_cursor={next_cursor}"
         )
 
-        if not has_more or cursor == 0:
+        if added == 0:
+            logger.info(f"[DouyinAPI] Page {page_num} only had duplicate posts, stopping")
             break
+        if limit and len(all_awemes) >= limit:
+            break
+        if len(aweme_list) < page_size:
+            logger.info(f"[DouyinAPI] Page {page_num} returned less than page size, stopping")
+            break
+        if not has_more or not next_cursor:
+            break
+        if str(next_cursor) == cursor_key or str(next_cursor) in seen_cursors:
+            logger.info(f"[DouyinAPI] Next cursor repeated ({next_cursor}), stopping")
+            break
+
+        cursor = next_cursor
 
         # 翻页间隔（避免触发频率限制）
         await asyncio.sleep(sleep_sec)
@@ -654,7 +693,7 @@ async def collect_douyin_data(
 async def collect_target_user(
     page,
     target_sec_user_id: str,
-    max_posts: int = 100,
+    max_posts: int = 0,
 ) -> DouyinCollectionResult:
     """
     采集任意抖音用户的数据（不需要该用户登录）。
@@ -662,7 +701,7 @@ async def collect_target_user(
     参数:
         page: Playwright Page（在 douyin.com 上，任意登录用户）
         target_sec_user_id: 目标用户的 sec_user_id
-        max_posts: 最多采集作品数
+        max_posts: 最多采集作品数；0 表示不设条数上限，按接口翻页信号自然结束
 
     返回:
         DouyinCollectionResult
@@ -685,18 +724,53 @@ async def collect_target_user(
     # 作品列表
     cursor = 0
     all_awemes = []
-    while len(all_awemes) < max_posts:
-        posts_data = await get_user_posts(page, target_sec_user_id, cursor, count=18)
+    page_num = 0
+    page_size = 18
+    limit = max_posts if isinstance(max_posts, int) and max_posts > 0 else None
+    seen_aweme_ids = set()
+    seen_cursors = set()
+    while page_num < 1000:
+        cursor_key = str(cursor)
+        if cursor_key in seen_cursors and page_num > 0:
+            break
+        seen_cursors.add(cursor_key)
+        page_num += 1
+        posts_data = await get_user_posts(page, target_sec_user_id, cursor, count=page_size)
         if not posts_data:
             break
         aweme_list = posts_data.get("aweme_list", [])
         if not aweme_list:
             break
-        all_awemes.extend(aweme_list)
+        added = 0
+        for aweme in aweme_list:
+            aweme_id = str(
+                aweme.get("aweme_id")
+                or aweme.get("group_id")
+                or aweme.get("item_id")
+                or aweme.get("desc", "")
+            )
+            if not aweme_id:
+                aweme_id = json.dumps(aweme, ensure_ascii=False, sort_keys=True)[:200]
+            if aweme_id in seen_aweme_ids:
+                continue
+            seen_aweme_ids.add(aweme_id)
+            all_awemes.append(aweme)
+            added += 1
+            if limit and len(all_awemes) >= limit:
+                break
         has_more = posts_data.get("has_more", 0)
-        cursor = posts_data.get("max_cursor", 0)
-        if not has_more or cursor == 0:
+        next_cursor = posts_data.get("max_cursor", 0)
+        if added == 0:
             break
+        if limit and len(all_awemes) >= limit:
+            break
+        if len(aweme_list) < page_size:
+            break
+        if not has_more or not next_cursor:
+            break
+        if str(next_cursor) == cursor_key or str(next_cursor) in seen_cursors:
+            break
+        cursor = next_cursor
         await asyncio.sleep(2.0)
 
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]

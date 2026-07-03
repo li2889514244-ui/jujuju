@@ -94,6 +94,15 @@
           <div v-for="stat in aggregatedStats" :key="stat.id" class="md-stat-item">
             <div class="md-stat-item__label">{{ stat.text }}</div>
             <div class="md-stat-item__value">{{ formatNum(stat.value) }}</div>
+            <div
+              v-if="aggregatedTrends[stat.type] !== undefined && aggregatedTrends[stat.type] !== null"
+              class="md-stat-item__trend"
+              :class="(aggregatedTrends[stat.type] ?? 0) >= 0 ? 'is-up' : 'is-down'"
+            >
+              <el-icon><CaretTop v-if="(aggregatedTrends[stat.type] ?? 0) >= 0" /><CaretBottom v-else /></el-icon>
+              {{ Math.abs(aggregatedTrends[stat.type] ?? 0) }}%
+              <span class="md-stat-item__trend-label">环比</span>
+            </div>
           </div>
         </div>
       </el-card>
@@ -103,7 +112,7 @@
         <template #header>
           <div class="md-section__header">
             <span>多账号明细</span>
-            <span class="md-table-subtitle">展示数据为账号最近30天累计获取得到的最新数据</span>
+            <span class="md-table-subtitle">展示{{ dateTypeLabel }}周期数据，当前粉丝为最新快照</span>
           </div>
         </template>
         <el-table
@@ -144,7 +153,7 @@
           </el-table-column>
           <el-table-column
             prop="fansFormatted"
-            label="粉丝数"
+            label="当前粉丝"
             width="100"
             align="right"
             sortable="custom"
@@ -235,91 +244,70 @@
         </el-card>
       </div>
 
-      <!-- Ranking -->
-      <el-card shadow="hover" class="md-section">
+      <!-- 跨 Group 对比 -->
+      <el-card v-if="groupComparison.length > 0" shadow="hover" class="md-section">
         <template #header>
           <div class="md-section__header">
-            <span>排行榜</span>
-            <div class="md-section__header-right">
-              <el-radio-group v-model="rankingPeriod" size="small" @change="refreshAll">
-                <el-radio-button value="week">周榜</el-radio-button>
-                <el-radio-button value="month">月榜</el-radio-button>
-                <el-radio-button value="all">总榜</el-radio-button>
-              </el-radio-group>
-            </div>
+            <span>分组对比</span>
+            <span class="md-table-subtitle">按{{ dateTypeLabel }}周期汇总，人均指标消除团队规模差异</span>
           </div>
         </template>
-        <div class="md-ranking-tabs">
-          <el-radio-group v-model="rankingTab" size="small">
-            <el-radio-button value="views">播放量排行</el-radio-button>
-            <el-radio-button value="engagement">互动率排行</el-radio-button>
-          </el-radio-group>
-        </div>
-        <el-table
-          :data="currentRanking.slice(0, 20)"
-          stripe
-          size="small"
-          max-height="520"
-          empty-text="暂无排行数据"
-          @row-click="handleRankingClick"
-        >
-          <el-table-column label="#" width="50" align="center">
-            <template #default="{ row }">
-              <span class="rank-badge" :class="'rank-' + Math.min(row.rank, 3)">{{
-                row.rank
-              }}</span>
+
+        <!-- 洞察提示 -->
+          <div v-if="groupInsight" class="md-group-insight" :class="'md-group-insight--' + groupInsight.type">
+            <el-icon :size="16"><TrendCharts /></el-icon>
+            <span>{{ groupInsight.text }}</span>
+          </div>
+
+        <el-table :data="groupComparison" stripe size="small" empty-text="暂无分组数据">
+          <el-table-column label="排名" width="60" align="center">
+            <template #default="{ $index }">
+              <span class="group-rank-badge" :class="'group-rank-' + Math.min($index + 1, 3)">{{ $index + 1 }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="内容" min-width="240">
+          <el-table-column prop="groupName" label="分组" min-width="120" />
+          <el-table-column prop="accountCount" label="账号" width="60" align="right" />
+          <el-table-column label="总粉丝" width="110" align="right" sortable :sort-by="'followers'">
             <template #default="{ row }">
-              <div class="ranking-title">{{ row.title || '无标题' }}</div>
-              <div class="ranking-meta">
-                <PlatformIcon :platform="row.platform" />
-                <span>{{ row.accountName }}</span>
+              <div>{{ row.followersFormatted }}</div>
+              <div class="group-sub-metric">人均 {{ row.avgFollowersFormatted }}</div>
+            </template>
+          </el-table-column>
+          <el-table-column label="播放量" width="120" align="right" sortable :sort-by="'play'">
+            <template #default="{ row }">
+              <div>{{ row.playFormatted }}</div>
+              <div class="group-bar-track">
+                <div class="group-bar-fill" :style="{ width: groupBarWidth(row.play) + '%' }" />
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="播放量" width="100" align="right" sortable>
-            <template #default="{ row }">{{ formatNum(row.views) }}</template>
+          <el-table-column label="互动量" width="120" align="right" sortable :sort-by="'interactions'">
+            <template #default="{ row }">
+              <div>{{ row.interactionsFormatted }}</div>
+              <div class="group-sub-metric">人均 {{ row.avgInteractionsFormatted }}</div>
+            </template>
           </el-table-column>
-          <el-table-column label="互动" width="80" align="right">
-            <template #default="{ row }">{{ formatNum(row.likes) }}</template>
-          </el-table-column>
-          <el-table-column label="互动率" width="80" align="right" sortable>
-            <template #default="{ row }">{{ row.engagementRate?.toFixed(1) }}%</template>
+          <el-table-column label="互动率" width="80" align="right">
+            <template #default="{ row }">
+              <span :class="engagementRateClass(row)">{{
+                row.play > 0 ? (row.interactions / row.play * 100).toFixed(1) : '0.0'
+              }}%</span>
+            </template>
           </el-table-column>
         </el-table>
       </el-card>
 
-      <!-- Tags -->
-      <el-card v-if="tags.length > 0" shadow="hover" class="md-section">
-        <template #header><span>标签表现</span></template>
-        <div class="md-tags">
-          <span
-            v-for="tag in tags.slice(0, 30)"
-            :key="tag.name"
-            class="md-tag"
-            :style="{ fontSize: tagSize(tag.count) + 'px' }"
-          >
-            {{ tag.name }}<sup>{{ tag.count }}</sup>
-          </span>
-        </div>
-      </el-card>
     </template>
-
-    <!-- Post Detail Drawer -->
-    <PostDetailDrawer ref="detailDrawerRef" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useMatrixDashboard } from '@/composables/useMatrixDashboard'
 import { useChartTheme } from '@/composables/useChartTheme'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
-import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
+import { CaretTop, CaretBottom, TrendCharts } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
 import type { EChartsOption } from 'echarts'
 
@@ -333,20 +321,18 @@ const {
   platform,
   groupId,
   groups,
-  rankingPeriod,
-  rankingTab,
   trendMetric,
   overview,
   kpiCards,
   aggregatedStats,
+  aggregatedTrends,
   platformStats,
   platformTableData,
   platformChartData,
   trendChartData,
-  currentRanking,
-  tags,
   accountTableData,
   toggleSort,
+  groupComparison,
   refreshAll,
 } = useMatrixDashboard()
 
@@ -422,6 +408,47 @@ const platformChartOption = computed<EChartsOption>(() => {
   })
 })
 
+// ─── Group Comparison Helpers ───
+const groupInsight = computed(() => {
+  const rows = groupComparison.value
+  if (rows.length === 0) return null
+  if (rows.length === 1) return { type: 'info', text: `当前只有 ${rows[0].groupName} 一个分组，无法横向对比。` }
+
+  const top = rows[0]
+  const bottom = rows[rows.length - 1]
+  const topRate = top.play > 0 ? (top.interactions / top.play * 100) : 0
+  const bottomRate = bottom.play > 0 ? (bottom.interactions / bottom.play * 100) : 0
+
+  if (topRate > bottomRate * 2) {
+    return {
+      type: 'success',
+      text: `${top.groupName} 互动率 ${topRate.toFixed(1)}% 远超 ${bottom.groupName}（${bottomRate.toFixed(1)}%），可复用其内容策略。`,
+    }
+  }
+  if (bottom.followers > top.followers && top.play > bottom.play) {
+    return {
+      type: 'warning',
+      text: `${bottom.groupName} 粉丝最多但播放量落后于 ${top.groupName}，建议检查近期内容发布频率和质量。`,
+    }
+  }
+  return {
+    type: 'info',
+    text: `${top.groupName} 综合表现领先，人均互动 ${(top.interactions / Math.max(top.accountCount, 1)).toFixed(0)} 次。`,
+  }
+})
+
+function groupBarWidth(value: number): number {
+  const max = Math.max(...groupComparison.value.map((r: any) => r.play || 0), 1)
+  return Math.max(2, (value / max * 100))
+}
+
+function engagementRateClass(row: any): string {
+  const rate = row.play > 0 ? (row.interactions / row.play * 100) : 0
+  if (rate >= 5) return 'engagement-rate--high'
+  if (rate >= 2) return 'engagement-rate--mid'
+  return 'engagement-rate--low'
+}
+
 // ─── Helpers ───
 function formatNum(n: number): string {
   if (n == null) return '-'
@@ -445,17 +472,6 @@ function avatarColor(name: string): string {
     hash = name.charCodeAt(i) + ((hash << 5) - hash)
   }
   return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length]
-}
-
-function tagSize(count: number): number {
-  const max = tags.value[0]?.count || 1
-  const ratio = count / max
-  return 13 + ratio * 11 // 13-24px
-}
-
-const detailDrawerRef = ref()
-function handleRankingClick(row: any) {
-  detailDrawerRef.value?.open(row)
 }
 
 onMounted(() => {
@@ -627,74 +643,6 @@ onMounted(() => {
   font-size: 14px;
 }
 
-// ─── Ranking ───
-.md-ranking-tabs {
-  margin-bottom: 12px;
-}
-.rank-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--color-bg-tertiary);
-  color: var(--color-text-secondary);
-  &.rank-1 {
-    background: #f59e0b20;
-    color: #f59e0b;
-  }
-  &.rank-2 {
-    background: #94a3b820;
-    color: #94a3b8;
-  }
-  &.rank-3 {
-    background: #d9770620;
-    color: #d97706;
-  }
-}
-.ranking-title {
-  font-size: 14px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 400px;
-}
-.ranking-meta {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-tertiary);
-  margin-top: 2px;
-}
-
-// ─── Tags ───
-.md-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: baseline;
-  padding: 8px 0;
-}
-.md-tag {
-  color: var(--color-accent);
-  cursor: pointer;
-  font-weight: 500;
-  transition: opacity 0.2s;
-  sup {
-    font-size: 0.7em;
-    color: var(--color-text-tertiary);
-    margin-left: 1px;
-  }
-  &:hover {
-    opacity: 0.75;
-  }
-}
-
 // ─── Stats Bar (日/周/月) ───
 .md-date-hint {
   color: var(--color-text-tertiary);
@@ -730,6 +678,25 @@ onMounted(() => {
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
   }
+  &__trend {
+    margin-top: 6px;
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    &.is-up {
+      color: var(--color-success);
+    }
+    &.is-down {
+      color: var(--color-danger);
+    }
+  }
+  &__trend-label {
+    color: var(--color-text-tertiary);
+    margin-left: 3px;
+    font-size: 11px;
+  }
 }
 
 // ─── Account Table ───
@@ -737,5 +704,91 @@ onMounted(() => {
   color: var(--color-text-tertiary);
   font-size: 12px;
   margin-left: 8px;
+}
+
+// ─── Group Comparison ───
+.md-group-insight {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+
+  &--info {
+    background: rgba(99, 102, 241, 0.08);
+    color: #818cf8;
+    border: 1px solid rgba(99, 102, 241, 0.2);
+  }
+  &--success {
+    background: rgba(16, 185, 129, 0.08);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.2);
+  }
+  &--warning {
+    background: rgba(245, 158, 11, 0.08);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.2);
+  }
+}
+
+.group-rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+
+  &.group-rank-1 {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+  }
+  &.group-rank-2 {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+  }
+  &.group-rank-3 {
+    background: rgba(217, 119, 6, 0.15);
+    color: #d97706;
+  }
+}
+
+.group-sub-metric {
+  font-size: 11px;
+  color: var(--color-text-tertiary);
+  margin-top: 2px;
+}
+
+.group-bar-track {
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+}
+
+.group-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6366f1, #818cf8);
+  transition: width 0.3s ease;
+}
+
+.engagement-rate--high {
+  color: #34d399;
+  font-weight: 600;
+}
+.engagement-rate--mid {
+  color: var(--color-text-secondary);
+}
+.engagement-rate--low {
+  color: #f87171;
 }
 </style>

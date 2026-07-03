@@ -69,6 +69,7 @@ export class AccountsService {
   async create(dto: CreateAccountDto, userId: string) {
     // 加密Cookie
     const encryptedCookies = dto.cookies ? this.encryptCookie(dto.cookies) : null
+    const cookieSavedAt = encryptedCookies ? new Date() : undefined
 
     // upsert: update if same platform+userId exists, create if not
     const account = await this.prisma.account.upsert({
@@ -85,6 +86,7 @@ export class AccountsService {
         avatar: dto.avatar,
         bio: dto.bio,
         cookies: encryptedCookies,
+        cookieSavedAt,
         proxyConfig: dto.proxyConfig ? JSON.stringify(dto.proxyConfig) : undefined,
         teamId: dto.teamId,
         userId,
@@ -94,6 +96,7 @@ export class AccountsService {
         avatar: dto.avatar,
         bio: dto.bio,
         cookies: encryptedCookies ?? undefined,
+        ...(encryptedCookies ? { cookieSavedAt: new Date() } : {}),
         proxyConfig: dto.proxyConfig ? JSON.stringify(dto.proxyConfig) : undefined,
         userId,
       },
@@ -125,7 +128,7 @@ export class AccountsService {
     const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params
 
     const where: Prisma.AccountWhereInput = {}
-    /* shared mode: skip userId filtering */
+    if (userId) where.userId = userId
     if (teamId) where.teamId = teamId
     if (groupId) where.groupId = groupId
     if (platform) where.platform = platform
@@ -215,9 +218,10 @@ export class AccountsService {
 
     const updateData: Prisma.AccountUpdateInput = { ...dto }
 
-    // 如果更新Cookie，需要加密
+    // 如果更新Cookie，需要加密，并更新保存时间戳
     if (dto.cookies) {
       updateData.cookies = this.encryptCookie(dto.cookies)
+      updateData.cookieSavedAt = new Date()
     }
 
     const updated = await this.prisma.account.update({

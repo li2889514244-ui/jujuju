@@ -40,28 +40,6 @@
         </template>
       </el-dropdown>
 
-      <!-- Team Switcher -->
-      <el-dropdown trigger="click" class="topbar__team-wrap" @command="handleTeamSwitch">
-        <div class="topbar__team">
-          <el-icon :size="14"><OfficeBuilding /></el-icon>
-          <span class="topbar__team-name topbar__desktop">{{
-            teamStore.currentTeam?.name || '选择团队'
-          }}</span>
-          <el-icon :size="11"><ArrowDown /></el-icon>
-        </div>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item
-              v-for="team in teamStore.teams"
-              :key="team.id"
-              :command="team"
-              :class="{ 'is-active': team.id === teamStore.currentTeamId }"
-              >{{ team.name }} ({{ team.memberCount }}人)</el-dropdown-item
-            >
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
-
       <!-- Notifications -->
       <el-popover
         placement="bottom-end"
@@ -140,9 +118,8 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { useTeamStore } from '@/store/team'
 import { notificationApi, type Notification } from '@/api/notifications'
 import {
   WarningFilled,
@@ -151,13 +128,18 @@ import {
   MagicStick,
   MoreFilled,
   Connection,
+  Download,
+  Bell,
+  ArrowDown,
+  SwitchButton,
+  User,
+  Lock,
 } from '@element-plus/icons-vue'
 import { getNotificationColor } from '@/composables/usePlatform'
-import type { Team } from '@/types'
 
 const route = useRoute()
+const router = useRouter()
 const userStore = useUserStore()
-const teamStore = useTeamStore()
 const unreadCount = ref(0)
 const notifications = ref<Notification[]>([])
 const notifLoading = ref(false)
@@ -166,7 +148,6 @@ let pollTimer: ReturnType<typeof setInterval> | null = null
 const currentRoute = computed(() => route)
 
 onMounted(() => {
-  teamStore.fetchTeams()
   fetchNotifications()
   pollTimer = setInterval(fetchUnreadCount, 30000)
 })
@@ -240,18 +221,16 @@ function formatTime(dateStr: string) {
   return date.toLocaleDateString('zh-CN')
 }
 
-function handleTeamSwitch(team: Team) {
-  teamStore.switchTeam(team)
-  teamStore.fetchMembers()
-}
-
 function handleUserCommand(command: string) {
   switch (command) {
     case 'logout':
       userStore.logout()
       break
     case 'profile':
+      router.push('/profile')
+      break
     case 'password':
+      router.push('/password')
       break
   }
 }

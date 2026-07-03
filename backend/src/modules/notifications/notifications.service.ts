@@ -322,7 +322,20 @@ export class NotificationsService {
   }
 
   private getEnvFilePath(): string {
-    return join(process.cwd(), '.env')
+    // 1. 尝试 process.cwd()/.env（最常见）
+    const cwdPath = join(process.cwd(), '.env')
+    if (existsSync(cwdPath)) return cwdPath
+
+    // 2. 尝试 __dirname/../.env（编译后 dist/ 目录的场景）
+    const distPath = join(__dirname, '..', '..', '..', '.env')
+    if (existsSync(distPath)) return distPath
+
+    // 3. 尝试 DOTENV_CONFIG_PATH 环境变量
+    const envConfigPath = process.env.DOTENV_CONFIG_PATH
+    if (envConfigPath && existsSync(envConfigPath)) return envConfigPath
+
+    // 4. 回退到 process.cwd()/.env（即使不存在，也允许创建）
+    return cwdPath
   }
 
   private createFeishuSignature(secret: string) {

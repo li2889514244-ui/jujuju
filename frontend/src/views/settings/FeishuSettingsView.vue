@@ -71,6 +71,15 @@
             title="这里接的是飞书群机器人 Webhook，用来发通知；不是飞书 CLI，也不是飞书 MCP。"
           />
 
+          <el-alert
+            v-if="settings && !settings.envFileWritable"
+            class="mode-alert"
+            type="warning"
+            :closable="false"
+            show-icon
+            title="服务器 .env 文件不可写，保存的设置在服务重启后会丢失。请联系管理员修复文件权限。"
+          />
+
           <el-form label-position="top" class="settings-form" @submit.prevent>
             <el-form-item label="Webhook URL">
               <el-input

@@ -71,6 +71,37 @@ async def goto_home_and_wait(page, timeout=6):
     return await page.evaluate("() => document.body.innerText")
 
 
+async def intercept_auth_data(page):
+    """在导航前注册响应拦截，捕获 auth_data API 响应。
+    
+    原理：页面加载时浏览器自动调用 auth_data API（带有效 cookie），
+    我们拦截这个响应来获取头像、昵称、粉丝数等。
+    比手动 fetch 可靠得多 — 不依赖 session 手动构造。
+    支持多账号：每个 profile 各自有有效 session，拦截自然生效。
+    
+    捕获后自动移除监听器，避免内存泄漏和重复检查开销。
+    """
+    captured = {}
+
+    async def _on_response(response):
+        if "auth" not in captured and "auth_data" in response.url and response.status == 200:
+            try:
+                ct = response.headers.get("content-type", "")
+                if "json" in ct or "text" in ct:
+                    text = await response.text()
+                    if text.startswith("{"):
+                        data = json.loads(text)
+                        if data.get("errCode") == 0:
+                            captured["auth"] = data.get("data", {})
+                            # 捕获成功，移除监听器
+                            page.remove_listener("response", _on_response)
+            except Exception:
+                pass
+
+    page.on("response", _on_response)
+    return captured
+
+
 async def collect_all():
     async with async_playwright() as pw:
         browser = await pw.chromium.connect_over_cdp(CDP_URL)
@@ -92,13 +123,31 @@ async def collect_all():
             "collected_at": datetime.now().isoformat(),
         }
 
+        # ── 响应拦截：在导航前注册，捕获页面自动加载的 auth_data API ──
+        captured = await intercept_auth_data(page)
+
         # === 1. 主页 ===
         print("[1/4] 主页数据...")
         text = await goto_home_and_wait(page)
+        await asyncio.sleep(3)  # 给 API 响应一点时间到达
         flat = text.replace("\n", " ").replace("\t", " ")
 
         result["follower_count"] = intv(re.search(r"关注者(\d[\d,]*)", flat).group(1)) if re.search(r"关注者(\d[\d,]*)", flat) else 0
         result["video_count"] = intv(re.search(r"视频(\d[\d,]*)", flat).group(1)) if re.search(r"视频(\d[\d,]*)", flat) else 0
+
+        # 从拦截到的 auth_data 响应中提取头像和补充数据
+        auth = captured.get("auth", {})
+        fu = auth.get("finderUser", {})
+        if fu.get("headImgUrl"):
+            result["avatar"] = fu["headImgUrl"]
+            print(f"  头像(API拦截): {result['avatar'][:80]}")
+        if fu.get("nickname"):
+            result["nickname_api"] = fu["nickname"]
+        if fu.get("fansCount"):
+            result["follower_count_api"] = fu["fansCount"]
+        if not fu:
+            print("  ⚠ auth_data 未拦截到，头像/昵称可能缺失")
+
         # 昨日数据块
         yd = flat.split("昨日数据")[1].split("关于腾讯")[0] if "昨日数据" in flat else ""
         result["daily_new_followers"] = intv(re.search(r"净增关注\s+(\d+)", yd).group(1)) if re.search(r"净增关注\s+(\d+)", yd) else 0
@@ -237,6 +286,10 @@ def save_to_local_db(data):
         field_map["comment_count"] = int(data.get("comment_count", 0) or 0)
     if "share_count" in col_names:
         field_map["share_count"] = int(data.get("share_count", 0) or 0)
+    if "avatar_url" in col_names:
+        field_map["avatar_url"] = data.get("avatar", "") or ""
+    if "avatar" in col_names:
+        field_map["avatar"] = data.get("avatar", "") or ""
     if "new_followers" in col_names:
         field_map["new_followers"] = int(data.get("daily_new_followers", 0) or 0)
     if "new_views" in col_names:
@@ -324,6 +377,7 @@ async def upload_to_server(data):
         "accountId": ACCOUNT_ID,
         "nickname": ACCOUNT_NAME,
         "metrics": {
+            "_avatar": data.get("avatar", ""),
             "followerCount": int(data.get("follower_count", 0) or 0),
             "videoCount": int(data.get("video_count", 0) or 0),
             "likeCount": int(data.get("play_count", 0) or data.get("play_count_daily", 0) or 0),

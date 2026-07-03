@@ -20,7 +20,9 @@ export interface UserInfo {
   avatar?: string
   role: string
   teamId?: string
+  phone?: string
   createdAt: string
+  lastLoginAt?: string
 }
 
 export interface LoginResponse {

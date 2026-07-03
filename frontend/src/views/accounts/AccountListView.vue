@@ -6,7 +6,7 @@
         <h2>账号状态、分组和作品数据</h2>
         <p>点击账号详情，可查看单账号视频播放、点赞、评论、收藏和互动率。</p>
       </div>
-      <router-link to="/data-center" class="account-list__header-link">查看矩阵数据</router-link>
+      <router-link to="/dashboard" class="account-list__header-link">查看矩阵数据</router-link>
     </div>
 
     <!-- Filters -->

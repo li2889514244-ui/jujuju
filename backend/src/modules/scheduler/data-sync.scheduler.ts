@@ -4,6 +4,8 @@ import { PrismaService } from '../../prisma/prisma.service'
 import { BrowserPool } from '../uploader/browser-pool'
 import { CookieManager } from '../uploader/cookie-manager'
 import { Platform } from '../../common/prisma-enums'
+import { NotificationsService } from '../notifications/notifications.service'
+import { StoredCookie } from '../uploader/base-uploader'
 
 interface AccountMetrics {
   followers: number
@@ -28,6 +30,7 @@ export class DataSyncScheduler {
     private prisma: PrismaService,
     private browserPool: BrowserPool,
     private cookieManager: CookieManager,
+    private notificationsService: NotificationsService,
   ) {}
 
   private getBeijingDayStart(offsetDays = 0): Date {
@@ -52,46 +55,65 @@ export class DataSyncScheduler {
     }
 
     this.isRunning = true
-    this.logger.log('')
-
+    this.logger.log('每日数据采集任务启动')
+    
     try {
       const accounts = await this.prisma.account.findMany({
         where: { status: 'ACTIVE' },
         select: { id: true, platform: true, cookies: true, nickname: true },
       })
-
+    
       this.logger.log(`Data sync: ${accounts.length} accounts to collect`)
-
+    
       let successCount = 0
       let failCount = 0
-
+      let skippedCount = 0
+    
       for (const account of accounts) {
         try {
           const cookies = account.cookies ? this.cookieManager.decryptCookie(account.cookies) : []
-
+    
           if (cookies.length === 0) {
-            this.logger.debug(`Skipping account without cookies: ${account.nickname}`)
+            skippedCount++
+            this.logger.warn(
+              `[${account.platform}] 账号 "${account.nickname}" 无Cookie，跳过浏览器采集。请通过桌面伴侣或平台授权登录以保存Cookie。`,
+            )
             continue
           }
-
-          const metrics = await this.collectMetrics(account.platform, cookies)
-
-          if (metrics) {
-            await this.saveMetrics(account.id, account.platform, metrics)
+    
+          const result = await this.collectMetrics(account.platform, account.id, cookies)
+    
+          if (result) {
+            await this.saveMetrics(account.id, account.platform, result.metrics)
             successCount++
-          }
 
-          // 姣忎釜璐﹀彿闂撮殧 5-10 绉掞紝閬垮厤棰戠巼杩囬珮
+            // 回存浏览器刷新后的 Cookie（延长登录态寿命）
+            if (result.refreshedCookies && result.refreshedCookies.length > 0) {
+              await this.cookieManager.saveCookies(account.id, result.refreshedCookies)
+              this.logger.log(
+                `[${account.platform}] "${account.nickname}" Cookie已回存 (${result.refreshedCookies.length} 条)`,
+              )
+            }
+          }
+    
+          // 每个账号间隔 5-10 秒，避免频率过高
           await this.delay(5000 + Math.random() * 5000)
         } catch (error: any) {
           failCount++
           this.logger.warn(`Collection failed [${account.nickname}]: ${error.message}`)
         }
       }
-
-      this.logger.log(`Data collection complete: ${successCount} success, ${failCount} failed`)
+    
+      this.logger.log(`Data collection complete: ${successCount} success, ${failCount} failed, ${skippedCount} skipped`)
+    
+      if (skippedCount === accounts.length && accounts.length > 0) {
+        this.logger.warn(
+          `所有 ${accounts.length} 个账号均无Cookie，自动采集全部跳过！` +
+          `请确保：1) 桌面伴侣已运行并上报数据，或 2) 在前端平台管理页面完成账号授权登录以保存Cookie。`,
+        )
+      }
     } catch (error: any) {
-      this.logger.error('', error.stack)
+      this.logger.error(`每日数据采集异常: ${error.message}`, error.stack)
     } finally {
       this.isRunning = false
     }
@@ -100,27 +122,50 @@ export class DataSyncScheduler {
   /**
    * 鏍规嵁骞冲彴閲囬泦鏁版嵁
    */
-  private async collectMetrics(platform: Platform, cookies: any[]): Promise<AccountMetrics | null> {
+  private async collectMetrics(
+    platform: Platform,
+    accountId: string,
+    cookies: StoredCookie[],
+  ): Promise<{ metrics: AccountMetrics; refreshedCookies?: StoredCookie[] } | null> {
     const context = await this.browserPool.createContext({ cookies })
     const page = await this.browserPool.createPage(context)
 
     try {
+      let metrics: AccountMetrics | null = null
       switch (platform) {
         case Platform.DOUYIN:
-          return await this.collectDouyin(page)
+          metrics = await this.collectDouyin(page)
+          break
         case Platform.XIAOHONGSHU:
-          return await this.collectXiaohongshu(page)
+          metrics = await this.collectXiaohongshu(page)
+          break
         case Platform.KUAISHOU:
-          return await this.collectKuaishou(page)
+          metrics = await this.collectKuaishou(page)
+          break
         case Platform.BILIBILI:
-          return await this.collectBilibili(page)
+          metrics = await this.collectBilibili(page)
+          break
         case Platform.WEIBO:
-          return await this.collectWeibo(page)
+          metrics = await this.collectWeibo(page)
+          break
         case Platform.WECHAT_VIDEO:
-          return await this.collectWechatVideo(page)
+          metrics = await this.collectWechatVideo(page)
+          break
         default:
-          return null
+          metrics = null
       }
+
+      if (metrics) {
+        // 采集成功，提取浏览器刷新后的 Cookie
+        try {
+          const refreshedCookies = await context.cookies() as StoredCookie[]
+          return { metrics, refreshedCookies }
+        } catch {
+          return { metrics }
+        }
+      }
+
+      return null
     } finally {
       await context.close()
     }
@@ -319,5 +364,180 @@ export class DataSyncScheduler {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms))
+  }
+
+  // ==================== 凭据健康检查 ====================
+
+  /**
+   * 每天早上 8:00 检查所有账号的认证凭据状态
+   * 对缺少凭据或凭据已过期的账号创建通知提醒
+   */
+  @Cron('0 8 * * *')
+  async handleCredentialHealthCheck() {
+    this.logger.log('凭据健康检查开始...')
+
+    try {
+      const accounts = await this.prisma.account.findMany({
+        where: { status: 'ACTIVE' },
+        select: {
+          id: true,
+          platform: true,
+          nickname: true,
+          cookies: true,
+          metadata: true,
+          userId: true,
+          cookieSavedAt: true,
+        },
+      })
+
+      const platformNames: Record<string, string> = {
+        DOUYIN: '抖音',
+        KUAISHOU: '快手',
+        XIAOHONGSHU: '小红书',
+        WECHAT_VIDEO: '微信视频号',
+        BILIBILI: 'B站',
+        WEIBO: '微博',
+      }
+
+      let missingCount = 0
+      let expiredCount = 0
+      let staleCount = 0
+      const COOKIE_STALE_DAYS = 14 // Cookie超过14天未刷新视为“即将过期”
+      const COOKIE_MAX_DAYS = 30   // Cookie超过30天未刷新视为“已过期”
+
+      for (const account of accounts) {
+        const hasCookies = account.cookies && account.cookies.length > 0
+        const metadata = (() => {
+          try { return JSON.parse(account.metadata || '{}') } catch { return {} }
+        })()
+        const hasToken = !!metadata.oauthToken
+        const tokenExpiresAt = metadata.tokenExpiresAt
+          ? new Date(metadata.tokenExpiresAt)
+          : null
+        const isTokenExpired = tokenExpiresAt && tokenExpiresAt < new Date()
+        const isTokenExpiringSoon =
+          tokenExpiresAt &&
+          !isTokenExpired &&
+          tokenExpiresAt < new Date(Date.now() + 3 * 24 * 60 * 60 * 1000)
+
+        const platformLabel = platformNames[account.platform] || account.platform
+
+        if (!hasCookies && !hasToken) {
+          // 无任何凭据
+          missingCount++
+          this.logger.warn(
+            `[凭据缺失] ${platformLabel} 账号 "${account.nickname}" 无Cookie和Token，自动采集将无法工作`,
+          )
+
+          // 检查是否已有未读的同类型通知（避免重复）
+          const existingNotification = await this.prisma.notification.findFirst({
+            where: {
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED',
+              read: false,
+              metadata: { contains: account.id },
+            },
+          })
+
+          if (!existingNotification) {
+            await this.notificationsService.create({
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED' as any,
+              title: `账号凭据缺失: ${account.nickname}`,
+              content: `${platformLabel} 账号 "${account.nickname}" 未保存Cookie或Token，每日自动采集已跳过。请通过桌面伴侣登录或在前端平台管理页完成授权。`,
+              metadata: { accountId: account.id, platform: account.platform, reason: 'no_credentials' },
+            })
+          }
+        } else if (isTokenExpired) {
+          // Token 已过期
+          expiredCount++
+          this.logger.warn(
+            `[Token过期] ${platformLabel} 账号 "${account.nickname}" OAuth Token 已于 ${tokenExpiresAt!.toISOString()} 过期`,
+          )
+
+          const existingNotification = await this.prisma.notification.findFirst({
+            where: {
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED',
+              read: false,
+              metadata: { contains: account.id },
+            },
+          })
+
+          if (!existingNotification) {
+            await this.notificationsService.create({
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED' as any,
+              title: `Token已过期: ${account.nickname}`,
+              content: `${platformLabel} 账号 "${account.nickname}" 的OAuth Token 已过期。请重新授权以恢复自动采集。`,
+              metadata: { accountId: account.id, platform: account.platform, reason: 'token_expired', expiredAt: tokenExpiresAt!.toISOString() },
+            })
+          }
+        } else if (isTokenExpiringSoon) {
+          // Token 即将过期（3天内）
+          this.logger.warn(
+            `[Token即将过期] ${platformLabel} 账号 "${account.nickname}" Token 将于 ${tokenExpiresAt!.toISOString()} 过期`,
+          )
+
+          const existingNotification = await this.prisma.notification.findFirst({
+            where: {
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED',
+              read: false,
+              metadata: { contains: account.id },
+            },
+          })
+
+          if (!existingNotification) {
+            await this.notificationsService.create({
+              userId: account.userId,
+              type: 'CREDENTIAL_EXPIRED' as any,
+              title: `Token即将过期: ${account.nickname}`,
+              content: `${platformLabel} 账号 "${account.nickname}" 的OAuth Token 将于 ${tokenExpiresAt!.toLocaleDateString('zh-CN')} 过期，请尽快刷新。`,
+              metadata: { accountId: account.id, platform: account.platform, reason: 'token_expiring_soon', expiresAt: tokenExpiresAt!.toISOString() },
+            })
+          }
+        } else if (hasCookies && account.cookieSavedAt) {
+          // Cookie 存在但已保存超过 COOKIE_STALE_DAYS 天，检查是否老化
+          const daysSinceSaved = (Date.now() - account.cookieSavedAt.getTime()) / (1000 * 60 * 60 * 24)
+
+          if (daysSinceSaved > COOKIE_MAX_DAYS) {
+            staleCount++
+            this.logger.warn(
+              `[Cookie老化] ${platformLabel} 账号 "${account.nickname}" Cookie 已 ${Math.floor(daysSinceSaved)} 天未刷新，可能已失效`,
+            )
+
+            const existingNotification = await this.prisma.notification.findFirst({
+              where: {
+                userId: account.userId,
+                type: 'CREDENTIAL_EXPIRED',
+                read: false,
+                metadata: { contains: account.id },
+              },
+            })
+
+            if (!existingNotification) {
+              await this.notificationsService.create({
+                userId: account.userId,
+                type: 'CREDENTIAL_EXPIRED' as any,
+                title: `Cookie可能已失效: ${account.nickname}`,
+                content: `${platformLabel} 账号 "${account.nickname}" 的Cookie 已 ${Math.floor(daysSinceSaved)} 天未刷新，登录态可能已失效。如采集失败请重新登录。`,
+                metadata: { accountId: account.id, platform: account.platform, reason: 'cookie_stale', daysSinceSaved: Math.floor(daysSinceSaved) },
+              })
+            }
+          } else if (daysSinceSaved > COOKIE_STALE_DAYS) {
+            this.logger.warn(
+              `[Cookie即将老化] ${platformLabel} 账号 "${account.nickname}" Cookie 已 ${Math.floor(daysSinceSaved)} 天未刷新`,
+            )
+          }
+        }
+      }
+
+      this.logger.log(
+        `凭据健康检查完成: ${accounts.length} 个账号, ${missingCount} 缺少凭据, ${expiredCount} Token过期, ${staleCount} Cookie老化`,
+      )
+    } catch (error: any) {
+      this.logger.error(`凭据健康检查失败: ${error.message}`, error.stack)
+    }
   }
 }

@@ -25,6 +25,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '矩阵数据', icon: 'Odometer', section: '总览' },
       },
       {
+        path: 'content-insights',
+        name: 'ContentInsights',
+        component: () => import('@/views/insights/ContentInsightsView.vue'),
+        meta: { title: '内容洞察', icon: 'DataAnalysis', section: '总览' },
+      },
+      {
         path: 'accounts',
         name: 'AccountList',
         component: () => import('@/views/accounts/AccountListView.vue'),
@@ -41,6 +47,12 @@ const routes: RouteRecordRaw[] = [
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
         meta: { title: '微信小店', icon: 'Money', section: '商业转化' },
+      },
+      {
+        path: 'doudian',
+        name: 'Doudian',
+        component: () => import('@/views/monetization/DoudianView.vue'),
+        meta: { title: '抖店', icon: 'Money', section: '商业转化' },
       },
       {
         path: 'team',
@@ -83,6 +95,18 @@ const routes: RouteRecordRaw[] = [
         name: 'AIAssistant',
         component: () => import('@/views/ai/AIAssistantView.vue'),
         meta: { title: 'AI 助手', icon: 'MagicStick', hidden: true },
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('@/views/settings/ProfileView.vue'),
+        meta: { title: '个人设置', icon: 'User', hidden: true },
+      },
+      {
+        path: 'password',
+        name: 'Password',
+        component: () => import('@/views/settings/PasswordView.vue'),
+        meta: { title: '修改密码', icon: 'Lock', hidden: true },
       },
     ],
   },

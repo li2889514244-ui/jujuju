@@ -1,0 +1,15 @@
+# 知识卡导出索引文件
+schema_version: 1
+locale: zh-CN
+branch: master
+exported_at: "2026-06-09T08:43:41Z"
+modules:
+    backend:
+        dir_name: MatrixFlow 多平台内容管理与 AI 增强后端
+        title: MatrixFlow 多平台内容管理与 AI 增强后端
+        scope:
+            - backend/
+        source_files: []
+        children: []
+        depends_on: []
+        related_to: []

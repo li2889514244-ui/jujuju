@@ -245,16 +245,20 @@ export class WechatStoreService implements OnModuleInit {
       take: 1000,
     })
 
-    const list = rows.map((row) => ({
-      id: row.afterSaleOrderId,
-      type: row.type,
-      status: row.status,
-      amount: row.amount,
-      reason: row.reason,
-      product: row.product,
-      complete_time: row.completeTime,
-      create_time: row.createTime,
-    }))
+    const list = rows.map((row) => {
+      const raw = row.raw as any
+      return {
+        id: row.afterSaleOrderId,
+        order_id: this.getAftersaleOrderId(raw),
+        type: row.type,
+        status: row.status,
+        amount: row.amount,
+        reason: row.reason,
+        product: row.product,
+        complete_time: row.completeTime,
+        create_time: row.createTime,
+      }
+    })
     const totalAmount = list.reduce((sum, item) => sum + item.amount, 0)
     return { errcode: 0, errmsg: 'ok', list, total: list.length, totalAmount, cached: true }
   }
@@ -268,6 +272,17 @@ export class WechatStoreService implements OnModuleInit {
       throw new Error(data.errmsg)
     }
     return data.access_token
+  }
+
+  private getAftersaleOrderId(aftersale: any) {
+    return String(
+      aftersale?.order_id ||
+        aftersale?.orderId ||
+        aftersale?.order_info?.order_id ||
+        aftersale?.order_info?.orderId ||
+        aftersale?.order_detail?.order_id ||
+        '',
+    )
   }
 
   private async getStoreToken(storeId: string): Promise<string> {

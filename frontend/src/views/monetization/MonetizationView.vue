@@ -44,7 +44,7 @@
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeSalesLabel }}</div>
         <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
-        <div class="kpi-card__sub">{{ orderStats.count }} 笔订单</div>
+        <div class="kpi-card__sub">{{ orderStatsSub }}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">售后退款</div>
@@ -84,7 +84,7 @@
             </div>
           </div>
           <div class="order-item__price order-item__price--refund">
-            -&yen;{{ centToYuan(a.amount) }}
+            {{ isSuccessfulAftersale(a) ? '-' : '' }}&yen;{{ centToYuan(a.amount) }}
           </div>
         </div>
       </div>
@@ -192,11 +192,18 @@ import { ElMessage } from 'element-plus'
 import DataChart from '@/components/common/DataChart.vue'
 import {
   wechatStoreApi,
+  type WechatAftersale,
   type WechatOrder,
   type WechatProduct,
   type WechatStore,
 } from '@/api/wechat-store'
 import dayjs from 'dayjs'
+import {
+  buildDailySales,
+  buildStatusBreakdown,
+  calculateNetSales,
+  normalizeAftersales,
+} from '@/utils/wechatStoreMetrics'
 
 const loading = ref(false)
 const trendMetric = ref('gmv')
@@ -206,7 +213,8 @@ const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
 const products = ref<WechatProduct[]>([])
 const aftersaleCount = ref(0)
-const aftersaleList = ref<any[]>([])
+const aftersaleList = ref<WechatAftersale[]>([])
+const rangeAftersaleList = ref<WechatAftersale[]>([])
 const aftersaleTotal = ref(0)
 const showAftersale = ref(false)
 let prevAftersaleCount = 0
@@ -217,46 +225,48 @@ let timer: ReturnType<typeof setInterval> | null = null
 // ── Stats ──
 const rangeSalesLabel = computed(() => {
   const labels = {
-    today: '今天销售额',
-    yesterday: '昨天销售额',
-    week: '近7天销售额',
+    today: '今天净销售额',
+    yesterday: '昨天净销售额',
+    week: '近7天净销售额',
   }
   return labels[viewMode.value]
 })
 
-const displayOrders = computed(() => {
-  if (viewMode.value === 'today' || viewMode.value === 'yesterday') {
-    const day = viewMode.value === 'yesterday' ? dayjs().subtract(1, 'day') : dayjs()
-    const start = day.startOf('day').unix()
-    const end = day.endOf('day').unix()
-    return orders.value.filter((o) => o.create_time >= start && o.create_time <= end)
+const displayRange = computed(() => {
+  const now = dayjs()
+  if (viewMode.value === 'yesterday') {
+    const day = now.subtract(1, 'day')
+    return { start: day.startOf('day').unix(), end: day.endOf('day').unix() }
   }
-  return orders.value
+  if (viewMode.value === 'week') {
+    return { start: now.subtract(6, 'day').startOf('day').unix(), end: now.unix() }
+  }
+  return { start: now.startOf('day').unix(), end: now.unix() }
+})
+
+const displayOrders = computed(() => {
+  const { start, end } = displayRange.value
+  return orders.value.filter((o) => o.create_time >= start && o.create_time <= end)
 })
 
 const orderStats = computed(() => {
-  const list = displayOrders.value
-  const gmv = list.reduce((s, o) => s + o.pay_amount, 0)
-  const count = list.length
-  return { gmv, count, avg: count > 0 ? gmv / count : 0 }
+  return calculateNetSales(displayOrders.value, rangeAftersaleList.value)
+})
+
+const orderStatsSub = computed(() => {
+  const { count, deduction, effectiveCount } = orderStats.value
+  if (count === 0) return '0 笔订单'
+
+  const countText =
+    effectiveCount === count ? `${count} 笔有效订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
+  return deduction > 0 ? `${countText}，已扣 ¥${centToYuan(deduction)}` : countText
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
 
 const statusBreakdown = computed(() => {
-  const labels: Record<number, string> = {
-    10: '待付款',
-    20: '待发货',
-    30: '已发货',
-    100: '已完成',
-    250: '已取消',
-  }
-  const groups: Record<number, number> = {}
-  displayOrders.value.forEach((o) => {
-    groups[o.status] = (groups[o.status] || 0) + 1
-  })
   return [
-    ...([10, 20, 30, 100, 250] as const).map((k) => ({ label: labels[k], count: groups[k] || 0 })),
+    ...buildStatusBreakdown(displayOrders.value),
     { label: '售后(24h)', count: aftersaleCount.value },
   ]
 })
@@ -271,18 +281,11 @@ const filteredOrders = computed(() => {
 const filteredOrderCount = computed(() => filteredOrders.value.length)
 
 const trendOption = computed(() => {
-  const dailyMap: Record<string, { gmv: number; orders: number }> = {}
-  displayOrders.value.forEach((o) => {
-    const d = dayjs.unix(o.create_time).format('MM-DD')
-    if (!dailyMap[d]) dailyMap[d] = { gmv: 0, orders: 0 }
-    dailyMap[d].gmv += o.pay_amount
-    dailyMap[d].orders += 1
-  })
-  const entries = Object.entries(dailyMap).sort()
+  const entries = buildDailySales(displayOrders.value, rangeAftersaleList.value)
   return {
     tooltip: { trigger: 'axis' as const },
     grid: { left: 55, right: 20, top: 20, bottom: 20 },
-    xAxis: { type: 'category' as const, data: entries.map((e) => e[0]) },
+    xAxis: { type: 'category' as const, data: entries.map((e) => e.date) },
     yAxis: { type: 'value' as const },
     series: [
       {
@@ -290,7 +293,7 @@ const trendOption = computed(() => {
         type: 'line' as const,
         smooth: true,
         areaStyle: { opacity: 0.15 },
-        data: entries.map((e) => (trendMetric.value === 'orders' ? e[1].orders : e[1].gmv / 100)),
+        data: entries.map((e) => (trendMetric.value === 'orders' ? e.orders : e.gmv / 100)),
       },
     ],
     graphic:
@@ -320,7 +323,7 @@ function fmtTime(ts: number) {
 function statusLabel(s: number) {
   const m: Record<number, string> = {
     10: '待付款',
-    12: '待收下',
+    12: '待收款',
     20: '待发货',
     21: '部分发货',
     30: '待收货',
@@ -331,6 +334,7 @@ function statusLabel(s: number) {
   return m[s] || `状态${s}`
 }
 function statusClass(s: number) {
+  if (s === 200 || s === 250) return 'is-cancel'
   if (s === 100) return 'is-done'
   if (s >= 30) return 'is-shipping'
   if (s >= 20) return 'is-paid'
@@ -345,6 +349,10 @@ function aftersaleStatus(s: string) {
 }
 
 // ── API ──
+function isSuccessfulAftersale(a: WechatAftersale) {
+  return a.status === 'MERCHANT_REFUND_SUCCESS'
+}
+
 async function loadStores() {
   try {
     const res = await wechatStoreApi.getStores()
@@ -362,25 +370,27 @@ async function loadStoreData() {
   if (!activeStoreId.value) return
   loading.value = true
   try {
-    const [ordRes, prodRes, afterRes, infoRes] = await Promise.all([
-      wechatStoreApi.getOrders(activeStoreId.value, { page_size: 50 }),
+    const { start, end } = displayRange.value
+    const [ordRes, prodRes, afterRes, rangeAfterRes, infoRes] = await Promise.all([
+      wechatStoreApi.getOrders(activeStoreId.value, { page_size: 1000 }),
       wechatStoreApi.getProducts(activeStoreId.value, { page_size: 50 }),
       wechatStoreApi.getAftersaleCount?.(activeStoreId.value) || Promise.resolve(null),
+      wechatStoreApi.getAftersaleCount?.(activeStoreId.value, {
+        begin_create_time: start,
+        end_create_time: end,
+      }) || Promise.resolve(null),
       wechatStoreApi.getShopInfo?.(activeStoreId.value) || Promise.resolve(null),
     ])
     if (ordRes.data?.errcode === 0) orders.value = ordRes.data.order_list || []
     if (prodRes.data?.errcode === 0) products.value = prodRes.data.products || []
     if (afterRes?.data?.errcode === 0) {
-      const raw = afterRes.data.list || []
-      const filtered = raw.filter((a: any) => {
-        if (a.complete_time && a.create_time && a.complete_time - a.create_time < 60) return false
-        return true
-      })
+      const raw = (afterRes.data.list || []) as WechatAftersale[]
+      const filtered = normalizeAftersales(raw)
       aftersaleList.value = filtered
       const newCount = filtered.length
       if (prevAftersaleCount > 0 && newCount > prevAftersaleCount) {
         const added = newCount - prevAftersaleCount
-        const detail = afterRes.data.list?.[0]
+        const detail = filtered[0]
         const msg = detail ? `「${detail.product || '商品'}」${detail.reason}` : `${added} 条新退款`
         if (Notification.permission === 'granted') {
           new Notification('新售后提醒', { body: msg })
@@ -389,7 +399,15 @@ async function loadStoreData() {
       }
       prevAftersaleCount = newCount
       aftersaleCount.value = newCount
-      aftersaleTotal.value = filtered.reduce((s: number, a: any) => s + (a.amount || 0), 0)
+      aftersaleTotal.value = filtered.reduce(
+        (s, a) => s + (isSuccessfulAftersale(a) ? a.amount || 0 : 0),
+        0,
+      )
+    }
+    if (rangeAfterRes?.data?.errcode === 0) {
+      rangeAftersaleList.value = normalizeAftersales(
+        (rangeAfterRes.data.list || []) as WechatAftersale[],
+      )
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
   } catch (error: any) {

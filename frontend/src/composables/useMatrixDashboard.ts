@@ -3,7 +3,7 @@ import { analyticsApi, type AccountDetailItem, type DailyMetrics } from '@/api/a
 import { accountsApi } from '@/api/accounts'
 import { formatLargeNum } from '@/utils/format'
 import { toBackend } from '@/utils/platform'
-import type { AnalyticsOverview, PlatformStats, TrendData } from '@/types'
+import type { AnalyticsOverview, PlatformStats, TrendData, Account } from '@/types'
 
 export interface KpiCard {
   key: string
@@ -14,33 +14,11 @@ export interface KpiCard {
   trendLabel: string
 }
 
-export interface RankingItem {
-  rank: number
-  postId: string
-  title: string
-  platform: string
-  accountName: string
-  accountAvatar: string
-  views: number
-  likes: number
-  comments: number
-  shares: number
-  engagementRate: number
-  publishedAt: string
-}
-
-export interface TagItem {
-  name: string
-  count: number
-}
-
 export function useMatrixDashboard() {
   const loading = ref(false)
   const error = ref<string | null>(null)
   const days = ref(7)
   const platform = ref<string>('')
-  const rankingPeriod = ref<'week' | 'month' | 'all'>('all')
-  const rankingTab = ref<'views' | 'engagement'>('views')
   const trendMetric = ref<'followers' | 'views' | 'engagement'>('followers')
   const dateType = ref<'day' | 'week' | 'month'>('day')
   const groupId = ref<string>('')
@@ -55,9 +33,6 @@ export function useMatrixDashboard() {
   const followerTrend = ref<TrendData[]>([])
   const engagementTrend = ref<TrendData[]>([])
   const dailyStatsTrend = ref<TrendData[]>([])
-  const viewsRanking = ref<RankingItem[]>([])
-  const engagementRanking = ref<RankingItem[]>([])
-  const tags = ref<TagItem[]>([])
   const accountDetailList = ref<AccountDetailItem[]>([])
 
   // ─── 日/周/月 聚合统计 (7 KPI 卡片) ───
@@ -101,6 +76,18 @@ export function useMatrixDashboard() {
     if (!ov) return []
 
     const getChange = (key: string) => comp?.weekOverWeek?.change?.[key] ?? null
+    // 互动 = 点赞 + 评论 + 分享
+    const totalInteractions =
+      ov.engagement.totalLikes + ov.engagement.totalComments + ov.engagement.totalShares
+    // 互动环比 = 互动增量的环比
+    const interactionTrend = (() => {
+      const wow = comp?.weekOverWeek
+      if (!wow) return null
+      const cur = (wow.current?.likes || 0) + (wow.current?.comments || 0) + (wow.current?.shares || 0)
+      const prev = (wow.previous?.likes || 0) + (wow.previous?.comments || 0) + (wow.previous?.shares || 0)
+      if (prev === 0) return null
+      return Math.round(((cur - prev) / prev) * 100)
+    })()
 
     return [
       {
@@ -122,12 +109,10 @@ export function useMatrixDashboard() {
       {
         key: 'likes',
         label: '总互动',
-        value: ov.engagement.totalLikes + ov.engagement.totalComments + ov.engagement.totalShares,
-        formatted: formatLargeNum(
-          ov.engagement.totalLikes + ov.engagement.totalComments + ov.engagement.totalShares,
-        ),
-        trend: null,
-        trendLabel: '',
+        value: totalInteractions,
+        formatted: formatLargeNum(totalInteractions),
+        trend: interactionTrend,
+        trendLabel: '较上周',
       },
       {
         key: 'accounts',
@@ -248,14 +233,18 @@ export function useMatrixDashboard() {
     }
   }
 
-  // ─── Platform Table ───
+  // ─── Platform Table (互动 = 点赞 + 评论 + 分享) ───
   const platformTableData = computed(() => {
-    return platformStats.value.map((p) => ({
-      ...p,
-      viewsFormatted: formatLargeNum(p.views || 0),
-      likesFormatted: formatLargeNum(p.likes || 0),
-      followersFormatted: formatLargeNum(p.followers || 0),
-    }))
+    return platformStats.value.map((p) => {
+      const interactions = (p.likes || 0) + (p.comments || 0) + (p.shares || 0)
+      return {
+        ...p,
+        interactions,
+        viewsFormatted: formatLargeNum(p.views || 0),
+        likesFormatted: formatLargeNum(interactions),
+        followersFormatted: formatLargeNum(p.followers || 0),
+      }
+    })
   })
 
   const platformChartData = computed(() => {
@@ -263,14 +252,10 @@ export function useMatrixDashboard() {
     return {
       platforms: platforms.map((p) => p.platform),
       views: platforms.map((p) => p.views || 0),
-      likes: platforms.map((p) => p.likes || 0),
+      likes: platforms.map((p) => (p.likes || 0) + (p.comments || 0) + (p.shares || 0)),
       followers: platforms.map((p) => p.followers || 0),
     }
   })
-
-  const currentRanking = computed(() =>
-    rankingTab.value === 'views' ? viewsRanking.value : engagementRanking.value,
-  )
 
   const trendChartData = computed(() => {
     switch (trendMetric.value) {
@@ -285,6 +270,121 @@ export function useMatrixDashboard() {
     }
   })
 
+  // ─── 环比趋势（基于 comparison 数据） ───
+  const aggregatedTrends = computed<Record<string, number | null>>(() => {
+    const comp = comparison.value
+    if (!comp) return {}
+    const period = dateType.value
+    if (period === 'day') {
+      // 日数据没有内置环比，返回空
+      return {}
+    }
+    const src = period === 'week' ? comp.weekOverWeek : comp.monthOverMonth
+    if (!src?.change) return {}
+    const c = src.change
+    return {
+      play: c.views ?? null,
+      new_fans: c.followers ?? null,
+      like: c.likes ?? null,
+      comment: c.comments ?? null,
+      share: c.shares ?? null,
+    } as Record<string, number | null>
+  })
+
+  // ─── 跨 Group 对比 ───
+  interface GroupComparisonRow {
+    groupId: string
+    groupName: string
+    accountCount: number
+    followers: number
+    play: number
+    like: number
+    comment: number
+    share: number
+    interactions: number
+    avgFollowers: number
+    avgInteractions: number
+    followersFormatted: string
+    playFormatted: string
+    interactionsFormatted: string
+    avgFollowersFormatted: string
+    avgInteractionsFormatted: string
+  }
+  const allAccounts = ref<Account[]>([])
+  const groupComparison = computed<GroupComparisonRow[]>(() => {
+    const detailList = accountDetailList.value
+    const accList = allAccounts.value
+    if (detailList.length === 0 || accList.length === 0) return []
+
+    // 构建 accountId -> groupName 映射
+    const accountGroupMap = new Map<string, { groupId: string; groupName: string }>()
+    for (const acc of accList) {
+      accountGroupMap.set(acc.id, {
+        groupId: acc.groupId || '',
+        groupName: acc.groupName || '未分组',
+      })
+    }
+
+    // 按 group 聚合
+    const groupMap = new Map<string, { groupName: string; accountCount: number; followers: number; play: number; like: number; comment: number; share: number }>()
+    for (const detail of detailList) {
+      const groupInfo = accountGroupMap.get(detail.id) || { groupId: '', groupName: '未分组' }
+      const key = groupInfo.groupId || '__none__'
+      const period = dateType.value
+      const source =
+        period === 'day'
+          ? detail.info.day_total
+          : period === 'week'
+            ? detail.info.week_total
+            : detail.info.month_total
+
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          groupName: groupInfo.groupName,
+          accountCount: 0,
+          followers: 0,
+          play: 0,
+          like: 0,
+          comment: 0,
+          share: 0,
+        })
+      }
+      const g = groupMap.get(key)!
+      g.accountCount += 1
+      g.followers += detail.fans || 0
+      g.play += source?.play || 0
+      g.like += source?.like || 0
+      g.comment += source?.comment || 0
+      g.share += source?.share || 0
+    }
+
+    return Array.from(groupMap.entries())
+      .map(([groupId, g]) => {
+        const interactions = g.like + g.comment + g.share
+        const avgFollowers = Math.round(g.followers / Math.max(g.accountCount, 1))
+        const avgInteractions = Math.round(interactions / Math.max(g.accountCount, 1))
+        return {
+          groupId,
+          groupName: g.groupName,
+          accountCount: g.accountCount,
+          followers: g.followers,
+          play: g.play,
+          like: g.like,
+          comment: g.comment,
+          share: g.share,
+          interactions,
+          avgFollowers,
+          avgInteractions,
+          followersFormatted: formatLargeNum(g.followers),
+          playFormatted: formatLargeNum(g.play),
+          interactionsFormatted: formatLargeNum(interactions),
+          avgFollowersFormatted: formatLargeNum(avgFollowers),
+          avgInteractionsFormatted: formatLargeNum(avgInteractions),
+        }
+      })
+      .sort((a, b) => b.followers - a.followers)
+  })
+
   // ─── Fetch All ───
   async function refreshAll() {
     loading.value = true
@@ -294,24 +394,16 @@ export function useMatrixDashboard() {
       const bp = platform.value ? toBackend(platform.value) : undefined
       const filter = { days: days.value, platform: bp, groupId: gid }
       const pFilter = { platform: bp, groupId: gid }
-      const [ov, comp, ps, ft, vt, er, vr, tg, adl, grps] = await Promise.all([
+      const [ov, comp, ps, ft, vt, er, adl, grps, accs] = await Promise.all([
         analyticsApi.getOverview(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getComparison(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getPlatformStats(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getFollowerTrend(filter).then((r: any) => r.data),
         analyticsApi.getViewsTrend(filter).then((r: any) => r.data),
         analyticsApi.getEngagementRate(filter).then((r: any) => r.data),
-        analyticsApi
-          .getViewsRanking({
-            limit: 50,
-            period: rankingPeriod.value,
-            platform: bp,
-            groupId: gid,
-          })
-          .then((r: any) => r.data),
-        analyticsApi.getTags(gid ? { groupId: gid } : undefined).then((r: any) => r.data),
         analyticsApi.getAccountDetailList(pFilter).then((r: any) => r.data),
         accountsApi.getGroups().then((r: any) => r.data),
+        accountsApi.getList({ platform: '', group: '', keyword: '', page: 1, pageSize: 500 }).then((r: any) => r.data),
       ])
       overview.value = ov
       comparison.value = comp
@@ -321,25 +413,7 @@ export function useMatrixDashboard() {
       engagementTrend.value = er || []
       accountDetailList.value = adl || []
       groups.value = grps || []
-
-      viewsRanking.value = vr?.ranking || []
-      tags.value = tg || []
-
-      try {
-        const enr = await analyticsApi
-          .getEngagementRanking({
-            limit: 50,
-            period: rankingPeriod.value,
-            platform: bp,
-            groupId: gid,
-          })
-          .then((r: any) => r.data)
-        engagementRanking.value = enr?.ranking || []
-      } catch {
-        engagementRanking.value = [...viewsRanking.value].sort(
-          (a, b) => b.engagementRate - a.engagementRate,
-        )
-      }
+      allAccounts.value = accs?.items || accs?.accounts || accs?.list || []
     } catch (e: any) {
       error.value = e.message || '数据加载失败'
     } finally {
@@ -354,12 +428,11 @@ export function useMatrixDashboard() {
     platform,
     dateType,
     dateTypeLabel,
-    rankingPeriod,
-    rankingTab,
     trendMetric,
     overview,
     kpiCards,
     aggregatedStats,
+    aggregatedTrends,
     platformStats,
     platformTableData,
     platformChartData,
@@ -367,16 +440,13 @@ export function useMatrixDashboard() {
     engagementTrend,
     dailyStatsTrend,
     trendChartData,
-    viewsRanking,
-    engagementRanking,
-    currentRanking,
-    tags,
     accountTableData,
     sortKey,
     sortOrder,
     toggleSort,
     groups,
     groupId,
+    groupComparison,
     refreshAll,
   }
 }

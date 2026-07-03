@@ -8,7 +8,7 @@ import { AnalyticsService } from '../../src/modules/analytics/analytics.service'
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { mockPrismaService, resetPrismaMocks } from '../mocks/prisma.mock';
 import { mockAccounts, mockStats } from '../fixtures';
-import { Platform } from '@prisma/client';
+import { Platform } from '../../src/common/prisma-enums';
 
 describe('AnalyticsService', () => {
   let service: AnalyticsService;
@@ -283,8 +283,8 @@ describe('AnalyticsService', () => {
   describe('getPlatformComparison', () => {
     it('应该返回各平台的对比数据', async () => {
       mockPrismaService.account.findMany.mockResolvedValue([
-        { id: 'acc-001', platform: Platform.DOUYIN },
-        { id: 'acc-002', platform: Platform.XIAOHONGSHU },
+        { id: 'acc-001', platform: Platform.DOUYIN, followers: 0, likes: 0 },
+        { id: 'acc-002', platform: Platform.XIAOHONGSHU, followers: 0, likes: 0 },
       ]);
       mockPrismaService.post.count
         .mockResolvedValueOnce(10) // DOUYIN published
@@ -299,13 +299,17 @@ describe('AnalyticsService', () => {
 
       const result = await service.getPlatformComparison('user-001');
 
-      expect(result).toHaveProperty(Platform.DOUYIN);
-      expect(result).toHaveProperty(Platform.XIAOHONGSHU);
+      expect(result).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ platform: Platform.DOUYIN }),
+          expect.objectContaining({ platform: Platform.XIAOHONGSHU }),
+        ]),
+      );
     });
 
     it('每个平台应包含正确的统计数据', async () => {
       mockPrismaService.account.findMany.mockResolvedValue([
-        { id: 'acc-001', platform: Platform.DOUYIN },
+        { id: 'acc-001', platform: Platform.DOUYIN, followers: 0, likes: 0 },
       ]);
       mockPrismaService.post.count.mockResolvedValue(10);
       mockPrismaService.postStats.aggregate.mockResolvedValue({
@@ -314,27 +318,31 @@ describe('AnalyticsService', () => {
 
       const result = await service.getPlatformComparison('user-001');
 
-      expect(result[Platform.DOUYIN]).toEqual({
-        accountCount: 1,
-        publishedPosts: 10,
-        views: 30000,
+      expect(result[0]).toEqual({
+        platform: Platform.DOUYIN,
+        accounts: 1,
+        followers: 0,
         likes: 2000,
+        publishes: 10,
+        views: 30000,
         comments: 500,
         shares: 200,
+        saves: 0,
+        engagementRate: 9,
       });
     });
 
-    it('无账号时应返回空对象', async () => {
+    it('无账号时应返回空数组', async () => {
       mockPrismaService.account.findMany.mockResolvedValue([]);
 
       const result = await service.getPlatformComparison('user-001');
 
-      expect(result).toEqual({});
+      expect(result).toEqual([]);
     });
 
     it('统计数据为 null 时应返回 0', async () => {
       mockPrismaService.account.findMany.mockResolvedValue([
-        { id: 'acc-001', platform: Platform.DOUYIN },
+        { id: 'acc-001', platform: Platform.DOUYIN, followers: 0, likes: 0 },
       ]);
       mockPrismaService.post.count.mockResolvedValue(0);
       mockPrismaService.postStats.aggregate.mockResolvedValue({
@@ -343,8 +351,122 @@ describe('AnalyticsService', () => {
 
       const result = await service.getPlatformComparison('user-001');
 
-      expect(result[Platform.DOUYIN].views).toBe(0);
-      expect(result[Platform.DOUYIN].likes).toBe(0);
+      expect(result[0].views).toBe(0);
+      expect(result[0].likes).toBe(0);
+    });
+  });
+
+  // ==================== 账号周期明细测试 ====================
+
+  describe('getAccountDetailList', () => {
+    beforeEach(() => {
+      jest.spyOn(Date, 'now').mockReturnValue(new Date('2026-06-18T04:00:00Z').getTime());
+    });
+
+    it('应优先使用 DailyStats 历史聚合，避免重复 metadata 覆盖周/月数据', async () => {
+      const duplicateMetric = {
+        play: 999,
+        like: 88,
+        comment: 77,
+        share: 66,
+        new_fans: 55,
+      };
+      mockPrismaService.account.findMany.mockResolvedValue([
+        {
+          id: 'acc-001',
+          platform: Platform.WECHAT_VIDEO,
+          nickname: '视频号测试',
+          avatar: null,
+          followers: 180,
+          metadata: JSON.stringify({
+            periodMetrics: {
+              videoData: {
+                day_total: duplicateMetric,
+                week_total: duplicateMetric,
+                month_total: duplicateMetric,
+              },
+            },
+          }),
+        },
+      ]);
+      mockPrismaService.dailyStats.findMany.mockResolvedValue([
+        {
+          accountId: 'acc-001',
+          date: new Date('2026-06-05T16:00:00.000Z'),
+          followers: 160,
+          viewsIncrement: 30,
+          likesIncrement: 3,
+          commentsIncrement: 3,
+          sharesIncrement: 3,
+          followersIncrement: 3,
+        },
+        {
+          accountId: 'acc-001',
+          date: new Date('2026-06-15T16:00:00.000Z'),
+          followers: 170,
+          viewsIncrement: 20,
+          likesIncrement: 2,
+          commentsIncrement: 2,
+          sharesIncrement: 2,
+          followersIncrement: 2,
+        },
+        {
+          accountId: 'acc-001',
+          date: new Date('2026-06-16T16:00:00.000Z'),
+          followers: 200,
+          viewsIncrement: 10,
+          likesIncrement: 1,
+          commentsIncrement: 1,
+          sharesIncrement: 1,
+          followersIncrement: 1,
+        },
+      ]);
+
+      const result = await service.getAccountDetailList('user-001');
+
+      expect(result[0].fans).toBe(200);
+      expect(result[0].info.day_total.play).toBe(10);
+      expect(result[0].info.week_total.play).toBe(30);
+      expect(result[0].info.month_total.play).toBe(60);
+    });
+
+    it('DailyStats 缺少长周期历史时，可用可信 metadata 补充周/月', async () => {
+      mockPrismaService.account.findMany.mockResolvedValue([
+        {
+          id: 'acc-001',
+          platform: Platform.WECHAT_VIDEO,
+          nickname: '视频号测试',
+          avatar: null,
+          followers: 100,
+          metadata: JSON.stringify({
+            periodMetrics: {
+              videoData: {
+                day_total: { play: 10, like: 1, comment: 1, share: 1, new_fans: 1 },
+                week_total: { play: 40, like: 4, comment: 4, share: 4, new_fans: 4 },
+                month_total: { play: 100, like: 10, comment: 10, share: 10, new_fans: 10 },
+              },
+            },
+          }),
+        },
+      ]);
+      mockPrismaService.dailyStats.findMany.mockResolvedValue([
+        {
+          accountId: 'acc-001',
+          date: new Date('2026-06-16T16:00:00.000Z'),
+          followers: 120,
+          viewsIncrement: 10,
+          likesIncrement: 1,
+          commentsIncrement: 1,
+          sharesIncrement: 1,
+          followersIncrement: 1,
+        },
+      ]);
+
+      const result = await service.getAccountDetailList('user-001');
+
+      expect(result[0].info.day_total.play).toBe(10);
+      expect(result[0].info.week_total.play).toBe(40);
+      expect(result[0].info.month_total.play).toBe(100);
     });
   });
 });

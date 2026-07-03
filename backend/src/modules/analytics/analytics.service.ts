@@ -292,7 +292,7 @@ export class AnalyticsService {
         totalShares: statsAgg._sum.shares || 0,
         totalSaves: statsAgg._sum.saves || 0,
         totalDanmaku: statsAgg._sum.danmakuCount || 0,
-        avgCompletionRate: statsAgg._avg.completionRate
+        avgCompletionRate: statsAgg._avg?.completionRate
           ? Math.round(statsAgg._avg.completionRate * 100) / 100
           : 0,
       },
@@ -344,6 +344,9 @@ export class AnalyticsService {
 
       const views = statsAgg._sum.views || 0
       const plikes = statsAgg._sum.likes || 0
+      const pcomments = statsAgg._sum.comments || 0
+      const pshares = statsAgg._sum.shares || 0
+      const totalInteractions = plikes + pcomments + pshares
 
       result.push({
         platform,
@@ -352,10 +355,10 @@ export class AnalyticsService {
         likes: plikes,
         publishes: postCount,
         views,
-        comments: statsAgg._sum.comments || 0,
-        shares: statsAgg._sum.shares || 0,
+        comments: pcomments,
+        shares: pshares,
         saves: statsAgg._sum.saves || 0,
-        engagementRate: views > 0 ? Math.round((plikes / views) * 10000) / 100 : 0,
+        engagementRate: views > 0 ? Math.round((totalInteractions / views) * 10000) / 100 : 0,
       })
     }
 
@@ -1197,15 +1200,15 @@ export class AnalyticsService {
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
-      select: { id: true, platform: true, nickname: true, avatar: true, followers: true },
+      select: { id: true, platform: true, nickname: true, avatar: true, followers: true, metadata: true },
       orderBy: { createdAt: 'desc' },
     })
 
     const accountIds = accounts.map((a) => a.id)
 
     // 查询最近30天的 DailyStats
-    const tomorrow = this.getBeijingDayStart(1)
     const thirtyDaysAgo = this.getBeijingDayStart(-30)
+    const tomorrow = this.getBeijingDayStart(1)
     const yesterday = this.getBeijingDayStart(-1)
     const sevenDaysAgo = this.getBeijingDayStart(-7)
 
@@ -1234,16 +1237,75 @@ export class AnalyticsService {
       statsByAccount[s.accountId].push(s)
     }
 
-    // 计算每个账号的日/周/月聚合
+    // 计算每个账号的日/周/月聚合。日/周必须按自然时间窗口计算，
+    // 这样采集断档或账号过期会在前端暴露为 "-"，便于运营排查。
     const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
     const isYesterday = (d: Date) => d.getTime() === yesterday.getTime()
+    const parseJsonObject = (value: unknown): Record<string, any> => {
+      if (!value) return {}
+      if (typeof value === 'object') return value as Record<string, any>
+      if (typeof value !== 'string') return {}
+      try {
+        const parsed = JSON.parse(value)
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+      } catch {
+        return {}
+      }
+    }
+    const metricKeys = ['play', 'like', 'comment', 'share', 'new_fans'] as const
+    type MetricKey = (typeof metricKeys)[number]
+    type MetricTotal = Record<MetricKey, number>
+    const createMetricTotal = (): MetricTotal => ({
+      play: 0,
+      like: 0,
+      comment: 0,
+      share: 0,
+      new_fans: 0,
+    })
+    const hasMetricValue = (value: MetricTotal) => metricKeys.some((key) => value[key] > 0)
+    const hasAdditionalMetricValue = (value: MetricTotal, baseline: MetricTotal) =>
+      metricKeys.some((key) => value[key] > baseline[key])
+    const isCumulativeAtLeast = (value: MetricTotal, baseline: MetricTotal) =>
+      metricKeys.every((key) => value[key] >= baseline[key])
+    const readMetricTotal = (value: any): MetricTotal | undefined => {
+      if (!value || typeof value !== 'object') return undefined
+      const total = {
+        play: Number(value.play) || 0,
+        like: Number(value.like) || 0,
+        comment: Number(value.comment) || 0,
+        share: Number(value.share) || 0,
+        new_fans: Number(value.new_fans) || 0,
+      }
+      return hasMetricValue(total) ? total : undefined
+    }
+    const readPeriodMetrics = (metadataValue: unknown) => {
+      const metadata = parseJsonObject(metadataValue)
+      const videoData = parseJsonObject(parseJsonObject(metadata.periodMetrics).videoData)
+      const dayTotal = readMetricTotal(videoData.day_total)
+      const weekTotal = readMetricTotal(videoData.week_total)
+      const monthTotal = readMetricTotal(videoData.month_total)
+      const validWeekTotal =
+        weekTotal && (!dayTotal || isCumulativeAtLeast(weekTotal, dayTotal))
+          ? weekTotal
+          : undefined
+      const monthBaseline = validWeekTotal || dayTotal
+      const validMonthTotal =
+        monthTotal && (!monthBaseline || isCumulativeAtLeast(monthTotal, monthBaseline))
+          ? monthTotal
+          : undefined
+      return {
+        day_total: dayTotal,
+        week_total: validWeekTotal,
+        month_total: validMonthTotal,
+      }
+    }
 
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []
 
-      const monthTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
-      const weekTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
-      const dayTotal = { play: 0, like: 0, comment: 0, share: 0, new_fans: 0 }
+      const monthTotal = createMetricTotal()
+      const weekTotal = createMetricTotal()
+      const dayTotal = createMetricTotal()
       let lastFans = acc.followers || 0
 
       for (const s of stats) {
@@ -1262,7 +1324,7 @@ export class AnalyticsService {
         monthTotal.share += increments.share
         monthTotal.new_fans += increments.new_fans
 
-        // 周累计：最近7天
+        // 周累计：自然最近7天
         if (isWithinLast7(s.date)) {
           weekTotal.play += increments.play
           weekTotal.like += increments.like
@@ -1271,7 +1333,7 @@ export class AnalyticsService {
           weekTotal.new_fans += increments.new_fans
         }
 
-        // 日：昨天
+        // 日：自然昨天
         if (isYesterday(s.date)) {
           dayTotal.play += increments.play
           dayTotal.like += increments.like
@@ -1282,6 +1344,25 @@ export class AnalyticsService {
 
         // 取最新的粉丝快照
         if (s.followers > 0) lastFans = s.followers
+      }
+
+      const periodMetrics = readPeriodMetrics(acc.metadata)
+      if (periodMetrics.day_total && !hasMetricValue(dayTotal)) {
+        Object.assign(dayTotal, periodMetrics.day_total)
+      }
+      if (
+        periodMetrics.week_total &&
+        !hasAdditionalMetricValue(weekTotal, dayTotal) &&
+        hasAdditionalMetricValue(periodMetrics.week_total, dayTotal)
+      ) {
+        Object.assign(weekTotal, periodMetrics.week_total)
+      }
+      if (
+        periodMetrics.month_total &&
+        !hasAdditionalMetricValue(monthTotal, weekTotal) &&
+        hasAdditionalMetricValue(periodMetrics.month_total, weekTotal)
+      ) {
+        Object.assign(monthTotal, periodMetrics.month_total)
       }
 
       return {

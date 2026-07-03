@@ -248,6 +248,67 @@ export class PlatformsService {
     try {
       const pickNumber = (value: unknown) =>
         typeof value === 'number' && Number.isFinite(value) ? value : undefined
+      const parseJsonObject = (value: unknown): Record<string, any> => {
+        if (!value) return {}
+        if (typeof value === 'object') return value as Record<string, any>
+        if (typeof value !== 'string') return {}
+        try {
+          const parsed = JSON.parse(value)
+          return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
+        } catch {
+          return {}
+        }
+      }
+      const normalizeDailyMetric = (value: any) => {
+        const normalized = {
+          play: pickNumber(value?.play) ?? 0,
+          like: pickNumber(value?.like) ?? 0,
+          comment: pickNumber(value?.comment) ?? 0,
+          share: pickNumber(value?.share) ?? 0,
+          new_fans: pickNumber(value?.new_fans) ?? 0,
+        }
+        return Object.values(normalized).some((n) => n > 0) ? normalized : undefined
+      }
+      const normalizeVideoPeriodMetrics = (value: any) => {
+        if (!value || typeof value !== 'object') return undefined
+        const normalized: Record<string, any> = {}
+        for (const key of ['day_total', 'week_total', 'month_total']) {
+          const total = normalizeDailyMetric(value[key])
+          if (total) normalized[key] = total
+        }
+        const metricKeys = ['play', 'like', 'comment', 'share', 'new_fans']
+        const sameMetrics = (a: any, b: any) =>
+          Boolean(a && b) && metricKeys.every((key) => (a[key] || 0) === (b[key] || 0))
+        const isCumulativeAtLeast = (a: any, b: any) =>
+          Boolean(a && b) && metricKeys.every((key) => (a[key] || 0) >= (b[key] || 0))
+        if (
+          normalized.day_total &&
+          normalized.week_total &&
+          !isCumulativeAtLeast(normalized.week_total, normalized.day_total)
+        ) {
+          delete normalized.week_total
+        }
+        const monthBaseline = normalized.week_total || normalized.day_total
+        if (
+          normalized.month_total &&
+          monthBaseline &&
+          !isCumulativeAtLeast(normalized.month_total, monthBaseline)
+        ) {
+          delete normalized.month_total
+        }
+        if (
+          sameMetrics(normalized.day_total, normalized.week_total) &&
+          sameMetrics(normalized.week_total, normalized.month_total)
+        ) {
+          delete normalized.week_total
+          delete normalized.month_total
+        }
+        if (typeof value.source === 'string') normalized.source = value.source
+        if (typeof value.collectedAt === 'string') normalized.collectedAt = value.collectedAt
+        return normalized.day_total || normalized.week_total || normalized.month_total
+          ? normalized
+          : undefined
+      }
 
       // Upsert DailyStats for the target date (including monetization + store fields)
       const statData: Record<string, number | undefined> = {
@@ -332,6 +393,19 @@ export class PlatformsService {
       if (metrics.storeScore !== undefined) accountUpdates.storeScore = metrics.storeScore
       if (metrics.storeDiagnosis !== undefined)
         accountUpdates.storeDiagnosis = metrics.storeDiagnosis
+      const videoPeriodMetrics = normalizeVideoPeriodMetrics(metrics?._periodMetrics?.videoData)
+      if (videoPeriodMetrics) {
+        const metadata = parseJsonObject(account.metadata)
+        const periodMetrics = parseJsonObject(metadata.periodMetrics)
+        accountUpdates.metadata = JSON.stringify({
+          ...metadata,
+          periodMetrics: {
+            ...periodMetrics,
+            videoData: videoPeriodMetrics,
+          },
+          companionPeriodMetricsUpdatedAt: new Date().toISOString(),
+        })
+      }
 
       if (Object.keys(accountUpdates).length > 0) {
         await this.prisma.account.update({

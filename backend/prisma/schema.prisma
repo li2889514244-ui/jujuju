@@ -124,6 +124,7 @@ model Account {
   following      Int           @default(0)
   status         AccountStatus @default(ACTIVE)
   cookies        String?
+  cookieSavedAt  DateTime?  // Cookie 上次保存时间，用于凭据健康监控
   proxyConfig    String? // JSON 字符串
   metadata       String? // JSON 字符串
   lastActiveAt   DateTime?
@@ -472,6 +473,96 @@ model WechatStoreAftersale {
   store WechatStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   @@unique([storeId, afterSaleOrderId])
+  @@index([storeId, createTime])
+  @@index([storeId, status])
+  @@index([syncedAt])
+}
+
+model DoudianStore {
+  id           String   @id @default(cuid())
+  name         String
+  profilePath  String   @unique
+  status       AccountStatus @default(ACTIVE)
+  lastSyncedAt DateTime?
+  syncStatus   String   @default("pending")
+  syncError    String?
+  sessionStatus String  @default("unknown")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders     DoudianStoreOrder[]
+  products   DoudianStoreProduct[]
+  aftersales DoudianStoreAftersale[]
+}
+
+model DoudianStoreOrder {
+  id           String   @id @default(cuid())
+  storeId      String
+  orderId      String
+  status       Int      @default(0)
+  payAmount    Int      @default(0)
+  postAmount   Int      @default(0)
+  productCount Int      @default(0)
+  createTime   Int      @default(0)
+  updateTime   Int      @default(0)
+  productTitle String   @default("")
+  productImg   String   @default("")
+  raw          Json
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store DoudianStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, orderId])
+  @@index([storeId, createTime])
+  @@index([storeId, status])
+  @@index([syncedAt])
+}
+
+model DoudianStoreProduct {
+  id           String   @id @default(cuid())
+  storeId      String
+  productId    String
+  title        String   @default("")
+  imgUrl       String   @default("")
+  minPrice     Int      @default(0)
+  maxPrice     Int      @default(0)
+  sales        Int      @default(0)
+  stock        Int      @default(0)
+  status       Int      @default(0)
+  raw          Json
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  store DoudianStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, productId])
+  @@index([storeId, status])
+  @@index([syncedAt])
+}
+
+model DoudianStoreAftersale {
+  id              String   @id @default(cuid())
+  storeId         String
+  afterSaleId     String
+  orderId         String   @default("")
+  type            Int      @default(0)
+  status          Int      @default(0)
+  amount          Int      @default(0)
+  product         String   @default("")
+  productId       String?
+  createTime      Int      @default(0)
+  updateTime      Int      @default(0)
+  raw             Json
+  syncedAt        DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  store DoudianStore @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([storeId, afterSaleId])
   @@index([storeId, createTime])
   @@index([storeId, status])
   @@index([syncedAt])
