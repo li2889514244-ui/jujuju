@@ -48,6 +48,9 @@ pnpm-debug.log*
 # Playwright
 browser-engine/test-results/
 browser-engine/playwright-report/
+doudian_profiles/
+doudian_probe_profile/
+doudian_login_status.json
 
 # 构建缓存
 .vite/
@@ -128,3 +131,23 @@ desktop-companion/
 
 # 外部爬虫工具
 bazhuayu_style_scraper.py_debug_archive/
+
+# MatrixFlow repo hygiene guardrails
+frontend/dist/
+backend/public/assets/
+desktop-companion/dist/
+desktop-companion/build/
+chrome_debug_profile/
+doudian_probe_profile/
+**/chrome_profile/
+**/.chrome_profile/
+**/.chrome_shipinhao/
+**/User Data/
+screenshot*.png
+wechat_*.png
+*.tar.gz
+*.zip
+*.sql.gz
+k8s/secrets.yaml
+*.secret
+token_output.txt

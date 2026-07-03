@@ -1,198 +1,82 @@
-# MatrixFlow ERP
+# MatrixFlow / Pixingyun
 
-矩阵账号管理平台 — 全栈 ERP 系统，基于 Vue 3 + NestJS 架构。
+This repository contains the MatrixFlow / Pixingyun frontend, backend, deployment scripts, and desktop companion code.
 
-## 架构
+## Read This First
 
-```
-┌──────────────┐     ┌──────────────┐
-│   Frontend   │────▶│   Backend    │
-│  Vue 3/Vite  │     │   NestJS     │
-│  Nginx/CfP   │     │  Port 3000   │
-└──────────────┘     └──────┬───────┘
-                            │
-                   ┌────────┴────────┐
-                   │                 │
-              ┌────▼────┐     ┌─────▼─────┐
-              │PostgreSQL│     │   Redis   │
-              │ Port 5432│     │ Port 6379 │
-              └──────────┘     └───────────┘
-```
+The current production site is not deployed by the old `/var/www/matrixflow`, Kubernetes, Render, Railway, or Cloudflare Pages paths.
 
-| 服务 | 技术栈 | 部署方式 |
-|------|--------|---------|
-| Frontend | Vue 3, Vite, Element Plus | Cloudflare Pages / Nginx (Docker) |
-| Backend | NestJS, TypeORM | Docker / Kubernetes (EKS) |
-| Database | PostgreSQL 16 | StatefulSet (K8s) / Docker Compose |
-| Cache | Redis 7 | Deployment (K8s) / Docker Compose |
+Current production truth:
 
-## 快速开始
+- Public URL: `https://ddddkiii.com`
+- Public path: Cloudflare Tunnel -> Aliyun ECS -> `localhost:80`
+- Frontend: Docker container `matrixflow-frontend`
+- Frontend files: `/opt/matrixflow/frontend/dist`
+- Backend: PM2 app `matrixflow`
+- Backend entry: `/opt/matrixflow/backend/dist/main.js`
+- Backend health: `https://ddddkiii.com/api/v1/health`
 
-### 环境要求
+Before changing deployment behavior, read these files in order:
 
-- Node.js 20 LTS
-- pnpm 8+
-- Docker 24+ & Docker Compose
-- (可选) Kubernetes 1.27+ & kubectl
+1. `LATEST_DEPLOYMENT.md`
+2. `docs/deployment-retrospective-ai-handoff.md`
+3. `docs/deployment-remediation-plan.md`
+4. `docs/project-workflow.md`
+5. `docs/legacy-deploy-index.md`
 
-### 1. 克隆 & 配置
+## Official Commands
+
+Use these entry points only.
 
 ```bash
-git clone https://github.com/matrixflow/erp.git
-cd erp
+# Diagnose without changing production
+python scripts/diagnose-production.py
 
-# 复制并编辑环境变量
-cp .env.example .env
-# ⚠️ 必须修改所有 CHANGE_ME 值！
+# Deploy frontend only, after local checks
+python scripts/deploy-frontend-fast.py
+
+# Prepare or execute backend deployment
+python scripts/deploy-backend-safe.py --plan
 ```
 
-### 2. Docker Compose (本地开发)
+`scripts/deploy-backend-safe.py` does not change production unless `--execute` is passed.
+
+## Work Rules
+
+- Do not run legacy `deploy-all`, `deploy-full`, `final-deploy`, `fix-deploy`, or `/var/www/matrixflow` scripts.
+- Do not run `git reset --hard` on the production server as part of normal deployment.
+- Do not mix frontend, backend, Prisma migration, nginx, tunnel, and desktop companion changes in one deployment.
+- Do not delete browser profiles, login state, database files, or production backups unless the user explicitly asks.
+- Every project change must update `docs/project-change-log.md`.
+- Every deployment or production incident must update `docs/deployment-log.md`.
+- Every new deployment lesson must be added to `docs/deployment-retrospective-ai-handoff.md` or `docs/deployment-remediation-plan.md`.
+
+## Change Types
+
+| Change type             | Official path                         | Required record              |
+| ----------------------- | ------------------------------------- | ---------------------------- |
+| Frontend source         | `scripts/deploy-frontend-fast.py`     | `docs/deployment-log.md`     |
+| Backend source          | `scripts/deploy-backend-safe.py`      | `docs/deployment-log.md`     |
+| Prisma schema           | backend deploy with migration section | `docs/deployment-log.md`     |
+| Documentation           | direct edit                           | `docs/project-change-log.md` |
+| Cleanup or repo hygiene | plan first, then small batches        | `docs/project-change-log.md` |
+| Incident response       | diagnose first, fix second            | both logs                    |
+
+## Local Development
 
 ```bash
-docker compose up -d
+npm install
+npm run dev:frontend
+npm run dev:backend
 ```
 
-服务启动后:
-- 前端: http://localhost
-- 后端 API: http://localhost:3000/api
-
-### 3. 本地开发 (无 Docker)
+Build checks:
 
 ```bash
-# 安装依赖
-pnpm install
-
-# 启动 PostgreSQL & Redis (需要本地安装或 Docker)
-docker compose up -d postgres redis
-
-# 启动后端
-cd backend && pnpm dev
-
-# 启动前端
-cd frontend && pnpm dev
+npm run build:frontend
+npm run build:backend
 ```
 
-## 项目结构
+## Production Safety
 
-```
-├── frontend/          # Vue 3 前端
-├── backend/           # NestJS 后端 API
-├── docker/            # Dockerfiles & Nginx 配置
-│   ├── Dockerfile.frontend
-│   ├── Dockerfile.backend
-│   └── nginx/         # Nginx 配置
-├── k8s/               # Kubernetes 清单
-│   ├── frontend/
-│   ├── backend/
-│   ├── postgres/
-│   ├── redis/
-│   ├── ingress.yaml
-│   ├── configmap.yaml
-│   └── secrets.yaml   # ⚠️ 模板文件，需替换占位符
-├── scripts/           # 运维脚本
-│   ├── deploy.sh      # 一键部署
-│   ├── health-check.sh
-│   ├── backup.sh
-│   ├── restore.sh
-│   └── security-scan.sh
-├── docs/              # 详细文档
-├── docker-compose.yml
-└── .github/workflows/ # CI/CD
-    ├── ci.yml         # Lint, Test, Build, CF Pages Preview
-    ├── cd.yml         # Deploy to K8s + Cloudflare Pages
-    └── security-scan.yml
-```
-
-## 部署
-
-### Cloudflare Pages (前端)
-
-前端自动部署到 Cloudflare Pages:
-
-| 环境 | 分支 | URL |
-|------|------|-----|
-| Production | `master` | `ddddkiii.com` |
-| Preview | PR | N/A (direct ECS deploy) |
-
-**GitHub Secrets 需要配置:**
-
-| Secret | 说明 |
-|--------|------|
-| `CLOUDFLARE_API_TOKEN` | Cloudflare API Token (Pages 权限) |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare Account ID |
-
-**GitHub Variables 需要配置:**
-
-| Variable | 示例值 |
-|----------|--------|
-| `VITE_API_BASE_URL` | `https://api.matrixflow.io/api` |
-| `VITE_WS_URL` | `wss://api.matrixflow.io` |
-
-### Kubernetes (后端)
-
-```bash
-# 配置密钥 (必须!)
-cp k8s/secrets.yaml k8s/secrets.local.yaml
-vim k8s/secrets.local.yaml  # 替换所有 <REPLACE_ME>
-kubectl apply -f k8s/secrets.local.yaml -n matrixflow
-
-# 一键部署
-./scripts/deploy.sh --namespace matrixflow --tag latest
-```
-
-详见 [部署指南](docs/deployment-guide.md)。
-
-## CI/CD
-
-### GitHub Actions Secrets
-
-| Secret | 用途 |
-|--------|------|
-| `AWS_ACCESS_KEY_ID` | AWS EKS 部署 |
-| `AWS_SECRET_ACCESS_KEY` | AWS EKS 部署 |
-| `AWS_REGION` | AWS 区域 |
-| `CLOUDFLARE_API_TOKEN` | Cloudflare Pages 部署 |
-| `CLOUDFLARE_ACCOUNT_ID` | Cloudflare 账户 |
-| `SNYK_TOKEN` | 安全扫描 (可选) |
-| `SLACK_WEBHOOK_URL` | Slack 通知 (可选) |
-
-### 流程
-
-```
-Push/PR → CI (Lint → Test → Build → CF Pages Preview)
-                ↓ (main/develop only)
-         CD (K8s Deploy → Blue-Green → Notify)
-```
-
-## 运维
-
-```bash
-# 健康检查
-./scripts/health-check.sh matrixflow
-
-# 数据库备份
-./scripts/backup.sh
-
-# 数据库恢复
-./scripts/restore.sh backup_file.sql.gz
-
-# 安全扫描
-./scripts/security-scan.sh
-```
-
-## 安全
-
-- 所有 Docker 容器使用非 root 用户运行
-- Kubernetes Pod 设置 `runAsNonRoot` + `securityContext`
-- Nginx 配置 CSP、HSTS、X-Frame-Options 等安全头
-- JWT 密钥、数据库密码通过 K8s Secrets 管理
-- CI 包含 CodeQL、Trivy、Gitleaks 安全扫描
-
-## 文档
-
-- [部署指南](docs/deployment-guide.md)
-- [系统架构](docs/architecture/system-architecture.md)
-- [API 设计](docs/architecture/api-design.md)
-- [安全架构](docs/architecture/security-architecture.md)
-- [运维手册](docs/operations-manual.md)
-- [故障排除](docs/troubleshooting.md)
+The repository is intentionally conservative now. Some legacy files remain for historical context, but they are not official deployment entry points. If a script or document conflicts with `LATEST_DEPLOYMENT.md`, treat `LATEST_DEPLOYMENT.md` as the source of truth and update the stale file instead of following it.
