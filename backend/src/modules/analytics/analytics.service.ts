@@ -617,32 +617,9 @@ export class AnalyticsService {
   ) {
     const { limit = 50, period = 'all', platform, groupId } = params
 
-    // shared mode: 不按 userId 过滤
-    const accounts = await this.prisma.account.findMany({
-      where: {
-        ...(platform ? { platform: platform as Platform } : {}),
-        ...(groupId ? { groupId } : {}),
-      },
-      select: { id: true },
-    })
-    const accountIds = accounts.map((a) => a.id)
-
-    // 时间范围 — 优先用 publishAt，fallback 到 createdAt
-    let dateFilter: Prisma.PostWhereInput = {}
-    const now = new Date()
-    if (period === 'week' || period === 'month') {
-      const days = period === 'week' ? 7 : 30
-      const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-      // COALESCE 语义: publishAt >= cutoff OR (publishAt IS NULL AND createdAt >= cutoff)
-      dateFilter = {
-        OR: [
-          { publishAt: { gte: cutoff } },
-          {
-            publishAt: null,
-            createdAt: { gte: cutoff },
-          },
-        ],
-      }
+    const { accountIds, dateFilter } = await this.prepareRankingFilters(platform, groupId, period)
+    if (accountIds.length === 0) {
+      return { ranking: [], total: 0, period }
     }
 
     const posts = await this.prisma.post.findMany({
@@ -663,28 +640,133 @@ export class AnalyticsService {
     })
 
     return {
-      ranking: posts.map((p, index) => {
-        const pviews = p.stats?.views || 0
-        const plikes = p.stats?.likes || 0
-        return {
-          rank: index + 1,
-          postId: p.id,
-          title: p.title,
-          platform: p.account.platform,
-          accountName: p.account.nickname,
-          accountAvatar: p.account.avatar,
-          views: pviews,
-          likes: plikes,
-          comments: p.stats?.comments || 0,
-          shares: p.stats?.shares || 0,
-          completionRate: p.stats?.completionRate || 0,
-          avgPlayDuration: p.stats?.avgPlayDuration || 0,
-          engagementRate: pviews > 0 ? Math.round((plikes / pviews) * 10000) / 100 : 0,
-          publishedAt: p.publishAt || p.createdAt,
-        }
-      }),
+      ranking: posts.map((p, index) => this.formatRankingItem(p, index + 1)),
       total: posts.length,
       period,
+    }
+  }
+
+  /**
+   * 互动率榜单 — 按互动率排名，独立查询，不依赖播放量排行
+   * 互动率 = (点赞 + 评论 + 转发) / 播放量 × 100%
+   * 设置最低播放量门槛，避免低播放量内容虚高互动率占据榜首
+   */
+  async getEngagementRanking(
+    userId: string,
+    params: {
+      limit?: number
+      period?: 'week' | 'month' | 'all'
+      platform?: string
+      groupId?: string
+    },
+  ) {
+    const { limit = 50, period = 'all', platform, groupId } = params
+
+    const { accountIds, dateFilter } = await this.prepareRankingFilters(platform, groupId, period)
+    if (accountIds.length === 0) {
+      return { ranking: [], total: 0, period }
+    }
+
+    // 互动率排行需要更大的候选集，然后按互动率排序取 top N
+    // 最低播放量门槛：过滤掉播放量过低的内容，避免虚高互动率
+    const MIN_VIEWS_FOR_ENGAGEMENT = 100
+
+    const posts = await this.prisma.post.findMany({
+      where: {
+        accountId: { in: accountIds },
+        status: 'PUBLISHED',
+        stats: { isNot: null },
+        ...dateFilter,
+      },
+      include: {
+        stats: true,
+        account: {
+          select: { id: true, nickname: true, platform: true, avatar: true },
+        },
+      },
+      orderBy: { stats: { views: 'desc' } },
+      // 取 5 倍 limit 作为候选池，确保覆盖足够多内容
+      take: Math.max(limit * 5, 200),
+    })
+
+    const ranked = posts
+      .filter((p) => (p.stats?.views || 0) >= MIN_VIEWS_FOR_ENGAGEMENT)
+      .map((p) => {
+        const views = p.stats?.views || 0
+        const likes = p.stats?.likes || 0
+        const comments = p.stats?.comments || 0
+        const shares = p.stats?.shares || 0
+        const totalInteractions = likes + comments + shares
+        const engagementRate = views > 0 ? Math.round((totalInteractions / views) * 10000) / 100 : 0
+        return { post: p, engagementRate }
+      })
+      .sort((a, b) => b.engagementRate - a.engagementRate)
+      .slice(0, limit)
+
+    return {
+      ranking: ranked.map((item, index) => this.formatRankingItem(item.post, index + 1)),
+      total: ranked.length,
+      period,
+    }
+  }
+
+  /**
+   * 排行榜公共筛选条件准备
+   */
+  private async prepareRankingFilters(
+    platform?: string,
+    groupId?: string,
+    period?: 'week' | 'month' | 'all',
+  ): Promise<{
+    accountIds: string[]
+    dateFilter: Prisma.PostWhereInput
+  }> {
+    const accounts = await this.prisma.account.findMany({
+      where: {
+        ...(platform ? { platform: platform as Platform } : {}),
+        ...(groupId ? { groupId } : {}),
+      },
+      select: { id: true },
+    })
+    const accountIds = accounts.map((a) => a.id)
+
+    let dateFilter: Prisma.PostWhereInput = {}
+    if (period === 'week' || period === 'month') {
+      const days = period === 'week' ? 7 : 30
+      const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+      dateFilter = {
+        OR: [{ publishAt: { gte: cutoff } }, { publishAt: null, createdAt: { gte: cutoff } }],
+      }
+    }
+
+    return { accountIds, dateFilter }
+  }
+
+  /**
+   * 格式化排行榜条目，统一计算互动率
+   * 互动率 = (点赞 + 评论 + 转发) / 播放量 × 100%
+   */
+  private formatRankingItem(p: any, rank: number) {
+    const pviews = p.stats?.views || 0
+    const plikes = p.stats?.likes || 0
+    const pcomments = p.stats?.comments || 0
+    const pshares = p.stats?.shares || 0
+    const totalInteractions = plikes + pcomments + pshares
+    return {
+      rank,
+      postId: p.id,
+      title: p.title,
+      platform: p.account.platform,
+      accountName: p.account.nickname,
+      accountAvatar: p.account.avatar,
+      views: pviews,
+      likes: plikes,
+      comments: pcomments,
+      shares: pshares,
+      completionRate: p.stats?.completionRate || 0,
+      avgPlayDuration: p.stats?.avgPlayDuration || 0,
+      engagementRate: pviews > 0 ? Math.round((totalInteractions / pviews) * 10000) / 100 : 0,
+      publishedAt: p.publishAt || p.createdAt,
     }
   }
 

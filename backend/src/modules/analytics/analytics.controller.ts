@@ -174,18 +174,12 @@ export class AnalyticsController {
     @Query('platform') platform?: string,
     @Query('groupId') groupId?: string,
   ) {
-    const result = await this.analyticsService.getViewsRanking(userId, {
+    return this.analyticsService.getEngagementRanking(userId, {
       limit: limit ? Math.min(100, Math.max(1, Number(limit))) : 50,
       period: period || 'all',
       platform,
       groupId,
     })
-    return {
-      ...result,
-      ranking: [...result.ranking]
-        .sort((a, b) => b.engagementRate - a.engagementRate)
-        .map((item, index) => ({ ...item, rank: index + 1 })),
-    }
   }
 
   // ─── 以下为补全的 7 个缺失端点 ───
