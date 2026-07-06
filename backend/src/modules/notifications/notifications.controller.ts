@@ -23,6 +23,15 @@ interface UpdateFeishuSettingsDto {
   enabled?: boolean
 }
 
+interface UpdateFeishuAppSettingsDto {
+  appId?: string
+  appSecret?: string
+  receiveIdType?: string
+  receiveId?: string
+  notifyTypes?: string[]
+  enabled?: boolean
+}
+
 @ApiTags('notifications')
 @ApiBearerAuth('access-token')
 @UseGuards(JwtAuthGuard)
@@ -57,24 +66,49 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId)
   }
 
+  // ── Webhook mode ────────────────────────────────────
+
   @Get('feishu/settings')
-  @ApiOperation({ summary: 'Get Feishu notification settings' })
+  @ApiOperation({ summary: 'Get Feishu webhook notification settings' })
   async getFeishuSettings() {
     return this.notificationsService.getFeishuSettings()
   }
 
   @Put('feishu/settings')
-  @ApiOperation({ summary: 'Update Feishu notification settings' })
+  @ApiOperation({ summary: 'Update Feishu webhook notification settings' })
   async updateFeishuSettings(@Body() body: UpdateFeishuSettingsDto) {
     return this.notificationsService.updateFeishuSettings(body)
   }
 
   @Post('feishu/test')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Send a Feishu notification test message' })
+  @ApiOperation({ summary: 'Send a Feishu webhook test message' })
   async testFeishu(@CurrentUser('id') userId: string) {
     return this.notificationsService.sendFeishuTest(userId)
   }
+
+  // ── App bot mode ────────────────────────────────────
+
+  @Get('feishu/app/settings')
+  @ApiOperation({ summary: 'Get Feishu app bot notification settings' })
+  async getFeishuAppSettings() {
+    return this.notificationsService.getFeishuAppSettings()
+  }
+
+  @Put('feishu/app/settings')
+  @ApiOperation({ summary: 'Update Feishu app bot notification settings' })
+  async updateFeishuAppSettings(@Body() body: UpdateFeishuAppSettingsDto) {
+    return this.notificationsService.updateFeishuAppSettings(body)
+  }
+
+  @Post('feishu/app/test')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Send a Feishu app bot test message (interactive card)' })
+  async testFeishuApp() {
+    return this.notificationsService.sendFeishuAppTest()
+  }
+
+  // ── Notification actions ────────────────────────────
 
   @Post(':id/read')
   @HttpCode(HttpStatus.OK)

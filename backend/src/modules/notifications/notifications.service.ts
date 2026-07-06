@@ -5,6 +5,11 @@ import { existsSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { NotificationType } from '../../common/prisma-enums'
 import { PrismaService } from '../../prisma/prisma.service'
+import {
+  FeishuOpenApiClient,
+  FeishuReceiveIdType,
+  FeishuSendResult,
+} from './feishu-open-api.client'
 
 interface NotificationCreateParams {
   userId: string
@@ -22,10 +27,23 @@ export interface FeishuPushResult {
 }
 
 export interface FeishuSettings {
+  mode: 'webhook' | 'app'
   enabled: boolean
   configured: boolean
   webhookUrl: string
   webhookSecretConfigured: boolean
+  notifyTypes: NotificationType[]
+  envFileWritable: boolean
+}
+
+export interface FeishuAppSettings {
+  mode: 'webhook' | 'app'
+  enabled: boolean
+  configured: boolean
+  appId: string
+  appSecretConfigured: boolean
+  receiveIdType: FeishuReceiveIdType
+  receiveId: string
   notifyTypes: NotificationType[]
   envFileWritable: boolean
 }
@@ -37,11 +55,23 @@ interface UpdateFeishuSettingsParams {
   enabled?: boolean
 }
 
+interface UpdateFeishuAppSettingsParams {
+  appId?: string
+  appSecret?: string
+  receiveIdType?: string
+  receiveId?: string
+  notifyTypes?: string[]
+  enabled?: boolean
+}
+
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name)
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private feishuClient: FeishuOpenApiClient,
+  ) {}
 
   async create(params: NotificationCreateParams) {
     const notification = await this.prisma.notification.create({
@@ -63,6 +93,8 @@ export class NotificationsService {
     return notification
   }
 
+  // ── Webhook mode: test ──────────────────────────────
+
   async sendFeishuTest(userId: string): Promise<FeishuPushResult> {
     return this.pushFeishuNotification(
       {
@@ -76,8 +108,27 @@ export class NotificationsService {
     )
   }
 
+  // ── App mode: test ──────────────────────────────────
+
+  async sendFeishuAppTest(): Promise<FeishuSendResult> {
+    if (!this.feishuClient.isAppConfigured()) {
+      return { sent: false, message: 'FEISHU_APP_ID or FEISHU_APP_SECRET is not configured.' }
+    }
+
+    const receiveId = this.feishuClient.getReceiveId()
+    if (!receiveId) {
+      return { sent: false, message: 'FEISHU_RECEIVE_ID is not configured.' }
+    }
+
+    const card = this.feishuClient.buildTestCard()
+    return this.feishuClient.sendCard(receiveId, this.feishuClient.getReceiveIdType(), card)
+  }
+
+  // ── Settings: webhook mode ──────────────────────────
+
   getFeishuSettings(): FeishuSettings {
     return {
+      mode: this.feishuClient.getMode(),
       enabled: this.isFeishuEnabled(),
       configured: Boolean(this.getFeishuWebhookUrl()),
       webhookUrl: this.maskWebhookUrl(this.getFeishuWebhookUrl()),
@@ -118,6 +169,76 @@ export class NotificationsService {
     this.persistEnvUpdates(updates)
     return this.getFeishuSettings()
   }
+
+  // ── Settings: app mode ──────────────────────────────
+
+  getFeishuAppSettings(): FeishuAppSettings {
+    return {
+      mode: this.feishuClient.getMode(),
+      enabled: this.isFeishuEnabled(),
+      configured: this.feishuClient.isAppConfigured() && Boolean(this.feishuClient.getReceiveId()),
+      appId: this.feishuClient.getAppId(),
+      appSecretConfigured: Boolean(this.feishuClient.getAppSecret()),
+      receiveIdType: this.feishuClient.getReceiveIdType(),
+      receiveId: this.feishuClient.getReceiveId(),
+      notifyTypes: this.getAllowedFeishuTypes(),
+      envFileWritable: this.isEnvFileWritable(),
+    }
+  }
+
+  updateFeishuAppSettings(params: UpdateFeishuAppSettingsParams): FeishuAppSettings {
+    const appId = typeof params.appId === 'string' ? params.appId.trim() : undefined
+    const appSecret = typeof params.appSecret === 'string' ? params.appSecret.trim() : undefined
+    const receiveId = typeof params.receiveId === 'string' ? params.receiveId.trim() : undefined
+    const enabled = params.enabled !== false
+    const notifyTypes = this.normalizeNotifyTypes(params.notifyTypes)
+
+    // 验证 receiveIdType
+    let receiveIdType: string | undefined
+    if (params.receiveIdType) {
+      const valid = ['open_id', 'user_id', 'union_id', 'email', 'chat_id']
+      if (!valid.includes(params.receiveIdType)) {
+        throw new BadRequestException(`Invalid receive_id_type: ${params.receiveIdType}`)
+      }
+      receiveIdType = params.receiveIdType
+    }
+
+    const updates: Record<string, string> = {
+      FEISHU_NOTIFY_MODE: 'app',
+      FEISHU_NOTIFY_ENABLED: enabled ? 'true' : 'false',
+      FEISHU_NOTIFY_TYPES: notifyTypes.join(','),
+    }
+
+    if (appId !== undefined) {
+      updates.FEISHU_APP_ID = appId
+    }
+
+    if (appSecret !== undefined) {
+      updates.FEISHU_APP_SECRET = appSecret
+    }
+
+    if (receiveIdType !== undefined) {
+      updates.FEISHU_RECEIVE_ID_TYPE = receiveIdType
+    }
+
+    if (receiveId !== undefined) {
+      updates.FEISHU_RECEIVE_ID = receiveId
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+      process.env[key] = value
+    })
+
+    // 更新后清除 token 缓存（凭证可能已变更）
+    if (appId !== undefined || appSecret !== undefined) {
+      this.feishuClient.invalidateToken()
+    }
+
+    this.persistEnvUpdates(updates)
+    return this.getFeishuAppSettings()
+  }
+
+  // ── Notification queries ────────────────────────────
 
   async findAll(userId: string, params: { skip?: number; take?: number; unreadOnly?: boolean }) {
     const { skip = 0, take = 20, unreadOnly = false } = params
@@ -176,19 +297,12 @@ export class NotificationsService {
     return { success: true, count: result.count }
   }
 
+  // ── Push logic ──────────────────────────────────────
+
   private async pushFeishuNotification(
     params: NotificationCreateParams,
     force = false,
   ): Promise<FeishuPushResult> {
-    const webhookUrl = this.getFeishuWebhookUrl()
-    if (!webhookUrl) {
-      return {
-        enabled: false,
-        sent: false,
-        message: 'FEISHU_WEBHOOK_URL is not configured.',
-      }
-    }
-
     if (!this.isFeishuEnabled()) {
       return { enabled: false, sent: false, message: 'Feishu notifications are disabled.' }
     }
@@ -198,6 +312,68 @@ export class NotificationsService {
         enabled: true,
         sent: false,
         message: `Notification type ${params.type} is filtered by FEISHU_NOTIFY_TYPES.`,
+      }
+    }
+
+    // 根据模式分发
+    const mode = this.feishuClient.getMode()
+    if (mode === 'app') {
+      return this.pushViaAppBot(params)
+    }
+
+    return this.pushViaWebhook(params)
+  }
+
+  // ── App bot push ────────────────────────────────────
+
+  private async pushViaAppBot(params: NotificationCreateParams): Promise<FeishuPushResult> {
+    if (!this.feishuClient.isAppConfigured()) {
+      return {
+        enabled: true,
+        sent: false,
+        message: 'FEISHU_APP_ID or FEISHU_APP_SECRET is not configured.',
+      }
+    }
+
+    const receiveId = this.feishuClient.getReceiveId()
+    if (!receiveId) {
+      return {
+        enabled: true,
+        sent: false,
+        message: 'FEISHU_RECEIVE_ID is not configured.',
+      }
+    }
+
+    const card = this.feishuClient.buildCard({
+      type: params.type,
+      title: params.title,
+      content: params.content,
+      metadata: params.metadata,
+      userId: params.userId,
+    })
+
+    const result = await this.feishuClient.sendCard(
+      receiveId,
+      this.feishuClient.getReceiveIdType(),
+      card,
+    )
+
+    return {
+      enabled: true,
+      sent: result.sent,
+      message: result.message,
+    }
+  }
+
+  // ── Webhook push (original) ─────────────────────────
+
+  private async pushViaWebhook(params: NotificationCreateParams): Promise<FeishuPushResult> {
+    const webhookUrl = this.getFeishuWebhookUrl()
+    if (!webhookUrl) {
+      return {
+        enabled: false,
+        sent: false,
+        message: 'FEISHU_WEBHOOK_URL is not configured.',
       }
     }
 
@@ -235,6 +411,8 @@ export class NotificationsService {
     return { enabled: true, sent: true, status: response.status, message: 'sent' }
   }
 
+  // ── Webhook helpers ─────────────────────────────────
+
   private getFeishuWebhookUrl(): string {
     return (process.env.FEISHU_WEBHOOK_URL || process.env.LARK_WEBHOOK_URL || '').trim()
   }
@@ -249,7 +427,6 @@ export class NotificationsService {
 
   private isAllowedFeishuType(type: NotificationType): boolean {
     const allowed = this.getAllowedFeishuTypes()
-
     return allowed.length === 0 || allowed.includes(type)
   }
 
@@ -288,6 +465,8 @@ export class NotificationsService {
     return `${value.slice(0, visible)}...${value.slice(-visible)}`
   }
 
+  // ── .env persistence ────────────────────────────────
+
   private isEnvFileWritable(): boolean {
     try {
       const envPath = this.getEnvFilePath()
@@ -322,21 +501,19 @@ export class NotificationsService {
   }
 
   private getEnvFilePath(): string {
-    // 1. 尝试 process.cwd()/.env（最常见）
     const cwdPath = join(process.cwd(), '.env')
     if (existsSync(cwdPath)) return cwdPath
 
-    // 2. 尝试 __dirname/../.env（编译后 dist/ 目录的场景）
     const distPath = join(__dirname, '..', '..', '..', '.env')
     if (existsSync(distPath)) return distPath
 
-    // 3. 尝试 DOTENV_CONFIG_PATH 环境变量
     const envConfigPath = process.env.DOTENV_CONFIG_PATH
     if (envConfigPath && existsSync(envConfigPath)) return envConfigPath
 
-    // 4. 回退到 process.cwd()/.env（即使不存在，也允许创建）
     return cwdPath
   }
+
+  // ── Webhook signature ───────────────────────────────
 
   private createFeishuSignature(secret: string) {
     const timestamp = Math.floor(Date.now() / 1000).toString()
@@ -344,6 +521,8 @@ export class NotificationsService {
     const sign = createHmac('sha256', stringToSign).update('').digest('base64')
     return { timestamp, sign }
   }
+
+  // ── Webhook text builder ────────────────────────────
 
   private buildFeishuText(params: NotificationCreateParams): string {
     const lines = [
