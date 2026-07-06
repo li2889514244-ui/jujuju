@@ -12,7 +12,38 @@ import { NotificationType } from '../../common/prisma-enums'
  *
  * 去重策略：查询是否已有包含相同 afterSaleId 的未读通知，
  * 避免同一笔退款重复推送。
+ *
+ * 过滤策略：买家主观原因的退款（不想要、尺码不合适等）
+ * 不推送通知，只保留需要关注的退款（商品问题、商家问题等）。
  */
+
+/** 需要静默处理的退款原因关键词（买家主观原因，非商品/商家问题） */
+const SILENT_REFUND_KEYWORDS = [
+  '多拍/错拍/不想要',
+  '不喜欢/效果不好',
+  '7天无理由',
+  '无理由退款',
+  '不想要了',
+  '尺码不合适',
+  '大小尺寸不合适',
+  '大小颜色',
+  '型号不合适',
+  '颜色/型号',
+  '尺寸不合适',
+  '拍错',
+  '多拍',
+]
+
+/**
+ * 判断退款原因是否属于「买家主观原因」，应静默处理不推送通知。
+ * 使用包含匹配，兼容各平台措辞差异。
+ */
+function isSilentRefundReason(reason: string): boolean {
+  if (!reason) return false
+  const normalized = reason.trim()
+  return SILENT_REFUND_KEYWORDS.some((kw) => normalized.includes(kw))
+}
+
 @Injectable()
 export class RefundAlertScheduler implements OnModuleInit {
   private readonly logger = new Logger(RefundAlertScheduler.name)
@@ -46,11 +77,23 @@ export class RefundAlertScheduler implements OnModuleInit {
         this.findNewDoudianRefunds(checkFrom),
       ])
 
-      const total = wechatNew.length + doudianNew.length
-      if (total === 0) return
+      // 过滤掉买家主观原因的退款（不想要、尺码不合适等），只推送需要关注的退款
+      const wechatFiltered = wechatNew.filter((r) => !isSilentRefundReason(r.reason))
+      const doudianFiltered = doudianNew.filter((r) => !isSilentRefundReason(r.reason))
+      const silentCount =
+        wechatNew.length + doudianNew.length - wechatFiltered.length - doudianFiltered.length
+
+      const total = wechatFiltered.length + doudianFiltered.length
+      if (total === 0) {
+        if (silentCount > 0) {
+          this.logger.log(`检测到 ${silentCount} 笔退款已静默过滤（买家主观原因）`)
+        }
+        return
+      }
 
       this.logger.log(
-        `检测到 ${total} 笔新退款（微信 ${wechatNew.length}，抖店 ${doudianNew.length}）`,
+        `检测到 ${total} 笔新退款需推送（微信 ${wechatFiltered.length}，抖店 ${doudianFiltered.length}）` +
+          (silentCount > 0 ? `，已过滤 ${silentCount} 笔主观原因退款` : ''),
       )
 
       const userIds = await this.getAdminUserIds()
@@ -59,7 +102,7 @@ export class RefundAlertScheduler implements OnModuleInit {
         return
       }
 
-      for (const refund of [...wechatNew, ...doudianNew]) {
+      for (const refund of [...wechatFiltered, ...doudianFiltered]) {
         for (const userId of userIds) {
           // 去重：检查是否已推送过这笔退款
           const alreadyNotified = await this.prisma.notification.findFirst({
