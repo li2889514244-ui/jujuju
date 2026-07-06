@@ -124,15 +124,7 @@
         </span>
       </div>
       <div v-if="activeTag" class="ci-tag-clear">
-        <el-button
-          size="small"
-          type="info"
-          plain
-          @click="
-            activeTag = ''
-            loadRanking()
-          "
-        >
+        <el-button size="small" type="info" plain @click="clearTag">
           清除标签筛选：{{ activeTag }}
         </el-button>
       </div>
@@ -288,7 +280,10 @@ function toggleTag(tagName: string) {
   } else {
     activeTag.value = tagName
   }
-  loadRanking()
+}
+
+function clearTag() {
+  activeTag.value = ''
 }
 
 onMounted(() => {
