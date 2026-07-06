@@ -79,7 +79,9 @@ export class RefundAlertScheduler implements OnModuleInit {
 
       // 过滤掉买家主观原因的退款（不想要、尺码不合适等），只推送需要关注的退款
       const wechatFiltered = wechatNew.filter((r) => !isSilentRefundReason(r.reason))
-      const doudianFiltered = doudianNew.filter((r) => !isSilentRefundReason(r.reason))
+      const doudianFiltered = doudianNew.filter(
+        (r: { reason: string }) => !isSilentRefundReason(r.reason),
+      )
       const silentCount =
         wechatNew.length + doudianNew.length - wechatFiltered.length - doudianFiltered.length
 
