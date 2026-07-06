@@ -1200,14 +1200,20 @@ export class AnalyticsService {
         ...(platform ? { platform: platform as Platform } : {}),
         ...(groupId ? { groupId } : {}),
       },
-      select: { id: true, platform: true, nickname: true, avatar: true, followers: true, metadata: true },
+      select: {
+        id: true,
+        platform: true,
+        nickname: true,
+        avatar: true,
+        followers: true,
+        metadata: true,
+      },
       orderBy: { createdAt: 'desc' },
     })
 
     const accountIds = accounts.map((a) => a.id)
 
-    // 查询最近30天的 DailyStats
-    const thirtyDaysAgo = this.getBeijingDayStart(-30)
+    // 查询全部历史 DailyStats（不再限制30天窗口）
     const tomorrow = this.getBeijingDayStart(1)
     const yesterday = this.getBeijingDayStart(-1)
     const sevenDaysAgo = this.getBeijingDayStart(-7)
@@ -1215,7 +1221,7 @@ export class AnalyticsService {
     const allStats = await this.prisma.dailyStats.findMany({
       where: {
         accountId: { in: accountIds },
-        date: { gte: thirtyDaysAgo, lt: tomorrow },
+        date: { lt: tomorrow },
       },
       select: {
         accountId: true,
@@ -1238,7 +1244,7 @@ export class AnalyticsService {
     }
 
     // 计算每个账号的日/周/月聚合。日/周必须按自然时间窗口计算，
-    // 这样采集断档或账号过期会在前端暴露为 "-"，便于运营排查。
+    // 这样采集断档或账号过期会在前端暴露为 null，便于运营排查。
     const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
     const isYesterday = (d: Date) => d.getTime() === yesterday.getTime()
     const parseJsonObject = (value: unknown): Record<string, any> => {
@@ -1262,9 +1268,12 @@ export class AnalyticsService {
       share: 0,
       new_fans: 0,
     })
-    const hasMetricValue = (value: MetricTotal) => metricKeys.some((key) => value[key] > 0)
-    const hasAdditionalMetricValue = (value: MetricTotal, baseline: MetricTotal) =>
-      metricKeys.some((key) => value[key] > baseline[key])
+    const hasMetricValue = (value: MetricTotal | null | undefined) =>
+      !!value && metricKeys.some((key) => value[key] > 0)
+    const hasAdditionalMetricValue = (
+      value: MetricTotal | null | undefined,
+      baseline: MetricTotal | null | undefined,
+    ) => !!value && metricKeys.some((key) => value[key] > (baseline?.[key] ?? 0))
     const isCumulativeAtLeast = (value: MetricTotal, baseline: MetricTotal) =>
       metricKeys.every((key) => value[key] >= baseline[key])
     const readMetricTotal = (value: any): MetricTotal | undefined => {
@@ -1285,9 +1294,7 @@ export class AnalyticsService {
       const weekTotal = readMetricTotal(videoData.week_total)
       const monthTotal = readMetricTotal(videoData.month_total)
       const validWeekTotal =
-        weekTotal && (!dayTotal || isCumulativeAtLeast(weekTotal, dayTotal))
-          ? weekTotal
-          : undefined
+        weekTotal && (!dayTotal || isCumulativeAtLeast(weekTotal, dayTotal)) ? weekTotal : undefined
       const monthBaseline = validWeekTotal || dayTotal
       const validMonthTotal =
         monthTotal && (!monthBaseline || isCumulativeAtLeast(monthTotal, monthBaseline))
@@ -1300,13 +1307,19 @@ export class AnalyticsService {
       }
     }
 
+    // 快照回退时效限制：超过 STALE_DAYS 天的快照不再作为"日"数据回退
+    const STALE_DAYS = 3
+    const staleThreshold = this.getBeijingDayStart(-STALE_DAYS)
+
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []
 
-      const monthTotal = createMetricTotal()
-      const weekTotal = createMetricTotal()
-      const dayTotal = createMetricTotal()
+      // 用 null 表示"无数据"，区分"真实0"和"缺失"
+      let monthTotal: MetricTotal | null = null
+      let weekTotal: MetricTotal | null = null
+      let dayTotal: MetricTotal | null = null
       let lastFans = acc.followers || 0
+      let latestStatsDate: Date | null = null
 
       for (const s of stats) {
         const increments = {
@@ -1317,7 +1330,8 @@ export class AnalyticsService {
           new_fans: s.followersIncrement || 0,
         }
 
-        // 月累计：全部30天
+        // 月累计：全部历史数据
+        if (!monthTotal) monthTotal = createMetricTotal()
         monthTotal.play += increments.play
         monthTotal.like += increments.like
         monthTotal.comment += increments.comment
@@ -1326,6 +1340,7 @@ export class AnalyticsService {
 
         // 周累计：自然最近7天
         if (isWithinLast7(s.date)) {
+          if (!weekTotal) weekTotal = createMetricTotal()
           weekTotal.play += increments.play
           weekTotal.like += increments.like
           weekTotal.comment += increments.comment
@@ -1335,6 +1350,7 @@ export class AnalyticsService {
 
         // 日：自然昨天
         if (isYesterday(s.date)) {
+          if (!dayTotal) dayTotal = createMetricTotal()
           dayTotal.play += increments.play
           dayTotal.like += increments.like
           dayTotal.comment += increments.comment
@@ -1344,25 +1360,37 @@ export class AnalyticsService {
 
         // 取最新的粉丝快照
         if (s.followers > 0) lastFans = s.followers
+        // 记录最近一次采集日期
+        if (!latestStatsDate || s.date > latestStatsDate) latestStatsDate = s.date
       }
 
+      // 快照回退：仅当无 DailyStats 数据时，用 metadata 快照补充
+      // 但"日"数据有时效限制：超过 STALE_DAYS 天的快照不再回退，避免过期数据误导
       const periodMetrics = readPeriodMetrics(acc.metadata)
+      let dataDate: string | null = latestStatsDate
+        ? latestStatsDate.toISOString().slice(0, 10)
+        : null
+
       if (periodMetrics.day_total && !hasMetricValue(dayTotal)) {
-        Object.assign(dayTotal, periodMetrics.day_total)
+        // 仅当快照时间在 STALE_DAYS 天内才回退到日数据
+        if (!latestStatsDate || latestStatsDate >= staleThreshold) {
+          dayTotal = { ...periodMetrics.day_total }
+          if (!dataDate) dataDate = 'snapshot'
+        }
       }
       if (
         periodMetrics.week_total &&
         !hasAdditionalMetricValue(weekTotal, dayTotal) &&
         hasAdditionalMetricValue(periodMetrics.week_total, dayTotal)
       ) {
-        Object.assign(weekTotal, periodMetrics.week_total)
+        weekTotal = { ...periodMetrics.week_total }
       }
       if (
         periodMetrics.month_total &&
         !hasAdditionalMetricValue(monthTotal, weekTotal) &&
         hasAdditionalMetricValue(periodMetrics.month_total, weekTotal)
       ) {
-        Object.assign(monthTotal, periodMetrics.month_total)
+        monthTotal = { ...periodMetrics.month_total }
       }
 
       return {
@@ -1371,7 +1399,12 @@ export class AnalyticsService {
         avatar: acc.avatar,
         platform: acc.platform,
         fans: lastFans,
-        info: { day_total: dayTotal, week_total: weekTotal, month_total: monthTotal },
+        info: {
+          day_total: dayTotal,
+          week_total: weekTotal,
+          month_total: monthTotal,
+        },
+        dataDate,
       }
     })
   }

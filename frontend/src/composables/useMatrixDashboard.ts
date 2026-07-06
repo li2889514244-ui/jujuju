@@ -83,8 +83,10 @@ export function useMatrixDashboard() {
     const interactionTrend = (() => {
       const wow = comp?.weekOverWeek
       if (!wow) return null
-      const cur = (wow.current?.likes || 0) + (wow.current?.comments || 0) + (wow.current?.shares || 0)
-      const prev = (wow.previous?.likes || 0) + (wow.previous?.comments || 0) + (wow.previous?.shares || 0)
+      const cur =
+        (wow.current?.likes || 0) + (wow.current?.comments || 0) + (wow.current?.shares || 0)
+      const prev =
+        (wow.previous?.likes || 0) + (wow.previous?.comments || 0) + (wow.previous?.shares || 0)
       if (prev === 0) return null
       return Math.round(((cur - prev) / prev) * 100)
     })()
@@ -146,19 +148,23 @@ export function useMatrixDashboard() {
     avatar: string
     platform: string
     fans: number
-    play: number
+    play: number | null
     issue?: number
-    new_fans: number
+    new_fans: number | null
     uv?: number
-    like: number
-    comment: number
-    share: number
+    like: number | null
+    comment: number | null
+    share: number | null
     fansFormatted: string
     playFormatted: string
     newFansFormatted: string
     likeFormatted: string
     commentFormatted: string
     shareFormatted: string
+    /** 该行数据是否为 null（无采集数据） */
+    isStale: boolean
+    /** 最近采集日期 */
+    dataDate: string | null
   }
 
   const sortKey = ref<string>('')
@@ -176,11 +182,13 @@ export function useMatrixDashboard() {
             ? acc.info.week_total
             : acc.info.month_total
 
-      const play = source?.play || 0
-      const new_fans = source?.new_fans || 0
-      const like = source?.like || 0
-      const comment = source?.comment || 0
-      const share = source?.share || 0
+      // source 为 null 表示该周期无采集数据
+      const isStale = !source
+      const play = source?.play ?? null
+      const new_fans = source?.new_fans ?? null
+      const like = source?.like ?? null
+      const comment = source?.comment ?? null
+      const share = source?.share ?? null
 
       return {
         id: acc.id,
@@ -194,18 +202,28 @@ export function useMatrixDashboard() {
         comment,
         share,
         fansFormatted: formatLargeNum(acc.fans || 0),
-        playFormatted: formatLargeNum(play),
-        newFansFormatted: formatLargeNum(new_fans),
-        likeFormatted: formatLargeNum(like),
-        commentFormatted: formatLargeNum(comment),
-        shareFormatted: formatLargeNum(share),
+        playFormatted: play === null ? '—' : formatLargeNum(play),
+        newFansFormatted: new_fans === null ? '—' : formatLargeNum(new_fans),
+        likeFormatted: like === null ? '—' : formatLargeNum(like),
+        commentFormatted: comment === null ? '—' : formatLargeNum(comment),
+        shareFormatted: share === null ? '—' : formatLargeNum(share),
+        isStale,
+        dataDate: (acc as any).dataDate ?? null,
       }
     })
 
-    // 排序
+    // 排序：null 值始终排在最后
     if (sortKey.value) {
       const dir = sortOrder.value === 'asc' ? 1 : -1
-      rows.sort((a: any, b: any) => (a[sortKey.value] - b[sortKey.value]) * dir)
+      rows.sort((a: any, b: any) => {
+        const av = a[sortKey.value]
+        const bv = b[sortKey.value]
+        // null 排最后
+        if (av === null && bv === null) return 0
+        if (av === null) return 1
+        if (bv === null) return -1
+        return (av - bv) * dir
+      })
     }
 
     return rows
@@ -326,7 +344,18 @@ export function useMatrixDashboard() {
     }
 
     // 按 group 聚合
-    const groupMap = new Map<string, { groupName: string; accountCount: number; followers: number; play: number; like: number; comment: number; share: number }>()
+    const groupMap = new Map<
+      string,
+      {
+        groupName: string
+        accountCount: number
+        followers: number
+        play: number
+        like: number
+        comment: number
+        share: number
+      }
+    >()
     for (const detail of detailList) {
       const groupInfo = accountGroupMap.get(detail.id) || { groupId: '', groupName: '未分组' }
       const key = groupInfo.groupId || '__none__'
@@ -403,7 +432,9 @@ export function useMatrixDashboard() {
         analyticsApi.getEngagementRate(filter).then((r: any) => r.data),
         analyticsApi.getAccountDetailList(pFilter).then((r: any) => r.data),
         accountsApi.getGroups().then((r: any) => r.data),
-        accountsApi.getList({ platform: '', group: '', keyword: '', page: 1, pageSize: 500 }).then((r: any) => r.data),
+        accountsApi
+          .getList({ platform: '', group: '', keyword: '', page: 1, pageSize: 500 })
+          .then((r: any) => r.data),
       ])
       overview.value = ov
       comparison.value = comp

@@ -95,11 +95,15 @@
             <div class="md-stat-item__label">{{ stat.text }}</div>
             <div class="md-stat-item__value">{{ formatNum(stat.value) }}</div>
             <div
-              v-if="aggregatedTrends[stat.type] !== undefined && aggregatedTrends[stat.type] !== null"
+              v-if="
+                aggregatedTrends[stat.type] !== undefined && aggregatedTrends[stat.type] !== null
+              "
               class="md-stat-item__trend"
               :class="(aggregatedTrends[stat.type] ?? 0) >= 0 ? 'is-up' : 'is-down'"
             >
-              <el-icon><CaretTop v-if="(aggregatedTrends[stat.type] ?? 0) >= 0" /><CaretBottom v-else /></el-icon>
+              <el-icon
+                ><CaretTop v-if="(aggregatedTrends[stat.type] ?? 0) >= 0" /><CaretBottom v-else
+              /></el-icon>
               {{ Math.abs(aggregatedTrends[stat.type] ?? 0) }}%
               <span class="md-stat-item__trend-label">环比</span>
             </div>
@@ -112,7 +116,9 @@
         <template #header>
           <div class="md-section__header">
             <span>多账号明细</span>
-            <span class="md-table-subtitle">展示{{ dateTypeLabel }}周期数据，当前粉丝为最新快照</span>
+            <span class="md-table-subtitle"
+              >展示{{ dateTypeLabel }}周期数据，当前粉丝为最新快照</span
+            >
           </div>
         </template>
         <el-table
@@ -121,6 +127,7 @@
           size="small"
           max-height="520"
           empty-text="暂无账号数据"
+          :row-class-name="({ row }: any) => (row.isStale ? 'row-stale' : '')"
           @sort-change="(sort: any) => toggleSort(sort?.prop || '')"
         >
           <el-table-column type="index" width="50" label="#" align="center" />
@@ -148,7 +155,22 @@
           </el-table-column>
           <el-table-column prop="nickname" label="账号名称" min-width="120">
             <template #default="{ row }">
-              <el-text truncated>{{ row.nickname }}</el-text>
+              <div class="cell-nickname">
+                <el-text truncated>{{ row.nickname }}</el-text>
+                <el-tooltip
+                  v-if="row.isStale"
+                  :content="
+                    row.dataDate
+                      ? `最近采集: ${row.dataDate}，当前周期无数据`
+                      : '该账号从未采集到数据，请启动桌面伴侣'
+                  "
+                  placement="top"
+                >
+                  <el-tag size="small" type="warning" effect="plain" class="stale-tag"
+                    >无数据</el-tag
+                  >
+                </el-tooltip>
+              </div>
             </template>
           </el-table-column>
           <el-table-column
@@ -164,35 +186,55 @@
             width="100"
             align="right"
             sortable="custom"
-          />
+          >
+            <template #default="{ row }">
+              <span :class="{ 'stale-value': row.isStale }">{{ row.playFormatted }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
             prop="newFansFormatted"
             label="净增粉丝"
             width="100"
             align="right"
             sortable="custom"
-          />
+          >
+            <template #default="{ row }">
+              <span :class="{ 'stale-value': row.isStale }">{{ row.newFansFormatted }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
             prop="likeFormatted"
             label="点赞"
             width="80"
             align="right"
             sortable="custom"
-          />
+          >
+            <template #default="{ row }">
+              <span :class="{ 'stale-value': row.isStale }">{{ row.likeFormatted }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
             prop="commentFormatted"
             label="评论"
             width="80"
             align="right"
             sortable="custom"
-          />
+          >
+            <template #default="{ row }">
+              <span :class="{ 'stale-value': row.isStale }">{{ row.commentFormatted }}</span>
+            </template>
+          </el-table-column>
           <el-table-column
             prop="shareFormatted"
             label="分享"
             width="80"
             align="right"
             sortable="custom"
-          />
+          >
+            <template #default="{ row }">
+              <span :class="{ 'stale-value': row.isStale }">{{ row.shareFormatted }}</span>
+            </template>
+          </el-table-column>
         </el-table>
       </el-card>
 
@@ -249,20 +291,28 @@
         <template #header>
           <div class="md-section__header">
             <span>分组对比</span>
-            <span class="md-table-subtitle">按{{ dateTypeLabel }}周期汇总，人均指标消除团队规模差异</span>
+            <span class="md-table-subtitle"
+              >按{{ dateTypeLabel }}周期汇总，人均指标消除团队规模差异</span
+            >
           </div>
         </template>
 
         <!-- 洞察提示 -->
-          <div v-if="groupInsight" class="md-group-insight" :class="'md-group-insight--' + groupInsight.type">
-            <el-icon :size="16"><TrendCharts /></el-icon>
-            <span>{{ groupInsight.text }}</span>
-          </div>
+        <div
+          v-if="groupInsight"
+          class="md-group-insight"
+          :class="'md-group-insight--' + groupInsight.type"
+        >
+          <el-icon :size="16"><TrendCharts /></el-icon>
+          <span>{{ groupInsight.text }}</span>
+        </div>
 
         <el-table :data="groupComparison" stripe size="small" empty-text="暂无分组数据">
           <el-table-column label="排名" width="60" align="center">
             <template #default="{ $index }">
-              <span class="group-rank-badge" :class="'group-rank-' + Math.min($index + 1, 3)">{{ $index + 1 }}</span>
+              <span class="group-rank-badge" :class="'group-rank-' + Math.min($index + 1, 3)">{{
+                $index + 1
+              }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="groupName" label="分组" min-width="120" />
@@ -281,7 +331,13 @@
               </div>
             </template>
           </el-table-column>
-          <el-table-column label="互动量" width="120" align="right" sortable :sort-by="'interactions'">
+          <el-table-column
+            label="互动量"
+            width="120"
+            align="right"
+            sortable
+            :sort-by="'interactions'"
+          >
             <template #default="{ row }">
               <div>{{ row.interactionsFormatted }}</div>
               <div class="group-sub-metric">人均 {{ row.avgInteractionsFormatted }}</div>
@@ -289,14 +345,15 @@
           </el-table-column>
           <el-table-column label="互动率" width="80" align="right">
             <template #default="{ row }">
-              <span :class="engagementRateClass(row)">{{
-                row.play > 0 ? (row.interactions / row.play * 100).toFixed(1) : '0.0'
-              }}%</span>
+              <span :class="engagementRateClass(row)"
+                >{{
+                  row.play > 0 ? ((row.interactions / row.play) * 100).toFixed(1) : '0.0'
+                }}%</span
+              >
             </template>
           </el-table-column>
         </el-table>
       </el-card>
-
     </template>
   </div>
 </template>
@@ -412,12 +469,13 @@ const platformChartOption = computed<EChartsOption>(() => {
 const groupInsight = computed(() => {
   const rows = groupComparison.value
   if (rows.length === 0) return null
-  if (rows.length === 1) return { type: 'info', text: `当前只有 ${rows[0].groupName} 一个分组，无法横向对比。` }
+  if (rows.length === 1)
+    return { type: 'info', text: `当前只有 ${rows[0].groupName} 一个分组，无法横向对比。` }
 
   const top = rows[0]
   const bottom = rows[rows.length - 1]
-  const topRate = top.play > 0 ? (top.interactions / top.play * 100) : 0
-  const bottomRate = bottom.play > 0 ? (bottom.interactions / bottom.play * 100) : 0
+  const topRate = top.play > 0 ? (top.interactions / top.play) * 100 : 0
+  const bottomRate = bottom.play > 0 ? (bottom.interactions / bottom.play) * 100 : 0
 
   if (topRate > bottomRate * 2) {
     return {
@@ -439,11 +497,11 @@ const groupInsight = computed(() => {
 
 function groupBarWidth(value: number): number {
   const max = Math.max(...groupComparison.value.map((r: any) => r.play || 0), 1)
-  return Math.max(2, (value / max * 100))
+  return Math.max(2, (value / max) * 100)
 }
 
 function engagementRateClass(row: any): string {
-  const rate = row.play > 0 ? (row.interactions / row.play * 100) : 0
+  const rate = row.play > 0 ? (row.interactions / row.play) * 100 : 0
   if (rate >= 5) return 'engagement-rate--high'
   if (rate >= 2) return 'engagement-rate--mid'
   return 'engagement-rate--low'
@@ -486,6 +544,13 @@ onMounted(() => {
   margin: 0 auto;
   height: 100%;
   overflow-y: auto;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+  @media (max-width: 480px) {
+    padding: 12px;
+  }
 }
 
 // ─── Header ───
@@ -496,6 +561,9 @@ onMounted(() => {
   margin-bottom: 32px;
   flex-wrap: wrap;
   gap: 16px;
+  @media (max-width: 768px) {
+    margin-bottom: 20px;
+  }
   &__left {
     h2 {
       margin: 0;
@@ -503,6 +571,9 @@ onMounted(() => {
       font-weight: 600;
       letter-spacing: -0.02em;
       color: var(--color-text-primary);
+      @media (max-width: 480px) {
+        font-size: 20px;
+      }
     }
   }
   &__sub {
@@ -514,6 +585,14 @@ onMounted(() => {
     display: flex;
     gap: 10px;
     align-items: center;
+    @media (max-width: 768px) {
+      width: 100%;
+      flex-wrap: wrap;
+      .filter-select {
+        flex: 1;
+        min-width: 100px;
+      }
+    }
   }
 }
 .filter-select {
@@ -543,6 +622,11 @@ onMounted(() => {
   @media (max-width: 900px) {
     grid-template-columns: repeat(2, 1fr);
   }
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
 }
 .md-kpi-card {
   background: var(--color-bg-elevated);
@@ -552,6 +636,9 @@ onMounted(() => {
   transition: all 0.2s var(--ease-out);
   position: relative;
   overflow: hidden;
+  @media (max-width: 480px) {
+    padding: 14px 12px;
+  }
   &::before {
     content: '';
     position: absolute;
@@ -584,6 +671,9 @@ onMounted(() => {
     letter-spacing: -0.02em;
     color: var(--color-text-primary);
     font-family: var(--font-mono);
+    @media (max-width: 480px) {
+      font-size: 22px;
+    }
   }
   &__trend {
     margin-top: 8px;
@@ -611,6 +701,9 @@ onMounted(() => {
 // ─── Sections ───
 .md-section {
   margin-bottom: 24px;
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
+  }
 }
 .md-section__header {
   display: flex;
@@ -632,6 +725,9 @@ onMounted(() => {
   margin-bottom: 24px;
   @media (max-width: 900px) {
     grid-template-columns: 1fr;
+  }
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
   }
 }
 .md-chart-empty {
@@ -657,6 +753,10 @@ onMounted(() => {
   @media (max-width: 900px) {
     grid-template-columns: repeat(3, 1fr);
   }
+  @media (max-width: 480px) {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 }
 .md-stat-item {
   text-align: center;
@@ -664,6 +764,9 @@ onMounted(() => {
   background: var(--color-bg-elevated);
   border: 1px solid var(--color-border);
   border-radius: 10px;
+  @media (max-width: 480px) {
+    padding: 12px 8px;
+  }
   &__label {
     font-size: 13px;
     color: var(--color-text-tertiary);
@@ -677,6 +780,9 @@ onMounted(() => {
     color: var(--color-text-primary);
     font-family: var(--font-mono);
     letter-spacing: -0.02em;
+    @media (max-width: 480px) {
+      font-size: 20px;
+    }
   }
   &__trend {
     margin-top: 6px;
@@ -790,5 +896,24 @@ onMounted(() => {
 }
 .engagement-rate--low {
   color: #f87171;
+}
+
+// ─── Stale data row styles ───
+:deep(.row-stale) {
+  td {
+    background: rgba(245, 158, 11, 0.04) !important;
+  }
+}
+.cell-nickname {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stale-tag {
+  flex-shrink: 0;
+}
+.stale-value {
+  color: var(--color-text-tertiary);
+  font-style: italic;
 }
 </style>

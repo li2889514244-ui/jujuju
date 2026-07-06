@@ -17,10 +17,12 @@ export interface AccountDetailItem {
   platform: string
   fans: number
   info: {
-    day_total: DailyMetrics
-    week_total: DailyMetrics
-    month_total: DailyMetrics
+    day_total: DailyMetrics | null
+    week_total: DailyMetrics | null
+    month_total: DailyMetrics | null
   }
+  /** 数据来源日期（最近一次采集日期），null 表示从未采集 */
+  dataDate: string | null
 }
 
 export const analyticsApi = {
