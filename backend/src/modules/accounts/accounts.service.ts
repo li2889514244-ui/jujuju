@@ -116,22 +116,26 @@ export class AccountsService {
 
   /**
    * 获取账号列表
+   * shared mode: 不按 userId 过滤，与 analytics service 保持一致
    */
   async findAll(params: {
     userId?: string
     teamId?: string
     groupId?: string
     platform?: Platform
+    keyword?: string
     skip?: number
     take?: number
   }) {
-    const { userId, teamId, groupId, platform, skip = 0, take = 20 } = params
+    const { teamId, groupId, platform, keyword, skip = 0, take = 20 } = params
 
     const where: Prisma.AccountWhereInput = {}
-    if (userId) where.userId = userId
     if (teamId) where.teamId = teamId
     if (groupId) where.groupId = groupId
     if (platform) where.platform = platform
+    if (keyword) {
+      where.nickname = { contains: keyword, mode: 'insensitive' }
+    }
 
     const [accounts, total] = await Promise.all([
       this.prisma.account.findMany({
