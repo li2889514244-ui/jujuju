@@ -336,7 +336,7 @@ export class FeishuOpenApiClient {
       header: {
         title: {
           tag: 'plain_text',
-          content: `[MatrixFlow] ${headerTitle}`,
+          content: `[披星云] ${headerTitle}`,
         },
         template,
       },
@@ -352,7 +352,7 @@ export class FeishuOpenApiClient {
       header: {
         title: {
           tag: 'plain_text',
-          content: '[MatrixFlow] 测试通知',
+          content: '[披星云] 测试通知',
         },
         template: 'blue',
       },

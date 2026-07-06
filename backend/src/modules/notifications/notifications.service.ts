@@ -526,7 +526,7 @@ export class NotificationsService {
 
   private buildFeishuText(params: NotificationCreateParams): string {
     const lines = [
-      `[MatrixFlow] ${params.title}`,
+      `[披星云] ${params.title}`,
       `Type: ${params.type}`,
       `User: ${params.userId}`,
       `Time: ${this.formatBeijingTime(new Date())}`,
