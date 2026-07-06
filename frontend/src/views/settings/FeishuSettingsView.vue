@@ -1,261 +1,208 @@
 <template>
   <div class="feishu-settings">
-    <div class="feishu-settings__header">
-      <div>
+    <!-- Header -->
+    <header class="fs-header">
+      <div class="fs-header__left">
         <h2>飞书通知</h2>
-        <p>用飞书接收网站通知。支持群机器人 Webhook 和应用机器人 OpenAPI 两种模式。</p>
+        <p>把网站通知推到飞书群，第一时间掌握账号异常和发布结果。</p>
       </div>
-      <el-button :loading="loading" @click="loadSettings">
-        <el-icon><Refresh /></el-icon>
-        刷新
-      </el-button>
-    </div>
+      <el-tag v-if="!loading" :type="isBound ? 'success' : 'info'" effect="dark" size="large" round>
+        {{ isBound ? '已连接' : '未连接' }}
+      </el-tag>
+    </header>
 
-    <el-skeleton v-if="loading && !webhookSettings && !appSettings" :rows="8" animated />
+    <el-skeleton v-if="loading && !webhookSettings && !appSettings" :rows="6" animated />
 
     <template v-else>
-      <!-- 模式切换 -->
-      <section class="mode-switcher">
-        <div
-          class="mode-card"
-          :class="{ 'mode-card--active': activeMode === 'webhook' }"
-          @click="activeMode = 'webhook'"
-        >
-          <div class="mode-card__icon">
-            <el-icon><Link /></el-icon>
+      <!-- ════════ 未绑定：三步向导 ════════ -->
+      <div v-if="!isBound && !appBound" class="wizard">
+        <!-- 步骤 1 -->
+        <div class="wizard-step">
+          <div class="wizard-step__badge">1</div>
+          <div class="wizard-step__body">
+            <h3>在飞书群里添加自定义机器人</h3>
+            <p>
+              打开飞书 → 选一个群 → 点右上角「设置」→「群机器人」→「添加机器人」→
+              选「自定义机器人」。
+            </p>
           </div>
-          <div class="mode-card__body">
-            <div class="mode-card__title">群机器人 Webhook</div>
-            <div class="mode-card__desc">简单快捷，往飞书群发文本通知</div>
+        </div>
+        <div class="wizard-connector" />
+
+        <!-- 步骤 2 -->
+        <div class="wizard-step">
+          <div class="wizard-step__badge">2</div>
+          <div class="wizard-step__body">
+            <h3>复制机器人地址</h3>
+            <p>
+              创建完成后飞书会给你一个网址（以 <code>https://open.feishu.cn</code> 开头），复制它。
+            </p>
           </div>
-          <el-icon v-if="webhookSettings?.configured" class="mode-card__check">
-            <CircleCheck />
-          </el-icon>
+        </div>
+        <div class="wizard-connector" />
+
+        <!-- 步骤 3 -->
+        <div class="wizard-step wizard-step--active">
+          <div class="wizard-step__badge">3</div>
+          <div class="wizard-step__body">
+            <h3>把地址粘贴到下面，点绑定</h3>
+            <div class="wizard-input">
+              <el-input
+                v-model="webhookForm.webhookUrl"
+                placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                spellcheck="false"
+                clearable
+                size="large"
+                @keyup.enter="bindAndTest"
+              />
+              <el-button
+                type="primary"
+                size="large"
+                :loading="binding"
+                :disabled="!webhookForm.webhookUrl.trim()"
+                @click="bindAndTest"
+              >
+                绑定并测试
+              </el-button>
+            </div>
+            <p class="wizard-step__tip">
+              绑定后我们会立刻往群里发一条测试消息，你到飞书确认收到就行。
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- ════════ 已绑定：状态卡片 ════════ -->
+      <template v-else>
+        <!-- 当前绑定的模式 -->
+        <div v-if="isBound" class="bound-card">
+          <div class="bound-card__icon">
+            <el-icon><CircleCheck /></el-icon>
+          </div>
+          <div class="bound-card__body">
+            <div class="bound-card__title">群机器人已连接</div>
+            <div class="bound-card__url">{{ webhookSettings?.webhookUrl }}</div>
+          </div>
+          <div class="bound-card__actions">
+            <el-switch
+              v-model="webhookForm.enabled"
+              active-text="开"
+              inactive-text="关"
+              inline-prompt
+              @change="toggleWebhook"
+            />
+            <el-button :loading="testing" @click="sendWebhookTest">
+              <el-icon><Promotion /></el-icon>
+              发测试
+            </el-button>
+          </div>
         </div>
 
-        <div
-          class="mode-card"
-          :class="{ 'mode-card--active': activeMode === 'app' }"
-          @click="activeMode = 'app'"
-        >
-          <div class="mode-card__icon">
-            <el-icon><Connection /></el-icon>
+        <!-- App 模式已绑定 -->
+        <div v-if="appBound && !isBound" class="bound-card">
+          <div class="bound-card__icon">
+            <el-icon><CircleCheck /></el-icon>
           </div>
-          <div class="mode-card__body">
-            <div class="mode-card__title">应用机器人 OpenAPI</div>
-            <div class="mode-card__desc">功能完整，支持私信 + 交互式卡片</div>
+          <div class="bound-card__body">
+            <div class="bound-card__title">应用机器人已连接</div>
+            <div class="bound-card__url">App ID: {{ appSettings?.appId }}</div>
           </div>
-          <el-icon v-if="appSettings?.configured" class="mode-card__check">
-            <CircleCheck />
-          </el-icon>
+          <div class="bound-card__actions">
+            <el-switch
+              v-model="appForm.enabled"
+              active-text="开"
+              inactive-text="关"
+              inline-prompt
+              @change="toggleApp"
+            />
+            <el-button :loading="testing" @click="sendAppTest">
+              <el-icon><Promotion /></el-icon>
+              发测试
+            </el-button>
+          </div>
         </div>
-      </section>
 
-      <!-- ═══════════════ Webhook 模式 ═══════════════ -->
-
-      <template v-if="activeMode === 'webhook'">
-        <section
-          class="status-strip"
-          :class="{ 'status-strip--enabled': webhookSettings?.configured }"
+        <!-- 测试结果 -->
+        <div
+          v-if="testMessage"
+          class="test-banner"
+          :class="testOk ? 'test-banner--ok' : 'test-banner--fail'"
         >
-          <div class="status-strip__icon">
-            <el-icon>
-              <CircleCheck v-if="webhookSettings?.configured" />
-              <WarningFilled v-else />
-            </el-icon>
-          </div>
-          <div class="status-strip__body">
-            <div class="status-strip__title">
-              {{ webhookSettings?.configured ? '群机器人已绑定' : '群机器人未绑定' }}
-            </div>
-            <div class="status-strip__text">
-              {{
-                webhookSettings?.configured
-                  ? `通知已${webhookSettings.enabled ? '启用' : '暂停'}，Webhook：${webhookSettings.webhookUrl}`
-                  : '先在飞书群里添加自定义机器人，然后把 Webhook URL 粘贴到这里。'
-              }}
-            </div>
-          </div>
-          <el-tag :type="webhookSettings?.enabled ? 'success' : 'info'" effect="dark">
-            {{ webhookSettings?.enabled ? '启用中' : '已暂停' }}
-          </el-tag>
-        </section>
+          <el-icon class="test-banner__icon">
+            <CircleCheck v-if="testOk" />
+            <WarningFilled v-else />
+          </el-icon>
+          <span>{{ testMessage }}</span>
+        </div>
 
-        <section class="settings-panel">
-          <div class="settings-panel__main">
-            <div class="section-title">
-              <el-icon><Bell /></el-icon>
-              <span>绑定群机器人</span>
-            </div>
+        <!-- 环境变量不可写警告 -->
+        <el-alert
+          v-if="envNotWritable"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="服务器配置文件不可写，重启后设置可能丢失。请联系管理员。"
+          class="fs-alert"
+        />
 
+        <!-- ════════ 折叠区：设置 ════════ -->
+        <el-collapse v-model="activeCollapse" class="fs-collapse">
+          <!-- 更换机器人地址 -->
+          <el-collapse-item title="更换群机器人地址" name="webhook">
+            <div class="collapse-form">
+              <el-input
+                v-model="webhookForm.webhookUrl"
+                placeholder="粘贴新的机器人地址"
+                spellcheck="false"
+                clearable
+              />
+              <el-button type="primary" :loading="saving" @click="saveWebhookSettings">
+                保存
+              </el-button>
+            </div>
+            <div class="collapse-form">
+              <el-input
+                v-model="webhookForm.webhookSecret"
+                type="password"
+                show-password
+                placeholder="签名密钥（没开签名校验就不用填）"
+                spellcheck="false"
+                clearable
+              />
+            </div>
+            <p class="collapse-hint">
+              留空保存不会覆盖已有地址。只有飞书机器人安全设置里开了「签名校验」才需要填密钥。
+            </p>
+          </el-collapse-item>
+
+          <!-- 通知类型 -->
+          <el-collapse-item title="选择通知哪些类型" name="types">
+            <p class="collapse-hint">不选 = 全部都推。一般保持默认就好。</p>
+            <el-checkbox-group
+              v-model="webhookForm.notifyTypes"
+              class="type-chips"
+              @change="saveNotifyTypes"
+            >
+              <el-checkbox-button
+                v-for="item in notifyTypeOptions"
+                :key="item.value"
+                :label="item.value"
+              >
+                {{ item.label }}
+              </el-checkbox-button>
+            </el-checkbox-group>
+          </el-collapse-item>
+
+          <!-- 高级：应用机器人模式 -->
+          <el-collapse-item title="高级：应用机器人模式（私信 + 卡片）" name="app">
             <el-alert
-              class="mode-alert"
               type="info"
               :closable="false"
               show-icon
-              title="这里接的是飞书群自定义机器人 Webhook，用来往群里发通知。"
+              title="应用机器人功能更全（私信、交互卡片），但需要在飞书开发者后台创建应用。大多数用户用上面的群机器人就够了。"
+              class="fs-alert"
             />
-
-            <el-alert
-              v-if="webhookSettings && !webhookSettings.envFileWritable"
-              class="mode-alert"
-              type="warning"
-              :closable="false"
-              show-icon
-              title="服务器 .env 文件不可写，保存的设置在服务重启后会丢失。请联系管理员修复文件权限。"
-            />
-
-            <el-form label-position="top" class="settings-form" @submit.prevent>
-              <el-form-item label="Webhook URL">
-                <el-input
-                  v-model="webhookForm.webhookUrl"
-                  placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
-                  spellcheck="false"
-                  clearable
-                />
-                <div v-if="webhookSettings?.configured" class="form-hint">
-                  当前已保存 Webhook；留空保存不会覆盖它。需要换群时，粘贴新的 Webhook 再保存。
-                </div>
-              </el-form-item>
-
-              <el-form-item label="签名密钥">
-                <el-input
-                  v-model="webhookForm.webhookSecret"
-                  type="password"
-                  show-password
-                  placeholder="飞书机器人未开启签名校验就留空"
-                  spellcheck="false"
-                  clearable
-                />
-                <div class="form-hint">
-                  只有飞书机器人安全设置里开启了"签名校验"才需要填 Secret。
-                  <span v-if="webhookSettings?.webhookSecretConfigured">
-                    当前已保存 Secret；留空保存不会覆盖它。
-                  </span>
-                </div>
-              </el-form-item>
-
-              <el-form-item label="通知开关">
-                <el-switch v-model="webhookForm.enabled" active-text="启用" inactive-text="暂停" />
-              </el-form-item>
-
-              <el-form-item label="推送类型">
-                <el-checkbox-group v-model="webhookForm.notifyTypes" class="type-grid">
-                  <el-checkbox-button
-                    v-for="item in notifyTypeOptions"
-                    :key="item.value"
-                    :label="item.value"
-                  >
-                    {{ item.label }}
-                  </el-checkbox-button>
-                </el-checkbox-group>
-                <div class="form-hint">不选择时，后端会推送全部通知类型。</div>
-              </el-form-item>
-
-              <div v-if="webhookTestMessage" class="test-result" :class="webhookTestResultClass">
-                {{ webhookTestMessage }}
-              </div>
-
-              <div class="form-actions">
-                <el-button type="primary" :loading="saving" @click="saveWebhookSettings">
-                  <el-icon><Check /></el-icon>
-                  保存绑定
-                </el-button>
-                <el-button
-                  :loading="testing"
-                  :disabled="!webhookSettings?.configured"
-                  @click="sendWebhookTest"
-                >
-                  <el-icon><Promotion /></el-icon>
-                  发送测试
-                </el-button>
-              </div>
-            </el-form>
-          </div>
-
-          <aside class="guide-panel">
-            <div class="section-title">
-              <el-icon><Link /></el-icon>
-              <span>快速指南</span>
-            </div>
-            <div class="tips-list">
-              <div class="tip-item">
-                <strong>1. 添加自定义机器人</strong>
-                <p>飞书群设置 → 群机器人 → 添加自定义机器人。</p>
-              </div>
-              <div class="tip-item">
-                <strong>2. 复制 Webhook URL</strong>
-                <p>格式为 https://open.feishu.cn/open-apis/bot/v2/hook/...</p>
-              </div>
-              <div class="tip-item">
-                <strong>3. 粘贴并测试</strong>
-                <p>粘贴到上方输入框，保存后点"发送测试"。</p>
-              </div>
-              <div class="tip-item">
-                <strong>签名错误</strong>
-                <p>填对 Secret，或关闭机器人签名校验。</p>
-              </div>
-              <div class="tip-item">
-                <strong>关键词不匹配</strong>
-                <p>如果开了关键词限制，关键词建议填 MatrixFlow。</p>
-              </div>
-            </div>
-          </aside>
-        </section>
-      </template>
-
-      <!-- ═══════════════ App 模式 ═══════════════ -->
-
-      <template v-if="activeMode === 'app'">
-        <section class="status-strip" :class="{ 'status-strip--enabled': appSettings?.configured }">
-          <div class="status-strip__icon">
-            <el-icon>
-              <CircleCheck v-if="appSettings?.configured" />
-              <WarningFilled v-else />
-            </el-icon>
-          </div>
-          <div class="status-strip__body">
-            <div class="status-strip__title">
-              {{ appSettings?.configured ? '应用机器人已连接' : '应用机器人未配置' }}
-            </div>
-            <div class="status-strip__text">
-              {{
-                appSettings?.configured
-                  ? `通知已${appSettings.enabled ? '启用' : '暂停'}，App ID：${appSettings.appId}，接收人：${appSettings.receiveIdType}=${appSettings.receiveId}`
-                  : '在飞书开发者后台创建应用、开启机器人能力，然后填入 App ID 和 App Secret。'
-              }}
-            </div>
-          </div>
-          <el-tag :type="appSettings?.enabled ? 'success' : 'info'" effect="dark">
-            {{ appSettings?.enabled ? '启用中' : '已暂停' }}
-          </el-tag>
-        </section>
-
-        <section class="settings-panel">
-          <div class="settings-panel__main">
-            <div class="section-title">
-              <el-icon><Connection /></el-icon>
-              <span>应用机器人配置</span>
-            </div>
-
-            <el-alert
-              class="mode-alert"
-              type="info"
-              :closable="false"
-              show-icon
-              title="应用机器人模式通过飞书 OpenAPI 发送消息，支持给个人发私信、发交互式消息卡片。需要在飞书开发者后台创建应用。"
-            />
-
-            <el-alert
-              v-if="appSettings && !appSettings.envFileWritable"
-              class="mode-alert"
-              type="warning"
-              :closable="false"
-              show-icon
-              title="服务器 .env 文件不可写，保存的设置在服务重启后会丢失。请联系管理员修复文件权限。"
-            />
-
-            <el-form label-position="top" class="settings-form" @submit.prevent>
+            <el-form label-position="top" class="app-form" @submit.prevent>
               <el-form-item label="App ID">
                 <el-input
                   v-model="appForm.appId"
@@ -263,11 +210,8 @@
                   spellcheck="false"
                   clearable
                 />
-                <div class="form-hint">
-                  在飞书开发者后台 → 应用详情 → 凭证与基础信息中获取。
-                  <span v-if="appSettings?.appId">
-                    当前已保存 App ID：{{ appSettings.appId }}
-                  </span>
+                <div v-if="appSettings?.appId" class="collapse-hint">
+                  当前：{{ appSettings.appId }}
                 </div>
               </el-form-item>
 
@@ -280,25 +224,19 @@
                   spellcheck="false"
                   clearable
                 />
-                <div class="form-hint">
-                  <span v-if="appSettings?.appSecretConfigured">
-                    当前已保存 Secret；留空保存不会覆盖它。
-                  </span>
-                  <span v-else> 在飞书开发者后台 → 凭证与基础信息中获取。 </span>
+                <div v-if="appSettings?.appSecretConfigured" class="collapse-hint">
+                  已保存，留空不覆盖
                 </div>
               </el-form-item>
 
               <el-form-item label="接收人类型">
-                <el-radio-group v-model="appForm.receiveIdType">
+                <el-radio-group v-model="appForm.receiveIdType" size="small">
                   <el-radio-button label="open_id">Open ID</el-radio-button>
+                  <el-radio-button label="email">邮箱</el-radio-button>
+                  <el-radio-button label="chat_id">群 ID</el-radio-button>
                   <el-radio-button label="user_id">User ID</el-radio-button>
                   <el-radio-button label="union_id">Union ID</el-radio-button>
-                  <el-radio-button label="email">邮箱</el-radio-button>
-                  <el-radio-button label="chat_id">群 Chat ID</el-radio-button>
                 </el-radio-group>
-                <div class="form-hint">
-                  {{ receiveIdTypeHint }}
-                </div>
               </el-form-item>
 
               <el-form-item label="接收人 ID">
@@ -308,17 +246,11 @@
                   spellcheck="false"
                   clearable
                 />
-                <div class="form-hint">
-                  {{ receiveIdHint }}
-                </div>
+                <div class="collapse-hint">{{ receiveIdHint }}</div>
               </el-form-item>
 
-              <el-form-item label="通知开关">
-                <el-switch v-model="appForm.enabled" active-text="启用" inactive-text="暂停" />
-              </el-form-item>
-
-              <el-form-item label="推送类型">
-                <el-checkbox-group v-model="appForm.notifyTypes" class="type-grid">
+              <el-form-item label="通知类型">
+                <el-checkbox-group v-model="appForm.notifyTypes" class="type-chips">
                   <el-checkbox-button
                     v-for="item in notifyTypeOptions"
                     :key="item.value"
@@ -327,16 +259,10 @@
                     {{ item.label }}
                   </el-checkbox-button>
                 </el-checkbox-group>
-                <div class="form-hint">不选择时，后端会推送全部通知类型。</div>
               </el-form-item>
 
-              <div v-if="appTestMessage" class="test-result" :class="appTestResultClass">
-                {{ appTestMessage }}
-              </div>
-
-              <div class="form-actions">
+              <div class="app-form__actions">
                 <el-button type="primary" :loading="saving" @click="saveAppSettings">
-                  <el-icon><Check /></el-icon>
                   保存配置
                 </el-button>
                 <el-button
@@ -344,88 +270,38 @@
                   :disabled="!appSettings?.configured"
                   @click="sendAppTest"
                 >
-                  <el-icon><Promotion /></el-icon>
-                  发送测试卡片
+                  发测试卡片
                 </el-button>
               </div>
             </el-form>
-          </div>
 
-          <aside class="guide-panel">
-            <div class="section-title">
-              <el-icon><Connection /></el-icon>
-              <span>配置指南</span>
-            </div>
-            <div class="tips-list">
-              <div class="tip-item">
-                <strong>1. 创建应用</strong>
-                <p>
+            <details class="app-guide">
+              <summary>应用机器人配置步骤</summary>
+              <ol>
+                <li>
                   打开
                   <a href="https://open.feishu.cn/app" target="_blank" rel="noopener"
                     >飞书开发者后台</a
-                  >
-                  ，点击「创建企业自建应用」。
-                </p>
-              </div>
-              <div class="tip-item">
-                <strong>2. 开启机器人能力</strong>
-                <p>应用详情 → 添加应用能力 → 机器人。开启后需要发布新版本。</p>
-              </div>
-              <div class="tip-item">
-                <strong>3. 配置权限</strong>
-                <p>
-                  权限管理 → 申请权限 → 搜索并开通：
-                  <code>im:message</code>（发送消息给用户）。
-                </p>
-              </div>
-              <div class="tip-item">
-                <strong>4. 获取 App ID / Secret</strong>
-                <p>凭证与基础信息页面，复制 App ID 和 App Secret 到这里。</p>
-              </div>
-              <div class="tip-item">
-                <strong>5. 设置接收人</strong>
-                <p>
-                  私信：填用户的 open_id（通讯录 API 获取）。<br />
-                  群聊：填 chat_id（群设置 → 群信息中获取），并把机器人加入群。
-                </p>
-              </div>
-              <div class="tip-item">
-                <strong>6. 发布应用</strong>
-                <p>所有配置完成后，需要在开发者后台发布新版本，应用才会生效。</p>
-              </div>
-              <div class="tip-item">
-                <strong>用户不在可用范围</strong>
-                <p>确保接收人在应用的可用范围内（应用详情 → 可用范围）。</p>
-              </div>
-              <div class="tip-item">
-                <strong>权限不足 99991672</strong>
-                <p>检查是否已申请 <code>im:message</code> 权限并审批通过。</p>
-              </div>
-              <div class="tip-item">
-                <strong>消息卡片效果</strong>
-                <p>应用机器人模式会发送带颜色标题、分栏内容的交互式消息卡片，比纯文本更好看。</p>
-              </div>
-            </div>
-          </aside>
-        </section>
+                  >，创建企业自建应用
+                </li>
+                <li>应用详情 → 添加应用能力 → 机器人</li>
+                <li>权限管理 → 搜索并开通 <code>im:message</code></li>
+                <li>凭证与基础信息 → 复制 App ID 和 App Secret</li>
+                <li>设置接收人：私信填 open_id，群聊填 chat_id 并把机器人加进群</li>
+                <li>发布新版本，应用才生效</li>
+              </ol>
+            </details>
+          </el-collapse-item>
+        </el-collapse>
       </template>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  Bell,
-  Check,
-  CircleCheck,
-  Connection,
-  Link,
-  Promotion,
-  Refresh,
-  WarningFilled,
-} from '@element-plus/icons-vue'
+import { CircleCheck, Promotion, WarningFilled } from '@element-plus/icons-vue'
 import {
   notificationApi,
   type FeishuNotifyType,
@@ -447,13 +323,13 @@ const notifyTypeOptions: Array<{ label: string; value: FeishuNotifyType }> = [
 const loading = ref(false)
 const saving = ref(false)
 const testing = ref(false)
-const activeMode = ref<'webhook' | 'app'>('webhook')
+const binding = ref(false)
+const activeCollapse = ref<string[]>([])
 
 // ── Webhook state ──────────────────────────────────────
-
 const webhookSettings = ref<FeishuSettings | null>(null)
-const webhookTestMessage = ref('')
-const webhookTestOk = ref(false)
+const testMessage = ref('')
+const testOk = ref(false)
 
 const webhookForm = reactive<{
   webhookUrl: string
@@ -468,10 +344,7 @@ const webhookForm = reactive<{
 })
 
 // ── App state ──────────────────────────────────────────
-
 const appSettings = ref<FeishuAppSettings | null>(null)
-const appTestMessage = ref('')
-const appTestOk = ref(false)
 
 const appForm = reactive<{
   appId: string
@@ -491,15 +364,14 @@ const appForm = reactive<{
 
 // ── Computed ───────────────────────────────────────────
 
-const webhookTestResultClass = computed(() => ({
-  'test-result--ok': webhookTestOk.value,
-  'test-result--fail': !webhookTestOk.value,
-}))
-
-const appTestResultClass = computed(() => ({
-  'test-result--ok': appTestOk.value,
-  'test-result--fail': !appTestOk.value,
-}))
+const isBound = computed(() => Boolean(webhookSettings.value?.configured))
+const appBound = computed(() => Boolean(appSettings.value?.configured))
+const envNotWritable = computed(() =>
+  Boolean(
+    (webhookSettings.value && !webhookSettings.value.envFileWritable) ||
+    (appSettings.value && !appSettings.value.envFileWritable),
+  ),
+)
 
 const receiveIdPlaceholder = computed(() => {
   switch (appForm.receiveIdType) {
@@ -518,42 +390,21 @@ const receiveIdPlaceholder = computed(() => {
   }
 })
 
-const receiveIdTypeHint = computed(() => {
-  switch (appForm.receiveIdType) {
-    case 'open_id':
-      return 'Open ID 是飞书用户的唯一标识，可通过通讯录 API 获取。'
-    case 'user_id':
-      return 'User ID 是应用范围内的用户标识。'
-    case 'union_id':
-      return 'Union ID 是跨应用的用户唯一标识。'
-    case 'email':
-      return '直接用飞书注册邮箱发送。'
-    case 'chat_id':
-      return '群聊 ID，机器人需已加入该群。在群设置 → 群信息中获取。'
-    default:
-      return ''
-  }
-})
-
 const receiveIdHint = computed(() => {
-  if (appForm.receiveIdType === 'chat_id') {
-    return '确保机器人已加入目标群聊，且群内有发言权限。'
+  switch (appForm.receiveIdType) {
+    case 'chat_id':
+      return '确保机器人已加入目标群聊。'
+    case 'email':
+      return '接收人需是飞书注册用户且在应用可用范围内。'
+    default:
+      return '接收人需在应用的可用范围内（开发者后台 → 应用详情 → 可用范围）。'
   }
-  if (appForm.receiveIdType === 'email') {
-    return '接收人需要是飞书注册用户，且在应用可用范围内。'
-  }
-  return '接收人需要在应用的可用范围内（开发者后台 → 应用详情 → 可用范围）。'
 })
 
 // ── Lifecycle ──────────────────────────────────────────
 
 onMounted(() => {
   loadSettings()
-})
-
-watch(activeMode, () => {
-  webhookTestMessage.value = ''
-  appTestMessage.value = ''
 })
 
 // ── Load ───────────────────────────────────────────────
@@ -567,29 +418,65 @@ async function loadSettings() {
     ])
     applyWebhookSettings(webhookRes.data)
     applyAppSettings(appRes.data)
-
-    // 自动切换到已配置的模式
-    if (appRes.data.mode === 'app' && appRes.data.configured) {
-      activeMode.value = 'app'
-    } else if (webhookRes.data.mode === 'webhook' && webhookRes.data.configured) {
-      activeMode.value = 'webhook'
-    }
+  } catch {
+    // ignore
   } finally {
     loading.value = false
   }
 }
 
-// ── Webhook actions ────────────────────────────────────
+// ── Bind & test (向导中的「绑定并测试」) ────────────────
 
-async function saveWebhookSettings() {
-  const webhookUrl = webhookForm.webhookUrl.trim()
-  if (!webhookUrl && !webhookSettings.value?.configured) {
-    ElMessage.warning('请填写飞书 Webhook URL')
+async function bindAndTest() {
+  const url = webhookForm.webhookUrl.trim()
+  if (!url) {
+    ElMessage.warning('请先粘贴机器人地址')
     return
   }
 
+  binding.value = true
+  testMessage.value = ''
+  try {
+    // 1. 保存
+    const res = await notificationApi.updateFeishuSettings({
+      webhookUrl: url,
+      webhookSecret: webhookForm.webhookSecret.trim() || undefined,
+      enabled: true,
+      notifyTypes: webhookForm.notifyTypes,
+    })
+    applyWebhookSettings(res.data)
+    webhookForm.webhookUrl = ''
+    webhookForm.webhookSecret = ''
+    ElMessage.success('绑定成功，正在发送测试消息…')
+
+    // 2. 自动发测试
+    await sendWebhookTest()
+  } catch (error) {
+    ElMessage.error(explainError(error, '绑定失败'))
+  } finally {
+    binding.value = false
+  }
+}
+
+// ── Webhook actions ────────────────────────────────────
+
+async function toggleWebhook(val: boolean) {
+  try {
+    const res = await notificationApi.updateFeishuSettings({
+      enabled: val,
+      notifyTypes: webhookForm.notifyTypes,
+    })
+    applyWebhookSettings(res.data)
+    ElMessage.success(val ? '通知已开启' : '通知已暂停')
+  } catch {
+    webhookForm.enabled = !val // 回滚
+    ElMessage.error('操作失败')
+  }
+}
+
+async function saveWebhookSettings() {
+  const webhookUrl = webhookForm.webhookUrl.trim()
   saving.value = true
-  webhookTestMessage.value = ''
   try {
     const res = await notificationApi.updateFeishuSettings({
       webhookUrl: webhookUrl || undefined,
@@ -600,11 +487,24 @@ async function saveWebhookSettings() {
     applyWebhookSettings(res.data)
     webhookForm.webhookUrl = ''
     webhookForm.webhookSecret = ''
-    ElMessage.success('飞书通知已保存，可以发送测试')
+    ElMessage.success('已保存')
+    activeCollapse.value = activeCollapse.value.filter((n) => n !== 'webhook')
   } catch (error) {
-    ElMessage.error(explainError(error, '飞书通知保存失败'))
+    ElMessage.error(explainError(error, '保存失败'))
   } finally {
     saving.value = false
+  }
+}
+
+async function saveNotifyTypes() {
+  try {
+    const res = await notificationApi.updateFeishuSettings({
+      enabled: webhookForm.enabled,
+      notifyTypes: webhookForm.notifyTypes,
+    })
+    applyWebhookSettings(res.data)
+  } catch {
+    // silent
   }
 }
 
@@ -612,26 +512,41 @@ async function sendWebhookTest() {
   testing.value = true
   try {
     const res = await notificationApi.testFeishu()
-    webhookTestOk.value = res.data.sent
-    webhookTestMessage.value = res.data.sent
-      ? '测试通知已发送。请到飞书群里确认是否收到 MatrixFlow 消息。'
+    testOk.value = res.data.sent
+    testMessage.value = res.data.sent
+      ? '测试消息已发送，去飞书群看看有没有收到吧！'
       : explainFeishuFailure(res.data.message)
 
     if (res.data.sent) {
-      ElMessage.success('测试通知已发送')
+      ElMessage.success('测试消息已发送')
     } else {
-      ElMessage.warning(webhookTestMessage.value)
+      ElMessage.warning(testMessage.value)
     }
   } catch (error) {
-    webhookTestOk.value = false
-    webhookTestMessage.value = explainError(error, '测试通知发送失败')
-    ElMessage.error(webhookTestMessage.value)
+    testOk.value = false
+    testMessage.value = explainError(error, '测试发送失败')
+    ElMessage.error(testMessage.value)
   } finally {
     testing.value = false
   }
 }
 
 // ── App actions ────────────────────────────────────────
+
+async function toggleApp(val: boolean) {
+  try {
+    const res = await notificationApi.updateFeishuAppSettings({
+      enabled: val,
+      notifyTypes: appForm.notifyTypes,
+      receiveIdType: appForm.receiveIdType,
+    })
+    applyAppSettings(res.data)
+    ElMessage.success(val ? '通知已开启' : '通知已暂停')
+  } catch {
+    appForm.enabled = !val
+    ElMessage.error('操作失败')
+  }
+}
 
 async function saveAppSettings() {
   const appId = appForm.appId.trim()
@@ -648,7 +563,6 @@ async function saveAppSettings() {
   }
 
   saving.value = true
-  appTestMessage.value = ''
   try {
     const res = await notificationApi.updateFeishuAppSettings({
       appId: appId || undefined,
@@ -661,9 +575,9 @@ async function saveAppSettings() {
     applyAppSettings(res.data)
     appForm.appId = ''
     appForm.appSecret = ''
-    ElMessage.success('应用机器人配置已保存，可以发送测试')
+    ElMessage.success('应用机器人配置已保存')
   } catch (error) {
-    ElMessage.error(explainError(error, '应用机器人配置保存失败'))
+    ElMessage.error(explainError(error, '保存失败'))
   } finally {
     saving.value = false
   }
@@ -673,20 +587,20 @@ async function sendAppTest() {
   testing.value = true
   try {
     const res = await notificationApi.testFeishuApp()
-    appTestOk.value = res.data.sent
-    appTestMessage.value = res.data.sent
-      ? '测试卡片已发送。请到飞书查看是否收到 MatrixFlow 交互式卡片消息。'
+    testOk.value = res.data.sent
+    testMessage.value = res.data.sent
+      ? '测试卡片已发送，去飞书看看吧！'
       : explainAppFailure(res.data.message)
 
     if (res.data.sent) {
       ElMessage.success('测试卡片已发送')
     } else {
-      ElMessage.warning(appTestMessage.value)
+      ElMessage.warning(testMessage.value)
     }
   } catch (error) {
-    appTestOk.value = false
-    appTestMessage.value = explainError(error, '测试卡片发送失败')
-    ElMessage.error(appTestMessage.value)
+    testOk.value = false
+    testMessage.value = explainError(error, '测试发送失败')
+    ElMessage.error(testMessage.value)
   } finally {
     testing.value = false
   }
@@ -709,46 +623,33 @@ function applyAppSettings(next: FeishuAppSettings) {
 }
 
 function explainFeishuFailure(message = '') {
-  if (!message) return '测试通知未发送，请检查 Webhook 是否正确。'
-  if (message.includes('FEISHU_WEBHOOK_URL')) return '还没有保存 Webhook URL。'
-  if (message.includes('19021') || message.includes('sign') || message.includes('signature')) {
-    return '飞书拒收：签名校验失败。请检查 Secret，或关闭机器人签名校验。'
-  }
-  if (message.includes('19024') || /key\s*words?/i.test(message) || message.includes('关键词')) {
+  if (!message) return '发送失败，请检查机器人地址是否正确。'
+  if (message.includes('FEISHU_WEBHOOK_URL')) return '还没有保存机器人地址。'
+  if (message.includes('19021') || message.includes('sign') || message.includes('signature'))
+    return '飞书拒收：签名校验失败。请在机器人设置里关掉签名校验，或填对密钥。'
+  if (message.includes('19024') || /key\s*words?/i.test(message) || message.includes('关键词'))
     return '飞书拒收：关键词不匹配。建议机器人关键词填 MatrixFlow。'
-  }
-  if (message.includes('19022') || /ip\s*not\s*allowed/i.test(message)) {
-    return '飞书拒收：服务器出口 IP 不在机器人白名单。'
-  }
-  if (message.includes('11232') || message.includes('rate') || message.includes('限流')) {
-    return '飞书限流：单机器人限制 5 次/秒、100 次/分钟，稍后再试。'
-  }
+  if (message.includes('19022') || /ip\s*not\s*allowed/i.test(message))
+    return '飞书拒收：服务器 IP 不在白名单。'
+  if (message.includes('11232') || message.includes('rate') || message.includes('限流'))
+    return '飞书限流：稍后再试。'
   return `飞书返回：${message}`
 }
 
 function explainAppFailure(message = '') {
-  if (!message) return '测试卡片未发送，请检查 App ID / Secret / 接收人是否正确。'
-  if (message.includes('FEISHU_APP_ID') || message.includes('FEISHU_APP_SECRET')) {
-    return '还没有配置 App ID 或 App Secret。'
-  }
-  if (message.includes('FEISHU_RECEIVE_ID')) {
-    return '还没有配置接收人 ID。'
-  }
-  if (message.includes('99991663') || message.includes('token')) {
-    return 'tenant_access_token 获取失败：请检查 App ID 和 App Secret 是否正确。'
-  }
-  if (message.includes('99991672') || message.includes('permission')) {
-    return '权限不足：请在飞书开发者后台申请 im:message 权限并审批通过。'
-  }
-  if (message.includes('230001') || message.includes('not exist') || message.includes('chat_id')) {
-    return '接收人不存在：请检查接收人 ID 是否正确，机器人是否已加入群聊。'
-  }
-  if (message.includes('230002') || message.includes('range') || message.includes('scope')) {
-    return '接收人不在应用可用范围内：请在开发者后台 → 可用范围中添加。'
-  }
-  if (message.includes('rate') || message.includes('限流')) {
-    return '飞书限流：单个用户/群 5 QPS，稍后再试。'
-  }
+  if (!message) return '发送失败，请检查 App ID / Secret / 接收人是否正确。'
+  if (message.includes('FEISHU_APP_ID') || message.includes('FEISHU_APP_SECRET'))
+    return '还没配置 App ID 或 Secret。'
+  if (message.includes('FEISHU_RECEIVE_ID')) return '还没配置接收人 ID。'
+  if (message.includes('99991663') || message.includes('token'))
+    return '获取 token 失败：请检查 App ID 和 Secret。'
+  if (message.includes('99991672') || message.includes('permission'))
+    return '权限不足：请申请 im:message 权限并审批通过。'
+  if (message.includes('230001') || message.includes('not exist') || message.includes('chat_id'))
+    return '接收人不存在：请检查 ID 是否正确，机器人是否已加入群。'
+  if (message.includes('230002') || message.includes('range') || message.includes('scope'))
+    return '接收人不在应用可用范围内。'
+  if (message.includes('rate') || message.includes('限流')) return '飞书限流：稍后再试。'
   return `飞书返回：${message}`
 }
 
@@ -759,142 +660,148 @@ function explainError(error: unknown, fallback: string) {
 
 <style lang="scss" scoped>
 .feishu-settings {
-  max-width: 1120px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 28px;
   color: $text-primary;
-
-  &__header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 16px;
-    margin-bottom: 20px;
-
-    h2 {
-      margin: 0;
-      font-size: 24px;
-      line-height: 1.2;
-      font-weight: 700;
-    }
-
-    p {
-      margin: 8px 0 0;
-      color: $text-secondary;
-      font-size: 14px;
-    }
-  }
 }
 
-// ── Mode switcher ──────────────────────────────────────
+// ── Header ─────────────────────────────────────────────
 
-.mode-switcher {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.mode-card {
+.fs-header {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border: 2px solid $border-subtle;
-  border-radius: $radius-md;
-  background: $bg-elevated;
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    background 0.2s;
-  position: relative;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
 
-  &:hover {
-    border-color: rgba(99, 102, 241, 0.4);
-  }
-
-  &--active {
-    border-color: $accent-300;
-    background: rgba(99, 102, 241, 0.06);
-  }
-
-  &__icon {
-    width: 40px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: $radius-sm;
-    background: rgba(99, 102, 241, 0.12);
-    color: $accent-300;
-    font-size: 20px;
-    flex-shrink: 0;
-  }
-
-  &__body {
-    flex: 1;
-    min-width: 0;
-  }
-
-  &__title {
-    font-size: 15px;
+  h2 {
+    margin: 0;
+    font-size: 24px;
     font-weight: 700;
-    color: $text-primary;
   }
 
-  &__desc {
-    margin-top: 4px;
-    font-size: 12px;
+  p {
+    margin: 8px 0 0;
     color: $text-secondary;
-    line-height: 1.4;
-  }
-
-  &__check {
-    position: absolute;
-    top: 12px;
-    right: 12px;
-    color: $color-success;
-    font-size: 18px;
+    font-size: 14px;
   }
 }
 
-// ── Status strip ───────────────────────────────────────
+// ── Wizard ─────────────────────────────────────────────
 
-.status-strip,
-.settings-panel {
-  border: 1px solid $border-subtle;
+.wizard {
   background: $bg-elevated;
+  border: 1px solid $border-base;
+  border-radius: $radius-lg;
+  padding: 28px;
   box-shadow: $shadow-sm;
 }
 
-.status-strip {
+.wizard-step {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border-radius: $radius-md;
-  margin-bottom: 16px;
+  align-items: flex-start;
+  gap: 16px;
+  position: relative;
 
-  &--enabled {
-    border-color: rgba(16, 185, 129, 0.28);
-    background: rgba(16, 185, 129, 0.08);
-  }
-
-  &__icon {
-    width: 36px;
-    height: 36px;
+  &__badge {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: $radius-sm;
-    color: $color-warning;
-    background: rgba(245, 158, 11, 0.12);
-    flex-shrink: 0;
+    border-radius: $radius-full;
+    background: rgba(99, 102, 241, 0.12);
+    color: $accent-300;
+    font-size: 15px;
+    font-weight: 700;
+    border: 2px solid rgba(99, 102, 241, 0.3);
+    transition: all 0.25s $ease-out;
   }
 
-  &--enabled &__icon {
-    color: $color-success;
+  &--active &__badge {
+    background: $accent-500;
+    color: #fff;
+    border-color: $accent-400;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.15);
+  }
+
+  &__body {
+    flex: 1;
+    min-width: 0;
+    padding-top: 3px;
+
+    h3 {
+      margin: 0 0 6px;
+      font-size: 15px;
+      font-weight: 700;
+      color: $text-primary;
+    }
+
+    p {
+      margin: 0;
+      color: $text-secondary;
+      font-size: 13px;
+      line-height: 1.7;
+
+      code {
+        padding: 1px 5px;
+        border-radius: 3px;
+        background: rgba(99, 102, 241, 0.12);
+        color: $accent-300;
+        font-size: 12px;
+      }
+    }
+  }
+
+  &__tip {
+    margin-top: 10px !important;
+    color: $text-tertiary !important;
+    font-size: 12px !important;
+  }
+}
+
+.wizard-connector {
+  width: 2px;
+  height: 24px;
+  margin-left: 15px;
+  background: $border-base;
+}
+
+.wizard-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+
+  .el-input {
+    flex: 1;
+  }
+}
+
+// ── Bound card ─────────────────────────────────────────
+
+.bound-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: rgba(16, 185, 129, 0.06);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  border-radius: $radius-lg;
+  margin-bottom: 16px;
+
+  &__icon {
+    width: 44px;
+    height: 44px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: $radius-full;
     background: rgba(16, 185, 129, 0.14);
+    color: $color-success;
+    font-size: 22px;
   }
 
   &__body {
@@ -903,83 +810,34 @@ function explainError(error: unknown, fallback: string) {
   }
 
   &__title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 700;
   }
 
-  &__text {
+  &__url {
     margin-top: 4px;
-    color: $text-secondary;
-    font-size: 13px;
+    color: $text-tertiary;
+    font-size: 12px;
     overflow-wrap: anywhere;
   }
-}
 
-// ── Settings panel ─────────────────────────────────────
-
-.settings-panel {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 24px;
-  padding: 20px;
-  border-radius: $radius-md;
-
-  &__main {
-    min-width: 0;
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
   }
 }
 
-.section-title {
+// ── Test banner ────────────────────────────────────────
+
+.test-banner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: $radius-md;
   margin-bottom: 16px;
-  color: $text-primary;
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.mode-alert {
-  margin-bottom: 18px;
-}
-
-.settings-form {
-  :deep(.el-form-item__label) {
-    color: $text-secondary;
-    font-weight: 600;
-  }
-}
-
-.form-hint {
-  margin-top: 6px;
-  color: $text-tertiary;
-  font-size: 12px;
-  line-height: 1.6;
-
-  code {
-    padding: 1px 5px;
-    border-radius: 3px;
-    background: rgba(99, 102, 241, 0.12);
-    color: $accent-300;
-    font-size: 11px;
-  }
-}
-
-.type-grid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-
-  :deep(.el-checkbox-button__inner) {
-    border-left: 1px solid var(--el-border-color);
-    border-radius: $radius-sm;
-  }
-}
-
-.test-result {
-  margin-bottom: 14px;
-  padding: 10px 12px;
-  border-radius: $radius-sm;
   font-size: 13px;
   line-height: 1.6;
 
@@ -992,38 +850,123 @@ function explainError(error: unknown, fallback: string) {
     color: $color-warning;
     background: rgba(245, 158, 11, 0.1);
   }
+
+  &__icon {
+    font-size: 18px;
+    flex-shrink: 0;
+  }
 }
 
-.form-actions {
+// ── Alert ──────────────────────────────────────────────
+
+.fs-alert {
+  margin-bottom: 16px;
+}
+
+// ── Collapse ───────────────────────────────────────────
+
+.fs-collapse {
+  border: 1px solid $border-subtle;
+  border-radius: $radius-lg;
+  background: $bg-elevated;
+  overflow: hidden;
+
+  :deep(.el-collapse-item__header) {
+    padding: 0 20px;
+    font-size: 14px;
+    font-weight: 600;
+    color: $text-primary;
+    background: transparent;
+    border-bottom: 1px solid $border-subtle;
+  }
+
+  :deep(.el-collapse-item__content) {
+    padding: 20px;
+    background: transparent;
+  }
+
+  :deep(.el-collapse-item__wrap) {
+    border-bottom: 1px solid $border-subtle;
+
+    &:last-child {
+      border-bottom: none;
+    }
+  }
+}
+
+.collapse-form {
   display: flex;
   gap: 10px;
+  margin-bottom: 10px;
+
+  .el-input {
+    flex: 1;
+  }
+}
+
+.collapse-hint {
+  margin: 6px 0 0;
+  color: $text-tertiary;
+  font-size: 12px;
+  line-height: 1.6;
+
+  code {
+    padding: 1px 4px;
+    border-radius: 3px;
+    background: rgba(99, 102, 241, 0.1);
+    color: $accent-300;
+    font-size: 11px;
+  }
+}
+
+.type-chips {
+  display: flex;
   flex-wrap: wrap;
-  padding-top: 4px;
+  gap: 8px;
+
+  :deep(.el-checkbox-button__inner) {
+    border-left: 1px solid var(--el-border-color);
+    border-radius: $radius-sm;
+  }
 }
 
-.guide-panel {
-  border-left: 1px solid $border-subtle;
-  padding-left: 24px;
-  color: $text-secondary;
-}
+// ── App form ───────────────────────────────────────────
 
-.tips-list {
-  display: grid;
-  gap: 14px;
-}
-
-.tip-item {
-  strong {
-    display: block;
-    color: $text-primary;
+.app-form {
+  :deep(.el-form-item__label) {
+    color: $text-secondary;
+    font-weight: 600;
     font-size: 13px;
   }
 
-  p {
-    margin: 5px 0 0;
+  &__actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 8px;
+  }
+}
+
+.app-guide {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid $border-subtle;
+  border-radius: $radius-md;
+  background: rgba(255, 255, 255, 0.02);
+
+  summary {
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
     color: $text-secondary;
+    user-select: none;
+  }
+
+  ol {
+    margin: 12px 0 0;
+    padding-left: 20px;
+    color: $text-tertiary;
     font-size: 12px;
-    line-height: 1.6;
+    line-height: 2;
 
     code {
       padding: 1px 4px;
@@ -1044,26 +987,30 @@ function explainError(error: unknown, fallback: string) {
   }
 }
 
-@media (max-width: 860px) {
+// ── Responsive ─────────────────────────────────────────
+
+@media (max-width: 640px) {
   .feishu-settings {
     padding: 18px;
   }
 
-  .feishu-settings__header,
-  .status-strip {
-    align-items: stretch;
+  .fs-header {
     flex-direction: column;
+    gap: 10px;
   }
 
-  .mode-switcher,
-  .settings-panel {
-    grid-template-columns: 1fr;
+  .bound-card {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: left;
+
+    &__actions {
+      justify-content: flex-end;
+    }
   }
 
-  .guide-panel {
-    border-left: 0;
-    border-top: 1px solid $border-subtle;
-    padding: 20px 0 0;
+  .wizard-input {
+    flex-direction: column;
   }
 }
 </style>

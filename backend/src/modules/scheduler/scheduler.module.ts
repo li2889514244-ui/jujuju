@@ -10,6 +10,9 @@ import { WechatStoreModule } from '../wechat-store/wechat-store.module'
 import { WechatStoreSyncScheduler } from './wechat-store-sync.scheduler'
 import { DoudianBrowserModule } from '../doudian-browser/doudian-browser.module'
 import { DoudianBrowserSyncScheduler } from './doudian-browser-sync.scheduler'
+import { OrderReportScheduler } from './order-report.scheduler'
+import { RefundAlertScheduler } from './refund-alert.scheduler'
+import { SchedulerController } from './scheduler.controller'
 
 @Module({
   imports: [
@@ -21,17 +24,22 @@ import { DoudianBrowserSyncScheduler } from './doudian-browser-sync.scheduler'
     WechatStoreModule,
     DoudianBrowserModule,
   ],
+  controllers: [SchedulerController],
   providers: [
     PublishScheduler,
     DataSyncScheduler,
     WechatStoreSyncScheduler,
     DoudianBrowserSyncScheduler,
+    OrderReportScheduler,
+    RefundAlertScheduler,
   ],
   exports: [
     PublishScheduler,
     DataSyncScheduler,
     WechatStoreSyncScheduler,
     DoudianBrowserSyncScheduler,
+    OrderReportScheduler,
+    RefundAlertScheduler,
   ],
 })
 export class SchedulerModule {}
