@@ -76,12 +76,29 @@ else:
 app = Flask(__name__, static_folder=STATIC_DIR)
 
 
+# ── CORS 白名单：只允许已知域名访问本地伴侣 ──
+_ALLOWED_ORIGINS = {
+    'https://ddddkiii.com',
+    'https://www.ddddkiii.com',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:3000',
+    # 伴侣自身的 UI（CDP 模式下从 localhost:5409 加载）
+    'http://localhost:5409',
+    'http://127.0.0.1:5409',
+}
+
 @app.after_request
 def _add_cors_headers(resp):
-    resp.headers.setdefault('Access-Control-Allow-Origin', '*')
-    resp.headers.setdefault('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-    resp.headers.setdefault('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-    resp.headers.setdefault('Access-Control-Allow-Private-Network', 'true')
+    origin = request.headers.get('Origin', '')
+    if origin in _ALLOWED_ORIGINS:
+        resp.headers['Access-Control-Allow-Origin'] = origin
+        resp.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Service-Token'
+        resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, PATCH, DELETE, OPTIONS'
+        resp.headers['Access-Control-Allow-Private-Network'] = 'true'
+        resp.headers['Vary'] = 'Origin'
+    # 对不在白名单中的 Origin，不设置 CORS 头 → 浏览器会拒绝跨域请求
     return resp
 
 # ┢�┢� 平台配置 ┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�
@@ -149,33 +166,10 @@ def _launch_browser_opts(headless: bool, extra_args: list = None) -> dict:
     return opts
 
 
-# ┢�┢� 持久化浏览器 Profile ┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�
+# ── 持久化浏览器 Profile 根目录 ──
+# （原 _get_persistent_context 函数已移除：它引用了未定义的 pw 变量且从未被调用。
+#   数据采集使用 _scrape_all() → _launch_browser_opts() 路径，不经过此函数。）
 _PROFILE_ROOT = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MatrixFlow' / 'browser-profiles'
-
-
-async def _get_persistent_context(headless: bool = True, extra_args: list = None) -> tuple:
-    """返回 (context, page) �?使用持久�?profile，抖音不再每次跳验证"""
-    _PROFILE_ROOT.mkdir(parents=True, exist_ok=True)
-    profile_dir = _PROFILE_ROOT / 'default'
-
-    args = ['--disable-blink-features=AutomationControlled', '--no-sandbox', '--lang=zh-CN']
-    if extra_args:
-        args.extend(extra_args)
-
-    kwargs = {
-        'headless': headless,
-        'args': args,
-        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'locale': 'zh-CN',
-        'viewport': {'width': 1280, 'height': 800},
-    }
-    if _BROWSER_PATH:
-        kwargs['executable_path'] = _BROWSER_PATH
-    elif _BROWSER_CHANNEL:
-        kwargs['channel'] = _BROWSER_CHANNEL
-
-    context = await pw.chromium.launch_persistent_context(str(profile_dir), **kwargs)
-    return context
 
 # ┢�┢� HTML UI ┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�┢�
 UI_HTML = r'''<!DOCTYPE html>
@@ -912,6 +906,79 @@ def _login_with_saved_credentials(cfg: dict) -> str:
             print(f'[Auth] _pw login error: {str(e)[:120]}')
 
     return ''
+
+
+# ══════════════════════════════════════════════════════════════════
+# 主动 Token 刷新 — 不等 401 才刷新
+# ══════════════════════════════════════════════════════════════════
+_TOKEN_REFRESH_INTERVAL = 1800  # 30 分钟检查一次
+_TOKEN_REFRESH_MARGIN = 300     # Token 过期前 5 分钟就刷新
+
+def _check_and_refresh_token() -> bool:
+    """
+    主动检查 JWT Token 是否即将过期，如果是则提前刷新。
+
+    返回 True 表示 Token 有效或已成功刷新；
+    返回 False 表示 Token 无效且无法刷新。
+    """
+    cfg = _load_config()
+    token = cfg.get('token', '')
+
+    if not token:
+        # 没有 Token，尝试用保存的凭据登录
+        new_token = _login_with_saved_credentials(cfg)
+        if new_token:
+            print('[TokenRefresh] 首次登录成功')
+            return True
+        print('[TokenRefresh] 无 Token 且无法自动登录')
+        return False
+
+    # 尝试解码 JWT 检查过期时间
+    try:
+        import jwt as _jwt
+        decoded = _jwt.decode(token, options={'verify_signature': False})
+        exp = decoded.get('exp', 0)
+        remaining = exp - time.time()
+
+        if remaining > _TOKEN_REFRESH_MARGIN:
+            # Token 还有效，不需要刷新
+            return True
+
+        print(f'[TokenRefresh] Token 将在 {int(remaining)}s 后过期，提前刷新...')
+    except Exception:
+        # 无法解码，可能格式错误，尝试刷新
+        print('[TokenRefresh] Token 无法解码，尝试刷新...')
+
+    # 刷新 Token
+    new_token = _login_with_saved_credentials(cfg)
+    if new_token:
+        print('[TokenRefresh] Token 刷新成功')
+        return True
+    print('[TokenRefresh] ⚠ Token 刷新失败！数据上传将无法工作，请重新登录。')
+    return False
+
+
+def _token_refresh_loop():
+    """后台线程：定期检查并刷新 Token。"""
+    print(f'[TokenRefresh] 守护线程启动，每 {_TOKEN_REFRESH_INTERVAL}s 检查一次')
+    while True:
+        try:
+            time.sleep(_TOKEN_REFRESH_INTERVAL)
+            _check_and_refresh_token()
+        except Exception as e:
+            print(f'[TokenRefresh] 异常: {str(e)[:120]}')
+            time.sleep(60)  # 出错后等 1 分钟再重试
+
+
+def _start_token_refresh_daemon():
+    """启动 Token 刷新守护线程。"""
+    # 启动时立即检查一次
+    _check_and_refresh_token()
+    # 然后启动后台定期检查
+    t = threading.Thread(target=_token_refresh_loop, daemon=True, name='TokenRefresh')
+    t.start()
+    print('[TokenRefresh] 守护线程已启动')
+
 
 PLATFORM_DASHBOARDS = {
     'DOUYIN': {
@@ -4457,7 +4524,7 @@ def index():
 @app.route('/health')
 def health():
     resp = make_response(jsonify({'status':'ok','version':APP_VERSION,'platforms':list(PLATFORMS.keys())}))
-    resp.headers['Access-Control-Allow-Origin'] = '*'
+    # CORS 头由全局 after_request 处理，这里不再硬编码 *
     return resp
 
 
@@ -4887,6 +4954,10 @@ if __name__ == '__main__':
         sys.exit(1)
     print('[Main] Flask 就绪')
     _ensure_doudian_scheduler_started()
+
+    # ── 主动 Token 刷新：启动时检查 + 定期后台刷新 ──
+    print('[Main] 启动 Token 刷新守护线程...')
+    _start_token_refresh_daemon()
 
     # ┢�┢� 2. 启动 CDP Chrome ┢�┢�
     cdp_ready = False

@@ -26,6 +26,7 @@ import { WechatStoreModule } from './modules/wechat-store/wechat-store.module'
 import { DoudianBrowserModule } from './modules/doudian-browser/doudian-browser.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
+import { ServiceTokenGuard } from './modules/auth/guards/service-token.guard'
 import jwtConfig from './config/jwt.config'
 import redisConfig from './config/redis.config'
 import databaseConfig from './config/database.config'
@@ -67,6 +68,7 @@ import databaseConfig from './config/database.config'
   ],
   providers: [
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: ServiceTokenGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
     { provide: APP_GUARD, useClass: ThrottlerGuard },
   ],

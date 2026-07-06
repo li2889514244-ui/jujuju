@@ -1,37 +1,105 @@
 """
 披星云数字人视频 Worker — 轮询任务 → 自动合成 → 回传结果
 作为 companion_app.py 的后台线程运行
+
+安全修复：
+  - 所有 API 调用携带 X-Service-Token 头，通过后端 ServiceTokenGuard 认证
+  - Service Token 从 companion_config.json 的 service_token 字段读取
+
+稳定性修复：
+  - 指数退避：API 连续失败时自动拉长轮询间隔（15s → 30s → 60s → 120s → 300s）
+  - 浏览器清理保证：无论任务成功或失败，都确保 browser/context 正确关闭
+  - 最大连续错误计数：超过 10 次连续错误后自动暂停 5 分钟
 """
 import asyncio, json, time, threading, requests, os
 from pathlib import Path
 
 # ═══════════════════════════════════════════════════════
-# 配置 — 修改这里
+# 配置
 # ═══════════════════════════════════════════════════════
 API_BASE = "https://ddddkiii.com/api/v1"
 PIXING_EDU_URL = "https://www.pixingjiaoyu.com.cn/#/login?redirectUrl=%2Fworks"
-POLL_INTERVAL = 15  # 轮询间隔（秒）
+POLL_INTERVAL = 15          # 基础轮询间隔（秒）
+MAX_POLL_INTERVAL = 300     # 最大轮询间隔（指数退避上限）
+MAX_CONSECUTIVE_ERRORS = 10  # 连续错误上限，超过后暂停 5 分钟
+COOLDOWN_AFTER_ERRORS = 300  # 连续错误后的冷却时间（秒）
 DOWNLOAD_DIR = Path.home() / "Downloads" / "披星云视频"
 
-_status = {"running": False, "current_task": None, "last_error": "", "completed": 0}
+_status = {
+    "running": False,
+    "current_task": None,
+    "last_error": "",
+    "completed": 0,
+    "consecutive_errors": 0,
+    "current_poll_interval": POLL_INTERVAL,
+}
 
 def get_status():
     return dict(_status)
 
 # ═══════════════════════════════════════════════════════
-# 核心：拉取任务 + 更新状态
+# Service Token 读取
+# ═══════════════════════════════════════════════════════
+def _get_service_token() -> str:
+    """从 companion_config.json 读取 service_token，或从环境变量读取。"""
+    # 1. 环境变量优先
+    env_token = os.environ.get('SERVICE_TOKEN', '')
+    if env_token:
+        return env_token
+
+    # 2. 从配置文件读取
+    try:
+        if getattr(__import__('sys'), 'frozen', False):
+            config_path = Path(__import__('sys').executable).parent / 'companion_config.json'
+        else:
+            config_path = Path(__file__).parent / 'companion_config.json'
+        if config_path.exists():
+            cfg = json.loads(config_path.read_text(encoding='utf-8'))
+            return cfg.get('service_token', '')
+    except Exception:
+        pass
+    return ''
+
+_SERVICE_TOKEN = ''
+def _ensure_service_token():
+    """确保 service token 已加载，返回是否成功。"""
+    global _SERVICE_TOKEN
+    if not _SERVICE_TOKEN:
+        _SERVICE_TOKEN = _get_service_token()
+    return bool(_SERVICE_TOKEN)
+
+def _get_auth_headers() -> dict:
+    """返回包含 Service Token 的请求头。"""
+    _ensure_service_token()
+    headers = {'Content-Type': 'application/json'}
+    if _SERVICE_TOKEN:
+        headers['X-Service-Token'] = _SERVICE_TOKEN
+    return headers
+
+# ═══════════════════════════════════════════════════════
+# 核心：拉取任务 + 更新状态（带认证）
 # ═══════════════════════════════════════════════════════
 def _api_get(path):
+    headers = _get_auth_headers()
     try:
-        r = requests.get(f"{API_BASE}{path}", timeout=15)
+        r = requests.get(f"{API_BASE}{path}", headers=headers, timeout=15)
+        if r.status_code == 401:
+            _status["last_error"] = f"API GET {path}: 401 Unauthorized — Service Token 无效或未配置"
+            print(f"[PixingWorker] ⚠ 401 Unauthorized: Service Token 认证失败。请检查 companion_config.json 中的 service_token 字段。")
+            return None
         return r.json() if r.status_code == 200 else None
     except Exception as e:
         _status["last_error"] = f"API GET {path}: {e}"
         return None
 
 def _api_patch(path, data):
+    headers = _get_auth_headers()
     try:
-        r = requests.patch(f"{API_BASE}{path}", json=data, timeout=15)
+        r = requests.patch(f"{API_BASE}{path}", json=data, headers=headers, timeout=15)
+        if r.status_code == 401:
+            _status["last_error"] = f"API PATCH {path}: 401 Unauthorized — Service Token 无效或未配置"
+            print(f"[PixingWorker] ⚠ 401 Unauthorized: Service Token 认证失败。")
+            return None
         return r.json() if r.status_code == 200 else None
     except Exception as e:
         _status["last_error"] = f"API PATCH {path}: {e}"
@@ -47,6 +115,27 @@ def fetch_next_task():
 def update_task(task_id, **kwargs):
     """更新任务状态/结果"""
     return _api_patch(f"/pixing-video/tasks/{task_id}", kwargs)
+
+# ═══════════════════════════════════════════════════════
+# 指数退避管理
+# ═══════════════════════════════════════════════════════
+def _on_api_success():
+    """API 调用成功时重置退避。"""
+    _status["consecutive_errors"] = 0
+    _status["current_poll_interval"] = POLL_INTERVAL
+
+def _on_api_failure():
+    """API 调用失败时增加退避间隔。"""
+    _status["consecutive_errors"] += 1
+    current = _status["current_poll_interval"]
+    # 指数退避：每次翻倍，上限 MAX_POLL_INTERVAL
+    _status["current_poll_interval"] = min(current * 2, MAX_POLL_INTERVAL)
+    print(f"[PixingWorker] 连续错误 {_status['consecutive_errors']} 次，"
+          f"下次轮询间隔 {_status['current_poll_interval']}s")
+
+def _should_cooldown() -> bool:
+    """是否需要进入冷却期。"""
+    return _status["consecutive_errors"] >= MAX_CONSECUTIVE_ERRORS
 
 # ═══════════════════════════════════════════════════════
 # 自动化执行 — Playwright
@@ -85,6 +174,9 @@ async def _execute_task(task: dict):
     print(f"[PixingWorker] 开始执行任务 {task_id}: 老师={teacher}, 文案={len(text)}字")
     _status["current_task"] = task_id
     update_task(task_id, status="processing")
+
+    browser = None
+    context = None
 
     try:
         async with async_playwright() as pw:
@@ -206,7 +298,7 @@ async def _execute_task(task: dict):
                     print(f"[PixingWorker] 警告: 未找到去合成按钮")
             await page.wait_for_timeout(3000)
 
-            # ── 第7步：等待合成完成 + 获取视频 ──
+            # ── 第8步：等待合成完成 + 获取视频 ──
             print(f"[PixingWorker] 等待视频合成...")
             DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
             for i in range(240):  # 最多等20分钟
@@ -241,7 +333,7 @@ async def _execute_task(task: dict):
                 if i % 24 == 0:
                     print(f"[PixingWorker] 仍在等待... ({i * 5}s)")
 
-            # ── 第8步：字幕 ──
+            # ── 第9步：字幕 ──
             srt_content = None
             # 方式1：从页面提取字幕
             try:
@@ -273,7 +365,6 @@ async def _execute_task(task: dict):
             if srt_content:
                 update_task(task_id, srtContent=srt_content)
 
-            await browser.close()
             _status["completed"] += 1
             _status["current_task"] = None
             print(f"[PixingWorker] 任务 {task_id} 完成")
@@ -284,6 +375,19 @@ async def _execute_task(task: dict):
         update_task(task_id, status="failed", error=error_msg)
         _status["last_error"] = error_msg
         _status["current_task"] = None
+    finally:
+        # ── 浏览器清理保证：无论成功或失败都关闭浏览器 ──
+        if context:
+            try:
+                await context.close()
+            except Exception:
+                pass
+        if browser:
+            try:
+                await browser.close()
+            except Exception:
+                pass
+        print(f"[PixingWorker] 浏览器已清理 (task={task_id})")
 
 
 def run_task_sync(task: dict):
@@ -292,26 +396,51 @@ def run_task_sync(task: dict):
 
 
 # ═══════════════════════════════════════════════════════
-# 后台轮询循环
+# 后台轮询循环（带指数退避）
 # ═══════════════════════════════════════════════════════
 def worker_loop():
     """后台线程：持续轮询任务队列"""
     print(f"[PixingWorker] 启动，API={API_BASE}, 间隔={POLL_INTERVAL}s")
+
+    # 启动时检查 Service Token
+    if not _ensure_service_token():
+        print(f"[PixingWorker] ⚠ 警告: Service Token 未配置！")
+        print(f"[PixingWorker]   请在 companion_config.json 中添加 'service_token' 字段，")
+        print(f"[PixingWorker]   或设置环境变量 SERVICE_TOKEN。")
+        print(f"[PixingWorker]   后端 /pixing-video/tasks/next 将返回 401，Worker 无法获取任务。")
+
     _status["running"] = True
 
     while _status["running"]:
+        # 检查是否需要进入冷却期
+        if _should_cooldown():
+            print(f"[PixingWorker] 连续错误已达 {MAX_CONSECUTIVE_ERRORS} 次，进入 {COOLDOWN_AFTER_ERRORS}s 冷却期...")
+            _status["last_error"] = f"连续错误 {MAX_CONSECUTIVE_ERRORS} 次，冷却中"
+            time.sleep(COOLDOWN_AFTER_ERRORS)
+            _status["consecutive_errors"] = 0
+            _status["current_poll_interval"] = POLL_INTERVAL
+            continue
+
         try:
             task = fetch_next_task()
             if task:
+                _on_api_success()
                 print(f"[PixingWorker] 发现待处理任务: {task['id']}")
                 run_task_sync(task)
             else:
-                pass  # 无任务，静默等待
+                # 无任务也可能是 API 返回 401（认证失败），检查 last_error
+                if "401" in _status.get("last_error", ""):
+                    _on_api_failure()
+                else:
+                    _on_api_success()  # 正常无任务
         except Exception as e:
+            _on_api_failure()
             _status["last_error"] = str(e)[:200]
             print(f"[PixingWorker] 轮询异常: {e}")
 
-        time.sleep(POLL_INTERVAL)
+        # 使用动态轮询间隔
+        sleep_interval = _status["current_poll_interval"]
+        time.sleep(sleep_interval)
 
     print("[PixingWorker] 已停止")
 

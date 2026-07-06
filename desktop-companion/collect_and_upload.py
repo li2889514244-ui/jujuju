@@ -1,12 +1,36 @@
-"""视频号全量数据采集 + 本地存储 + 云端上传"""
+"""
+⚠ 已废弃 (DEPRECATED) — 请勿直接运行此脚本！
+================================================
+
+此脚本已被 companion_app.py 的 _run_collection_once() 完全替代。
+companion_app.py 提供了多账号支持、定时调度、Token 自动刷新等能力。
+
+已知问题（如果你仍然要运行）：
+  - API_BASE 原硬编码为 IP:Port，无 HTTPS（已修正为域名）
+  - CDP_URL 端口原与 companion_app.py 不一致 (2058 vs 9222)（已修正）
+  - ACCOUNT_ID / ACCOUNT_NAME 硬编码为单个账号
+  - 无 Token 认证
+
+如需采集数据，请通过桌面伴侣 UI 的「一键采集」按钮触发，
+或调用 POST http://localhost:5409/api/data-collection/trigger
+
+原功能说明：视频号全量数据采集 + 本地存储 + 云端上传
+"""
 import asyncio, json, re, sys, time, os
 from datetime import datetime
 from playwright.async_api import async_playwright
 
-API_BASE = "http://8.134.218.39:3000/api"
-CDP_URL = "http://127.0.0.1:2058"
-ACCOUNT_ID = "sphi9lmniWArf5T"
-ACCOUNT_NAME = "听卢慧说"
+# ═══════════════════════════════════════════════════════
+# 配置 — 已废弃，请勿修改后使用
+# 如需采集数据请使用 companion_app.py
+# ═══════════════════════════════════════════════════════
+print('⚠ 警告: collect_and_upload.py 已废弃，请通过桌面伴侣 UI 采集数据。', file=sys.stderr)
+print('  如需程序化触发，请调用: POST http://localhost:5409/api/data-collection/trigger', file=sys.stderr)
+
+API_BASE = "https://ddddkiii.com/api/v1"  # 修正: 使用 HTTPS 域名
+CDP_URL = "http://127.0.0.1:9222"          # 修正: 与 companion_app.py 一致
+ACCOUNT_ID = "sphi9lmniWArf5T"              # 注意: 硬编码账号，仅用于历史参考
+ACCOUNT_NAME = "听卢慧说"                    # 注意: 硬编码账号名
 PLATFORM = "WECHAT_VIDEO"
 
 URLS = {
