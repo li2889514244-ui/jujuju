@@ -85,13 +85,19 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="播放量" width="120" align="right" sortable>
+        <el-table-column label="播放量" prop="views" width="110" align="right" sortable>
           <template #default="{ row }">{{ formatNum(row.views) }}</template>
         </el-table-column>
-        <el-table-column label="互动" width="100" align="right" sortable>
-          <template #default="{ row }">{{ formatNum(totalEngagement(row)) }}</template>
+        <el-table-column label="点赞" prop="likes" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
         </el-table-column>
-        <el-table-column label="互动率" width="100" align="right" sortable>
+        <el-table-column label="评论" prop="comments" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
+        </el-table-column>
+        <el-table-column label="转发" prop="shares" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+        </el-table-column>
+        <el-table-column label="互动率" prop="engagementRate" width="100" align="right" sortable>
           <template #default="{ row }">{{ Number(row.engagementRate || 0).toFixed(1) }}%</template>
         </el-table-column>
       </el-table>
@@ -118,7 +124,15 @@
         </span>
       </div>
       <div v-if="activeTag" class="ci-tag-clear">
-        <el-button size="small" type="info" plain @click="activeTag = ''; loadRanking()">
+        <el-button
+          size="small"
+          type="info"
+          plain
+          @click="
+            activeTag = ''
+            loadRanking()
+          "
+        >
           清除标签筛选：{{ activeTag }}
         </el-button>
       </div>
@@ -177,9 +191,14 @@ const detailDrawerRef = ref()
 const activeTag = ref('')
 
 const platforms = Object.entries(PLATFORM_LABELS).map(([value, label]) => ({ value, label }))
-const currentRanking = computed(() =>
-  rankingTab.value === 'views' ? viewsRanking.value : engagementRanking.value,
-)
+const currentRanking = computed(() => {
+  const list = rankingTab.value === 'views' ? viewsRanking.value : engagementRanking.value
+  if (!activeTag.value) return list
+  return list.filter((item) => {
+    const tags = (item.title || '').match(/#[\u4e00-\u9fa5\w]+/g)?.map((t) => t.slice(1)) || []
+    return tags.includes(activeTag.value)
+  })
+})
 
 function filterParams() {
   return {
@@ -189,7 +208,11 @@ function filterParams() {
 }
 
 function groupAccountCount(group: AccountGroup): number {
-  return group.count ?? (group as AccountGroup & { _count?: { accounts?: number } })._count?.accounts ?? 0
+  return (
+    group.count ??
+    (group as AccountGroup & { _count?: { accounts?: number } })._count?.accounts ??
+    0
+  )
 }
 
 async function loadRanking() {
@@ -244,14 +267,10 @@ async function loadAll() {
 }
 
 function formatNum(n: number): string {
-  if (!n) return '-'
+  if (!n) return '0'
   if (n >= 100000000) return (n / 100000000).toFixed(1) + '亿'
   if (n >= 10000) return (n / 10000).toFixed(1) + '万'
   return n.toLocaleString()
-}
-
-function totalEngagement(row: RankingItem) {
-  return (row.likes || 0) + (row.comments || 0) + (row.shares || 0)
 }
 
 function tagSize(count: number): number {
@@ -461,6 +480,25 @@ onMounted(() => {
     &__actions {
       width: 100%;
       flex-wrap: wrap;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .content-insights {
+    padding: 12px;
+  }
+
+  .ci-header {
+    h2 {
+      font-size: 20px;
+    }
+  }
+
+  .ci-filter {
+    width: 100%;
+    &--group {
+      width: 100%;
     }
   }
 }

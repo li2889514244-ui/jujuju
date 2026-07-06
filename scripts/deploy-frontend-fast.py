@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_TARGET = "/opt/matrixflow/frontend/dist"
+DEFAULT_TARGET = "/opt/matrixflow/frontend-dist"
 DEFAULT_CONTAINER = "matrixflow-frontend"
 DEFAULT_PUBLIC_URL = "https://ddddkiii.com"
 
@@ -116,7 +116,7 @@ def connect_ssh(env: dict[str, str]):
         "hostname": host,
         "username": user,
         "timeout": 30,
-        "banner_timeout": 90,
+        "banner_timeout": 15,
         "auth_timeout": 30,
     }
     if key_path:
@@ -159,7 +159,7 @@ def deploy_archive(client, archive: Path, target: str, container: str) -> str:
         BACKUP=/tmp/matrixflow-frontend-dist-backup-$STAMP
 
         case "$TARGET" in
-          /opt/matrixflow/frontend/dist) ;;
+          /opt/matrixflow/frontend-dist) ;;
           *) echo "Refusing unexpected target: $TARGET" >&2; exit 2 ;;
         esac
 
@@ -188,9 +188,9 @@ def deploy_archive(client, archive: Path, target: str, container: str) -> str:
         """
     )
     out, err, code = exec_remote(client, command)
-    print(out, end="")
+    print(out.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), end="")
     if err.strip():
-        print(err, file=sys.stderr)
+        print(err.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), file=sys.stderr)
     if code != 0:
         raise SystemExit(f"Remote deploy failed with exit code {code}")
     match = re.search(r"remote_ref=(assets/js/index-[^\s]+)", out)

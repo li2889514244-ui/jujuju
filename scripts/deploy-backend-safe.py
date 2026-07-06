@@ -67,7 +67,7 @@ def connect_ssh(env: dict[str, str]):
         "hostname": host,
         "username": user,
         "timeout": 30,
-        "banner_timeout": 90,
+        "banner_timeout": 15,
         "auth_timeout": 30,
     }
     if key_path:
@@ -161,9 +161,9 @@ def deploy_archive(client, archive: Path, remote_backend: str, pm2_app: str, *, 
         """
     )
     out, err, code = exec_remote(client, command)
-    print(out, end="")
+    print(out.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), end="")
     if err.strip():
-        print(err, file=sys.stderr)
+        print(err.encode("utf-8", errors="replace").decode("utf-8", errors="replace"), file=sys.stderr)
     if code != 0:
         raise SystemExit(f"Remote backend deploy failed with exit code {code}")
 
