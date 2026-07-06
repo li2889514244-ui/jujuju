@@ -98,7 +98,11 @@ export class OrderReportScheduler {
     const startSec = Math.floor(beijingYesterday.getTime() / 1000)
     const endSec = Math.floor(beijingToday.getTime() / 1000)
 
-    const dateLabel = `${beijingYesterday.getUTCFullYear()}-${String(beijingYesterday.getUTCMonth() + 1).padStart(2, '0')}-${String(beijingYesterday.getUTCDate()).padStart(2, '0')}`
+    // dateLabel 用 beijingNow（已偏移到北京时间）的日期减 1，避免时区错位
+    const yLabel = beijingNow.getUTCFullYear()
+    const mLabel = beijingNow.getUTCMonth()
+    const dLabel = new Date(Date.UTC(yLabel, mLabel, beijingNow.getUTCDate() - 1))
+    const dateLabel = `${dLabel.getUTCFullYear()}-${String(dLabel.getUTCMonth() + 1).padStart(2, '0')}-${String(dLabel.getUTCDate()).padStart(2, '0')}`
 
     return { start: startSec, end: endSec, dateLabel }
   }
