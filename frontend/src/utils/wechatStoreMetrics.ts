@@ -22,6 +22,7 @@ export interface SalesStats {
   count: number
   effectiveCount: number
   transactionCount: number
+  refundCount: number
   avg: number
   gross: number
   refund: number
@@ -120,6 +121,7 @@ export function calculateNetSales(
     count,
     effectiveCount,
     transactionCount,
+    refundCount: successfulRefunds.length,
     avg: effectiveCount > 0 ? gmv / effectiveCount : 0,
     gross,
     refund,

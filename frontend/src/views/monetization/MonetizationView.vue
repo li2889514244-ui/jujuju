@@ -56,7 +56,7 @@
         <div class="kpi-card__value kpi-card__value--danger">
           &yen;{{ centToYuan(orderStats.refund) }}
         </div>
-        <div class="kpi-card__sub">{{ rangeAftersaleList.length }} 条退款记录</div>
+        <div class="kpi-card__sub">{{ orderStats.refundCount }} 笔退款</div>
       </div>
     </div>
 

@@ -39,6 +39,7 @@ describe('wechatStoreMetrics', () => {
     expect(result.refund).toBe(29900)
     expect(result.count).toBe(4)
     expect(result.transactionCount).toBe(3)
+    expect(result.refundCount).toBe(1)
     expect(result.effectiveCount).toBe(2)
   })
 
