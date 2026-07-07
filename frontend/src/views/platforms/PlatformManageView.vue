@@ -18,7 +18,12 @@
     <div class="platform-stats">
       <el-row :gutter="16">
         <el-col v-for="stat in platformStats" :key="stat.platform" :xs="12" :sm="6" :md="4" :lg="3">
-          <el-card shadow="hover" class="stat-card" :class="{ active: filterPlatform === stat.platform }" @click="filterByPlatform(stat.platform)">
+          <el-card
+            shadow="hover"
+            class="stat-card"
+            :class="{ active: filterPlatform === stat.platform }"
+            @click="filterByPlatform(stat.platform)"
+          >
             <div class="stat-icon">
               <PlatformIcon :platform="stat.platform" :size="32" />
             </div>
@@ -69,13 +74,13 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="粉丝数" width="120" sortable>
+      <el-table-column label="粉丝数" prop="followers" width="120" sortable>
         <template #default="{ row }">
           <span class="metric">{{ formatNumber(row.followers) }}</span>
         </template>
       </el-table-column>
 
-      <el-table-column label="关注数" width="120" sortable>
+      <el-table-column label="关注数" prop="following" width="120" sortable>
         <template #default="{ row }">
           <span class="metric">{{ formatNumber(row.following) }}</span>
         </template>

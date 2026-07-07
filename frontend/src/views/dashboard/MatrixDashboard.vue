@@ -128,7 +128,7 @@
           max-height="520"
           empty-text="暂无账号数据"
           :row-class-name="({ row }: any) => (row.isStale ? 'row-stale' : '')"
-          @sort-change="(sort: any) => toggleSort(sort?.prop || '')"
+          @sort-change="(sort: any) => toggleSort(sort?.prop || '', sort?.order)"
         >
           <el-table-column type="index" width="50" label="#" align="center" />
           <el-table-column prop="avatar" label="头像" width="60" align="center">
@@ -161,13 +161,13 @@
                   v-if="row.isStale"
                   :content="
                     row.dataDate
-                      ? `最近采集: ${row.dataDate}，当前周期无数据`
+                      ? `最近采集: ${row.dataDate}，当前周期无新数据，已展示最近可用数据`
                       : '该账号从未采集到数据，请启动桌面伴侣'
                   "
                   placement="top"
                 >
                   <el-tag size="small" type="warning" effect="plain" class="stale-tag"
-                    >无数据</el-tag
+                    >近期未采集</el-tag
                   >
                 </el-tooltip>
               </div>
@@ -276,8 +276,12 @@
               /></template>
             </el-table-column>
             <el-table-column prop="accounts" label="账号" width="60" align="right" />
-            <el-table-column prop="followersFormatted" label="粉丝" align="right" sortable />
-            <el-table-column prop="viewsFormatted" label="播放量" align="right" sortable />
+            <el-table-column prop="followers" label="粉丝" align="right" sortable>
+              <template #default="{ row }">{{ row.followersFormatted }}</template>
+            </el-table-column>
+            <el-table-column prop="views" label="播放量" align="right" sortable>
+              <template #default="{ row }">{{ row.viewsFormatted }}</template>
+            </el-table-column>
             <el-table-column prop="likesFormatted" label="互动" align="right" />
             <el-table-column prop="engagementRate" label="互动率" width="80" align="right">
               <template #default="{ row }">{{ row.engagementRate }}%</template>
@@ -285,75 +289,6 @@
           </el-table>
         </el-card>
       </div>
-
-      <!-- 跨 Group 对比 -->
-      <el-card v-if="groupComparison.length > 0" shadow="hover" class="md-section">
-        <template #header>
-          <div class="md-section__header">
-            <span>分组对比</span>
-            <span class="md-table-subtitle"
-              >按{{ dateTypeLabel }}周期汇总，人均指标消除团队规模差异</span
-            >
-          </div>
-        </template>
-
-        <!-- 洞察提示 -->
-        <div
-          v-if="groupInsight"
-          class="md-group-insight"
-          :class="'md-group-insight--' + groupInsight.type"
-        >
-          <el-icon :size="16"><TrendCharts /></el-icon>
-          <span>{{ groupInsight.text }}</span>
-        </div>
-
-        <el-table :data="groupComparison" stripe size="small" empty-text="暂无分组数据">
-          <el-table-column label="排名" width="60" align="center">
-            <template #default="{ $index }">
-              <span class="group-rank-badge" :class="'group-rank-' + Math.min($index + 1, 3)">{{
-                $index + 1
-              }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="groupName" label="分组" min-width="120" />
-          <el-table-column prop="accountCount" label="账号" width="60" align="right" />
-          <el-table-column label="总粉丝" width="110" align="right" sortable :sort-by="'followers'">
-            <template #default="{ row }">
-              <div>{{ row.followersFormatted }}</div>
-              <div class="group-sub-metric">人均 {{ row.avgFollowersFormatted }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="播放量" width="120" align="right" sortable :sort-by="'play'">
-            <template #default="{ row }">
-              <div>{{ row.playFormatted }}</div>
-              <div class="group-bar-track">
-                <div class="group-bar-fill" :style="{ width: groupBarWidth(row.play) + '%' }" />
-              </div>
-            </template>
-          </el-table-column>
-          <el-table-column
-            label="互动量"
-            width="120"
-            align="right"
-            sortable
-            :sort-by="'interactions'"
-          >
-            <template #default="{ row }">
-              <div>{{ row.interactionsFormatted }}</div>
-              <div class="group-sub-metric">人均 {{ row.avgInteractionsFormatted }}</div>
-            </template>
-          </el-table-column>
-          <el-table-column label="互动率" width="80" align="right">
-            <template #default="{ row }">
-              <span :class="engagementRateClass(row)"
-                >{{
-                  row.play > 0 ? ((row.interactions / row.play) * 100).toFixed(1) : '0.0'
-                }}%</span
-              >
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
     </template>
   </div>
 </template>
@@ -364,7 +299,7 @@ import { useMatrixDashboard } from '@/composables/useMatrixDashboard'
 import { useChartTheme } from '@/composables/useChartTheme'
 import DataChart from '@/components/common/DataChart.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
-import { CaretTop, CaretBottom, TrendCharts } from '@element-plus/icons-vue'
+import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
 import { PLATFORM_LABELS } from '@/types'
 import type { EChartsOption } from 'echarts'
 
@@ -389,7 +324,6 @@ const {
   trendChartData,
   accountTableData,
   toggleSort,
-  groupComparison,
   refreshAll,
 } = useMatrixDashboard()
 
@@ -464,48 +398,6 @@ const platformChartOption = computed<EChartsOption>(() => {
     ],
   })
 })
-
-// ─── Group Comparison Helpers ───
-const groupInsight = computed(() => {
-  const rows = groupComparison.value
-  if (rows.length === 0) return null
-  if (rows.length === 1)
-    return { type: 'info', text: `当前只有 ${rows[0].groupName} 一个分组，无法横向对比。` }
-
-  const top = rows[0]
-  const bottom = rows[rows.length - 1]
-  const topRate = top.play > 0 ? (top.interactions / top.play) * 100 : 0
-  const bottomRate = bottom.play > 0 ? (bottom.interactions / bottom.play) * 100 : 0
-
-  if (topRate > bottomRate * 2) {
-    return {
-      type: 'success',
-      text: `${top.groupName} 互动率 ${topRate.toFixed(1)}% 远超 ${bottom.groupName}（${bottomRate.toFixed(1)}%），可复用其内容策略。`,
-    }
-  }
-  if (bottom.followers > top.followers && top.play > bottom.play) {
-    return {
-      type: 'warning',
-      text: `${bottom.groupName} 粉丝最多但播放量落后于 ${top.groupName}，建议检查近期内容发布频率和质量。`,
-    }
-  }
-  return {
-    type: 'info',
-    text: `${top.groupName} 综合表现领先，人均互动 ${(top.interactions / Math.max(top.accountCount, 1)).toFixed(0)} 次。`,
-  }
-})
-
-function groupBarWidth(value: number): number {
-  const max = Math.max(...groupComparison.value.map((r: any) => r.play || 0), 1)
-  return Math.max(2, (value / max) * 100)
-}
-
-function engagementRateClass(row: any): string {
-  const rate = row.play > 0 ? (row.interactions / row.play) * 100 : 0
-  if (rate >= 5) return 'engagement-rate--high'
-  if (rate >= 2) return 'engagement-rate--mid'
-  return 'engagement-rate--low'
-}
 
 // ─── Helpers ───
 function formatNum(n: number): string {

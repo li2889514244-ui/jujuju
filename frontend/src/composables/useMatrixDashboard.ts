@@ -229,7 +229,7 @@ export function useMatrixDashboard() {
     return rows
   })
 
-  function toggleSort(prop: string) {
+  function toggleSort(prop: string, order?: string | null) {
     const propMap: Record<string, string> = {
       fansFormatted: 'fans',
       playFormatted: 'play',
@@ -239,16 +239,12 @@ export function useMatrixDashboard() {
       shareFormatted: 'share',
     }
     const key = propMap[prop] || prop
-    if (!key) {
+    if (!key || !order) {
       sortKey.value = ''
       return
     }
-    if (sortKey.value === key) {
-      sortOrder.value = sortOrder.value === 'asc' ? 'desc' : 'asc'
-    } else {
-      sortKey.value = key
-      sortOrder.value = 'desc'
-    }
+    sortKey.value = key
+    sortOrder.value = order === 'ascending' ? 'asc' : 'desc'
   }
 
   // ─── Platform Table (互动 = 点赞 + 评论 + 分享) ───

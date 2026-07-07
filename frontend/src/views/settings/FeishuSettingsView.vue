@@ -186,7 +186,7 @@
               <el-checkbox-button
                 v-for="item in notifyTypeOptions"
                 :key="item.value"
-                :label="item.value"
+                :value="item.value"
               >
                 {{ item.label }}
               </el-checkbox-button>
@@ -231,11 +231,11 @@
 
               <el-form-item label="接收人类型">
                 <el-radio-group v-model="appForm.receiveIdType" size="small">
-                  <el-radio-button label="open_id">Open ID</el-radio-button>
-                  <el-radio-button label="email">邮箱</el-radio-button>
-                  <el-radio-button label="chat_id">群 ID</el-radio-button>
-                  <el-radio-button label="user_id">User ID</el-radio-button>
-                  <el-radio-button label="union_id">Union ID</el-radio-button>
+                  <el-radio-button value="open_id">Open ID</el-radio-button>
+                  <el-radio-button value="email">邮箱</el-radio-button>
+                  <el-radio-button value="chat_id">群 ID</el-radio-button>
+                  <el-radio-button value="user_id">User ID</el-radio-button>
+                  <el-radio-button value="union_id">Union ID</el-radio-button>
                 </el-radio-group>
               </el-form-item>
 
@@ -254,7 +254,7 @@
                   <el-checkbox-button
                     v-for="item in notifyTypeOptions"
                     :key="item.value"
-                    :label="item.value"
+                    :value="item.value"
                   >
                     {{ item.label }}
                   </el-checkbox-button>
@@ -460,16 +460,17 @@ async function bindAndTest() {
 
 // ── Webhook actions ────────────────────────────────────
 
-async function toggleWebhook(val: boolean) {
+async function toggleWebhook(val: string | number | boolean) {
+  const enabled = !!val
   try {
     const res = await notificationApi.updateFeishuSettings({
-      enabled: val,
+      enabled,
       notifyTypes: webhookForm.notifyTypes,
     })
     applyWebhookSettings(res.data)
-    ElMessage.success(val ? '通知已开启' : '通知已暂停')
+    ElMessage.success(enabled ? '通知已开启' : '通知已暂停')
   } catch {
-    webhookForm.enabled = !val // 回滚
+    webhookForm.enabled = !enabled // 回滚
     ElMessage.error('操作失败')
   }
 }
@@ -533,17 +534,18 @@ async function sendWebhookTest() {
 
 // ── App actions ────────────────────────────────────────
 
-async function toggleApp(val: boolean) {
+async function toggleApp(val: string | number | boolean) {
+  const enabled = !!val
   try {
     const res = await notificationApi.updateFeishuAppSettings({
-      enabled: val,
+      enabled,
       notifyTypes: appForm.notifyTypes,
       receiveIdType: appForm.receiveIdType,
     })
     applyAppSettings(res.data)
-    ElMessage.success(val ? '通知已开启' : '通知已暂停')
+    ElMessage.success(enabled ? '通知已开启' : '通知已暂停')
   } catch {
-    appForm.enabled = !val
+    appForm.enabled = !enabled
     ElMessage.error('操作失败')
   }
 }
