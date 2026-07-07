@@ -74,15 +74,15 @@
         <span>售后/退款</span>
         <span class="section-card__meta">
           {{
-            aftersaleCount > 0
-              ? `${aftersaleCount} 条，合计 ¥${centToYuan(aftersaleTotal)}`
+            rangeAftersaleList.length > 0
+              ? `${rangeAftersaleList.length} 条，合计 ¥${centToYuan(rangeAftersaleTotal)}`
               : '当前时段无售后'
           }}
           <span class="section-card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
         </span>
       </div>
-      <div v-if="showAftersale && aftersaleList.length > 0" class="order-list">
-        <div v-for="a in aftersaleList" :key="a.id" class="order-item">
+      <div v-if="showAftersale && rangeAftersaleList.length > 0" class="order-list">
+        <div v-for="a in rangeAftersaleList" :key="a.id" class="order-item">
           <div class="order-item__info">
             <div class="order-item__title">{{ a.product || '未知商品' }}</div>
             <div class="order-item__meta">
@@ -98,7 +98,7 @@
     </div>
 
     <!-- Trend -->
-    <div class="section-card monetization__chart">
+    <div v-if="trendEntries.length > 1" class="section-card monetization__chart">
       <div class="section-card__header">
         <span>销售趋势</span>
         <el-radio-group v-model="trendMetric" size="small">
@@ -153,7 +153,9 @@
                 <span v-if="order.ship_time" class="order-item__shipped">已发货</span>
               </div>
             </div>
-            <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount) }}</div>
+            <div class="order-item__price">
+              &yen;{{ centToYuan(order.product_price || order.pay_amount) }}
+            </div>
           </div>
         </div>
       </div>
@@ -219,12 +221,10 @@ const stores = ref<WechatStore[]>([])
 const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
 const products = ref<WechatProduct[]>([])
-const aftersaleCount = ref(0)
-const aftersaleList = ref<WechatAftersale[]>([])
 const rangeAftersaleList = ref<WechatAftersale[]>([])
-const aftersaleTotal = ref(0)
-const showAftersale = ref(false)
+const allAftersaleList = ref<WechatAftersale[]>([])
 let prevAftersaleCount = 0
+const showAftersale = ref(false)
 const orderSearch = ref('')
 const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: string } | null>(null)
 let timer: ReturnType<typeof setInterval> | null = null
@@ -301,8 +301,15 @@ const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales
 const statusBreakdown = computed(() => {
   return [
     ...buildStatusBreakdown(displayOrders.value),
-    { label: '售后', count: aftersaleCount.value },
+    { label: '售后', count: rangeAftersaleList.value.length },
   ]
+})
+
+const rangeAftersaleTotal = computed(() => {
+  return rangeAftersaleList.value.reduce(
+    (s, a) => s + (isSuccessfulAftersale(a) ? a.amount || 0 : 0),
+    0,
+  )
 })
 
 const filteredOrders = computed(() => {
@@ -314,8 +321,10 @@ const filteredOrders = computed(() => {
 })
 const filteredOrderCount = computed(() => filteredOrders.value.length)
 
+const trendEntries = computed(() => buildDailySales(displayOrders.value, rangeAftersaleList.value))
+
 const trendOption = computed(() => {
-  const entries = buildDailySales(displayOrders.value, rangeAftersaleList.value)
+  const entries = trendEntries.value
   return {
     tooltip: { trigger: 'axis' as const },
     grid: { left: 55, right: 20, top: 20, bottom: 20 },
@@ -406,7 +415,7 @@ async function loadStoreData() {
   try {
     const { start, end } = displayRange.value
     const [ordRes, prodRes, afterRes, rangeAfterRes, infoRes] = await Promise.all([
-      wechatStoreApi.getOrders(activeStoreId.value, { page_size: 1000 }),
+      wechatStoreApi.getOrders(activeStoreId.value, { page_size: 5000 }),
       wechatStoreApi.getProducts(activeStoreId.value, { page_size: 50 }),
       wechatStoreApi.getAftersaleCount?.(activeStoreId.value) || Promise.resolve(null),
       wechatStoreApi.getAftersaleCount?.(activeStoreId.value, {
@@ -420,7 +429,7 @@ async function loadStoreData() {
     if (afterRes?.data?.errcode === 0) {
       const raw = (afterRes.data.list || []) as WechatAftersale[]
       const filtered = normalizeAftersales(raw)
-      aftersaleList.value = filtered
+      allAftersaleList.value = filtered
       const newCount = filtered.length
       if (prevAftersaleCount > 0 && newCount > prevAftersaleCount) {
         const added = newCount - prevAftersaleCount
@@ -432,16 +441,13 @@ async function loadStoreData() {
         showAftersale.value = true
       }
       prevAftersaleCount = newCount
-      aftersaleCount.value = newCount
-      aftersaleTotal.value = filtered.reduce(
-        (s, a) => s + (isSuccessfulAftersale(a) ? a.amount || 0 : 0),
-        0,
-      )
     }
     if (rangeAfterRes?.data?.errcode === 0) {
       rangeAftersaleList.value = normalizeAftersales(
         (rangeAfterRes.data.list || []) as WechatAftersale[],
       )
+    } else {
+      rangeAftersaleList.value = []
     }
     if (infoRes?.data?.errcode === 0) shopInfo.value = infoRes.data.info || null
   } catch (error: any) {

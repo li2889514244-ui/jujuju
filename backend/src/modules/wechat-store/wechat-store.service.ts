@@ -173,7 +173,7 @@ export class WechatStoreService implements OnModuleInit {
   }
 
   async getOrderListAggregated(storeId: string, params: OrderQuery) {
-    const pageSize = 1000
+    const pageSize = 5000
     const where: any = { storeId }
     if (params.status !== undefined) where.status = params.status
 
