@@ -234,7 +234,7 @@ export class WechatStoreService implements OnModuleInit {
 
   async getAftersaleListAggregated(storeId: string, params: AftersaleQuery = {}) {
     const now = Math.floor(Date.now() / 1000)
-    const begin = params.begin_create_time || now - 24 * 3600
+    const begin = params.begin_create_time || now - 7 * 86400
     const end = params.end_create_time || now
     const rows = await this.prisma.wechatStoreAftersale.findMany({
       where: {
@@ -346,7 +346,7 @@ export class WechatStoreService implements OnModuleInit {
   private async fetchAftersaleListRemote(storeId: string, params: AftersaleQuery) {
     const now = Math.floor(Date.now() / 1000)
     return this.request(storeId, '/channels/ec/aftersale/getaftersalelist', {
-      begin_create_time: params.begin_create_time || now - 24 * 3600,
+      begin_create_time: params.begin_create_time || now - 7 * 86400,
       end_create_time: params.end_create_time || now,
       ...(params.next_key && { next_key: params.next_key }),
     })
@@ -536,7 +536,7 @@ export class WechatStoreService implements OnModuleInit {
     const ids: string[] = []
     let nextKey: string | undefined
     const endTime = Math.floor(Date.now() / 1000)
-    const beginTime = endTime - 24 * 3600
+    const beginTime = endTime - 7 * 86400
 
     for (let page = 0; page < 20; page++) {
       const res: any = await this.fetchAftersaleListRemote(storeId, {

@@ -39,6 +39,7 @@ describe('wechatStoreMetrics', () => {
     expect(result.refund).toBe(29900)
     expect(result.deduction).toBe(119600)
     expect(result.count).toBe(4)
+    expect(result.transactionCount).toBe(3)
     expect(result.effectiveCount).toBe(2)
   })
 
@@ -61,7 +62,7 @@ describe('wechatStoreMetrics', () => {
     expect(result.refund).toBe(29900)
   })
 
-  it('does not double count a refunded order again on the aftersale day in trends', () => {
+  it('shows refund on the aftersale date, not the order date in trends', () => {
     const entries = buildDailySales(
       [{ order_id: 'refunded', status: 200, pay_amount: 29900, create_time: 1781539200 }],
       [
@@ -75,7 +76,10 @@ describe('wechatStoreMetrics', () => {
       ],
     )
 
-    expect(entries).toEqual([{ date: '06-16', gmv: 0, orders: 1 }])
+    expect(entries).toEqual([
+      { date: '06-16', gmv: 29900, orders: 1 },
+      { date: '06-17', gmv: -29900, orders: 0 },
+    ])
   })
 
   it('shows refund-only days as negative daily net sales', () => {

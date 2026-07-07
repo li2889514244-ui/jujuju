@@ -528,6 +528,9 @@ onUnmounted(() => {
   }
 
   @media (max-width: 960px) {
+    &__kpi--primary {
+      grid-template-columns: 1fr;
+    }
     &__kpi--status {
       grid-template-columns: repeat(3, 1fr);
     }

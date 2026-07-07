@@ -20,6 +20,7 @@ export interface SalesStats {
   gmv: number
   count: number
   effectiveCount: number
+  transactionCount: number
   avg: number
   gross: number
   refund: number
@@ -82,39 +83,24 @@ export function calculateNetSales(
   aftersales: WechatAftersaleMetric[],
 ): SalesStats {
   const rawTotal = orders.reduce((sum, order) => sum + safeAmount(order.pay_amount), 0)
-  const effectiveCount = orders.filter(
-    (order) =>
-      !NON_REVENUE_ORDER_STATUSES.has(order.status) && order.status !== REFUNDED_ORDER_STATUS,
+
+  // 成交订单 = 排除待付款(10,12)和已取消(250)的所有订单（含已退款200）
+  const transactionOrders = orders.filter((order) => !NON_REVENUE_ORDER_STATUSES.has(order.status))
+  const transactionCount = transactionOrders.length
+
+  // 有效订单 = 排除待付款、已取消、已退款(200)的订单
+  const effectiveCount = transactionOrders.filter(
+    (order) => order.status !== REFUNDED_ORDER_STATUS,
   ).length
-  const gross = orders.reduce((sum, order) => {
-    if (NON_REVENUE_ORDER_STATUSES.has(order.status)) return sum
-    return sum + safeAmount(order.pay_amount)
-  }, 0)
 
-  const refundedOrders = orders.filter((order) => order.status === REFUNDED_ORDER_STATUS)
-  const refundedOrderAmount = refundedOrders.reduce(
-    (sum, order) => sum + safeAmount(order.pay_amount),
-    0,
-  )
-  const refundedOrderIds = new Set(
-    refundedOrders.map((order) => String(order.order_id)).filter(Boolean),
-  )
+  // 成交金额 = 所有成交订单的支付金额（含已退款的）
+  const gross = transactionOrders.reduce((sum, order) => sum + safeAmount(order.pay_amount), 0)
+
+  // 退款金额 = 所有成功退款的售后记录金额之和
+  // 与官方平台一致：基于售后记录计算，而非订单状态
   const successfulRefunds = aftersales.filter(isSuccessfulRefund)
-  const successfulRefundTotal = successfulRefunds.reduce(
-    (sum, item) => sum + safeAmount(item.amount),
-    0,
-  )
+  const refund = successfulRefunds.reduce((sum, item) => sum + safeAmount(item.amount), 0)
 
-  const hasRefundOrderIds = successfulRefunds.some((item) => item.order_id)
-  const extraRefundAmount = successfulRefunds.reduce((sum, item) => {
-    const orderId = item.order_id ? String(item.order_id) : ''
-    if (orderId && refundedOrderIds.has(orderId)) return sum
-    return sum + safeAmount(item.amount)
-  }, 0)
-
-  const refund = hasRefundOrderIds
-    ? refundedOrderAmount + extraRefundAmount
-    : Math.max(refundedOrderAmount, successfulRefundTotal)
   const gmv = gross - refund
   const count = orders.length
 
@@ -122,6 +108,7 @@ export function calculateNetSales(
     gmv,
     count,
     effectiveCount,
+    transactionCount,
     avg: effectiveCount > 0 ? gmv / effectiveCount : 0,
     gross,
     refund,
@@ -144,8 +131,6 @@ export function buildDailySales(
   const grossByDate = new Map<string, number>()
   const refundByDate = new Map<string, number>()
   const ordersByDate = new Map<string, number>()
-  const refundedOrderIds = new Set<string>()
-
   orders.forEach((order) => {
     const date = orderDate(order)
     const amount = safeAmount(order.pay_amount)
@@ -154,18 +139,10 @@ export function buildDailySales(
 
     if (NON_REVENUE_ORDER_STATUSES.has(order.status)) return
     grossByDate.set(date, (grossByDate.get(date) || 0) + amount)
-
-    if (order.status === REFUNDED_ORDER_STATUS) {
-      refundedOrderIds.add(String(order.order_id))
-      refundByDate.set(date, (refundByDate.get(date) || 0) + amount)
-    }
   })
 
   aftersales.forEach((item) => {
     if (!isSuccessfulRefund(item)) return
-    const orderId = item.order_id ? String(item.order_id) : ''
-    if (orderId && refundedOrderIds.has(orderId)) return
-
     const date = aftersaleDate(item)
     if (!date) return
     dates.add(date)
