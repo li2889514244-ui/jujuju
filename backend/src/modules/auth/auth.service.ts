@@ -4,25 +4,26 @@ import {
   ConflictException,
   Logger,
   OnModuleInit,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
-import { PrismaService } from '../../prisma/prisma.service';
-import { RedisService } from '../../redis/redis.service';
+} from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
+import { ConfigService } from '@nestjs/config'
+import * as bcrypt from 'bcryptjs'
+import * as crypto from 'crypto'
+import { PrismaService } from '../../prisma/prisma.service'
+import { RedisService } from '../../redis/redis.service'
 
 /** Cost factor for bcrypt password hashing */
-const BCRYPT_ROUNDS = 12;
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
+const BCRYPT_ROUNDS = 12
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
 
 @Injectable()
 export class AuthService implements OnModuleInit {
-  private readonly logger = new Logger(AuthService.name);
-  private jwtSecret!: string;
-  private jwtRefreshSecret!: string;
-  private jwtAccessExpires!: string;
-  private jwtRefreshExpires!: string;
+  private readonly logger = new Logger(AuthService.name)
+  private jwtSecret!: string
+  private jwtRefreshSecret!: string
+  private jwtAccessExpires!: string
+  private jwtRefreshExpires!: string
 
   constructor(
     private prisma: PrismaService,
@@ -33,15 +34,13 @@ export class AuthService implements OnModuleInit {
 
   onModuleInit() {
     // Validate required secrets at startup
-    this.jwtSecret = this.configService.get<string>('JWT_SECRET')!;
-    this.jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET')!;
-    this.jwtAccessExpires = this.configService.get<string>('JWT_ACCESS_EXPIRES', '15m');
-    this.jwtRefreshExpires = this.configService.get<string>('JWT_REFRESH_EXPIRES', '7d');
+    this.jwtSecret = this.configService.get<string>('JWT_SECRET')!
+    this.jwtRefreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET')!
+    this.jwtAccessExpires = this.configService.get<string>('JWT_ACCESS_EXPIRES', '15m')
+    this.jwtRefreshExpires = this.configService.get<string>('JWT_REFRESH_EXPIRES', '7d')
 
     if (!this.jwtSecret || !this.jwtRefreshSecret) {
-      throw new Error(
-        'JWT_SECRET and JWT_REFRESH_SECRET must be configured. Check your .env file.',
-      );
+      throw new Error('JWT_SECRET and JWT_REFRESH_SECRET must be configured. Check your .env file.')
     }
   }
 
@@ -49,18 +48,20 @@ export class AuthService implements OnModuleInit {
    * 用户注册
    */
   async register(dto: RegisterDto) {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: dto.email },
-    });
+    const existingUser = dto.email
+      ? await this.prisma.user.findUnique({
+          where: { email: dto.email },
+        })
+      : null
 
     if (existingUser) {
-      throw new ConflictException('该邮箱已被注册');
+      throw new ConflictException('该邮箱已被注册')
     }
 
     // Enforce password policy
-    this.validatePassword(dto.password);
+    this.validatePassword(dto.password)
 
-    const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const hashedPassword = await bcrypt.hash(dto.password, BCRYPT_ROUNDS)
 
     const user = await this.prisma.user.create({
       data: {
@@ -78,32 +79,32 @@ export class AuthService implements OnModuleInit {
         status: true,
         createdAt: true,
       },
-    });
+    })
 
-    this.logger.log(`用户注册成功: ${user.email}`);
+    this.logger.log(`用户注册成功: ${user.email}`)
 
-    const tokens = await this.generateTokens(user.id, user.email);
-    return { user, ...tokens };
+    const tokens = await this.generateTokens(user.id, user.email)
+    return { user, ...tokens }
   }
 
   /**
    * 用户登录
    */
   async login(dto: LoginDto) {
-    const user = await this.validateUser(dto.email, dto.password);
+    const user = await this.validateUser(dto.email, dto.password)
     if (!user) {
-      throw new UnauthorizedException('邮箱或密码错误');
+      throw new UnauthorizedException('邮箱或密码错误')
     }
 
     // 更新最后登录时间
     await this.prisma.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
-    });
+    })
 
-    this.logger.log(`用户登录成功: ${user.email}`);
+    this.logger.log(`用户登录成功: ${user.email}`)
 
-    const tokens = await this.generateTokens(user.id, user.email);
+    const tokens = await this.generateTokens(user.id, user.email)
     return {
       user: {
         id: user.id,
@@ -112,7 +113,7 @@ export class AuthService implements OnModuleInit {
         role: user.role,
       },
       ...tokens,
-    };
+    }
   }
 
   /**
@@ -121,58 +122,68 @@ export class AuthService implements OnModuleInit {
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
-    });
+    })
 
-    if (!user) {
-      return null;
+    if (!user || !user.password) {
+      return null
     }
 
     if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('用户账号已被禁用');
+      throw new UnauthorizedException('用户账号已被禁用')
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.password)
     if (!isPasswordValid) {
-      return null;
+      return null
     }
 
-    return user;
+    return user
+  }
+
+  /**
+   * 对 token 进行哈希，避免在 Redis Key 中存储原始 token
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex')
   }
 
   /**
    * 刷新令牌
    * #2 修复: refresh 时将旧 token 存入 Redis 黑名单
+   * 安全修复: 使用 token 的 SHA-256 hash 作为 Redis Key，避免明文存储
    */
   async refreshTokens(refreshToken: string) {
     try {
+      const tokenHash = this.hashToken(refreshToken)
+
       // 检查旧 token 是否已在黑名单中
-      const isBlacklisted = await this.redis.exists(`token:blacklist:${refreshToken}`);
+      const isBlacklisted = await this.redis.exists(`token:blacklist:${tokenHash}`)
       if (isBlacklisted) {
-        throw new UnauthorizedException('刷新令牌已被吊销');
+        throw new UnauthorizedException('刷新令牌已被吊销')
       }
 
       const payload = this.jwtService.verify(refreshToken, {
         secret: this.jwtRefreshSecret,
-      });
+      })
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
-      });
+      })
 
       if (!user || user.status !== 'ACTIVE') {
-        throw new UnauthorizedException('无效的刷新令牌');
+        throw new UnauthorizedException('无效的刷新令牌')
       }
 
-      // 将旧 refresh token 加入黑名单（TTL 设为 refresh token 的最大有效期 7 天）
-      await this.redis.setWithTTL(`token:blacklist:${refreshToken}`, '1', 7 * 24 * 60 * 60);
+      // 将旧 refresh token 的 hash 加入黑名单（TTL 设为 refresh token 的最大有效期 7 天）
+      await this.redis.setWithTTL(`token:blacklist:${tokenHash}`, '1', 7 * 24 * 60 * 60)
 
-      const tokens = await this.generateTokens(user.id, user.email);
-      return tokens;
+      const tokens = await this.generateTokens(user.id, user.email)
+      return tokens
     } catch (error) {
       if (error instanceof UnauthorizedException) {
-        throw error;
+        throw error
       }
-      throw new UnauthorizedException('刷新令牌已过期或无效');
+      throw new UnauthorizedException('刷新令牌已过期或无效')
     }
   }
 
@@ -184,22 +195,23 @@ export class AuthService implements OnModuleInit {
       // 验证 token 有效性（不抛异常，只解析）
       this.jwtService.verify(refreshToken, {
         secret: this.jwtRefreshSecret,
-      });
+      })
     } catch {
       // token 已过期也正常处理
     }
 
-    // 无论如何都将 token 加入黑名单
-    await this.redis.setWithTTL(`token:blacklist:${refreshToken}`, '1', 7 * 24 * 60 * 60);
-    this.logger.log('用户登出成功，refresh token 已吊销');
-    return { success: true, message: '登出成功' };
+    // 无论如何都将 token 的 hash 加入黑名单
+    const tokenHash = this.hashToken(refreshToken)
+    await this.redis.setWithTTL(`token:blacklist:${tokenHash}`, '1', 7 * 24 * 60 * 60)
+    this.logger.log('用户登出成功，refresh token 已吊销')
+    return { success: true, message: '登出成功' }
   }
 
   /**
    * 生成 Access Token 和 Refresh Token
    */
-  private async generateTokens(userId: string, email: string) {
-    const payload = { sub: userId, email };
+  private async generateTokens(userId: string, email: string | null) {
+    const payload = { sub: userId, email: email || undefined }
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -210,9 +222,9 @@ export class AuthService implements OnModuleInit {
         secret: this.jwtRefreshSecret,
         expiresIn: this.jwtRefreshExpires,
       }),
-    ]);
+    ])
 
-    return { accessToken, refreshToken };
+    return { accessToken, refreshToken }
   }
 
   /**
@@ -224,24 +236,31 @@ export class AuthService implements OnModuleInit {
    * - 包含数字
    */
   private validatePassword(password: string): void {
-    const errors: string[] = [];
+    const errors: string[] = []
 
     if (password.length < 8) {
-      errors.push('密码长度不能少于8个字符');
+      errors.push('密码长度不能少于8个字符')
     }
     if (!/[A-Z]/.test(password)) {
-      errors.push('密码必须包含至少一个大写字母');
+      errors.push('密码必须包含至少一个大写字母')
     }
     if (!/[a-z]/.test(password)) {
-      errors.push('密码必须包含至少一个小写字母');
+      errors.push('密码必须包含至少一个小写字母')
     }
     if (!/[0-9]/.test(password)) {
-      errors.push('密码必须包含至少一个数字');
+      errors.push('密码必须包含至少一个数字')
     }
 
     if (errors.length > 0) {
-      throw new ConflictException(errors.join('; '));
+      throw new ConflictException(errors.join('; '))
     }
+  }
+
+  /**
+   * 为 Authing 登录的用户签发 JWT（供 AuthingService 回调使用）
+   */
+  async generateTokensForUser(user: { id: string; email: string | null }) {
+    return this.generateTokens(user.id, user.email)
   }
 
   /**
@@ -261,23 +280,53 @@ export class AuthService implements OnModuleInit {
         lastLoginAt: true,
         createdAt: true,
       },
-    });
+    })
 
     if (!user) {
-      throw new UnauthorizedException('用户不存在');
+      throw new UnauthorizedException('用户不存在')
     }
 
-    return user;
+    return user
+  }
+
+  /**
+   * 修改密码
+   */
+  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    })
+
+    if (!user || !user.password) {
+      throw new UnauthorizedException('用户不存在或未设置密码')
+    }
+
+    const isOldValid = await bcrypt.compare(oldPassword, user.password)
+    if (!isOldValid) {
+      throw new UnauthorizedException('旧密码错误')
+    }
+
+    // 校验新密码策略
+    this.validatePassword(newPassword)
+
+    const hashedPassword = await bcrypt.hash(newPassword, BCRYPT_ROUNDS)
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    })
+
+    this.logger.log(`用户修改密码成功: ${userId}`)
+    return { success: true, message: '密码修改成功' }
   }
 
   /**
    * 更新用户资料
    */
   async updateProfile(userId: string, data: { name?: string; avatar?: string; phone?: string }) {
-    const updateData: Record<string, string> = {};
-    if (data.name) updateData.name = data.name;
-    if (data.avatar) updateData.avatar = data.avatar;
-    if (data.phone) updateData.phone = data.phone;
+    const updateData: Record<string, string> = {}
+    if (data.name) updateData.name = data.name
+    if (data.avatar) updateData.avatar = data.avatar
+    if (data.phone) updateData.phone = data.phone
 
     const user = await this.prisma.user.update({
       where: { id: userId },
@@ -293,9 +342,9 @@ export class AuthService implements OnModuleInit {
         lastLoginAt: true,
         createdAt: true,
       },
-    });
+    })
 
-    this.logger.log(`用户资料更新: ${userId}`);
-    return user;
+    this.logger.log(`用户资料更新: ${userId}`)
+    return user
   }
 }

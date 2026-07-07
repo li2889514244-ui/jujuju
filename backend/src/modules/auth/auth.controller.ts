@@ -1,18 +1,32 @@
-import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { Public } from '../../common/decorators/public.decorator';
-import { AuthService } from './auth.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { RefreshTokenDto } from './dto/refresh-token.dto';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import {
+  Controller,
+  Post,
+  Get,
+  Body,
+  Query,
+  HttpCode,
+  HttpStatus,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { Throttle } from '@nestjs/throttler'
+import { Public } from '../../common/decorators/public.decorator'
+import { AuthService } from './auth.service'
+import { AuthingService } from './authing.service'
+import { RegisterDto } from './dto/register.dto'
+import { LoginDto } from './dto/login.dto'
+import { RefreshTokenDto } from './dto/refresh-token.dto'
+import { JwtAuthGuard } from './guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly authingService: AuthingService,
+  ) {}
 
   @Post('register')
   @Public()
@@ -22,7 +36,7 @@ export class AuthController {
   @ApiResponse({ status: 409, description: '邮箱已被注册' })
   @ApiResponse({ status: 429, description: '请求过于频繁' })
   async register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+    return this.authService.register(dto)
   }
 
   @Post('login')
@@ -34,7 +48,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '邮箱或密码错误' })
   @ApiResponse({ status: 429, description: '请求过于频繁' })
   async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+    return this.authService.login(dto)
   }
 
   @Post('refresh')
@@ -46,7 +60,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '刷新令牌无效' })
   @ApiResponse({ status: 429, description: '请求过于频繁' })
   async refresh(@Body() dto: RefreshTokenDto) {
-    return this.authService.refreshTokens(dto.refreshToken);
+    return this.authService.refreshTokens(dto.refreshToken)
   }
 
   @Post('logout')
@@ -55,7 +69,58 @@ export class AuthController {
   @ApiOperation({ summary: '用户登出（吊销 refresh token）' })
   @ApiResponse({ status: 200, description: '登出成功' })
   async logout(@Body() dto: RefreshTokenDto) {
-    return this.authService.logout(dto.refreshToken);
+    return this.authService.logout(dto.refreshToken)
+  }
+
+  // ==================== Authing 第三方登录 ====================
+
+  @Get('authing/url')
+  @Public()
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: '获取 Authing 登录 URL（微信/手机号登录）' })
+  @ApiQuery({ name: 'method', description: '登录方式', required: false, enum: ['wechat', 'phone'] })
+  @ApiResponse({ status: 200, description: '返回 Authing 授权 URL' })
+  async getAuthingUrl(@Query('method') _method?: string) {
+    if (!this.authingService.isEnabled()) {
+      throw new BadRequestException('Authing 未配置，请联系管理员')
+    }
+    const state = await this.authingService.generateState()
+    const url = this.authingService.getAuthorizeUrl(state)
+    return { url, state }
+  }
+
+  @Post('authing/callback')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ short: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Authing 登录回调（用授权码换取用户信息并签发 JWT）' })
+  @ApiResponse({ status: 200, description: '登录成功' })
+  @ApiResponse({ status: 401, description: '授权码无效' })
+  async authingCallback(@Body() body: { code: string; state: string }) {
+    if (!body.code || !body.state) {
+      throw new BadRequestException('缺少 code 或 state 参数')
+    }
+
+    const authingUser = await this.authingService.exchangeCodeForUserInfo(body.code, body.state)
+
+    const user = await this.authingService.findOrCreateUser(authingUser)
+
+    const tokens = await this.authService.generateTokensForUser({
+      id: user.id,
+      email: user.email,
+    })
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        avatar: user.avatar,
+        phone: user.phone,
+      },
+      ...tokens,
+    }
   }
 
   @Get('me')
@@ -65,7 +130,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '获取成功' })
   @ApiResponse({ status: 401, description: '未登录' })
   async getMe(@CurrentUser('id') userId: string) {
-    return this.authService.getProfile(userId);
+    return this.authService.getProfile(userId)
   }
 
   @Post('profile')
@@ -78,6 +143,20 @@ export class AuthController {
     @CurrentUser('id') userId: string,
     @Body() dto: { name?: string; avatar?: string; phone?: string },
   ) {
-    return this.authService.updateProfile(userId, dto);
+    return this.authService.updateProfile(userId, dto)
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '修改密码' })
+  @ApiResponse({ status: 200, description: '修改成功' })
+  @ApiResponse({ status: 400, description: '旧密码错误或新密码不符合策略' })
+  async changePassword(
+    @CurrentUser('id') userId: string,
+    @Body() dto: { oldPassword: string; newPassword: string },
+  ) {
+    return this.authService.changePassword(userId, dto.oldPassword, dto.newPassword)
   }
 }

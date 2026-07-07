@@ -9,38 +9,39 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PrismaService } from '../../prisma/prisma.service';
-import { IsString, IsOptional, IsInt } from 'class-validator';
+  NotFoundException,
+} from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { PrismaService } from '../../prisma/prisma.service'
+import { IsString, IsOptional, IsInt } from 'class-validator'
 
 class CreateGroupDto {
   @IsString()
-  name: string;
+  name: string
 
   @IsOptional()
   @IsString()
-  color?: string;
+  color?: string
 
   @IsOptional()
   @IsInt()
-  sortOrder?: number;
+  sortOrder?: number
 }
 
 class UpdateGroupDto {
   @IsOptional()
   @IsString()
-  name?: string;
+  name?: string
 
   @IsOptional()
   @IsString()
-  color?: string;
+  color?: string
 
   @IsOptional()
   @IsInt()
-  sortOrder?: number;
+  sortOrder?: number
 }
 
 @ApiTags('account-groups')
@@ -60,7 +61,7 @@ export class AccountGroupsController {
         sortOrder: dto.sortOrder || 0,
         userId,
       },
-    });
+    })
   }
 
   @Get()
@@ -70,7 +71,7 @@ export class AccountGroupsController {
       where: { userId },
       include: { _count: { select: { accounts: true } } },
       orderBy: { sortOrder: 'asc' },
-    });
+    })
   }
 
   @Put(':id')
@@ -82,15 +83,15 @@ export class AccountGroupsController {
     @CurrentUser('id') userId: string,
   ) {
     // 先验证归属
-    const group = await this.prisma.accountGroup.findFirst({ where: { id, userId } });
+    const group = await this.prisma.accountGroup.findFirst({ where: { id, userId } })
     if (!group) {
-      return { success: false, message: '分组不存在或无权操作' };
+      throw new NotFoundException('分组不存在或无权操作')
     }
     return this.prisma.accountGroup.update({
       where: { id },
       data: dto,
       include: { _count: { select: { accounts: true } } },
-    });
+    })
   }
 
   @Delete(':id')
@@ -101,8 +102,8 @@ export class AccountGroupsController {
     await this.prisma.account.updateMany({
       where: { groupId: id, userId },
       data: { groupId: null },
-    });
-    return this.prisma.accountGroup.deleteMany({ where: { id, userId } });
+    })
+    return this.prisma.accountGroup.deleteMany({ where: { id, userId } })
   }
 
   @Put(':id/accounts')
@@ -116,7 +117,7 @@ export class AccountGroupsController {
     await this.prisma.account.updateMany({
       where: { id: { in: body.accountIds }, userId },
       data: { groupId },
-    });
-    return { success: true, count: body.accountIds.length };
+    })
+    return { success: true, count: body.accountIds.length }
   }
 }

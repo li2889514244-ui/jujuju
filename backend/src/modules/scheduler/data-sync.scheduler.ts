@@ -17,8 +17,8 @@ interface AccountMetrics {
 }
 
 /**
- * 鏁版嵁閲囬泦瀹氭椂浠诲姟
- * 姣忔棩鍑屾櫒 2:00 鑷姩鎶撳彇鍚勫钩鍙拌处鍙风殑绮変笣/浜掑姩鏁版嵁
+ * 数据采集定时任务
+ * 每日凌晨 2:00 自动抓取各平台账号的粉丝/互动数据
  */
 @Injectable()
 export class DataSyncScheduler {
@@ -45,34 +45,34 @@ export class DataSyncScheduler {
   }
 
   /**
-   * 姣忓ぉ鍑屾櫒 2:00 鎵ц鏁版嵁閲囬泦
+   * 每天凌晨 2:00 执行数据采集
    */
   @Cron('0 2 * * *')
   async handleDailySync() {
     if (this.isRunning) {
-      this.logger.warn('[garbled]')
+      this.logger.warn('上一次数据采集任务仍在执行，跳过本次触发')
       return
     }
 
     this.isRunning = true
     this.logger.log('每日数据采集任务启动')
-    
+
     try {
       const accounts = await this.prisma.account.findMany({
         where: { status: 'ACTIVE' },
         select: { id: true, platform: true, cookies: true, nickname: true },
       })
-    
+
       this.logger.log(`Data sync: ${accounts.length} accounts to collect`)
-    
+
       let successCount = 0
       let failCount = 0
       let skippedCount = 0
-    
+
       for (const account of accounts) {
         try {
           const cookies = account.cookies ? this.cookieManager.decryptCookie(account.cookies) : []
-    
+
           if (cookies.length === 0) {
             skippedCount++
             this.logger.warn(
@@ -80,9 +80,9 @@ export class DataSyncScheduler {
             )
             continue
           }
-    
+
           const result = await this.collectMetrics(account.platform, account.id, cookies)
-    
+
           if (result) {
             await this.saveMetrics(account.id, account.platform, result.metrics)
             successCount++
@@ -95,7 +95,7 @@ export class DataSyncScheduler {
               )
             }
           }
-    
+
           // 每个账号间隔 5-10 秒，避免频率过高
           await this.delay(5000 + Math.random() * 5000)
         } catch (error: any) {
@@ -103,13 +103,15 @@ export class DataSyncScheduler {
           this.logger.warn(`Collection failed [${account.nickname}]: ${error.message}`)
         }
       }
-    
-      this.logger.log(`Data collection complete: ${successCount} success, ${failCount} failed, ${skippedCount} skipped`)
-    
+
+      this.logger.log(
+        `Data collection complete: ${successCount} success, ${failCount} failed, ${skippedCount} skipped`,
+      )
+
       if (skippedCount === accounts.length && accounts.length > 0) {
         this.logger.warn(
           `所有 ${accounts.length} 个账号均无Cookie，自动采集全部跳过！` +
-          `请确保：1) 桌面伴侣已运行并上报数据，或 2) 在前端平台管理页面完成账号授权登录以保存Cookie。`,
+            `请确保：1) 桌面伴侣已运行并上报数据，或 2) 在前端平台管理页面完成账号授权登录以保存Cookie。`,
         )
       }
     } catch (error: any) {
@@ -120,7 +122,10 @@ export class DataSyncScheduler {
   }
 
   /**
-   * 鏍规嵁骞冲彴閲囬泦鏁版嵁
+   * 根据平台采集数据
+   * 注意：当前 CSS 选择器为空，无法提取真实数据。
+   * 采集结果返回 null 跳过写入，避免用全 0 覆盖已有真实数据。
+   * 数据采集主要依赖桌面伴侣上报，此处仅作为备用补充。
    */
   private async collectMetrics(
     platform: Platform,
@@ -158,7 +163,7 @@ export class DataSyncScheduler {
       if (metrics) {
         // 采集成功，提取浏览器刷新后的 Cookie
         try {
-          const refreshedCookies = await context.cookies() as StoredCookie[]
+          const refreshedCookies = (await context.cookies()) as StoredCookie[]
           return { metrics, refreshedCookies }
         } catch {
           return { metrics }
@@ -179,12 +184,9 @@ export class DataSyncScheduler {
 
     if (page.url().includes('login')) return null
 
-    // 灏濊瘯浠庢暟鎹瑙堥〉鎻愬彇鏁板瓧
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '')
-    const views = await this.extractNumber(page, '')
-
-    return { followers, likes, views, comments: 0 }
+    // CSS 选择器未配置，跳过采集，避免写入全 0 数据覆盖真实数据
+    this.logger.warn('抖音采集：CSS 选择器未配置，跳过本次采集。请通过桌面伴侣上报数据。')
+    return null
   }
 
   private async collectXiaohongshu(page: any): Promise<AccountMetrics | null> {
@@ -195,11 +197,8 @@ export class DataSyncScheduler {
 
     if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '')
-    const views = await this.extractNumber(page, '')
-
-    return { followers, likes, views, comments: 0 }
+    this.logger.warn('小红书采集：CSS 选择器未配置，跳过本次采集。')
+    return null
   }
 
   private async collectKuaishou(page: any): Promise<AccountMetrics | null> {
@@ -210,11 +209,8 @@ export class DataSyncScheduler {
 
     if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '')
-    const views = await this.extractNumber(page, '')
-
-    return { followers, likes, views, comments: 0 }
+    this.logger.warn('快手采集：CSS 选择器未配置，跳过本次采集。')
+    return null
   }
 
   private async collectBilibili(page: any): Promise<AccountMetrics | null> {
@@ -225,11 +221,8 @@ export class DataSyncScheduler {
 
     if (page.url().includes('passport')) return null
 
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '')
-    const views = await this.extractNumber(page, '')
-
-    return { followers, likes, views, comments: 0 }
+    this.logger.warn('B站采集：CSS 选择器未配置，跳过本次采集。')
+    return null
   }
 
   private async collectWeibo(page: any): Promise<AccountMetrics | null> {
@@ -238,11 +231,8 @@ export class DataSyncScheduler {
 
     if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '[class*="like"]')
-    const views = await this.extractNumber(page, '[class*="read"]')
-
-    return { followers, likes, views: views || 0, comments: 0 }
+    this.logger.warn('微博采集：CSS 选择器未配置，跳过本次采集。')
+    return null
   }
 
   private async collectWechatVideo(page: any): Promise<AccountMetrics | null> {
@@ -253,23 +243,22 @@ export class DataSyncScheduler {
 
     if (page.url().includes('login')) return null
 
-    const followers = await this.extractNumber(page, '')
-    const likes = await this.extractNumber(page, '')
-
-    return { followers, likes, views: 0, comments: 0 }
+    this.logger.warn('微信视频号采集：CSS 选择器未配置，跳过本次采集。')
+    return null
   }
 
   /**
-   * 浠庨〉闈㈡彁鍙栨暟瀛楋紙鏀寔澶氫釜閫夋嫨鍣ㄥ皾璇曪級
+   * 从页面提取数字（支持多个选择器尝试）
    */
   private async extractNumber(page: any, ...selectors: string[]): Promise<number> {
     for (const selector of selectors) {
+      if (!selector) continue
       try {
         const el = page.locator(selector).first()
         if (await el.isVisible().catch(() => false)) {
           const text = await el.textContent()
           if (text) {
-            // 澶勭悊 ""12.5w"[garbled]"
+            // 处理 "12.5w" 等中文数字格式
             return this.parseChineseNumber(text.trim())
           }
         }
@@ -281,10 +270,10 @@ export class DataSyncScheduler {
   }
 
   /**
-   * 瑙ｆ瀽涓枃鏁板瓧鏍煎紡
+   * 解析中文数字格式
    */
   private parseChineseNumber(text: string): number {
-    const cleaned = text.replace(/[,锛孿s]/g, '')
+    const cleaned = text.replace(/[,，\s]/g, '')
     if (cleaned.includes('万')) {
       const num = parseFloat(cleaned.replace(/[万亿]/g, ''))
       return Math.round(num * 10000)
@@ -298,7 +287,7 @@ export class DataSyncScheduler {
   }
 
   /**
-   * 淇濆瓨閲囬泦鏁版嵁鍒?DailyStats 琛?
+   * 保存采集数据到 DailyStats 表
    */
   private async saveMetrics(accountId: string, platform: Platform, metrics: AccountMetrics) {
     const today = this.getBeijingDayStart()
@@ -310,17 +299,12 @@ export class DataSyncScheduler {
       orderBy: { date: 'desc' },
     })
 
-    const followersIncrement = previousStats
-      ? Math.max(0, metrics.followers - previousStats.followers)
-      : 0
-    const viewsIncrement = previousStats ? Math.max(0, metrics.views - previousStats.views) : 0
-    const likesIncrement = previousStats ? Math.max(0, metrics.likes - previousStats.likes) : 0
-    const commentsIncrement = previousStats
-      ? Math.max(0, metrics.comments - previousStats.comments)
-      : 0
-    const sharesIncrement = previousStats
-      ? Math.max(0, (metrics.shares || 0) - previousStats.shares)
-      : 0
+    // 允许负增量（如掉粉），真实反映数据变化
+    const followersIncrement = previousStats ? metrics.followers - previousStats.followers : 0
+    const viewsIncrement = previousStats ? metrics.views - previousStats.views : 0
+    const likesIncrement = previousStats ? metrics.likes - previousStats.likes : 0
+    const commentsIncrement = previousStats ? metrics.comments - previousStats.comments : 0
+    const sharesIncrement = previousStats ? (metrics.shares || 0) - previousStats.shares : 0
 
     await this.prisma.dailyStats.upsert({
       where: { accountId_date: { accountId, date: today } },
@@ -355,7 +339,7 @@ export class DataSyncScheduler {
       },
     })
 
-    // 鍚屾椂鏇存柊 Account 琛ㄧ殑鏈€鏂扮矇涓濇暟
+    // 同时更新 Account 表的最新粉丝数
     await this.prisma.account.update({
       where: { id: accountId },
       data: { followers: metrics.followers, likes: metrics.likes },
@@ -402,18 +386,20 @@ export class DataSyncScheduler {
       let missingCount = 0
       let expiredCount = 0
       let staleCount = 0
-      const COOKIE_STALE_DAYS = 14 // Cookie超过14天未刷新视为“即将过期”
-      const COOKIE_MAX_DAYS = 30   // Cookie超过30天未刷新视为“已过期”
+      const COOKIE_STALE_DAYS = 14 // Cookie超过14天未刷新视为"即将过期"
+      const COOKIE_MAX_DAYS = 30 // Cookie超过30天未刷新视为"已过期"
 
       for (const account of accounts) {
         const hasCookies = account.cookies && account.cookies.length > 0
         const metadata = (() => {
-          try { return JSON.parse(account.metadata || '{}') } catch { return {} }
+          try {
+            return JSON.parse(account.metadata || '{}')
+          } catch {
+            return {}
+          }
         })()
         const hasToken = !!metadata.oauthToken
-        const tokenExpiresAt = metadata.tokenExpiresAt
-          ? new Date(metadata.tokenExpiresAt)
-          : null
+        const tokenExpiresAt = metadata.tokenExpiresAt ? new Date(metadata.tokenExpiresAt) : null
         const isTokenExpired = tokenExpiresAt && tokenExpiresAt < new Date()
         const isTokenExpiringSoon =
           tokenExpiresAt &&
@@ -445,7 +431,11 @@ export class DataSyncScheduler {
               type: 'CREDENTIAL_EXPIRED' as any,
               title: `账号凭据缺失: ${account.nickname}`,
               content: `${platformLabel} 账号 "${account.nickname}" 未保存Cookie或Token，每日自动采集已跳过。请通过桌面伴侣登录或在前端平台管理页完成授权。`,
-              metadata: { accountId: account.id, platform: account.platform, reason: 'no_credentials' },
+              metadata: {
+                accountId: account.id,
+                platform: account.platform,
+                reason: 'no_credentials',
+              },
             })
           }
         } else if (isTokenExpired) {
@@ -470,7 +460,12 @@ export class DataSyncScheduler {
               type: 'CREDENTIAL_EXPIRED' as any,
               title: `Token已过期: ${account.nickname}`,
               content: `${platformLabel} 账号 "${account.nickname}" 的OAuth Token 已过期。请重新授权以恢复自动采集。`,
-              metadata: { accountId: account.id, platform: account.platform, reason: 'token_expired', expiredAt: tokenExpiresAt!.toISOString() },
+              metadata: {
+                accountId: account.id,
+                platform: account.platform,
+                reason: 'token_expired',
+                expiredAt: tokenExpiresAt!.toISOString(),
+              },
             })
           }
         } else if (isTokenExpiringSoon) {
@@ -494,12 +489,18 @@ export class DataSyncScheduler {
               type: 'CREDENTIAL_EXPIRED' as any,
               title: `Token即将过期: ${account.nickname}`,
               content: `${platformLabel} 账号 "${account.nickname}" 的OAuth Token 将于 ${tokenExpiresAt!.toLocaleDateString('zh-CN')} 过期，请尽快刷新。`,
-              metadata: { accountId: account.id, platform: account.platform, reason: 'token_expiring_soon', expiresAt: tokenExpiresAt!.toISOString() },
+              metadata: {
+                accountId: account.id,
+                platform: account.platform,
+                reason: 'token_expiring_soon',
+                expiresAt: tokenExpiresAt!.toISOString(),
+              },
             })
           }
         } else if (hasCookies && account.cookieSavedAt) {
           // Cookie 存在但已保存超过 COOKIE_STALE_DAYS 天，检查是否老化
-          const daysSinceSaved = (Date.now() - account.cookieSavedAt.getTime()) / (1000 * 60 * 60 * 24)
+          const daysSinceSaved =
+            (Date.now() - account.cookieSavedAt.getTime()) / (1000 * 60 * 60 * 24)
 
           if (daysSinceSaved > COOKIE_MAX_DAYS) {
             staleCount++
@@ -522,7 +523,12 @@ export class DataSyncScheduler {
                 type: 'CREDENTIAL_EXPIRED' as any,
                 title: `Cookie可能已失效: ${account.nickname}`,
                 content: `${platformLabel} 账号 "${account.nickname}" 的Cookie 已 ${Math.floor(daysSinceSaved)} 天未刷新，登录态可能已失效。如采集失败请重新登录。`,
-                metadata: { accountId: account.id, platform: account.platform, reason: 'cookie_stale', daysSinceSaved: Math.floor(daysSinceSaved) },
+                metadata: {
+                  accountId: account.id,
+                  platform: account.platform,
+                  reason: 'cookie_stale',
+                  daysSinceSaved: Math.floor(daysSinceSaved),
+                },
               })
             }
           } else if (daysSinceSaved > COOKIE_STALE_DAYS) {

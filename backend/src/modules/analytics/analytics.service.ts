@@ -113,7 +113,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑾峰彇姣忔棩缁熻鏁版嵁
+   * 获取每日统计数据
    */
   async createManualMonetization(
     userId: string,
@@ -184,7 +184,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑾峰彇鍐呭琛ㄧ幇缁熻
+   * 获取内容表现统计
    */
   async getPostStats(dto: QueryAnalyticsDto, userId?: string) {
     const where: Prisma.PostStatsWhereInput = {}
@@ -224,7 +224,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑾峰彇鑱氬悎姒傝鏁版嵁
+   * 获取聚合概览数据
    */
   async getOverview(userId: string, groupId?: string) {
     // shared mode: 不按 userId 过滤
@@ -235,7 +235,7 @@ export class AnalyticsService {
 
     const accountIds = accounts.map((a) => a.id)
 
-    // 鍐呭缁熻
+    // 内容统计
     const [totalPosts, publishedPosts, failedPosts] = await Promise.all([
       this.prisma.post.count({ where: { accountId: { in: accountIds } } }),
       this.prisma.post.count({
@@ -246,7 +246,7 @@ export class AnalyticsService {
       }),
     ])
 
-    // 绱浜掑姩鏁版嵁
+    // 累计互动数据
     const statsAgg = await this.prisma.postStats.aggregate({
       where: { post: { accountId: { in: accountIds } } },
       _sum: {
@@ -262,13 +262,13 @@ export class AnalyticsService {
       },
     })
 
-    // 鎸夊钩鍙板垎缁勮处鍙锋暟
+    // 按平台分组账号数
     const platformCounts: Record<string, number> = {}
     accounts.forEach((a) => {
       platformCounts[a.platform] = (platformCounts[a.platform] || 0) + 1
     })
 
-    // 鎬荤矇涓濇暟
+    // 总粉丝数
     const totalFollowers = accounts.reduce((sum, a) => sum + a.followers, 0)
     const totalLikes = accounts.reduce((sum, a) => sum + a.likes, 0)
 
@@ -300,7 +300,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑾峰彇骞冲彴缁村害瀵规瘮鏁版嵁
+   * 获取平台维度对比数据
    */
   async getPlatformComparison(userId: string, groupId?: string) {
     // shared mode: 不按 userId 过滤
@@ -366,7 +366,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鐢熸垚鏁版嵁鎶ヨ〃
+   * 生成数据报表
    */
   async generateReport(
     userId: string,
@@ -378,7 +378,7 @@ export class AnalyticsService {
   ) {
     const { startDate, endDate, platform } = params
 
-    // 榛樿鏈€杩?0澶?
+    // 默认最近30天
     const end = endDate || new Date()
     const start = startDate || new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000)
 
@@ -392,7 +392,7 @@ export class AnalyticsService {
 
     const accountIds = accounts.map((a) => a.id)
 
-    // 姣忔棩鏁版嵁瓒嬪娍
+    // 每日数据趋势
     const dailyStats = await this.prisma.dailyStats.findMany({
       where: {
         accountId: { in: accountIds },
@@ -424,7 +424,7 @@ export class AnalyticsService {
       }),
     ])
 
-    // 鍐呭琛ㄧ幇 Top 10
+    // 内容表现 Top 10
     const topPosts = await this.prisma.post.findMany({
       where: {
         accountId: { in: accountIds },
@@ -549,8 +549,8 @@ export class AnalyticsService {
   }
 
   /**
-   * 鏁版嵁鍚屾瘮鐜瘮瀵规瘮
-   * 杩斿洖鏈懆vs涓婂懆銆佹湰鏈坴s涓婃湀銆佹湰鏈坴s鍘诲勾鍚屾湀鐨勬牳蹇冩寚鏍囧姣?
+   * 数据同比环比对比
+   * 返回本周vs上周、本月vs上月、本月vs去年同月的核心指标对比
    */
   async getComparison(userId: string, groupId?: string) {
     // shared mode: 不按 userId 过滤
@@ -562,17 +562,17 @@ export class AnalyticsService {
 
     const now = new Date()
 
-    // 鏈懆锛堝懆涓€鍒颁粖澶╋級
+    // 本周（周一到今天）
     const thisWeekStart = this.getWeekStart(now)
     const lastWeekStart = new Date(thisWeekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
     const lastWeekEnd = new Date(thisWeekStart.getTime() - 1)
 
-    // 鏈湀
+    // 本月
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastMonthEnd = new Date(thisMonthStart.getTime() - 1)
 
-    // 鍘诲勾鍚屾湀
+    // 去年同月
     const lastYearSameMonthStart = new Date(now.getFullYear() - 1, now.getMonth(), 1)
     const lastYearSameMonthEnd = new Date(now.getFullYear() - 1, now.getMonth() + 1, 0)
 
@@ -604,7 +604,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鎾斁閲忔鍗?鈥?鎸夋挱鏀鹃噺鎺掑悕鐨勮棰戝垪琛?
+   * 播放量榜单 — 按播放量排名的视频列表
    */
   async getViewsRanking(
     userId: string,
@@ -771,7 +771,7 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑱氬悎鎸囧畾鏃堕棿娈靛唴鐨勬牳蹇冩寚鏍?
+   * 聚合指定时间段内的核心指标
    */
   private async aggregateStats(accountIds: string[], start: Date, end: Date) {
     if (accountIds.length === 0) {
@@ -801,7 +801,7 @@ export class AnalyticsService {
       }),
     ])
 
-    // 绮変笣澧為暱 = 鏈熸湯 - 鏈熷垵
+    // 粉丝增长 = 期末 - 期初（允许负值，如掉粉）
     const followerStats = await this.prisma.dailyStats.findMany({
       where: {
         accountId: { in: accountIds },
@@ -820,10 +820,11 @@ export class AnalyticsService {
       lastFollowers[stat.accountId] = stat.followers || 0
     }
 
+    // 允许负值（掉粉），不再用 Math.max(0, ...)
     const followerGrowth = accountIds.reduce((sum, accountId) => {
       const first = firstFollowers[accountId] ?? 0
       const last = lastFollowers[accountId] ?? first
-      return sum + Math.max(0, last - first)
+      return sum + (last - first)
     }, 0)
 
     return {
@@ -831,13 +832,13 @@ export class AnalyticsService {
       likes: dailyAgg._sum.likesIncrement || 0,
       comments: dailyAgg._sum.commentsIncrement || 0,
       shares: dailyAgg._sum.sharesIncrement || 0,
-      followers: dailyAgg._sum.followersIncrement || 0,
+      followers: followerGrowth,
       posts: postCount,
     }
   }
 
   /**
-   * 璁＄畻鍙樺寲鐜?
+   * 计算变化率
    */
   private calcChange(current: Record<string, number>, previous: Record<string, number>) {
     const result: Record<string, number | null> = {}
@@ -854,17 +855,17 @@ export class AnalyticsService {
   }
 
   /**
-   * 鑾峰彇鏈懆涓€鐨勬棩鏈燂紙UTC+8 涓浗鏃跺尯锛?
+   * 获取本周一的日期（UTC+8 中国时区）
    */
   private getWeekStart(date: Date): Date {
-    // 杞崲涓?UTC+8
+    // 转换为 UTC+8
     const utc8Offset = 8 * 60 * 60 * 1000
     const localTime = new Date(date.getTime() + utc8Offset)
     const day = localTime.getUTCDay()
     const diff = localTime.getUTCDate() - day + (day === 0 ? -6 : 1)
     localTime.setUTCDate(diff)
     localTime.setUTCHours(0, 0, 0, 0)
-    // 杞洖 UTC
+    // 转回 UTC
     return new Date(localTime.getTime() - utc8Offset)
   }
 

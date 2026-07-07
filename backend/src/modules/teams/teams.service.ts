@@ -4,31 +4,31 @@ import {
   ForbiddenException,
   ConflictException,
   Logger,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateTeamDto } from './dto/create-team.dto';
-import { InviteMemberDto } from './dto/invite-member.dto';
-import { Role } from '../../common/prisma-enums';
+} from '@nestjs/common'
+import { PrismaService } from '../../prisma/prisma.service'
+import { CreateTeamDto } from './dto/create-team.dto'
+import { InviteMemberDto } from './dto/invite-member.dto'
+import { Role } from '../../common/prisma-enums'
 
 @Injectable()
 export class TeamsService {
-  private readonly logger = new Logger(TeamsService.name);
+  private readonly logger = new Logger(TeamsService.name)
 
   constructor(private prisma: PrismaService) {}
 
   /**
-   * 鍒涘缓鍥㈤槦
+   * 创建团队
    */
   async create(dto: CreateTeamDto, userId: string) {
-    // 鑾峰彇鐢ㄦ埛鐨勭粍缁嘔D
+    // 获取用户的组织ID
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { organizationId: true },
-    });
+    })
 
-    const organizationId = dto.organizationId || user?.organizationId;
+    const organizationId = dto.organizationId || user?.organizationId
     if (!organizationId) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('用户未关联任何组织，无法创建团队')
     }
 
     const team = await this.prisma.team.create({
@@ -41,17 +41,17 @@ export class TeamsService {
           select: { id: true, name: true },
         },
       },
-    });
+    })
 
-    this.logger.log(`鍥㈤槦鍒涘缓鎴愬姛: ${team.name} (${team.id})`);
-    return team;
+    this.logger.log(`团队创建成功: ${team.name} (${team.id})`)
+    return team
   }
 
   /**
-   * 鑾峰彇鍥㈤槦鍒楄〃
+   * 获取团队列表
    */
   async findAll(organizationId?: string) {
-    const where = organizationId ? { organizationId } : {};
+    const where = organizationId ? { organizationId } : {}
     return this.prisma.team.findMany({
       where,
       include: {
@@ -68,11 +68,11 @@ export class TeamsService {
         },
       },
       orderBy: { createdAt: 'desc' },
-    });
+    })
   }
 
   /**
-   * 鑾峰彇鍥㈤槦璇︽儏
+   * 获取团队详情
    */
   async findById(id: string) {
     const team = await this.prisma.team.findUnique({
@@ -96,49 +96,49 @@ export class TeamsService {
           },
         },
       },
-    });
+    })
 
     if (!team) {
-      throw new NotFoundException('[garbled]');
+      throw new NotFoundException('团队不存在')
     }
 
-    return team;
+    return team
   }
 
   /**
-   * 閭€璇锋垚鍛樺埌缁勭粐
+   * 邀请成员到组织
    */
   async inviteMember(dto: InviteMemberDto, inviterId: string) {
-    // 鏌ユ壘琚個璇蜂汉
+    // 查找被邀请人
     const invitee = await this.prisma.user.findUnique({
       where: { email: dto.email },
-    });
+    })
 
     if (!invitee) {
-      throw new NotFoundException('[garbled]');
+      throw new NotFoundException('被邀请的用户不存在')
     }
 
-    // 鑾峰彇閭€璇蜂汉鐨勭粍缁?
+    // 获取邀请人的组织
     const inviter = await this.prisma.user.findUnique({
       where: { id: inviterId },
       select: { organizationId: true, role: true },
-    });
+    })
 
     if (!inviter?.organizationId) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('邀请人未关联任何组织')
     }
 
-    // 妫€鏌ユ潈闄愶細鍙湁 OWNER銆丄DMIN銆丮ANAGER 鍙互閭€璇?
+    // 检查权限：只有 OWNER、ADMIN、MANAGER 可以邀请
     if (!['OWNER', 'ADMIN', 'MANAGER'].includes(inviter.role)) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('无权邀请成员')
     }
 
-    // 妫€鏌ヨ閭€璇蜂汉鏄惁宸插湪鍚屼竴缁勭粐
+    // 检查被邀请人是否已在同一组织
     if (invitee.organizationId === inviter.organizationId) {
-      throw new ConflictException('');
+      throw new ConflictException('该用户已在当前组织中')
     }
 
-    // 灏嗚閭€璇蜂汉鍔犲叆缁勭粐骞惰缃鑹?
+    // 将被邀请人加入组织并设置角色
     const updatedUser = await this.prisma.user.update({
       where: { id: invitee.id },
       data: {
@@ -154,18 +154,18 @@ export class TeamsService {
           select: { id: true, name: true },
         },
       },
-    });
+    })
 
     this.logger.log(
-      `鎴愬憳閭€璇锋垚鍔? ${dto.email} 鍔犲叆缁勭粐 ${inviter.organizationId}锛岃鑹? ${dto.role}`,
-    );
+      `成员邀请成功: ${dto.email} 加入组织 ${inviter.organizationId}，角色: ${dto.role}`,
+    )
 
-    return updatedUser;
+    return updatedUser
   }
 
   /**
-   * 鏇存柊鎴愬憳瑙掕壊
-   * #6 淇: 鏍￠獙涓嶈兘璁剧疆姣旇嚜宸辨洿楂樼殑瑙掕壊
+   * 更新成员角色
+   * #6 修复: 校验不能设置比自己更高的角色
    */
   async updateMemberRole(
     organizationId: string,
@@ -173,40 +173,40 @@ export class TeamsService {
     newRole: Role,
     operatorId: string,
   ) {
-    // 楠岃瘉鎿嶄綔鑰呮潈闄?
+    // 验证操作者权限
     const operator = await this.prisma.user.findUnique({
       where: { id: operatorId },
-    });
+    })
 
     if (!operator || !['OWNER', 'ADMIN'].includes(operator.role)) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('无权修改成员角色')
     }
 
-    // 涓嶈兘淇敼鑷繁鐨勮鑹?
+    // 不能修改自己的角色
     if (memberId === operatorId) {
-      throw new ForbiddenException('[garbled]');
+      throw new ForbiddenException('不能修改自己的角色')
     }
 
     const member = await this.prisma.user.findFirst({
       where: { id: memberId, organizationId },
-    });
+    })
 
     if (!member) {
-      throw new NotFoundException('[garbled]');
+      throw new NotFoundException('成员不存在')
     }
 
-    // #6 淇: 瑙掕壊绛夌骇鏍￠獙 鈥?涓嶈兘璁剧疆姣旇嚜宸辨洿楂樼殑瑙掕壊
+    // #6 修复: 角色等级校验 — 不能设置比自己更高的角色
     const roleHierarchy: Record<string, number> = {
       OWNER: 5,
       ADMIN: 4,
       MANAGER: 3,
       MEMBER: 2,
       VIEWER: 1,
-    };
-    const operatorLevel = roleHierarchy[operator.role] || 0;
-    const targetLevel = roleHierarchy[newRole] || 0;
+    }
+    const operatorLevel = roleHierarchy[operator.role] || 0
+    const targetLevel = roleHierarchy[newRole] || 0
     if (targetLevel >= operatorLevel) {
-      throw new ForbiddenException('[garbled]');
+      throw new ForbiddenException('不能设置比自己更高或同级的角色')
     }
 
     return this.prisma.user.update({
@@ -218,39 +218,35 @@ export class TeamsService {
         name: true,
         role: true,
       },
-    });
+    })
   }
 
   /**
-   * 绉婚櫎鎴愬憳锛堜粠缁勭粐涓Щ闄わ級
+   * 移除成员（从组织中移除）
    */
-  async removeMember(
-    organizationId: string,
-    memberId: string,
-    operatorId: string,
-  ) {
+  async removeMember(organizationId: string, memberId: string, operatorId: string) {
     const operator = await this.prisma.user.findUnique({
       where: { id: operatorId },
-    });
+    })
 
     if (!operator || !['OWNER', 'ADMIN'].includes(operator.role)) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('无权移除成员')
     }
 
     if (memberId === operatorId) {
-      throw new ForbiddenException('');
+      throw new ForbiddenException('不能移除自己')
     }
 
     const member = await this.prisma.user.findFirst({
       where: { id: memberId, organizationId },
-    });
+    })
 
     if (!member) {
-      throw new NotFoundException('[garbled]');
+      throw new NotFoundException('成员不存在')
     }
 
     if (member.role === 'OWNER') {
-      throw new ForbiddenException('[garbled]');
+      throw new ForbiddenException('不能移除组织所有者')
     }
 
     return this.prisma.user.update({
@@ -259,11 +255,11 @@ export class TeamsService {
         organizationId: null,
         role: 'MEMBER',
       },
-    });
+    })
   }
 
   /**
-   * 鑾峰彇缁勭粐鎴愬憳鍒楄〃
+   * 获取组织成员列表
    */
   async getMembers(organizationId: string) {
     return this.prisma.user.findMany({
@@ -279,6 +275,6 @@ export class TeamsService {
         createdAt: true,
       },
       orderBy: { createdAt: 'asc' },
-    });
+    })
   }
 }

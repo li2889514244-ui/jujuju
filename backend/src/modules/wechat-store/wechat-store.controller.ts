@@ -1,8 +1,9 @@
 import { Controller, Get, Param, Query, Post, Delete, Body } from '@nestjs/common'
-import { ApiTags } from '@nestjs/swagger'
-import { Public } from '../../common/decorators/public.decorator'
+import { ApiTags, ApiBearerAuth } from '@nestjs/swagger'
 import { WechatStoreService } from './wechat-store.service'
+
 @ApiTags('wechat-store')
+@ApiBearerAuth('access-token')
 @Controller('wechat-store')
 export class WechatStoreController {
   constructor(private readonly wechatStoreService: WechatStoreService) {}
@@ -13,7 +14,6 @@ export class WechatStoreController {
     return Number.isFinite(parsed) ? parsed : undefined
   }
 
-  @Public()
   @Get('stores')
   async getStores() {
     return this.wechatStoreService.getStores()
@@ -40,7 +40,6 @@ export class WechatStoreController {
     return this.wechatStoreService.syncAllStores()
   }
 
-  @Public()
   @Get('shop/orders')
   async getOrderList(
     @Query('store_id') storeId: string,
@@ -55,13 +54,11 @@ export class WechatStoreController {
     })
   }
 
-  @Public()
   @Get('shop/orders/:orderId')
   async getOrderDetail(@Query('store_id') storeId: string, @Param('orderId') orderId: string) {
     return this.wechatStoreService.getOrderDetail(storeId, orderId)
   }
 
-  @Public()
   @Get('shop/products')
   async getProductList(
     @Query('store_id') storeId: string,
@@ -74,7 +71,6 @@ export class WechatStoreController {
     })
   }
 
-  @Public()
   @Get('shop/aftersale')
   async getAftersaleList(
     @Query('store_id') storeId: string,
@@ -89,7 +85,6 @@ export class WechatStoreController {
     })
   }
 
-  @Public()
   @Get('shop/info')
   async getShopInfo(@Query('store_id') storeId: string) {
     return this.wechatStoreService.getShopInfo(storeId)

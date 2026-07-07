@@ -37,7 +37,7 @@ export class AnalyticsController {
   }
 
   @Get('views/trend')
-  @ApiOperation({ summary: '鑾峰彇鎾斁澧為暱瓒嬪娍' })
+  @ApiOperation({ summary: '获取播放增长趋势' })
   async getViewsTrend(
     @CurrentUser('id') userId: string,
     @Query('days') days?: number,

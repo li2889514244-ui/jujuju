@@ -18,20 +18,21 @@ export const teamsApi = {
     return del(`/teams/${id}`)
   },
 
-  getMembers(teamId: string) {
-    return get<TeamMember[]>(`/teams/${teamId}/members`)
+  // 后端使用 organizationId（从 JWT 中提取），不需要 teamId
+  getMembers(_teamId: string) {
+    return get<TeamMember[]>('/teams/members')
   },
 
-  invite(teamId: string, form: InviteForm) {
-    return post(`/teams/${teamId}/invite`, form)
+  invite(_teamId: string, form: InviteForm) {
+    return post('/teams/members/invite', form)
   },
 
-  removeMember(teamId: string, memberId: string) {
-    return del(`/teams/${teamId}/members/${memberId}`)
+  removeMember(_teamId: string, memberId: string) {
+    return del(`/teams/members/${memberId}`)
   },
 
-  updateRole(teamId: string, memberId: string, role: string) {
-    return put(`/teams/${teamId}/members/${memberId}`, { role })
+  updateRole(_teamId: string, memberId: string, role: string) {
+    return put(`/teams/members/${memberId}/role`, { role })
   },
 
   acceptInvite(inviteToken: string) {

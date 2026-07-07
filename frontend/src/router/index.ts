@@ -5,6 +5,24 @@ import { useUserStore } from '@/store/user'
 
 NProgress.configure({ showSpinner: false })
 
+/**
+ * 解析 JWT payload，检查 token 是否即将过期
+ * 返回 true 表示 token 有效（或无法解析时不拦截），false 表示已过期
+ */
+function isTokenExpired(token: string): boolean {
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3) return false
+    const payload = JSON.parse(atob(parts[1]))
+    if (!payload.exp) return false
+    // 提前 60 秒判定为过期，留出刷新窗口
+    const now = Math.floor(Date.now() / 1000)
+    return payload.exp < now + 60
+  } catch {
+    return false
+  }
+}
+
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -58,13 +76,18 @@ const routes: RouteRecordRaw[] = [
         path: 'team',
         name: 'Team',
         component: () => import('@/views/team/TeamView.vue'),
-        meta: { title: '团队管理', icon: 'UserFilled', section: '组织设置' },
+        meta: {
+          title: '团队管理',
+          icon: 'UserFilled',
+          section: '组织设置',
+          roles: ['OWNER', 'ADMIN', 'MANAGER'],
+        },
       },
       {
         path: 'team/permissions',
         name: 'Permissions',
         component: () => import('@/views/team/PermissionView.vue'),
-        meta: { title: '权限管理', hidden: true },
+        meta: { title: '权限管理', hidden: true, roles: ['OWNER', 'ADMIN'] },
       },
       {
         path: 'platforms',
@@ -130,13 +153,41 @@ router.beforeEach((to, _from, next) => {
   const userStore = useUserStore()
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth !== false)
 
+  // 检查 token 是否存在
   if (requiresAuth && !userStore.token) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'Login' && userStore.token) {
-    next({ name: 'Dashboard' })
-  } else {
-    next()
+    return
   }
+
+  // 检查 token 是否即将过期（提前 60 秒）
+  // 如果有 refreshToken，让请求拦截器自动刷新；如果没有则跳转登录
+  if (requiresAuth && userStore.token && isTokenExpired(userStore.token)) {
+    if (!userStore.refreshToken) {
+      userStore.logout()
+      next({ name: 'Login', query: { redirect: to.fullPath } })
+      return
+    }
+    // 有 refreshToken 时，让请求拦截器自动处理刷新，不阻断路由
+  }
+
+  // 已登录用户不允许访问登录页
+  if (to.name === 'Login' && userStore.token) {
+    next({ name: 'Dashboard' })
+    return
+  }
+
+  // 角色权限检查
+  const requiredRoles = to.meta.roles as string[] | undefined
+  if (requiredRoles && requiredRoles.length > 0) {
+    const userRole = userStore.userInfo?.role
+    if (!userRole || !requiredRoles.includes(userRole)) {
+      // 无权访问，重定向到仪表盘
+      next({ name: 'Dashboard' })
+      return
+    }
+  }
+
+  next()
 })
 
 router.afterEach(() => {

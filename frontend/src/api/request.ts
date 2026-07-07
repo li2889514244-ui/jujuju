@@ -91,7 +91,10 @@ function handleTokenRefresh(config?: RetriableRequestConfig): Promise<AxiosRespo
 service.interceptors.response.use(
   (response: AxiosResponse<ApiResponse>) => {
     const res = response.data
-    if (res.code !== 0 && res.code !== 200) {
+    // 统一判断逻辑：后端 TransformInterceptor 成功返回 code: 0
+    // 兼容部分旧接口可能返回 code: 200
+    const isSuccess = res.code === 0 || res.code === 200
+    if (!isSuccess) {
       if (!response.config.url?.includes('/notifications')) {
         ElMessage.error(res.message || '请求失败')
       }

@@ -1,37 +1,40 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import * as compression from 'compression';
-import * as express from 'express';
-import * as crypto from 'crypto';
-import helmet from 'helmet';
-import { AppModule } from './app.module';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
-import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { NestFactory } from '@nestjs/core'
+import { ValidationPipe, Logger } from '@nestjs/common'
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
+import * as compression from 'compression'
+import * as express from 'express'
+import * as crypto from 'crypto'
+import helmet from 'helmet'
+import { AppModule } from './app.module'
+import { TransformInterceptor } from './common/interceptors/transform.interceptor'
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor'
+import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 
 function parseCorsOrigins(originStr: string): string[] | boolean {
-  if (originStr === '*') return true;
-  if (originStr === 'false') return false;
-  return originStr.split(',').map((o) => o.trim()).filter(Boolean);
+  if (originStr === '*') return true
+  if (originStr === 'false') return false
+  return originStr
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean)
 }
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['error', 'warn', 'log', 'debug', 'verbose'],
-  });
+  })
 
-  const logger = new Logger('Bootstrap');
-  const isDev = process.env.NODE_ENV !== 'production';
+  const logger = new Logger('Bootstrap')
+  const isDev = process.env.NODE_ENV !== 'production'
 
   // 全局前缀
-  app.setGlobalPrefix('api/v1');
+  app.setGlobalPrefix('api/v1')
 
   // #18 修复: CORS 配置 — 开发环境默认允许 localhost
-  const corsOrigin = process.env.CORS_ORIGIN || '';
-  let origin: string[] | boolean;
+  const corsOrigin = process.env.CORS_ORIGIN || ''
+  let origin: string[] | boolean
   if (corsOrigin) {
-    origin = parseCorsOrigins(corsOrigin);
+    origin = parseCorsOrigins(corsOrigin)
   } else if (isDev) {
     // 开发环境默认允许 localhost
     origin = [
@@ -39,16 +42,12 @@ async function bootstrap() {
       'http://localhost:3001',
       'http://localhost:5173',
       'http://localhost:8080',
-    ];
-    logger.log('CORS: 开发环境默认允许 localhost 端口');
+    ]
+    logger.log('CORS: 开发环境默认允许 localhost 端口')
   } else {
-    // 未配置 CORS_ORIGIN 时，允许 Cloudflare Pages 域名及 Railway 预览域名
-    origin = [
-      'https://fda2071c.jujuju-28b.pages.dev',
-      /\.jujuju-28b\.pages\.dev$/,
-      /\.pages\.dev$/,
-    ] as any;
-    logger.warn('CORS_ORIGIN not set, falling back to Cloudflare Pages domains');
+    // 未配置 CORS_ORIGIN 时，仅允许已知的生产域名
+    origin = ['https://ddddkiii.com', 'https://www.ddddkiii.com']
+    logger.warn('CORS_ORIGIN not set, falling back to production domains only')
   }
 
   app.enableCors({
@@ -57,10 +56,10 @@ async function bootstrap() {
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Version'],
     maxAge: 86400, // 24h preflight cache
-  });
+  })
 
   // 安全头
-  app.use(helmet());
+  app.use(helmet())
 
   // 响应压缩
   app.use(
@@ -68,11 +67,11 @@ async function bootstrap() {
       threshold: 1024, // 只压缩大于1KB的响应
       level: 6,
     }),
-  );
+  )
 
   // #20 修复: 请求体大小限制
-  app.use(express.json({ limit: '10mb' }));
-  app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+  app.use(express.json({ limit: '10mb' }))
+  app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
   // 全局验证管道
   app.useGlobalPipes(
@@ -84,26 +83,26 @@ async function bootstrap() {
         enableImplicitConversion: true,
       },
     }),
-  );
+  )
 
   // 全局拦截器
-  app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor());
+  app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor())
 
   // 全局异常过滤器
-  app.useGlobalFilters(new HttpExceptionFilter());
+  app.useGlobalFilters(new HttpExceptionFilter())
 
   // API 版本头
   app.use((_req: any, res: any, next: any) => {
-    res.setHeader('X-API-Version', '1.0');
-    next();
-  });
+    res.setHeader('X-API-Version', '1.0')
+    next()
+  })
 
   // Trace ID middleware — injects X-Trace-Id header on every request
   app.use((req: any, res: any, next: any) => {
-    req['traceId'] = req.headers['x-trace-id'] || crypto.randomUUID();
-    res.setHeader('X-Trace-Id', req['traceId']);
-    next();
-  });
+    req['traceId'] = req.headers['x-trace-id'] || crypto.randomUUID()
+    res.setHeader('X-Trace-Id', req['traceId'])
+    next()
+  })
 
   // Swagger 文档配置（仅非生产环境启用）
   if (isDev) {
@@ -132,23 +131,23 @@ async function bootstrap() {
       .addTag('ai', 'AI智能服务接口')
       .addTag('platforms', '平台管理接口')
       .addTag('health', '健康检查接口')
-      .build();
+      .build()
 
-    const document = SwaggerModule.createDocument(app, swaggerConfig);
+    const document = SwaggerModule.createDocument(app, swaggerConfig)
     SwaggerModule.setup('api/docs', app, document, {
       swaggerOptions: {
         persistAuthorization: true,
       },
-    });
+    })
   }
 
-  const port = process.env.PORT || 3000;
-  await app.listen(port);
+  const port = process.env.PORT || 3000
+  await app.listen(port)
 
-  logger.log(`🚀 MatrixFlow ERP 后端服务已启动: http://localhost:${port}`);
+  logger.log(`🚀 MatrixFlow ERP 后端服务已启动: http://localhost:${port}`)
   if (isDev) {
-    logger.log(`📚 Swagger 文档地址: http://localhost:${port}/api/docs`);
+    logger.log(`📚 Swagger 文档地址: http://localhost:${port}/api/docs`)
   }
 }
 
-bootstrap();
+bootstrap()

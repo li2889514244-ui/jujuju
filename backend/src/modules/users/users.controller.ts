@@ -73,7 +73,7 @@ export class UsersController {
   }
 
   /**
-   * #5 淇: 鏅€氱敤鎴峰彧鑳芥煡鐪嬭嚜宸憋紝绠＄悊鍛?鎵€鏈夎€呭彲鏌ョ湅浠栦汉
+   * #5 修复: 普通用户只能查看自己，管理员/所有者可查看他人
    */
   @Get(':id')
   async findOne(
@@ -81,9 +81,9 @@ export class UsersController {
     @CurrentUser('id') currentUserId: string,
     @CurrentUser('role') currentRole: Role,
   ) {
-    // 鏅€氱敤鎴峰彧鑳芥煡鐪嬭嚜宸?
+    // 普通用户只能查看自己
     if (id !== currentUserId && !['OWNER', 'ADMIN'].includes(currentRole)) {
-      throw new ForbiddenException('鏃犳潈鏌ョ湅鍏朵粬鐢ㄦ埛淇℃伅')
+      throw new ForbiddenException('无权查看其他用户信息')
     }
     return this.usersService.findById(id)
   }
