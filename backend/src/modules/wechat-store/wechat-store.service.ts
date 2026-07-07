@@ -346,7 +346,7 @@ export class WechatStoreService implements OnModuleInit {
   private async fetchAftersaleListRemote(storeId: string, params: AftersaleQuery) {
     const now = Math.floor(Date.now() / 1000)
     return this.request(storeId, '/channels/ec/aftersale/getaftersalelist', {
-      begin_create_time: params.begin_create_time || now - 7 * 86400,
+      begin_create_time: params.begin_create_time || now - 24 * 3600,
       end_create_time: params.end_create_time || now,
       ...(params.next_key && { next_key: params.next_key }),
     })
@@ -534,20 +534,26 @@ export class WechatStoreService implements OnModuleInit {
 
   private async collectAftersaleIds(storeId: string) {
     const ids: string[] = []
-    let nextKey: string | undefined
-    const endTime = Math.floor(Date.now() / 1000)
-    const beginTime = endTime - 7 * 86400
+    const now = Math.floor(Date.now() / 1000)
 
-    for (let page = 0; page < 20; page++) {
-      const res: any = await this.fetchAftersaleListRemote(storeId, {
-        next_key: nextKey,
-        begin_create_time: beginTime,
-        end_create_time: endTime,
-      })
-      if (res.errcode !== 0) throw new Error(res.errmsg || `aftersale list error ${res.errcode}`)
-      ids.push(...((res.after_sale_order_id_list || []) as string[]).map(String))
-      nextKey = res.next_key || res.nextKey
-      if (!nextKey) break
+    // 微信 API 限制：售后查询区间不得超过 24 小时
+    // 逐天拉取最近 7 天的售后数据
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const dayEnd = now - dayOffset * 86400
+      const dayBegin = dayEnd - 86400
+      let nextKey: string | undefined
+
+      for (let page = 0; page < 20; page++) {
+        const res: any = await this.fetchAftersaleListRemote(storeId, {
+          next_key: nextKey,
+          begin_create_time: dayBegin,
+          end_create_time: dayEnd,
+        })
+        if (res.errcode !== 0) throw new Error(res.errmsg || `aftersale list error ${res.errcode}`)
+        ids.push(...((res.after_sale_order_id_list || []) as string[]).map(String))
+        nextKey = res.next_key || res.nextKey
+        if (!nextKey) break
+      }
     }
 
     return [...new Set(ids)]
