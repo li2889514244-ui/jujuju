@@ -42,14 +42,21 @@
     <!-- KPI -->
     <div class="monetization__kpi monetization__kpi--primary">
       <div class="kpi-card">
-        <div class="kpi-card__label">{{ rangeSalesLabel }}</div>
-        <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gmv) }}</div>
+        <div class="kpi-card__label">{{ rangeAmountLabel }}</div>
+        <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gross) }}</div>
         <div class="kpi-card__sub">{{ orderStatsSub }}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-card__label">售后退款</div>
-        <div class="kpi-card__value kpi-card__value--danger">{{ aftersaleCount }}</div>
-        <div class="kpi-card__sub">近 24 小时申请</div>
+        <div class="kpi-card__label">{{ rangeOrderLabel }}</div>
+        <div class="kpi-card__value">{{ orderStats.transactionCount }}</div>
+        <div class="kpi-card__sub">{{ effectiveOrderSub }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card__label">{{ rangeRefundLabel }}</div>
+        <div class="kpi-card__value kpi-card__value--danger">
+          &yen;{{ centToYuan(orderStats.refund) }}
+        </div>
+        <div class="kpi-card__sub">{{ rangeAftersaleList.length }} 条退款记录</div>
       </div>
     </div>
 
@@ -69,7 +76,7 @@
           {{
             aftersaleCount > 0
               ? `${aftersaleCount} 条，合计 ¥${centToYuan(aftersaleTotal)}`
-              : '近24小时无售后'
+              : '当前时段无售后'
           }}
           <span class="section-card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
         </span>
@@ -223,11 +230,29 @@ const shopInfo = ref<{ nickname: string; headimg_url: string; subject_type: stri
 let timer: ReturnType<typeof setInterval> | null = null
 
 // ── Stats ──
-const rangeSalesLabel = computed(() => {
+const rangeAmountLabel = computed(() => {
   const labels = {
-    today: '今天净销售额',
-    yesterday: '昨天净销售额',
-    week: '近7天净销售额',
+    today: '今天成交金额',
+    yesterday: '昨天成交金额',
+    week: '近7天成交金额',
+  }
+  return labels[viewMode.value]
+})
+
+const rangeOrderLabel = computed(() => {
+  const labels = {
+    today: '今天成交订单',
+    yesterday: '昨天成交订单',
+    week: '近7天成交订单',
+  }
+  return labels[viewMode.value]
+})
+
+const rangeRefundLabel = computed(() => {
+  const labels = {
+    today: '今天退款金额',
+    yesterday: '昨天退款金额',
+    week: '近7天退款金额',
   }
   return labels[viewMode.value]
 })
@@ -254,12 +279,21 @@ const orderStats = computed(() => {
 })
 
 const orderStatsSub = computed(() => {
-  const { count, deduction, effectiveCount } = orderStats.value
-  if (count === 0) return '0 笔订单'
-
+  const { gross, refund, transactionCount, effectiveCount } = orderStats.value
+  const net = gross - refund
+  if (transactionCount === 0) return '0 笔订单'
+  const netText = refund > 0 ? `净额 ¥${centToYuan(net)}` : ''
   const countText =
-    effectiveCount === count ? `${count} 笔有效订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
-  return deduction > 0 ? `${countText}，已扣 ¥${centToYuan(deduction)}` : countText
+    effectiveCount === transactionCount
+      ? `${transactionCount} 笔`
+      : `${effectiveCount} 有效 / ${transactionCount} 总`
+  return netText ? `${countText}，${netText}` : countText
+})
+
+const effectiveOrderSub = computed(() => {
+  const { transactionCount, effectiveCount } = orderStats.value
+  if (transactionCount === 0) return '暂无订单'
+  return effectiveCount === transactionCount ? '全部有效' : `${effectiveCount} 笔有效`
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
@@ -267,7 +301,7 @@ const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales
 const statusBreakdown = computed(() => {
   return [
     ...buildStatusBreakdown(displayOrders.value),
-    { label: '售后(24h)', count: aftersaleCount.value },
+    { label: '售后', count: aftersaleCount.value },
   ]
 })
 
@@ -472,7 +506,7 @@ onUnmounted(() => {
     margin-bottom: 0;
 
     &--primary {
-      grid-template-columns: repeat(2, 1fr);
+      grid-template-columns: repeat(3, 1fr);
     }
     &--status {
       grid-template-columns: repeat(6, 1fr);
