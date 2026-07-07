@@ -214,7 +214,7 @@ import {
 
 const loading = ref(false)
 const trendMetric = ref('gmv')
-const viewMode = ref<'today' | 'yesterday' | 'week'>('today')
+const viewMode = ref<'today' | 'yesterday' | 'week'>('yesterday')
 const stores = ref<WechatStore[]>([])
 const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
