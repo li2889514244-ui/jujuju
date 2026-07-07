@@ -76,6 +76,7 @@ export interface WechatOrder {
   sku_id: string
   status: number
   pay_amount: number
+  product_price?: number
   commission: number
   commission_rate: number
   create_time: number

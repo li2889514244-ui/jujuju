@@ -4,6 +4,7 @@ export interface WechatOrderMetric {
   order_id: string
   status: number
   pay_amount: number
+  product_price?: number
   create_time: number
 }
 
@@ -93,12 +94,22 @@ export function calculateNetSales(
     (order) => order.status !== REFUNDED_ORDER_STATUS,
   ).length
 
-  // 成交金额 = 所有成交订单的支付金额（含已退款的）
-  const gross = transactionOrders.reduce((sum, order) => sum + safeAmount(order.pay_amount), 0)
+  // 成交金额 = 商品原价之和（与官方平台一致，用 product_price 而非 order_price）
+  const gross = transactionOrders.reduce(
+    (sum, order) => sum + (safeAmount(order.product_price) || safeAmount(order.pay_amount)),
+    0,
+  )
 
-  // 退款金额 = 所有成功退款的售后记录金额之和
-  // 与官方平台一致：基于售后记录计算，而非订单状态
-  const successfulRefunds = aftersales.filter(isSuccessfulRefund)
+  // 退款金额 = 仅统计当日成交订单的成功退款
+  // 官方平台只统计当日订单的退款，不含历史订单的退款
+  const orderIdsInScope = new Set(
+    transactionOrders.map((order) => String(order.order_id)).filter(Boolean),
+  )
+  const successfulRefunds = aftersales.filter((item) => {
+    if (!isSuccessfulRefund(item)) return false
+    const orderId = item.order_id ? String(item.order_id) : ''
+    return !orderId || orderIdsInScope.has(orderId)
+  })
   const refund = successfulRefunds.reduce((sum, item) => sum + safeAmount(item.amount), 0)
 
   const gmv = gross - refund
@@ -131,11 +142,14 @@ export function buildDailySales(
   const grossByDate = new Map<string, number>()
   const refundByDate = new Map<string, number>()
   const ordersByDate = new Map<string, number>()
+  const orderIdToDate = new Map<string, string>()
+
   orders.forEach((order) => {
     const date = orderDate(order)
-    const amount = safeAmount(order.pay_amount)
+    const amount = safeAmount(order.product_price) || safeAmount(order.pay_amount)
     dates.add(date)
     ordersByDate.set(date, (ordersByDate.get(date) || 0) + 1)
+    orderIdToDate.set(String(order.order_id), date)
 
     if (NON_REVENUE_ORDER_STATUSES.has(order.status)) return
     grossByDate.set(date, (grossByDate.get(date) || 0) + amount)
@@ -143,7 +157,9 @@ export function buildDailySales(
 
   aftersales.forEach((item) => {
     if (!isSuccessfulRefund(item)) return
-    const date = aftersaleDate(item)
+    // Only count refunds for orders within our dataset (same-day order refunds)
+    const orderId = item.order_id ? String(item.order_id) : ''
+    const date = orderId ? orderIdToDate.get(orderId) : aftersaleDate(item)
     if (!date) return
     dates.add(date)
     refundByDate.set(date, (refundByDate.get(date) || 0) + safeAmount(item.amount))

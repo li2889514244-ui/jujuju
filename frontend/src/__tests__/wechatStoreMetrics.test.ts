@@ -37,10 +37,44 @@ describe('wechatStoreMetrics', () => {
     expect(result.gmv).toBe(537100)
     expect(result.gross).toBe(567000)
     expect(result.refund).toBe(29900)
-    expect(result.deduction).toBe(119600)
     expect(result.count).toBe(4)
     expect(result.transactionCount).toBe(3)
     expect(result.effectiveCount).toBe(2)
+  })
+
+  it('uses product_price for gross when available (matches official platform)', () => {
+    const result = calculateNetSales(
+      [
+        { order_id: 'o1', status: 30, pay_amount: 26900, product_price: 29900, create_time: 1 },
+        { order_id: 'o2', status: 100, pay_amount: 29900, product_price: 29900, create_time: 1 },
+        { order_id: 'o3', status: 200, pay_amount: 28400, product_price: 29900, create_time: 1 },
+      ],
+      [],
+    )
+
+    // gross = 3 × 29900 = 89700 (product_price, not pay_amount)
+    expect(result.gross).toBe(89700)
+    expect(result.transactionCount).toBe(3)
+    expect(result.effectiveCount).toBe(2)
+  })
+
+  it('only counts refunds for orders in the current scope (same-day orders)', () => {
+    const result = calculateNetSales(
+      [
+        { order_id: 'today-1', status: 30, pay_amount: 29900, create_time: 1 },
+        { order_id: 'today-2', status: 200, pay_amount: 29900, create_time: 1 },
+      ],
+      [
+        // Refund for today's order - should be counted
+        { order_id: 'today-2', status: 'MERCHANT_REFUND_SUCCESS', amount: 29900 },
+        // Refund for an old order not in scope - should NOT be counted
+        { order_id: 'old-order', status: 'MERCHANT_REFUND_SUCCESS', amount: 29900 },
+      ],
+    )
+
+    expect(result.refund).toBe(29900)
+    expect(result.gross).toBe(59800)
+    expect(result.gmv).toBe(29900)
   })
 
   it('subtracts a successful refund while the order is still shipped', () => {
@@ -52,17 +86,7 @@ describe('wechatStoreMetrics', () => {
     expect(result.gmv).toBe(149500)
   })
 
-  it('allows net sales to go negative when refunds exceed gross sales', () => {
-    const result = calculateNetSales(
-      [{ order_id: 'old-refund-today', status: 30, pay_amount: 10000, create_time: 1 }],
-      [{ order_id: 'old-order', status: 'MERCHANT_REFUND_SUCCESS', amount: 29900 }],
-    )
-
-    expect(result.gmv).toBe(-19900)
-    expect(result.refund).toBe(29900)
-  })
-
-  it('shows refund on the aftersale date, not the order date in trends', () => {
+  it('matches refund to order date in daily trends', () => {
     const entries = buildDailySales(
       [{ order_id: 'refunded', status: 200, pay_amount: 29900, create_time: 1781539200 }],
       [
@@ -76,13 +100,11 @@ describe('wechatStoreMetrics', () => {
       ],
     )
 
-    expect(entries).toEqual([
-      { date: '06-16', gmv: 29900, orders: 1 },
-      { date: '06-17', gmv: -29900, orders: 0 },
-    ])
+    // Refund is attributed to the order's date (06-16), not the aftersale date (06-17)
+    expect(entries).toEqual([{ date: '06-16', gmv: 0, orders: 1 }])
   })
 
-  it('shows refund-only days as negative daily net sales', () => {
+  it('skips refunds for orders outside the dataset in daily trends', () => {
     const entries = buildDailySales(
       [],
       [
@@ -96,7 +118,8 @@ describe('wechatStoreMetrics', () => {
       ],
     )
 
-    expect(entries).toEqual([{ date: '06-17', gmv: -29900, orders: 0 }])
+    // No matching order, so refund is not counted
+    expect(entries).toEqual([])
   })
 
   it('keeps legitimate fast refunds and deduplicates by aftersale id', () => {

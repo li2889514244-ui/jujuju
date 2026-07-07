@@ -186,21 +186,26 @@ export class WechatStoreService implements OnModuleInit {
     return {
       errcode: 0,
       errmsg: 'ok',
-      order_list: rows.map((row) => ({
-        order_id: row.orderId,
-        product_id: row.productId || '',
-        sku_id: row.skuId || '',
-        status: row.status,
-        pay_amount: row.payAmount,
-        create_time: row.createTime,
-        settle_time: row.settleTime,
-        product_title: row.productTitle,
-        product_img: row.productImg,
-        ship_time: row.shipTime,
-        delivery_list: row.deliveryList || [],
-        commission: 0,
-        commission_rate: 0,
-      })),
+      order_list: rows.map((row) => {
+        const raw = row.raw as any
+        const productPrice = raw?.order_detail?.price_info?.product_price ?? row.payAmount
+        return {
+          order_id: row.orderId,
+          product_id: row.productId || '',
+          sku_id: row.skuId || '',
+          status: row.status,
+          pay_amount: row.payAmount,
+          product_price: Number(productPrice) || row.payAmount,
+          create_time: row.createTime,
+          settle_time: row.settleTime,
+          product_title: row.productTitle,
+          product_img: row.productImg,
+          ship_time: row.shipTime,
+          delivery_list: row.deliveryList || [],
+          commission: 0,
+          commission_rate: 0,
+        }
+      }),
       total_num: rows.length,
       cached: true,
     }
