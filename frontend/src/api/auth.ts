@@ -29,4 +29,12 @@ export const authApi = {
   changePassword(data: { oldPassword: string; newPassword: string }) {
     return post('/auth/change-password', data)
   },
+
+  authingCallback(data: { code: string; state: string }) {
+    return post<LoginResponse>('/auth/authing/callback', data)
+  },
+
+  getAuthingUrl(method?: string) {
+    return get<{ url: string; state: string }>('/auth/authing/url', { method })
+  },
 }
