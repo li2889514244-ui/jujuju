@@ -465,14 +465,11 @@ function orderStatus(orderOrStatus: any) {
   const text = typeof orderOrStatus === 'object' ? orderOrStatus.status_text : ''
   if (text) return text
   const code = Number(typeof orderOrStatus === 'object' ? orderOrStatus.status : orderOrStatus)
-  if (code === 1) return '待确认'
-  if (code === 2) return '待付款'
-  if (code === 3) return '待发货'
-  if (code === 4) return '已发货'
-  if (code === 5) return '已收货'
-  if (code === 6) return '已完成'
-  if (code === 7 || code === 21) return '已关闭'
-  if (code === 8) return '已退款'
+  if (code === 2) return '待发货'
+  if (code === 3) return '已发货'
+  if (code === 4) return '已关闭'
+  if (code === 5) return '已完成'
+  if (code === 21) return '已关闭'
   return '待处理'
 }
 
@@ -483,7 +480,7 @@ function isClosedOrder(orderOrStatus: any) {
 
 function orderStatusClass(orderOrStatus: any) {
   const label = orderStatus(orderOrStatus)
-  if (label.includes('完成') || label.includes('发货') || label.includes('收货')) return 'is-done'
+  if (label.includes('完成') || label.includes('发货')) return 'is-done'
   if (label.includes('关闭') || label.includes('取消') || label.includes('退款')) return 'is-muted'
   if (label.includes('待发货')) return 'is-paid'
   return 'is-pending'
@@ -493,8 +490,8 @@ function aftersaleStatus(itemOrStatus: any) {
   const text = typeof itemOrStatus === 'object' ? itemOrStatus.status_text : ''
   if (text) return text
   const code = Number(typeof itemOrStatus === 'object' ? itemOrStatus.status : itemOrStatus)
-  if ([6, 12, 27].includes(code)) return '已退款'
-  if ([1, 2, 3].includes(code)) return '处理中'
+  if ([12, 27].includes(code)) return '已退款'
+  if ([1, 2, 3, 6].includes(code)) return '处理中'
   if ([7, 28].includes(code)) return '已关闭'
   return '售后'
 }
@@ -700,7 +697,7 @@ async function checkCompanion() {
 }
 
 async function waitCompanionJob(companionUrl: string, jobId: string) {
-  for (let i = 0; i < 90; i++) {
+  for (let i = 0; i < 300; i++) {
     await new Promise((resolve) => setTimeout(resolve, 2000))
     const resp = await fetch(`${companionUrl}/api/doudian/jobs/${jobId}`)
     const data = await resp.json()

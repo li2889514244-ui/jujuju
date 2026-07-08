@@ -32,7 +32,7 @@ const safeStoreSelect = {
 } as const
 
 const DEFAULT_PROFILE_ROOT = 'doudian_profiles'
-const MAX_PAGINATION_PAGES = 20
+const MAX_PAGINATION_PAGES = 10
 
 @Injectable()
 export class DoudianBrowserService implements OnModuleInit {
