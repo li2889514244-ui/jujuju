@@ -1,19 +1,8 @@
-import {
-  Controller,
-  Post,
-  Get,
-  Body,
-  Query,
-  HttpCode,
-  HttpStatus,
-  UseGuards,
-  BadRequestException,
-} from '@nestjs/common'
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { Controller, Post, Get, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import { Throttle } from '@nestjs/throttler'
 import { Public } from '../../common/decorators/public.decorator'
 import { AuthService } from './auth.service'
-import { AuthingService } from './authing.service'
 import { RegisterDto } from './dto/register.dto'
 import { LoginDto } from './dto/login.dto'
 import { RefreshTokenDto } from './dto/refresh-token.dto'
@@ -23,10 +12,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator'
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(
-    private readonly authService: AuthService,
-    private readonly authingService: AuthingService,
-  ) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('register')
   @Public()
@@ -70,57 +56,6 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '登出成功' })
   async logout(@Body() dto: RefreshTokenDto) {
     return this.authService.logout(dto.refreshToken)
-  }
-
-  // ==================== Authing 第三方登录 ====================
-
-  @Get('authing/url')
-  @Public()
-  @Throttle({ short: { ttl: 60000, limit: 10 } })
-  @ApiOperation({ summary: '获取 Authing 登录 URL（微信/手机号登录）' })
-  @ApiQuery({ name: 'method', description: '登录方式', required: false, enum: ['wechat', 'phone'] })
-  @ApiResponse({ status: 200, description: '返回 Authing 授权 URL' })
-  async getAuthingUrl(@Query('method') _method?: string) {
-    if (!this.authingService.isEnabled()) {
-      throw new BadRequestException('Authing 未配置，请联系管理员')
-    }
-    const state = await this.authingService.generateState()
-    const url = this.authingService.getAuthorizeUrl(state)
-    return { url, state }
-  }
-
-  @Post('authing/callback')
-  @Public()
-  @HttpCode(HttpStatus.OK)
-  @Throttle({ short: { ttl: 60000, limit: 10 } })
-  @ApiOperation({ summary: 'Authing 登录回调（用授权码换取用户信息并签发 JWT）' })
-  @ApiResponse({ status: 200, description: '登录成功' })
-  @ApiResponse({ status: 401, description: '授权码无效' })
-  async authingCallback(@Body() body: { code: string; state: string }) {
-    if (!body.code || !body.state) {
-      throw new BadRequestException('缺少 code 或 state 参数')
-    }
-
-    const authingUser = await this.authingService.exchangeCodeForUserInfo(body.code, body.state)
-
-    const user = await this.authingService.findOrCreateUser(authingUser)
-
-    const tokens = await this.authService.generateTokensForUser({
-      id: user.id,
-      email: user.email,
-    })
-
-    return {
-      user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        avatar: user.avatar,
-        phone: user.phone,
-      },
-      ...tokens,
-    }
   }
 
   @Get('me')
