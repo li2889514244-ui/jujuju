@@ -327,15 +327,12 @@ const rangeAftersaleAmount = computed(() =>
   displayAftersales.value.reduce((sum, item) => sum + Number(item.amount || 0), 0),
 )
 const rangeSalesLabel = computed(() => {
-  if (viewMode.value === 'yesterday') return '昨天净销售额'
-  if (viewMode.value === 'week') return '近7天净销售额'
-  return '今天净销售额'
+  if (viewMode.value === 'yesterday') return '昨天成交金额'
+  if (viewMode.value === 'week') return '近7天成交金额'
+  return '今天成交金额'
 })
 const orderStats = computed(() => {
-  const gross = displayOrders.value.reduce((sum, order) => {
-    if (isClosedOrder(order)) return sum
-    return sum + Number(order.pay_amount || 0)
-  }, 0)
+  const gross = displayOrders.value.reduce((sum, order) => sum + Number(order.pay_amount || 0), 0)
   const closedOrderIds = new Set(
     displayOrders.value
       .filter((order) => isClosedOrder(order))
@@ -355,11 +352,11 @@ const orderStats = computed(() => {
   }
 })
 const orderStatsSub = computed(() => {
-  const { count, effectiveCount, refund } = orderStats.value
+  const { count, effectiveCount } = orderStats.value
   if (count === 0) return '0 笔订单'
   const countText =
-    effectiveCount === count ? `${count} 笔有效订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
-  return refund > 0 ? `${countText}，已扣 ¥${centToYuan(refund)}` : countText
+    effectiveCount === count ? `${count} 笔订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
+  return countText
 })
 const syncText = computed(() => {
   if (usingCloudFallback.value && activeStore.value?.lastSyncedAt) {
