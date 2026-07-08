@@ -32,7 +32,7 @@ const safeStoreSelect = {
 } as const
 
 const DEFAULT_PROFILE_ROOT = 'doudian_profiles'
-const MAX_PAGINATION_PAGES = 5
+const MAX_PAGINATION_PAGES = 20
 
 @Injectable()
 export class DoudianBrowserService implements OnModuleInit {
@@ -346,6 +346,9 @@ export class DoudianBrowserService implements OnModuleInit {
 
   private async collectData(page: Page): Promise<CapturedData> {
     const captured: CapturedData = {}
+    // Buffer raw response texts to avoid Protocol error when the page
+    // navigates before response.json() can read the body.
+    const rawBuffer: Array<{ endpoint: CapturedEndpoint; text: string }> = []
 
     page.on('response', async (response: any) => {
       const url = response.url()
@@ -355,10 +358,10 @@ export class DoudianBrowserService implements OnModuleInit {
       if (!endpoint) return
 
       try {
-        const json = await response.json()
-        this.mergeCaptured(captured, endpoint, json)
+        const text = await response.text()
+        rawBuffer.push({ endpoint, text })
       } catch {
-        // Ignore non-parseable JSON responses from auxiliary endpoints.
+        // Response body unavailable — skip.
       }
     })
 
@@ -369,17 +372,37 @@ export class DoudianBrowserService implements OnModuleInit {
     )
     await this.visitAndPaginate(page, 'https://fxg.jinritemai.com/ffa/maftersale/aftersale/list')
 
+    // Parse buffered responses AFTER all navigation is done.
+    for (const { endpoint, text } of rawBuffer) {
+      try {
+        const json = JSON.parse(text)
+        this.mergeCaptured(captured, endpoint, json)
+      } catch {
+        // Ignore non-parseable JSON.
+      }
+    }
+
     return captured
   }
 
   private async visitAndPaginate(page: Page, url: string) {
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    await page.waitForTimeout(14_000)
+    try {
+      await page.waitForLoadState('networkidle', { timeout: 20_000 })
+    } catch {
+      // networkidle timeout is acceptable
+    }
+    await page.waitForTimeout(5_000)
 
     for (let pageNo = 1; pageNo < MAX_PAGINATION_PAGES; pageNo++) {
       const clicked = await this.clickNextPage(page)
       if (!clicked) break
-      await page.waitForTimeout(10_000)
+      try {
+        await page.waitForLoadState('networkidle', { timeout: 15_000 })
+      } catch {
+        // networkidle timeout is acceptable
+      }
+      await page.waitForTimeout(5_000)
     }
   }
 
