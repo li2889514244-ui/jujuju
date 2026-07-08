@@ -12,6 +12,18 @@ interface StoreOrderSummary {
   refundAmount: number
 }
 
+// ── 微信小店订单状态 ──────────────────────────────────
+// 非成交状态：待付款(10)、待收款(12)、已取消(250)
+const WECHAT_NON_REVENUE_STATUSES = new Set([10, 12, 250])
+// 成功退款状态（字符串，存在 WechatStoreAftersale.status 字段）
+const WECHAT_SUCCESSFUL_REFUND_STATUS = 'MERCHANT_REFUND_SUCCESS'
+
+// ── 抖店订单状态 ──────────────────────────────────────
+// 已关闭订单状态：4=已关闭、5=已关闭、21=已关闭
+const DOUDIAN_CLOSED_ORDER_STATUSES = new Set([4, 5, 21])
+// 成功退款状态：6=已退款、12=已退款、27=已退款
+const DOUDIAN_SUCCESSFUL_REFUND_STATUSES = new Set([6, 12, 27])
+
 /**
  * 每日 9:00 推送昨日订单汇总（微信小店 + 抖店）
  */
@@ -124,20 +136,35 @@ export class OrderReportScheduler {
       const [orders, aftersales] = await Promise.all([
         this.prisma.wechatStoreOrder.findMany({
           where: { storeId: store.id, createTime: { gte: startSec, lt: endSec } },
-          select: { payAmount: true },
+          select: { orderId: true, status: true, payAmount: true, raw: true },
         }),
         this.prisma.wechatStoreAftersale.findMany({
           where: { storeId: store.id, createTime: { gte: startSec, lt: endSec } },
-          select: { amount: true },
+          select: { afterSaleOrderId: true, status: true, amount: true },
         }),
       ])
 
+      // 成交订单 = 排除待付款(10)、待收款(12)、已取消(250)
+      const transactionOrders = orders.filter((o) => !WECHAT_NON_REVENUE_STATUSES.has(o.status))
+
+      // 成交金额 = product_price 之和（与微信小店官方一致），fallback 到 payAmount
+      const totalAmount = transactionOrders.reduce((sum, o) => {
+        const raw = o.raw as any
+        const productPrice = raw?.order_detail?.price_info?.product_price
+        return sum + (Number(productPrice) || o.payAmount)
+      }, 0)
+
+      // 成功退款 = status 为 MERCHANT_REFUND_SUCCESS 且金额 > 0
+      const successfulRefunds = aftersales.filter(
+        (a) => a.status === WECHAT_SUCCESSFUL_REFUND_STATUS && Number(a.amount) > 0,
+      )
+
       summaries.push({
         storeName: store.name,
-        orderCount: orders.length,
-        totalAmount: orders.reduce((sum, o) => sum + o.payAmount, 0),
-        refundCount: aftersales.length,
-        refundAmount: aftersales.reduce((sum, a) => sum + a.amount, 0),
+        orderCount: transactionOrders.length,
+        totalAmount,
+        refundCount: successfulRefunds.length,
+        refundAmount: successfulRefunds.reduce((sum, a) => sum + a.amount, 0),
       })
     }
 
@@ -161,20 +188,30 @@ export class OrderReportScheduler {
       const [orders, aftersales] = await Promise.all([
         (this.prisma as any).doudianStoreOrder.findMany({
           where: { storeId: store.id, createTime: { gte: startSec, lt: endSec } },
-          select: { payAmount: true },
+          select: { payAmount: true, status: true },
         }),
         (this.prisma as any).doudianStoreAftersale.findMany({
           where: { storeId: store.id, createTime: { gte: startSec, lt: endSec } },
-          select: { amount: true },
+          select: { amount: true, status: true, orderId: true },
         }),
       ])
 
+      // 有效订单 = 排除已关闭订单(status 4, 5, 21)
+      const effectiveOrders = orders.filter(
+        (o: any) => !DOUDIAN_CLOSED_ORDER_STATUSES.has(o.status),
+      )
+
+      // 成功退款 = status 为已退款(6, 12, 27) 且金额 > 0
+      const successfulRefunds = aftersales.filter(
+        (a: any) => DOUDIAN_SUCCESSFUL_REFUND_STATUSES.has(a.status) && Number(a.amount) > 0,
+      )
+
       summaries.push({
         storeName: store.name,
-        orderCount: orders.length,
-        totalAmount: orders.reduce((sum: number, o: any) => sum + o.payAmount, 0),
-        refundCount: aftersales.length,
-        refundAmount: aftersales.reduce((sum: number, a: any) => sum + a.amount, 0),
+        orderCount: effectiveOrders.length,
+        totalAmount: effectiveOrders.reduce((sum: number, o: any) => sum + o.payAmount, 0),
+        refundCount: successfulRefunds.length,
+        refundAmount: successfulRefunds.reduce((sum: number, a: any) => sum + a.amount, 0),
       })
     }
 
