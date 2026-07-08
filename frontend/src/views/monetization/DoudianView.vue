@@ -1,10 +1,14 @@
-﻿﻿<template>
+﻿<template>
   <div class="doudian">
     <div class="doudian__header">
       <div>
         <h2 class="doudian__title">抖店</h2>
         <p class="doudian__subtitle">
-          {{ activeLocalStore ? `${activeLocalStore.name} · ${syncText}` : '本地伴侣采集，云端展示数据' }}
+          {{
+            activeLocalStore
+              ? `${activeLocalStore.name} · ${syncText}`
+              : '本地伴侣采集，云端展示数据'
+          }}
         </p>
       </div>
       <div class="doudian__actions">
@@ -13,7 +17,7 @@
           <el-radio-button value="yesterday">昨天</el-radio-button>
           <el-radio-button value="week">近7天</el-radio-button>
         </el-radio-group>
-                <el-select
+        <el-select
           v-if="localStores.length > 0"
           v-model="activeLocalStoreId"
           placeholder="选择店铺"
@@ -44,10 +48,16 @@
           />
         </el-select>
         <el-button :icon="Refresh" circle size="small" :loading="loading" @click="refreshAll" />
-        <el-button v-if="!usingCloudFallback" type="primary" size="small" :loading="syncing" @click="syncActive">
+        <el-button
+          v-if="!usingCloudFallback"
+          type="primary"
+          size="small"
+          :loading="syncing"
+          @click="syncActive"
+        >
           同步
         </el-button>
-                <el-popover v-if="!usingCloudFallback" placement="bottom-end" width="360" trigger="click">
+        <el-popover v-if="!usingCloudFallback" placement="bottom-end" width="360" trigger="click">
           <template #reference>
             <el-button :icon="Setting" circle size="small" />
           </template>
@@ -56,9 +66,18 @@
             <el-input v-model="newStoreName" placeholder="店铺备注，可留空" />
             <div class="setup-panel__buttons">
               <el-button :loading="creatingStore" @click="createStore">添加并登录</el-button>
-              <el-button :disabled="!activeLocalStoreId" @click="() => openLogin()">打开登录</el-button>
-              <el-button :disabled="!activeLocalStoreId" @click="checkCompanion">检查伴侣</el-button>
-              <el-button type="danger" plain :disabled="!activeLocalStoreId" @click="deleteActiveStore">
+              <el-button :disabled="!activeLocalStoreId" @click="() => openLogin()"
+                >打开登录</el-button
+              >
+              <el-button :disabled="!activeLocalStoreId" @click="checkCompanion"
+                >检查伴侣</el-button
+              >
+              <el-button
+                type="danger"
+                plain
+                :disabled="!activeLocalStoreId"
+                @click="deleteActiveStore"
+              >
                 删除当前店铺
               </el-button>
             </div>
@@ -74,7 +93,10 @@
       </el-button>
     </div>
 
-    <div v-else-if="!loading && localStores.length === 0 && stores.length === 0" class="empty-hint doudian__empty-store">
+    <div
+      v-else-if="!loading && localStores.length === 0 && stores.length === 0"
+      class="empty-hint doudian__empty-store"
+    >
       <p>暂无抖店店铺。点击右上角设置，添加店铺并登录一次。</p>
     </div>
 
@@ -172,7 +194,11 @@
               <el-icon><Refresh /></el-icon>同步数据
             </el-button>
           </div>
-          <div v-for="order in filteredOrders.slice(0, 20)" :key="order.order_id" class="order-item">
+          <div
+            v-for="order in filteredOrders.slice(0, 20)"
+            :key="order.order_id"
+            class="order-item"
+          >
             <img
               v-if="order.product_img"
               :src="order.product_img"
@@ -216,7 +242,9 @@
             <div class="product-card__info">
               <div class="product-card__title">{{ product.title || '未命名商品' }}</div>
               <div class="product-card__stats">
-                <span class="product-card__price">&yen;{{ centToYuan(product.selling_price) }}</span>
+                <span class="product-card__price"
+                  >&yen;{{ centToYuan(product.selling_price) }}</span
+                >
                 <span>已售 {{ fmtNum(product.sales) }}</span>
                 <span>库存 {{ fmtNum(product.stock) }}</span>
               </div>
@@ -234,11 +262,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Setting } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import DataChart from '@/components/common/DataChart.vue'
-import {
-  doudianStoreApi,
-  type DoudianCompanionStore,
-  type DoudianStore,
-} from '@/api/doudian-store'
+import { doudianStoreApi, type DoudianCompanionStore, type DoudianStore } from '@/api/doudian-store'
 import { getCompanionUrl } from '@/composables/useCompanionUrl'
 import { useUserStore } from '@/store/user'
 
@@ -271,7 +295,9 @@ const activeStoreId = computed(() => {
 })
 const activeStore = computed(() => stores.value.find((store) => store.id === activeStoreId.value))
 const usingCloudFallback = computed(() => localStores.value.length === 0 && stores.value.length > 0)
-const hasCachedData = computed(() => orders.value.length > 0 || products.value.length > 0 || aftersales.value.length > 0)
+const hasCachedData = computed(
+  () => orders.value.length > 0 || products.value.length > 0 || aftersales.value.length > 0,
+)
 const storeAlertTitle = computed(() => {
   const message = activeStore.value?.syncError || activeLocalStore.value?.last_error || ''
   if (!message) return ''
@@ -311,7 +337,9 @@ const orderStats = computed(() => {
     return sum + Number(order.pay_amount || 0)
   }, 0)
   const closedOrderIds = new Set(
-    displayOrders.value.filter((order) => isClosedOrder(order)).map((order) => String(order.order_id)),
+    displayOrders.value
+      .filter((order) => isClosedOrder(order))
+      .map((order) => String(order.order_id)),
   )
   const refund = displayAftersales.value.reduce((sum, item) => {
     if (closedOrderIds.has(String(item.order_id || ''))) return sum
@@ -329,14 +357,17 @@ const orderStats = computed(() => {
 const orderStatsSub = computed(() => {
   const { count, effectiveCount, refund } = orderStats.value
   if (count === 0) return '0 笔订单'
-  const countText = effectiveCount === count ? `${count} 笔有效订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
+  const countText =
+    effectiveCount === count ? `${count} 笔有效订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
   return refund > 0 ? `${countText}，已扣 ¥${centToYuan(refund)}` : countText
 })
 const syncText = computed(() => {
   if (usingCloudFallback.value && activeStore.value?.lastSyncedAt) {
     return `上次同步 ${dayjs(activeStore.value.lastSyncedAt).format('YYYY-MM-DD HH:mm:ss')}`
   }
-  return activeLocalStore.value?.last_synced_at ? `上次同步 ${activeLocalStore.value.last_synced_at}` : '未同步'
+  return activeLocalStore.value?.last_synced_at
+    ? `上次同步 ${activeLocalStore.value.last_synced_at}`
+    : '未同步'
 })
 const filteredOrders = computed(() => {
   const keyword = orderSearch.value.trim()
@@ -398,7 +429,9 @@ const trendOption = computed(() => {
         type: 'line' as const,
         smooth: true,
         areaStyle: { opacity: 0.15 },
-        data: entries.map((item) => (trendMetric.value === 'orders' ? item.orders : item.gmv / 100)),
+        data: entries.map((item) =>
+          trendMetric.value === 'orders' ? item.orders : item.gmv / 100,
+        ),
       },
     ],
     graphic:
@@ -432,10 +465,14 @@ function orderStatus(orderOrStatus: any) {
   const text = typeof orderOrStatus === 'object' ? orderOrStatus.status_text : ''
   if (text) return text
   const code = Number(typeof orderOrStatus === 'object' ? orderOrStatus.status : orderOrStatus)
-  if (code === 2) return '待发货'
-  if (code === 3) return '已发货'
-  if (code === 4) return '已关闭'
-  if (code === 5 || code === 21) return '已关闭'
+  if (code === 1) return '待确认'
+  if (code === 2) return '待付款'
+  if (code === 3) return '待发货'
+  if (code === 4) return '已发货'
+  if (code === 5) return '已收货'
+  if (code === 6) return '已完成'
+  if (code === 7 || code === 21) return '已关闭'
+  if (code === 8) return '已退款'
   return '待处理'
 }
 
@@ -446,9 +483,9 @@ function isClosedOrder(orderOrStatus: any) {
 
 function orderStatusClass(orderOrStatus: any) {
   const label = orderStatus(orderOrStatus)
-  if (label.includes('完成') || label.includes('发货')) return 'is-done'
+  if (label.includes('完成') || label.includes('发货') || label.includes('收货')) return 'is-done'
   if (label.includes('关闭') || label.includes('取消') || label.includes('退款')) return 'is-muted'
-  if (label.includes('支付') || label.includes('待发货')) return 'is-paid'
+  if (label.includes('待发货')) return 'is-paid'
   return 'is-pending'
 }
 
@@ -521,7 +558,7 @@ async function loadData() {
       doudianStoreApi.getAftersales(activeStoreId.value),
     ])
     orders.value = orderRes.data?.order_list || []
-    products.value = orderRes.data ? productRes.data?.products || [] : []
+    products.value = productRes.data?.products || []
     aftersales.value = aftersaleRes.data?.list || []
   } finally {
     loading.value = false
@@ -614,15 +651,18 @@ async function syncActive() {
     if (userStore.refreshToken) {
       await userStore.doRefreshToken()
     }
-    const resp = await fetch(`${companionUrl}/api/doudian/stores/${activeLocalStoreId.value}/sync`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        token: userStore.token,
-        refreshToken: userStore.refreshToken,
-        api_url: resolveApiUrl(),
-      }),
-    })
+    const resp = await fetch(
+      `${companionUrl}/api/doudian/stores/${activeLocalStoreId.value}/sync`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          token: userStore.token,
+          refreshToken: userStore.refreshToken,
+          api_url: resolveApiUrl(),
+        }),
+      },
+    )
     const started = await resp.json()
     if (!resp.ok || started.code !== 0) throw new Error(started.msg || '同步启动失败')
     const data = await waitCompanionJob(companionUrl, started.job_id)

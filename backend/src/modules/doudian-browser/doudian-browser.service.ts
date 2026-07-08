@@ -133,7 +133,9 @@ export class DoudianBrowserService implements OnModuleInit {
     const store = await (this.prisma as any).doudianStore.findUnique({ where: { id: storeId } })
     if (!store) throw new Error(`Doudian store not found: ${storeId}`)
     if (String(store.profilePath || '').startsWith('companion:')) {
-      throw new Error('This Doudian store is managed by desktop companion. Please sync from the local companion.')
+      throw new Error(
+        'This Doudian store is managed by desktop companion. Please sync from the local companion.',
+      )
     }
 
     const syncedAt = new Date()
@@ -171,7 +173,9 @@ export class DoudianBrowserService implements OnModuleInit {
         data: {
           syncStatus: 'failed',
           syncError: message,
-          ...(message.includes('login') || message.includes('登录') ? { sessionStatus: 'login_required' } : {}),
+          ...(message.includes('login') || message.includes('登录')
+            ? { sessionStatus: 'login_required' }
+            : {}),
         },
       })
       throw error
@@ -264,7 +268,8 @@ export class DoudianBrowserService implements OnModuleInit {
       order_list: rows.map((row: any) => ({
         order_id: row.orderId,
         status: row.status,
-        status_text: row.raw?.order_status_text || '',
+        status_text:
+          row.raw?.order_status_text || row.raw?.order_status_info?.order_status_text || '',
         pay_amount: row.payAmount,
         post_amount: row.postAmount,
         product_count: row.productCount,
@@ -314,9 +319,15 @@ export class DoudianBrowserService implements OnModuleInit {
       order_id: row.orderId,
       type: row.type,
       status: row.status,
-      status_text: row.raw?.after_sale_info?.after_sale_status_text || '',
-      type_text: row.raw?.after_sale_info?.after_sale_type_text || '',
-      reason: row.raw?.after_sale_info?.reason_text || '',
+      status_text:
+        row.raw?.after_sale_info?.after_sale_status_text ||
+        row.raw?.text_part?.after_sale_status_text ||
+        '',
+      type_text:
+        row.raw?.after_sale_info?.after_sale_type_text ||
+        row.raw?.text_part?.after_sale_type_text ||
+        '',
+      reason: row.raw?.after_sale_info?.reason_text || row.raw?.text_part?.reason_text || '',
       amount: row.amount,
       product: row.product,
       product_id: row.productId,
@@ -352,7 +363,10 @@ export class DoudianBrowserService implements OnModuleInit {
     })
 
     await this.visitAndPaginate(page, 'https://fxg.jinritemai.com/ffa/morder/order/list')
-    await this.visitAndPaginate(page, 'https://fxg.jinritemai.com/ffa/g/list?sov_draft_status=0&sov_goodsType=0')
+    await this.visitAndPaginate(
+      page,
+      'https://fxg.jinritemai.com/ffa/g/list?sov_draft_status=0&sov_goodsType=0',
+    )
     await this.visitAndPaginate(page, 'https://fxg.jinritemai.com/ffa/maftersale/aftersale/list')
 
     return captured
@@ -384,7 +398,9 @@ export class DoudianBrowserService implements OnModuleInit {
           .map((selector) => document.querySelector(selector) as HTMLElement | null)
           .find(Boolean)
 
-        const textCandidates = Array.from(document.querySelectorAll('button, a, li')) as HTMLElement[]
+        const textCandidates = Array.from(
+          document.querySelectorAll('button, a, li'),
+        ) as HTMLElement[]
         const byText = textCandidates.find((element) => {
           const text = (element.innerText || element.textContent || '').trim()
           const aria = element.getAttribute('aria-label') || ''
@@ -421,8 +437,10 @@ export class DoudianBrowserService implements OnModuleInit {
   }
 
   private mergeCaptured(captured: CapturedData, endpoint: CapturedEndpoint, payload: any) {
-    if (endpoint === 'orders') captured.orders = this.mergeListPayload(captured.orders, payload, 'orders')
-    if (endpoint === 'products') captured.products = this.mergeListPayload(captured.products, payload, 'products')
+    if (endpoint === 'orders')
+      captured.orders = this.mergeListPayload(captured.orders, payload, 'orders')
+    if (endpoint === 'products')
+      captured.products = this.mergeListPayload(captured.products, payload, 'products')
     if (endpoint === 'aftersales') {
       captured.aftersales = this.mergeListPayload(captured.aftersales, payload, 'aftersales')
     }
@@ -431,7 +449,11 @@ export class DoudianBrowserService implements OnModuleInit {
     if (endpoint === 'aftersaleCounts') captured.aftersaleCounts = payload
   }
 
-  private mergeListPayload(current: any, incoming: any, endpoint: 'orders' | 'products' | 'aftersales') {
+  private mergeListPayload(
+    current: any,
+    incoming: any,
+    endpoint: 'orders' | 'products' | 'aftersales',
+  ) {
     if (!current) return incoming
 
     const currentItems = this.getPayloadItems(current, endpoint)
@@ -459,19 +481,22 @@ export class DoudianBrowserService implements OnModuleInit {
   }
 
   private getPayloadItems(payload: any, endpoint: 'orders' | 'products' | 'aftersales') {
-    if (endpoint === 'aftersales') return Array.isArray(payload?.data?.items) ? payload.data.items : []
+    if (endpoint === 'aftersales')
+      return Array.isArray(payload?.data?.items) ? payload.data.items : []
     return Array.isArray(payload?.data) ? payload.data : []
   }
 
   private getPayloadItemKey(item: any, endpoint: 'orders' | 'products' | 'aftersales') {
-    if (endpoint === 'orders') return String(item.shop_order_id || item.order_id || JSON.stringify(item))
+    if (endpoint === 'orders')
+      return String(item.shop_order_id || item.order_id || JSON.stringify(item))
     if (endpoint === 'products') return String(item.product_id || JSON.stringify(item))
     return String(item.after_sale_info?.after_sale_id || item.id || JSON.stringify(item))
   }
 
   private assertLoggedIn(captured: CapturedData) {
     const hasBusinessData = captured.orders || captured.products || captured.aftersales
-    if (!hasBusinessData) throw new Error('Doudian login required or business endpoints not captured')
+    if (!hasBusinessData)
+      throw new Error('Doudian login required or business endpoints not captured')
     for (const data of [captured.orders, captured.products, captured.aftersales]) {
       if (data && (data.code === 10008 || data.st === 10008 || data.msg?.includes('未登录'))) {
         throw new Error('Doudian login required')
@@ -481,7 +506,10 @@ export class DoudianBrowserService implements OnModuleInit {
 
   private async isLoggedIn(page: Page) {
     await page.waitForTimeout(3_000)
-    const text = await page.locator('body').innerText({ timeout: 5_000 }).catch(() => '')
+    const text = await page
+      .locator('body')
+      .innerText({ timeout: 5_000 })
+      .catch(() => '')
     return (
       !page.url().includes('/login/') &&
       !/手机登录|邮箱登录|发送验证码/.test(text) &&
@@ -495,16 +523,17 @@ export class DoudianBrowserService implements OnModuleInit {
     for (const order of orders) {
       const orderId = String(order.shop_order_id || order.order_id || '')
       if (!orderId) continue
-      const product = order.product_item?.[0] || order.product_item_list?.[0] || order.sku_order_list?.[0] || {}
+      const product =
+        order.product_item?.[0] || order.product_item_list?.[0] || order.sku_order_list?.[0] || {}
       await (this.prisma as any).doudianStoreOrder.upsert({
         where: { storeId_orderId: { storeId, orderId } },
         update: {
-          status: Number(order.order_status || 0),
-          payAmount: Number(order.pay_amount || order.total_pay_amount || 0),
-          postAmount: Number(order.post_amount || order.total_post_amount || 0),
-          productCount: Number(order.product_count || 0),
-          createTime: Number(order.create_time || 0),
-          updateTime: Number(order.update_time || 0),
+          status: Number(order.order_status ?? 0),
+          payAmount: Number(order.pay_amount ?? order.total_pay_amount ?? 0),
+          postAmount: Number(order.post_amount ?? order.total_post_amount ?? 0),
+          productCount: Number(order.product_count ?? 0),
+          createTime: Number(order.create_time ?? 0),
+          updateTime: Number(order.update_time ?? 0),
           productTitle: product.product_name || product.name || '',
           productImg: product.product_pic || product.img || '',
           raw: order,
@@ -513,12 +542,12 @@ export class DoudianBrowserService implements OnModuleInit {
         create: {
           storeId,
           orderId,
-          status: Number(order.order_status || 0),
-          payAmount: Number(order.pay_amount || order.total_pay_amount || 0),
-          postAmount: Number(order.post_amount || order.total_post_amount || 0),
-          productCount: Number(order.product_count || 0),
-          createTime: Number(order.create_time || 0),
-          updateTime: Number(order.update_time || 0),
+          status: Number(order.order_status ?? 0),
+          payAmount: Number(order.pay_amount ?? order.total_pay_amount ?? 0),
+          postAmount: Number(order.post_amount ?? order.total_post_amount ?? 0),
+          productCount: Number(order.product_count ?? 0),
+          createTime: Number(order.create_time ?? 0),
+          updateTime: Number(order.update_time ?? 0),
           productTitle: product.product_name || product.name || '',
           productImg: product.product_pic || product.img || '',
           raw: order,
@@ -541,11 +570,11 @@ export class DoudianBrowserService implements OnModuleInit {
         update: {
           title: product.name || '',
           imgUrl: product.img || '',
-          minPrice: Number(product.price_lower || product.discount_price || 0),
-          maxPrice: Number(product.price_higher || product.discount_price || 0),
-          sales: Number(product.sell_num || 0),
-          stock: Number(product.stock_num || product.stock || 0),
-          status: Number(product.status || 0),
+          minPrice: Number(product.price_lower ?? product.discount_price ?? 0),
+          maxPrice: Number(product.price_higher ?? product.discount_price ?? 0),
+          sales: Number(product.sell_num ?? 0),
+          stock: Number(product.stock_num ?? product.stock ?? 0),
+          status: Number(product.status ?? 0),
           raw: product,
           syncedAt,
         },
@@ -554,11 +583,11 @@ export class DoudianBrowserService implements OnModuleInit {
           productId,
           title: product.name || '',
           imgUrl: product.img || '',
-          minPrice: Number(product.price_lower || product.discount_price || 0),
-          maxPrice: Number(product.price_higher || product.discount_price || 0),
-          sales: Number(product.sell_num || 0),
-          stock: Number(product.stock_num || product.stock || 0),
-          status: Number(product.status || 0),
+          minPrice: Number(product.price_lower ?? product.discount_price ?? 0),
+          maxPrice: Number(product.price_higher ?? product.discount_price ?? 0),
+          sales: Number(product.sell_num ?? 0),
+          stock: Number(product.stock_num ?? product.stock ?? 0),
+          status: Number(product.status ?? 0),
           raw: product,
           syncedAt,
         },
@@ -580,28 +609,28 @@ export class DoudianBrowserService implements OnModuleInit {
       await (this.prisma as any).doudianStoreAftersale.upsert({
         where: { storeId_afterSaleId: { storeId, afterSaleId } },
         update: {
-          orderId: String(info.related_id || order.order_id || ''),
-          type: Number(info.after_sale_type || 0),
-          status: Number(info.after_sale_status || 0),
-          amount: Number(info.refund_amount || 0),
+          orderId: String(info.related_id ?? order.order_id ?? ''),
+          type: Number(info.after_sale_type ?? 0),
+          status: Number(info.after_sale_status ?? 0),
+          amount: Number(info.refund_amount ?? 0),
           product: product.product_name || product.name || '',
           productId: product.product_id ? String(product.product_id) : null,
-          createTime: Number(info.create_time || info.apply_time || 0),
-          updateTime: Number(info.update_time || 0),
+          createTime: Number(info.create_time ?? info.apply_time ?? 0),
+          updateTime: Number(info.update_time ?? 0),
           raw: item,
           syncedAt,
         },
         create: {
           storeId,
           afterSaleId,
-          orderId: String(info.related_id || order.order_id || ''),
-          type: Number(info.after_sale_type || 0),
-          status: Number(info.after_sale_status || 0),
-          amount: Number(info.refund_amount || 0),
+          orderId: String(info.related_id ?? order.order_id ?? ''),
+          type: Number(info.after_sale_type ?? 0),
+          status: Number(info.after_sale_status ?? 0),
+          amount: Number(info.refund_amount ?? 0),
           product: product.product_name || product.name || '',
           productId: product.product_id ? String(product.product_id) : null,
-          createTime: Number(info.create_time || info.apply_time || 0),
-          updateTime: Number(info.update_time || 0),
+          createTime: Number(info.create_time ?? info.apply_time ?? 0),
+          updateTime: Number(info.update_time ?? 0),
           raw: item,
           syncedAt,
         },

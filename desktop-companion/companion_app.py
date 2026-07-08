@@ -32,14 +32,20 @@ def _get_encryption_key() -> bytes:
     from conf import ENCRYPTION_KEY as CONF_KEY
     key_str = CONF_KEY
     if not key_str:
-        # Fallback: try reading _key from companion_config.json directly
-        try:
-            config_path = BASE_DIR / 'companion_config.json'
-            if config_path.exists():
-                cfg = json.loads(config_path.read_text(encoding='utf-8'))
-                key_str = cfg.get('_key', '')
-        except Exception:
-            pass
+        # Fallback: try reading _key from companion_config.json
+        # Check both AppData (new) and source dir (old/legacy) locations
+        for config_path in [
+            Path.home() / 'AppData' / 'Local' / 'MatrixFlow' / 'companion_config.json',
+            BASE_DIR / 'companion_config.json',
+        ]:
+            try:
+                if config_path.exists():
+                    cfg = json.loads(config_path.read_text(encoding='utf-8'))
+                    key_str = cfg.get('_key', '')
+                    if key_str:
+                        break
+            except Exception:
+                pass
     if not key_str:
         raise RuntimeError("ENCRYPTION_KEY not set. Ensure launcher.py has been run at least once.")
     # key_str is a base64-encoded 32-byte key
@@ -634,23 +640,34 @@ except Exception as _ui_error:
 
 
 # ══════════════════════════════════════════════════════════════════
-# Config persistence (for data collector)
-# When running as frozen EXE, check source dir (parent of dist) for
-# existing config so saved credentials aren't lost after repackaging.
+# Config persistence — store in AppData (survives app updates)
+# Previously config was stored next to the EXE, which meant every
+# update (auto-update or manual rebuild) would overwrite it and lose
+# all saved credentials. Now we use the same AppData directory as
+# local_db.py so config persists across updates.
 # ══════════════════════════════════════════════════════════════════
-if getattr(sys, 'frozen', False):
-    _exe_dir = Path(sys.executable).parent
-    _config_candidate = _exe_dir / 'companion_config.json'
-    if not _config_candidate.exists():
-        _src_dir = _exe_dir.parent  # dist/pixingyun-mate/ -> desktop-companion/
-        _src_config = _src_dir / 'companion_config.json'
-        if _src_config.exists():
-            _config_candidate.parent.mkdir(parents=True, exist_ok=True)
-            import shutil
-            shutil.copy2(str(_src_config), str(_config_candidate))
-    CONFIG_FILE = _config_candidate
-else:
-    CONFIG_FILE = BASE_DIR / 'companion_config.json'
+_APPDATA_DIR = Path.home() / 'AppData' / 'Local' / 'MatrixFlow'
+_APPDATA_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_FILE = _APPDATA_DIR / 'companion_config.json'
+
+# Migrate config from old locations if AppData config doesn't exist yet
+if not CONFIG_FILE.exists():
+    import shutil
+    _old_candidates = []
+    if getattr(sys, 'frozen', False):
+        _exe_dir = Path(sys.executable).parent
+        _old_candidates.append(_exe_dir / 'companion_config.json')
+        _old_candidates.append(_exe_dir.parent / 'companion_config.json')
+    else:
+        _old_candidates.append(BASE_DIR / 'companion_config.json')
+    for _old in _old_candidates:
+        if _old.exists():
+            try:
+                shutil.copy2(str(_old), str(CONFIG_FILE))
+                print(f'[Config] Migrated config from {_old} -> {CONFIG_FILE}')
+                break
+            except Exception as e:
+                print(f'[Config] Migration failed from {_old}: {e}')
 
 
 def _load_config() -> dict:
@@ -806,7 +823,19 @@ try {{
   }} else {{
     $SourceDir = $StageDir
   }}
+  # Backup config before overwrite (safety net — config should already
+  # be in AppData, but keep this in case of legacy installs)
+  $CfgBackup = Join-Path $AppDir 'companion_config.json'
+  $CfgPreserved = $null
+  if (Test-Path $CfgBackup) {{
+    $CfgPreserved = Copy-Item -LiteralPath $CfgBackup -Destination ([System.IO.Path]::GetTempPath() + 'pixingyun_config_backup.json') -Force -PassThru
+  }}
   Copy-Item -Path (Join-Path $SourceDir '*') -Destination $AppDir -Recurse -Force
+  # Restore config if it was backed up
+  if ($CfgPreserved -and (Test-Path $CfgPreserved.FullName)) {{
+    Copy-Item -LiteralPath $CfgPreserved.FullName -Destination $CfgBackup -Force
+    Remove-Item -LiteralPath $CfgPreserved.FullName -Force -ErrorAction SilentlyContinue
+  }}
   Start-Process -FilePath $ExePath -WindowStyle Hidden
 }} catch {{
   $_ | Out-String | Add-Content -LiteralPath $LogPath
@@ -1164,7 +1193,7 @@ def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: st
 
     from doudian_store_collector import collect_store, run_async, upload_store_data
 
-    captured = run_async(collect_store(store.get('profile_id') or local_id))
+    captured = run_async(collect_store(store.get('profile_id') or local_id, _BROWSER_PATH, _BROWSER_CHANNEL))
     store_name = captured.get('storeName') or store.get('name')
     upload_payload = {
         'storeName': store_name,
@@ -1510,7 +1539,8 @@ def data_collection_trigger():
             max_posts = _DEFAULT_QUICK_MAX_POSTS
         if max_posts <= 0:
             max_posts = _DEFAULT_QUICK_MAX_POSTS
-    # 立即执行丢�次采�?    t = threading.Thread(target=_run_collection_once, args=(max_posts, mode, 'manual'), daemon=True)
+    # 立即执行丢�次采�?
+    t = threading.Thread(target=_run_collection_once, args=(max_posts, mode, 'manual'), daemon=True)
     t.start()
     return jsonify({
         'status': 'started',
@@ -2297,7 +2327,11 @@ async def _scrape_data_center(page, platform: str) -> dict:
         if m:
             val = _parse_metric_num(m.group(1))
             if 0 < val < 100_000_000:
-                result['views'] = val
+                # "昨日数据" section 的播放量是日增量，不是累计值。
+                # 只存为 newViews，不存为 views（累计值），
+                # 避免 API 采集失败时把日增量当成累计播放量。
+                if 'newViews' not in result:
+                    result['newViews'] = val
                 break
 
     for pat in _METRIC_PATTERNS.get('followers', []):
@@ -3187,8 +3221,7 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                 return {'metrics': {}, 'video_stats': [], 'expired': True}
 
         try:
-            # DOM login check �?skip DOUYIN (detected by URL above; creator pages
-            # contain QR elements like mobile app download = false positives)
+            # DOM login check: skip DOUYIN (detected by URL above; creator pages contain QR elements like mobile app download = false positives)
             if platform in ('DOUYIN', 'WECHAT_VIDEO'):
                 login_dom = False
             else:
@@ -3399,6 +3432,24 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
     finally:
         try: await page.close()
         except: pass
+
+    # --- Sanity check: 日增量不应超过累计值的 30% ---
+    # 数据中心有时会把累计值当成日增量返回（如"数据总览"选错了时间范围），
+    # 导致 newLikes/newViews 出现数百万的假增量。
+    # 如果日增量 > 累计值的 30%，很可能是数据源混淆，重置为 0。
+    _sanity_pairs = [
+        ('newViews', 'views'),
+        ('newLikes', 'likes'),
+        ('newComments', 'comments'),
+        ('newShares', 'shares'),
+    ]
+    for new_key, total_key in _sanity_pairs:
+        new_val = metrics.get(new_key)
+        total_val = metrics.get(total_key)
+        if (isinstance(new_val, (int, float)) and isinstance(total_val, (int, float))
+                and total_val > 0 and new_val > total_val * 0.3):
+            print(f'[DC] Sanity check: {new_key}={new_val} > {total_key}*0.3={total_val*0.3:.0f}, resetting to 0')
+            metrics[new_key] = 0
 
     return {'metrics': metrics, 'video_stats': video_stats}
 
@@ -3612,7 +3663,8 @@ def _run_collection_once(
         import requests
         run_id = start_collection_run(collection_mode, max_posts, trigger_type)
 
-        # 从本�?DB 获取扢�有绑定的账号（含 expired �?不预判过期，实际试了再说�?        local_accounts = get_all_accounts(include_expired=True)
+        # Get all bound accounts from local DB (including expired)
+        local_accounts = get_all_accounts(include_expired=True)
         print(f'[DC] Stage 1b: got {len(local_accounts)} local accounts', flush=True)
         if not local_accounts:
             print('[DC] Stage 4: collection complete, saving results', flush=True)
@@ -4007,7 +4059,8 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                 scan_errors[session_id] = err_msg
                             return
 
-                        # 复用已有 context（单窗口模式），不再每次 new_context 弢�新窗�?                        existing = browser.contexts
+                        # 复用已有 context（单窗口模式），不再每次 new_context 弢�新窗�?
+                        existing = browser.contexts
                         context = None
                         if existing:
                             try:
