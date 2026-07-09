@@ -1,7 +1,7 @@
 // prisma-enums.ts - SQLite compatibility (replaces @prisma/client enums)
 
 export const Role = {
-  ADMIN: 'ADMIN', MEMBER: 'MEMBER', VIEWER: 'VIEWER', OWNER: 'OWNER', MANAGER: 'MANAGER',
+  ADMIN: 'ADMIN', MEMBER: 'MEMBER', VIEWER: 'VIEWER', OWNER: 'OWNER', MANAGER: 'MANAGER', SUPER_ADMIN: 'SUPER_ADMIN',
 } as const;
 export type Role = (typeof Role)[keyof typeof Role];
 

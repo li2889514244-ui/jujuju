@@ -1,0 +1,41 @@
+<!-- pages/login/login.wxml -->
+<view class="login-wrap">
+  <view class="brand">
+    <view class="logo">MF</view>
+    <view class="brand-name">MatrixFlow</view>
+    <view class="brand-sub">矩阵账号管理 · 数据查看</view>
+  </view>
+
+  <view class="form">
+    <view class="field">
+      <text class="label">邮箱</text>
+      <input
+        class="input"
+        placeholder="登录邮箱"
+        placeholder-class="ph"
+        value="{{email}}"
+        bindinput="onEmailInput"
+        confirm-type="next"
+      />
+    </view>
+    <view class="field">
+      <text class="label">密码</text>
+      <input
+        class="input"
+        placeholder="登录密码"
+        placeholder-class="ph"
+        password
+        value="{{password}}"
+        bindinput="onPwdInput"
+        confirm-type="done"
+        bindconfirm="onLogin"
+      />
+    </view>
+
+    <button class="btn-login" loading="{{loading}}" bindtap="onLogin">
+      {{loading ? '登录中...' : '登录'}}
+    </button>
+  </view>
+
+  <view class="tip">使用 MatrixFlow 主站账号登录，实时同步数据</view>
+</view>

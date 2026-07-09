@@ -1,11 +1,12 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common'
 import { PrismaClient } from '@prisma/client'
+import { TenantMiddleware } from '../common/tenant/tenant.middleware'
 
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(PrismaService.name)
 
-  constructor() {
+  constructor(private readonly tenantMiddleware?: TenantMiddleware) {
     super({
       log: [
         { emit: 'event', level: 'query' },
@@ -19,6 +20,12 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     try {
       await this.$connect()
       this.logger.log('Database connected successfully')
+
+      // 注册租户隔离 middleware
+      if (this.tenantMiddleware) {
+        this.$use(this.tenantMiddleware.createMiddleware())
+        this.logger.log('Tenant isolation middleware registered')
+      }
     } catch (error: any) {
       this.logger.error(`Failed to connect to database: ${error.message}`)
       throw error
@@ -61,6 +68,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
             'Team',
             'User',
             'Organization',
+            'Tenant',
           ]
 
     for (const modelName of models) {

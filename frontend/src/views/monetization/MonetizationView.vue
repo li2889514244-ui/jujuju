@@ -7,6 +7,7 @@
           <el-radio-button value="today">今天</el-radio-button>
           <el-radio-button value="yesterday">昨天</el-radio-button>
           <el-radio-button value="week">近7天</el-radio-button>
+          <el-radio-button value="month">近30天</el-radio-button>
         </el-radio-group>
         <el-select
           v-model="activeStoreId"
@@ -216,7 +217,7 @@ import {
 
 const loading = ref(false)
 const trendMetric = ref('gmv')
-const viewMode = ref<'today' | 'yesterday' | 'week'>('yesterday')
+const viewMode = ref<'today' | 'yesterday' | 'week' | 'month'>('yesterday')
 const stores = ref<WechatStore[]>([])
 const activeStoreId = ref('')
 const orders = ref<WechatOrder[]>([])
@@ -235,6 +236,7 @@ const rangeAmountLabel = computed(() => {
     today: '今天成交金额',
     yesterday: '昨天成交金额',
     week: '近7天成交金额',
+    month: '近30天成交金额',
   }
   return labels[viewMode.value]
 })
@@ -244,6 +246,7 @@ const rangeOrderLabel = computed(() => {
     today: '今天成交订单',
     yesterday: '昨天成交订单',
     week: '近7天成交订单',
+    month: '近30天成交订单',
   }
   return labels[viewMode.value]
 })
@@ -253,6 +256,7 @@ const rangeRefundLabel = computed(() => {
     today: '今天退款金额',
     yesterday: '昨天退款金额',
     week: '近7天退款金额',
+    month: '近30天退款金额',
   }
   return labels[viewMode.value]
 })
@@ -265,6 +269,9 @@ const displayRange = computed(() => {
   }
   if (viewMode.value === 'week') {
     return { start: now.subtract(6, 'day').startOf('day').unix(), end: now.unix() }
+  }
+  if (viewMode.value === 'month') {
+    return { start: now.subtract(29, 'day').startOf('day').unix(), end: now.unix() }
   }
   return { start: now.startOf('day').unix(), end: now.unix() }
 })
@@ -415,7 +422,11 @@ async function loadStoreData() {
   try {
     const { start, end } = displayRange.value
     const [ordRes, prodRes, afterRes, rangeAfterRes, infoRes] = await Promise.all([
-      wechatStoreApi.getOrders(activeStoreId.value, { page_size: 5000 }),
+      wechatStoreApi.getOrders(activeStoreId.value, {
+        page_size: 5000,
+        start_time: start,
+        end_time: end,
+      }),
       wechatStoreApi.getProducts(activeStoreId.value, { page_size: 50 }),
       wechatStoreApi.getAftersaleCount?.(activeStoreId.value) || Promise.resolve(null),
       wechatStoreApi.getAftersaleCount?.(activeStoreId.value, {
@@ -484,6 +495,8 @@ onUnmounted(() => {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: $space-3;
+    flex-wrap: wrap;
   }
   &__title {
     font-size: $text-h1;
@@ -496,6 +509,8 @@ onUnmounted(() => {
     display: flex;
     gap: $space-2;
     align-items: center;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
   &__store-select {
     width: 160px;

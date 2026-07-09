@@ -98,6 +98,14 @@ body,
   overflow: hidden;
 }
 
+// 安全区域 padding（刘海屏 / 底部 Home 条）
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
 body {
   font-family: $font-sans;
   font-size: 14px;
@@ -361,7 +369,7 @@ pre {
 
 @media (max-width: 768px) {
   .app-layout__content {
-    padding: $space-4 !important;
+    padding: $space-3 !important;
   }
 
   .el-form--inline {
@@ -369,18 +377,71 @@ pre {
   }
 
   .el-form--inline .el-form-item {
-    margin-right: 12px;
+    margin-right: 8px;
     margin-bottom: 8px;
   }
 
   .el-dialog {
-    width: 92% !important;
-    margin-top: 8vh !important;
+    width: 94% !important;
+    margin-top: 6vh !important;
+  }
+
+  // 表格在移动端允许横向滚动
+  .el-table {
+    .el-table__inner-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  // 分页组件精简
+  .el-pagination {
+    .el-pagination__sizes,
+    .el-pagination__jump {
+      display: none !important;
+    }
+    .el-pager li:not(.is-active):not(:first-child):not(:last-child):not(.more) {
+      display: none;
+    }
+  }
+
+  // 卡片内边距缩小
+  .el-card__body {
+    padding: $space-4;
+  }
+  .el-card__header {
+    padding: $space-3 $space-4;
+  }
+
+  // Section header 在移动端换行
+  .md-section__header,
+  .ci-section__header {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 }
 
 @media (max-width: 480px) {
+  .app-layout__content {
+    padding: $space-2 !important;
+  }
+
   .hero-value {
     font-size: 42px !important;
+  }
+
+  // 超小屏下卡片内边距再减
+  .el-card__body {
+    padding: $space-3;
+  }
+
+  // 表单 select / input 在超小屏占满
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    width: 100%;
+    .el-select,
+    .el-input {
+      width: 100% !important;
+    }
   }
 }

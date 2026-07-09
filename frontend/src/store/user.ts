@@ -65,7 +65,7 @@ export const useUserStore = defineStore(
     persist: {
       key: 'matrixflow-user',
       paths: ['token', 'refreshToken', 'userInfo'],
-      storage: sessionStorage,
+      storage: localStorage,
     },
   },
 )

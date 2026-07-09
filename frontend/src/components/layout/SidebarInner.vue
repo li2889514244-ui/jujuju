@@ -29,6 +29,7 @@
         :to="'/' + r.path"
         class="sidebar-inner__item"
         :class="{ 'sidebar-inner__item--active': isActiveRoute(r.path) }"
+        :title="collapsed ? String(r.meta?.title || '') : undefined"
         @click="$emit('navigate')"
       >
         <el-icon :size="18" class="sidebar-inner__item-icon">
@@ -62,6 +63,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, markRaw, type Component } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
 import {
   Monitor,
   User,
@@ -79,6 +81,10 @@ import {
   VideoCamera,
   Refresh,
   Bell,
+  Setting,
+  SetUp,
+  Shop,
+  ShoppingCart,
 } from '@element-plus/icons-vue'
 
 defineProps<{ collapsed: boolean }>()
@@ -86,6 +92,7 @@ const emit = defineEmits<{ navigate: []; toggle: [] }>()
 
 const route = useRoute()
 const router = useRouter()
+const userStore = useUserStore()
 const backendVersion = ref('v0.1')
 const backendOk = ref(true)
 
@@ -114,7 +121,17 @@ function onLogoClick() {
 
 const menuRoutes = computed(() => {
   const mainRoute = router.options.routes.find((r) => r.path === '/')
-  return (mainRoute?.children || []).filter((r) => !r.meta?.hidden)
+  const userRole = userStore.userInfo?.role
+  return (mainRoute?.children || []).filter((r) => {
+    // 隐藏的路由不显示
+    if (r.meta?.hidden) return false
+    // 有角色限制的路由，检查当前用户角色
+    const requiredRoles = r.meta?.roles as string[] | undefined
+    if (requiredRoles && requiredRoles.length > 0) {
+      return userRole && requiredRoles.includes(userRole)
+    }
+    return true
+  })
 })
 
 const menuSections = computed(() => {
@@ -145,8 +162,12 @@ const iconMap: Record<string, Component> = {
   Calendar: markRaw(Calendar),
   ChatDotSquare: markRaw(MagicStick),
   Money: markRaw(Money),
+  Shop: markRaw(Shop),
+  ShoppingCart: markRaw(ShoppingCart),
   VideoCamera: markRaw(VideoCamera),
   Bell: markRaw(Bell),
+  Setting: markRaw(Setting),
+  SetUp: markRaw(SetUp),
 }
 
 function getIcon(name: unknown): Component {

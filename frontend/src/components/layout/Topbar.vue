@@ -27,11 +27,6 @@
               >
             </el-dropdown-item>
             <el-dropdown-item>
-              <router-link to="/ai" class="topbar__tool-link">
-                <el-icon :size="14"><MagicStick /></el-icon> AI 助手
-              </router-link>
-            </el-dropdown-item>
-            <el-dropdown-item>
               <router-link to="/mcp" class="topbar__tool-link">
                 <el-icon :size="14"><Connection /></el-icon> MCP 接入
               </router-link>
@@ -125,7 +120,6 @@ import {
   WarningFilled,
   SuccessFilled,
   InfoFilled,
-  MagicStick,
   MoreFilled,
   Connection,
   Download,
@@ -406,6 +400,10 @@ function handleUserCommand(command: string) {
     max-height: 360px;
     overflow-y: auto;
     padding-top: 6px;
+
+    @media (max-width: 768px) {
+      max-height: 50vh;
+    }
   }
 
   &__empty {
@@ -488,6 +486,29 @@ function handleUserCommand(command: string) {
       :deep(.el-breadcrumb__separator:first-of-type) {
         display: none;
       }
+    }
+  }
+
+  // 通知弹窗在移动端窄屏适配
+  :deep(.notification-popover.el-popover) {
+    width: calc(100vw - 24px) !important;
+    max-width: 360px;
+  }
+}
+
+@media (max-width: 480px) {
+  .topbar {
+    padding: 0 8px;
+    &__right {
+      gap: 4px;
+    }
+    &__icon-btn {
+      width: 28px;
+      height: 28px;
+    }
+    &__tool-button {
+      padding: 0 6px;
+      height: 28px;
     }
   }
 }

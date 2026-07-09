@@ -185,8 +185,8 @@
         </transition>
 
         <p class="login__terms">
-          登录即代表您同意 <a href="javascript:void(0)">服务条款</a> 与
-          <a href="javascript:void(0)">隐私政策</a>
+          登录即代表您同意 <router-link to="/terms">服务条款</router-link> 与
+          <router-link to="/privacy">隐私政策</router-link>
         </p>
       </div>
     </main>

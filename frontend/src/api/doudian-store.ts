@@ -23,6 +23,25 @@ export interface DoudianCompanionStore {
   last_error?: string
 }
 
+export type DoudianSummaryMode = 'today' | 'yesterday' | 'week' | 'month'
+
+export interface DoudianSummary {
+  mode: DoudianSummaryMode
+  range: {
+    start: number
+    end: number
+  }
+  gross: number
+  refund: number
+  net: number
+  count: number
+  effectiveCount: number
+  refundCount: number
+  statusBreakdown: Array<{ label: string; count: number }>
+  trend: Array<{ date: string; gmv: number; orders: number }>
+  cached?: boolean
+}
+
 export const doudianStoreApi = {
   getStores() {
     return get<DoudianStore[]>('/doudian-browser/stores')
@@ -55,5 +74,13 @@ export const doudianStoreApi = {
   },
   getAftersales(storeId: string) {
     return get<any>('/doudian-browser/shop/aftersale', { store_id: storeId })
+  },
+  getSummary(storeId: string, params: { start: number; end: number; mode: DoudianSummaryMode }) {
+    return get<DoudianSummary>('/doudian-browser/shop/summary', {
+      store_id: storeId,
+      start: params.start,
+      end: params.end,
+      mode: params.mode,
+    })
   },
 }

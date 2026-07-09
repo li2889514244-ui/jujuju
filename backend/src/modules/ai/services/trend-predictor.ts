@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { getProvider } from '../providers/ai-provider.interface';
 import { renderTemplate } from '../utils/prompt-templates';
 import { calculateTrend, growthRate, compoundGrowthRate, movingAverage, type TrendResult } from '../utils/data-analyzer';
+import { PrismaService } from '../../../prisma/prisma.service';
 import type { PredictTrendDto } from '../dto/ai-request.dto';
 
 export interface TrendPrediction {
@@ -12,29 +13,53 @@ export interface TrendPrediction {
   trend: TrendResult;
   insights: string[];
   recommendations: string[];
+  dataSource: 'real' | 'mock' | 'none';
 }
 
 @Injectable()
 export class TrendPredictorService {
   private readonly logger = new Logger(TrendPredictorService.name);
 
+  constructor(private readonly prisma: PrismaService) {}
+
   async predictTrend(dto: PredictTrendDto): Promise<TrendPrediction> {
     const provider = getProvider();
     const days = dto.days || 30;
 
-    // Parse historical data or use mock
+    // Try to get real data from DailyStats
     let historicalValues: number[] = [];
+    let dataSource: 'real' | 'mock' | 'none' = 'none';
+
     if (dto.historicalData) {
       try {
         historicalValues = JSON.parse(dto.historicalData);
+        dataSource = 'real';
       } catch {
-        this.logger.warn('Invalid historical data JSON, using mock');
+        this.logger.warn('Invalid historical data JSON');
       }
     }
 
-    // Generate mock data if none provided
+    // If no explicit data, query database for real metrics
     if (historicalValues.length === 0) {
-      historicalValues = this.generateMockData(dto.metric, 60);
+      historicalValues = await this.fetchRealMetrics(dto.metric, dto.platform, days + 30);
+      if (historicalValues.length > 0) {
+        dataSource = 'real';
+      }
+    }
+
+    // If still no data, return empty prediction
+    if (historicalValues.length === 0) {
+      this.logger.warn(`No real data available for trend prediction: metric=${dto.metric}`);
+      return {
+        metric: dto.metric,
+        currentValue: 0,
+        predictedValue: 0,
+        growthRate: 0,
+        trend: { direction: 'stable', slope: 0, r2: 0, predicted: [], forecast: [] },
+        insights: ['暂无足够的历史数据进行趋势预测，请先通过桌面伴侣采集数据。'],
+        recommendations: ['绑定账号并使用桌面伴侣采集数据后再查看趋势预测。'],
+        dataSource: 'none',
+      };
     }
 
     // Statistical analysis
@@ -44,7 +69,7 @@ export class TrendPredictorService {
     const cgr = compoundGrowthRate(historicalValues);
     const ma = movingAverage(historicalValues, 7);
 
-    // AI-powered insights
+    // AI-powered insights (falls back to statistical if AI unavailable)
     let insights: string[] = [];
     let recommendations: string[] = [];
 
@@ -52,7 +77,7 @@ export class TrendPredictorService {
       const prompt = renderTemplate(
         dto.metric === 'followers' ? 'follower_growth' : 'content_trend',
         {
-          platform: dto.platform || '抖音',
+          platform: dto.platform || '全平台',
           currentFollowers: currentValue,
           historicalData: JSON.stringify(historicalValues.slice(-30)),
           days,
@@ -85,7 +110,60 @@ export class TrendPredictorService {
       trend,
       insights,
       recommendations,
+      dataSource,
     };
+  }
+
+  /**
+   * Query real DailyStats from database for the given metric
+   */
+  private async fetchRealMetrics(metric: string, platform: string | undefined, days: number): Promise<number[]> {
+    try {
+      const metricField = this.getMetricField(metric);
+      if (!metricField) return [];
+
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - days);
+
+      const where: any = {
+        date: { gte: startDate },
+      };
+      if (platform) where.platform = platform;
+
+      const stats = await this.prisma.dailyStats.findMany({
+        where,
+        select: {
+          date: true,
+          [metricField]: true,
+        } as any,
+        orderBy: { date: 'asc' },
+      });
+
+      if (stats.length === 0) return [];
+
+      // Aggregate by date (sum across all accounts for each day)
+      const byDate = new Map<string, number>();
+      for (const s of stats) {
+        const dateKey = new Date(s.date as any).toISOString().split('T')[0];
+        const val = (s as any)[metricField] || 0;
+        byDate.set(dateKey, (byDate.get(dateKey) || 0) + val);
+      }
+
+      return Array.from(byDate.values());
+    } catch (error) {
+      this.logger.error(`Failed to fetch real metrics: ${error}`);
+      return [];
+    }
+  }
+
+  private getMetricField(metric: string): string | null {
+    const map: Record<string, string> = {
+      followers: 'followers',
+      likes: 'likes',
+      views: 'views',
+      engagement: 'likes', // engagement = likes / followers, approximate with likes
+    };
+    return map[metric] || null;
   }
 
   async getMetricSummary(data: number[]): Promise<{
@@ -103,26 +181,6 @@ export class TrendPredictorService {
       trend: calculateTrend(data),
       movingAvg: movingAverage(data),
     };
-  }
-
-  private generateMockData(metric: string, days: number): number[] {
-    const baseValues: Record<string, { base: number; daily: number; variance: number }> = {
-      followers: { base: 10000, daily: 50, variance: 20 },
-      likes: { base: 50000, daily: 200, variance: 80 },
-      views: { base: 100000, daily: 1000, variance: 300 },
-      engagement: { base: 5, daily: 0.05, variance: 0.5 },
-    };
-
-    const cfg = baseValues[metric] || baseValues.followers;
-    const data: number[] = [];
-
-    for (let i = 0; i < days; i++) {
-      const trend = cfg.base + cfg.daily * i;
-      const noise = (Math.random() - 0.5) * 2 * cfg.variance;
-      data.push(Math.max(0, Math.round(trend + noise)));
-    }
-
-    return data;
   }
 
   private getStatisticalInsights(trend: TrendResult, cgr: number, metric: string): string[] {

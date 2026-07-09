@@ -641,17 +641,18 @@ async def collect_douyin_data(
     # ── Step 5: 格式化作品数据 ──
     result.video_stats = [_parse_aweme_stats(a) for a in all_awemes]
 
-    # 从作品聚合计算总指标（companion 字段名：followers/views/comments/shares/likes）
+    # 从作品列表聚合 views/comments/shares（profile API 不提供这三个指标）
+    # likes 不用求和 — 使用 profile API 的 total_favorited（更准确的累计值）
+    # 注意：求和值会因采集视频数量不同而波动（快采20条 vs 全量500+条），
+    # local_db.py 的指标源跳变保护会处理大幅波动，避免产生假增量
     if all_awemes:
         total_plays = sum(vs.get("views", 0) for vs in result.video_stats)
-        total_likes = sum(vs.get("likes", 0) for vs in result.video_stats)
         total_comments = sum(vs.get("comments", 0) for vs in result.video_stats)
         total_shares = sum(vs.get("shares", 0) for vs in result.video_stats)
         result.metrics.update({
             "views": total_plays,
             "comments": total_comments,
             "shares": total_shares,
-            "likes": total_likes,  # 如果 profile 没拿到，从作品聚合
         })
 
     # ── Step 6 (可选): 采集评论 ──

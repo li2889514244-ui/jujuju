@@ -83,6 +83,36 @@ export class TeamsController {
     return this.teamsService.removeMember(orgId, memberId, userId);
   }
 
+  @Put(':id')
+  @Roles(Role.OWNER, Role.ADMIN, Role.MANAGER)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '更新团队信息' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: { name?: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.update(id, dto, userId);
+  }
+
+  @Delete(':id')
+  @Roles(Role.OWNER, Role.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '删除团队' })
+  async remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.teamsService.remove(id, userId);
+  }
+
+  @Post('accept-invite')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '接受邀请加入团队' })
+  async acceptInvite(
+    @Body() dto: { token: string },
+    @CurrentUser('id') userId: string,
+  ) {
+    return this.teamsService.acceptInvite(dto.token, userId);
+  }
+
   // :id route comes AFTER members routes
   @Get(':id')
   async findOne(@Param('id') id: string) {

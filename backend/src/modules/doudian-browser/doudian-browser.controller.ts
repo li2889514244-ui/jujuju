@@ -85,4 +85,15 @@ export class DoudianBrowserController {
   getAftersales(@Query('store_id') storeId: string) {
     return this.doudianBrowserService.getAftersales(storeId)
   }
+
+  @Public()
+  @Get('shop/summary')
+  getSummary(
+    @Query('store_id') storeId: string,
+    @Query('start') start: string,
+    @Query('end') end: string,
+    @Query('mode') mode: 'today' | 'yesterday' | 'week' | 'month',
+  ) {
+    return this.doudianBrowserService.getSummary(storeId, Number(start), Number(end), mode)
+  }
 }

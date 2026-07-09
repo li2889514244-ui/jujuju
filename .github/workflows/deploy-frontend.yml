@@ -1,0 +1,139 @@
+name: Deploy Frontend
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-frontend
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build & Deploy Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+      - name: Pack dist
+        run: |
+          cd frontend
+          tar -czf ../dist.tar.gz dist
+
+      - name: Upload & deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_SSH_USER }}
+          password: ${{ secrets.ECS_SSH_PASSWORD }}
+          port: 22
+          timeout: 60s
+          script: |
+            set -euo pipefail
+            STAMP=$(date +%Y%m%d%H%M%S)
+            TAR=/tmp/matrixflow-frontend-ci-$STAMP.tar.gz
+            TARGET=/opt/matrixflow/frontend/dist
+            CONTAINER=matrixflow-frontend
+            BACKUP=/tmp/matrixflow-frontend-dist-backup-$STAMP
+
+            # Upload via base64 from stdin is not efficient; use SCP instead
+            echo "Waiting for SFTP upload..."
+
+      - name: Upload dist via SCP
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_SSH_USER }}
+          password: ${{ secrets.ECS_SSH_PASSWORD }}
+          port: 22
+          source: dist.tar.gz
+          target: /tmp/matrixflow-frontend-ci.tar.gz
+          overwrite: true
+
+      - name: Deploy on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ secrets.ECS_SSH_USER }}
+          password: ${{ secrets.ECS_SSH_PASSWORD }}
+          port: 22
+          timeout: 60s
+          script: |
+            set -euo pipefail
+            STAMP=$(date +%Y%m%d%H%M%S)
+            TAR=/tmp/matrixflow-frontend-ci.tar.gz
+            TMP=/tmp/matrixflow-release-ci-$STAMP
+            TARGET=/opt/matrixflow/frontend/dist
+            CONTAINER=matrixflow-frontend
+            BACKUP=/tmp/matrixflow-frontend-dist-backup-$STAMP
+
+            echo "=== Extracting ==="
+            rm -rf "$TMP"
+            mkdir -p "$TMP" "$TARGET" "$BACKUP"
+            tar -xzf "$TAR" -C "$TMP"
+            test -f "$TMP/dist/index.html" || { echo "ERROR: index.html not found"; exit 1; }
+
+            echo "=== Backing up & replacing ==="
+            if [ -d "$TARGET" ]; then
+              cp -a "$TARGET/." "$BACKUP/" || true
+              find "$TARGET" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+            fi
+            cp -a "$TMP/dist/." "$TARGET/"
+            chmod -R a+rX "$TARGET"
+
+            echo "=== Reloading nginx ==="
+            if docker ps --format '{{.Names}}' | grep -qx "$CONTAINER"; then
+              docker exec "$CONTAINER" nginx -s reload 2>&1 || docker restart "$CONTAINER"
+              echo "nginx reloaded"
+            else
+              echo "WARNING: container $CONTAINER not found"
+            fi
+
+            echo "=== Verifying ==="
+            sleep 2
+            HTTP_CODE=$(curl -sf --max-time 10 -o /dev/null -w '%{http_code}' http://127.0.0.1/ 2>&1 || echo "FAIL")
+            echo "HTTP status: $HTTP_CODE"
+
+            REMOTE_REF=$(grep -o 'assets/js/index-[^" ]*' "$TARGET/index.html" | head -1)
+            echo "remote_ref=$REMOTE_REF"
+
+            # Cleanup
+            rm -f "$TAR"
+            rm -rf "$TMP"
+
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ DEPLOY SUCCESS"
+            else
+              echo "⚠️ HTTP status: $HTTP_CODE"
+              exit 1
+            fi
+
+      - name: Verify public URL
+        run: |
+          sleep 3
+          HTTP_CODE=$(curl -sf --max-time 15 -o /dev/null -w '%{http_code}' 'https://ddddkiii.com/?v='${GITHUB_RUN_ID} 2>&1 || echo "FAIL")
+          echo "Public HTTP status: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Public verification passed"
+          else
+            echo "⚠️ Public verification returned: $HTTP_CODE"
+          fi

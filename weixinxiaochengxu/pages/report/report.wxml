@@ -1,0 +1,55 @@
+<!-- pages/report/report.wxml -->
+<view class="container">
+  <view class="page-head">
+    <text class="title">数据报告</text>
+  </view>
+
+  <view class="seg">
+    <view
+      class="seg-item {{days === 7 ? 'active' : ''}}"
+      data-days="7"
+      bindtap="changeDays"
+    >近7天</view>
+    <view
+      class="seg-item {{days === 30 ? 'active' : ''}}"
+      data-days="30"
+      bindtap="changeDays"
+    >近30天</view>
+  </view>
+
+  <block wx:if="{{loading && !publishEffect.length}}">
+    <view class="loading">加载中...</view>
+  </block>
+
+  <block wx:else>
+    <view class="card">
+      <view class="card-title">发布效果</view>
+      <view class="eff-row eff-head">
+        <text class="c1">平台</text>
+        <text class="c2">发布</text>
+        <text class="c3">均播</text>
+        <text class="c4">均赞</text>
+      </view>
+      <view class="eff-row" wx:for="{{publishEffect}}" wx:key="platform">
+        <text class="c1">{{item.platform}}</text>
+        <text class="c2">{{item.published}}</text>
+        <text class="c3">{{item.avgViews}}</text>
+        <text class="c4">{{item.avgLikes}}</text>
+      </view>
+      <view wx:if="{{!publishEffect.length}}" class="empty">暂无数据</view>
+    </view>
+
+    <view class="card">
+      <view class="card-title">互动趋势</view>
+      <view class="eff-row eff-head">
+        <text class="c1">日期</text>
+        <text class="c2">互动量</text>
+      </view>
+      <view class="eff-row" wx:for="{{engagement}}" wx:key="date">
+        <text class="c1">{{item.date}}</text>
+        <text class="c2">{{item.value}}</text>
+      </view>
+      <view wx:if="{{!engagement.length}}" class="empty">暂无数据</view>
+    </view>
+  </block>
+</view>

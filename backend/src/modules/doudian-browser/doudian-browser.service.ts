@@ -3,6 +3,12 @@ import { AccountStatus } from '@prisma/client'
 import * as fs from 'fs'
 import * as path from 'path'
 import { PrismaService } from '../../prisma/prisma.service'
+import {
+  buildDoudianSummary,
+  type DoudianAftersaleMetric,
+  type DoudianOrderMetric,
+  type DoudianViewMode,
+} from './doudian-store-metrics'
 
 type BrowserContext = any
 type Page = any
@@ -341,6 +347,58 @@ export class DoudianBrowserService implements OnModuleInit {
       total: list.length,
       totalAmount: list.reduce((sum: number, item: any) => sum + Number(item.amount || 0), 0),
       cached: true,
+    }
+  }
+
+  async getSummary(storeId: string, start: number, end: number, mode: DoudianViewMode) {
+    const normalizedMode: DoudianViewMode = ['today', 'yesterday', 'week', 'month'].includes(mode)
+      ? mode
+      : 'today'
+    const range = {
+      start: Number(start || 0),
+      end: Number(end || 0),
+    }
+    if (!storeId || !range.start || !range.end || range.end < range.start) {
+      throw new Error('Invalid Doudian summary query')
+    }
+
+    const [orderRows, aftersaleRows] = await Promise.all([
+      (this.prisma as any).doudianStoreOrder.findMany({
+        where: { storeId },
+        orderBy: { createTime: 'desc' },
+      }),
+      (this.prisma as any).doudianStoreAftersale.findMany({
+        where: { storeId },
+        orderBy: { updateTime: 'desc' },
+      }),
+    ])
+
+    const orders: DoudianOrderMetric[] = orderRows.map((row: any) => ({
+      order_id: row.orderId,
+      status: row.status,
+      status_text:
+        row.raw?.order_status_text || row.raw?.order_status_info?.order_status_text || '',
+      pay_amount: row.payAmount,
+      create_time: row.createTime,
+    }))
+    const aftersales: DoudianAftersaleMetric[] = aftersaleRows.map((row: any) => ({
+      id: row.afterSaleId,
+      order_id: row.orderId,
+      status: row.status,
+      status_text:
+        row.raw?.after_sale_info?.after_sale_status_text ||
+        row.raw?.text_part?.after_sale_status_text ||
+        '',
+      amount: row.amount,
+      create_time: row.createTime,
+      update_time: row.updateTime,
+    }))
+
+    return {
+      errcode: 0,
+      errmsg: 'ok',
+      cached: true,
+      ...buildDoudianSummary(orders, aftersales, range, normalizedMode),
     }
   }
 

@@ -34,7 +34,16 @@ export const wechatStoreApi = {
   // ── 订单 ──
 
   /** 小店订单列表 */
-  getOrders(storeId: string, params?: { page_size?: number; next_key?: string; status?: number }) {
+  getOrders(
+    storeId: string,
+    params?: {
+      page_size?: number
+      next_key?: string
+      status?: number
+      start_time?: number
+      end_time?: number
+    },
+  ) {
     return get<any>('/wechat-store/shop/orders', { store_id: storeId, ...params })
   },
 

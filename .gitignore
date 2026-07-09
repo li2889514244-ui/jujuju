@@ -151,3 +151,6 @@ wechat_*.png
 k8s/secrets.yaml
 *.secret
 token_output.txt
+
+# Deployment scripts with secrets
+scripts/

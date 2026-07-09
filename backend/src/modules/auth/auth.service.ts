@@ -77,13 +77,14 @@ export class AuthService implements OnModuleInit {
         phone: true,
         role: true,
         status: true,
+        organizationId: true,
         createdAt: true,
       },
     })
 
     this.logger.log(`用户注册成功: ${user.email}`)
 
-    const tokens = await this.generateTokens(user.id, user.email)
+    const tokens = await this.generateTokens(user.id, user.email, user.organizationId)
     return { user, ...tokens }
   }
 
@@ -104,7 +105,7 @@ export class AuthService implements OnModuleInit {
 
     this.logger.log(`用户登录成功: ${user.email}`)
 
-    const tokens = await this.generateTokens(user.id, user.email)
+    const tokens = await this.generateTokens(user.id, user.email, user.organizationId)
     return {
       user: {
         id: user.id,
@@ -122,6 +123,15 @@ export class AuthService implements OnModuleInit {
   async validateUser(email: string, password: string) {
     const user = await this.prisma.user.findUnique({
       where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        password: true,
+        role: true,
+        status: true,
+        organizationId: true,
+      },
     })
 
     if (!user || !user.password) {
@@ -168,6 +178,12 @@ export class AuthService implements OnModuleInit {
 
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
+        select: {
+          id: true,
+          email: true,
+          status: true,
+          organizationId: true,
+        },
       })
 
       if (!user || user.status !== 'ACTIVE') {
@@ -177,7 +193,7 @@ export class AuthService implements OnModuleInit {
       // 将旧 refresh token 的 hash 加入黑名单（TTL 设为 refresh token 的最大有效期 7 天）
       await this.redis.setWithTTL(`token:blacklist:${tokenHash}`, '1', 7 * 24 * 60 * 60)
 
-      const tokens = await this.generateTokens(user.id, user.email)
+      const tokens = await this.generateTokens(user.id, user.email, user.organizationId)
       return tokens
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -210,8 +226,16 @@ export class AuthService implements OnModuleInit {
   /**
    * 生成 Access Token 和 Refresh Token
    */
-  private async generateTokens(userId: string, email: string | null) {
-    const payload = { sub: userId, email: email || undefined }
+  private async generateTokens(
+    userId: string,
+    email: string | null,
+    organizationId?: string | null,
+  ) {
+    const payload = {
+      sub: userId,
+      email: email || undefined,
+      organizationId: organizationId || undefined,
+    }
 
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
@@ -259,8 +283,12 @@ export class AuthService implements OnModuleInit {
   /**
    * 为 Authing 登录的用户签发 JWT（供 AuthingService 回调使用）
    */
-  async generateTokensForUser(user: { id: string; email: string | null }) {
-    return this.generateTokens(user.id, user.email)
+  async generateTokensForUser(user: {
+    id: string
+    email: string | null
+    organizationId?: string | null
+  }) {
+    return this.generateTokens(user.id, user.email, user.organizationId)
   }
 
   /**

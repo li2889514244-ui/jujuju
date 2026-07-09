@@ -1,8 +1,7 @@
 """
 披星云伴侣启动器
 - 自动检测环境
-- 后台启动 Flask
-- 自动打开浏览器
+- 后台启动 Flask + 系统托盘 + Chrome CDP 窗口
 - 出错弹窗提示
 """
 import subprocess
@@ -60,12 +59,17 @@ def init_encryption_key():
     Checks if COMPANION_KEY env var exists. If not, generates a random 
     32-byte key, stores it in companion_config.json._key, and sets the 
     environment variable for the current session.
+    
+    Config is stored in AppData/Local/MatrixFlow/ (persists across updates).
     """
     companion_key = os.environ.get('COMPANION_KEY', '').strip()
     if companion_key:
         return companion_key
 
-    config_path = os.path.join(COMPANION_DIR, 'companion_config.json')
+    # Config lives in AppData now (same as companion_app.py)
+    appdata_dir = os.path.join(os.path.expanduser('~'), 'AppData', 'Local', 'MatrixFlow')
+    os.makedirs(appdata_dir, exist_ok=True)
+    config_path = os.path.join(appdata_dir, 'companion_config.json')
 
     # Try reading existing key from config file
     try:
@@ -83,7 +87,7 @@ def init_encryption_key():
     raw_key = secrets.token_bytes(32)
     key_b64 = base64.b64encode(raw_key).decode('ascii')
 
-    # Store in companion_config.json
+    # Store in companion_config.json (AppData location)
     try:
         cfg = {}
         if os.path.isfile(config_path):
@@ -96,7 +100,7 @@ def init_encryption_key():
         print(f"[启动器] 警告: 无法保存加密密钥到配置文件: {e}", file=sys.stderr)
 
     os.environ['COMPANION_KEY'] = key_b64
-    print("[启动器] ⚠️  首次运行：已生成加密密钥并保存到 companion_config.json")
+    print(f"[启动器] 首次运行：已生成加密密钥并保存到 {config_path}")
     return key_b64
 
 
@@ -116,7 +120,8 @@ def main():
     # 2. 检查端口是否已被占用（说明已启动）
     try:
         urllib.request.urlopen(URL, timeout=1)
-        print("[启动器] 伴侣已在运行，直接打开浏览器")
+        print("[启动器] 伴侣已在运行，无需重复启动")
+        # 已在运行时打开浏览器作为备用入口
         open_browser()
         return 0
     except Exception:
@@ -150,9 +155,8 @@ def main():
         )
         return 1
 
-    # 5. 打开浏览器
-    print("[启动器] 服务器就绪，打开浏览器")
-    open_browser()
+    # 5. 伴侣进程会自行打开 Chrome CDP 窗口和系统托盘
+    print("[启动器] 服务器就绪，伴侣窗口即将打开")
 
     # 6. 启动器自身退出（伴侣进程已 detached）
     print("[启动器] 完成，启动器退出")

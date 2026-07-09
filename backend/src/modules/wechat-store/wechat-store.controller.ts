@@ -46,11 +46,15 @@ export class WechatStoreController {
     @Query('page_size') pageSize?: string,
     @Query('next_key') nextKey?: string,
     @Query('status') status?: string,
+    @Query('start_time') startTime?: string,
+    @Query('end_time') endTime?: string,
   ) {
     return this.wechatStoreService.getOrderListAggregated(storeId, {
       page_size: this.toOptionalNumber(pageSize),
       next_key: nextKey,
       status: this.toOptionalNumber(status),
+      start_time: this.toOptionalNumber(startTime),
+      end_time: this.toOptionalNumber(endTime),
     })
   }
 

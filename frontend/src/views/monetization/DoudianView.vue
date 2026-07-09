@@ -16,6 +16,7 @@
           <el-radio-button value="today">今天</el-radio-button>
           <el-radio-button value="yesterday">昨天</el-radio-button>
           <el-radio-button value="week">近7天</el-radio-button>
+          <el-radio-button value="month">近30天</el-radio-button>
         </el-radio-group>
         <el-select
           v-if="localStores.length > 0"
@@ -49,10 +50,11 @@
         </el-select>
         <el-button :icon="Refresh" circle size="small" :loading="loading" @click="refreshAll" />
         <el-button
-          v-if="!usingCloudFallback"
           type="primary"
           size="small"
+          :disabled="usingCloudFallback"
           :loading="syncing"
+          :title="usingCloudFallback ? '桌面伴侣未连接，无法同步' : '同步抖店数据'"
           @click="syncActive"
         >
           同步
@@ -119,7 +121,7 @@
         <div class="kpi-card__value kpi-card__value--danger">
           &yen;{{ centToYuan(rangeAftersaleAmount) }}
         </div>
-        <div class="kpi-card__sub">{{ displayAftersales.length }} 条售后记录</div>
+        <div class="kpi-card__sub">{{ displayRefundAftersales.length }} 条退款记录</div>
       </div>
     </div>
 
@@ -135,8 +137,8 @@
         <span>售后/退款</span>
         <span class="section-card__meta">
           {{
-            displayAftersales.length > 0
-              ? `${displayAftersales.length} 条，合计 ¥${centToYuan(rangeAftersaleAmount)}`
+            displayRefundAftersales.length > 0
+              ? `${displayRefundAftersales.length} 条，合计 ¥${centToYuan(rangeAftersaleAmount)}`
               : '当前时段暂无售后'
           }}
           <span class="section-card__toggle">{{ showAftersale ? '收起' : '展开' }}</span>
@@ -146,16 +148,16 @@
         <div v-if="aftersales.length === 0" class="empty-hint">
           <p>暂无售后记录</p>
         </div>
-        <div v-for="item in displayAftersales.slice(0, 20)" :key="item.id" class="order-item">
+        <div v-for="item in displayRefundAftersales.slice(0, 20)" :key="item.id" class="order-item">
           <div class="order-item__info">
             <div class="order-item__title">{{ item.product || '未知商品' }}</div>
             <div class="order-item__meta">
-              <span>{{ fmtTime(item.create_time) }}</span>
+              <span>{{ fmtTime(item.create_time || 0) }}</span>
               <span class="order-item__status is-done">{{ aftersaleStatus(item) }}</span>
             </div>
           </div>
           <div class="order-item__price order-item__price--refund">
-            -&yen;{{ centToYuan(item.amount) }}
+            -&yen;{{ centToYuan(item.amount || 0) }}
           </div>
         </div>
       </div>
@@ -215,7 +217,7 @@
                 <span>订单 {{ order.order_id }}</span>
               </div>
             </div>
-            <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount) }}</div>
+            <div class="order-item__price">&yen;{{ centToYuan(order.pay_amount || 0) }}</div>
           </div>
         </div>
       </div>
@@ -262,9 +264,25 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh, Setting } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import DataChart from '@/components/common/DataChart.vue'
-import { doudianStoreApi, type DoudianCompanionStore, type DoudianStore } from '@/api/doudian-store'
+import {
+  doudianStoreApi,
+  type DoudianCompanionStore,
+  type DoudianStore,
+  type DoudianSummary,
+} from '@/api/doudian-store'
 import { getCompanionUrl } from '@/composables/useCompanionUrl'
 import { useUserStore } from '@/store/user'
+import {
+  buildDoudianStatusBreakdown,
+  buildDoudianTrend,
+  doudianAftersaleStatus,
+  doudianOrderStatus,
+  filterDoudianRefunds,
+  getDoudianRevenueOrders,
+  getDoudianSuccessfulRefundOrderIds,
+  type DoudianAftersaleMetric,
+  type DoudianOrderMetric,
+} from '@/utils/doudianStoreMetrics'
 
 const stores = ref<DoudianStore[]>([])
 const localStores = ref<DoudianCompanionStore[]>([])
@@ -275,13 +293,15 @@ const syncing = ref(false)
 const creatingStore = ref(false)
 const companionReady = ref(true)
 const showAftersale = ref(false)
-const viewMode = ref<'today' | 'yesterday' | 'week'>('today')
+const viewMode = ref<'today' | 'yesterday' | 'week' | 'month'>('today')
 const trendMetric = ref<'gmv' | 'orders'>('gmv')
 const orderSearch = ref('')
 const newStoreName = ref('')
-const orders = ref<any[]>([])
+const orders = ref<DoudianOrderMetric[]>([])
 const products = ref<any[]>([])
-const aftersales = ref<any[]>([])
+const aftersales = ref<DoudianAftersaleMetric[]>([])
+const summary = ref<DoudianSummary | null>(null)
+const lastLoadError = ref('')
 const userStore = useUserStore()
 let timer: ReturnType<typeof setInterval> | null = null
 
@@ -299,6 +319,7 @@ const hasCachedData = computed(
   () => orders.value.length > 0 || products.value.length > 0 || aftersales.value.length > 0,
 )
 const storeAlertTitle = computed(() => {
+  if (lastLoadError.value && !hasCachedData.value) return lastLoadError.value
   const message = activeStore.value?.syncError || activeLocalStore.value?.last_error || ''
   if (!message) return ''
   if (hasCachedData.value) return ''
@@ -311,44 +332,76 @@ const displayRange = computed(() => {
     return { start: day.startOf('day').unix(), end: day.endOf('day').unix() }
   }
   if (viewMode.value === 'week') {
-    return { start: now.subtract(6, 'day').startOf('day').unix(), end: now.unix() }
+    return {
+      start: now.subtract(7, 'day').startOf('day').unix(),
+      end: now.subtract(1, 'day').endOf('day').unix(),
+    }
+  }
+  if (viewMode.value === 'month') {
+    return {
+      start: now.subtract(30, 'day').startOf('day').unix(),
+      end: now.subtract(1, 'day').endOf('day').unix(),
+    }
   }
   return { start: now.startOf('day').unix(), end: now.unix() }
+})
+const backendSummary = computed(() => {
+  const current = summary.value
+  const range = displayRange.value
+  if (!current) return null
+  if (current.mode !== viewMode.value) return null
+  if (current.range?.start !== range.start || current.range?.end !== range.end) return null
+  return current
 })
 const displayOrders = computed(() => {
   const { start, end } = displayRange.value
   return orders.value.filter((order) => order.create_time >= start && order.create_time <= end)
 })
-const displayAftersales = computed(() => {
-  const { start, end } = displayRange.value
-  return aftersales.value.filter((item) => item.create_time >= start && item.create_time <= end)
+const successfulRefundOrderIds = computed(() =>
+  getDoudianSuccessfulRefundOrderIds(aftersales.value),
+)
+const revenueOrders = computed(() =>
+  getDoudianRevenueOrders(displayOrders.value, successfulRefundOrderIds.value),
+)
+const revenueOrderIds = computed(
+  () => new Set(revenueOrders.value.map((order) => String(order.order_id))),
+)
+const displayRefundAftersales = computed(() => {
+  return filterDoudianRefunds(
+    aftersales.value,
+    displayRange.value,
+    viewMode.value,
+    revenueOrderIds.value,
+  )
 })
 const rangeAftersaleAmount = computed(() =>
-  displayAftersales.value.reduce((sum, item) => sum + Number(item.amount || 0), 0),
+  displayRefundAftersales.value.reduce((sum, item) => sum + Number(item.amount || 0), 0),
 )
 const rangeSalesLabel = computed(() => {
   if (viewMode.value === 'yesterday') return '昨天成交金额'
   if (viewMode.value === 'week') return '近7天成交金额'
+  if (viewMode.value === 'month') return '近30天成交金额'
   return '今天成交金额'
 })
 const orderStats = computed(() => {
-  const gross = displayOrders.value.reduce((sum, order) => sum + Number(order.pay_amount || 0), 0)
-  const closedOrderIds = new Set(
-    displayOrders.value
-      .filter((order) => isClosedOrder(order))
-      .map((order) => String(order.order_id)),
-  )
-  const refund = displayAftersales.value.reduce((sum, item) => {
-    if (closedOrderIds.has(String(item.order_id || ''))) return sum
-    return sum + Number(item.amount || 0)
-  }, 0)
-  const effectiveCount = displayOrders.value.filter((order) => !isClosedOrder(order)).length
+  if (backendSummary.value) {
+    const current = backendSummary.value
+    return {
+      gross: current.gross,
+      refund: current.refund,
+      net: current.net,
+      count: current.count,
+      effectiveCount: current.effectiveCount,
+    }
+  }
+  const gross = revenueOrders.value.reduce((sum, order) => sum + Number(order.pay_amount || 0), 0)
+  const refund = rangeAftersaleAmount.value
   return {
     gross,
     refund,
-    net: Math.max(0, gross - refund),
+    net: gross,
     count: displayOrders.value.length,
-    effectiveCount,
+    effectiveCount: revenueOrders.value.length,
   }
 })
 const orderStatsSub = computed(() => {
@@ -379,42 +432,13 @@ const sortedProducts = computed(() =>
   [...products.value].sort((a, b) => Number(b.sales || 0) - Number(a.sales || 0)).slice(0, 24),
 )
 const statusBreakdown = computed(() => {
-  const labels = ['待发货', '已发货', '已完成', '已关闭', '售后']
-  const buckets = new Map(labels.map((label) => [label, 0]))
-  for (const order of displayOrders.value) {
-    const label = orderStatus(order)
-    buckets.set(label, (buckets.get(label) || 0) + 1)
-  }
-  buckets.set('售后', displayAftersales.value.length)
-  return Array.from(buckets, ([label, count]) => ({ label, count }))
+  if (backendSummary.value) return backendSummary.value.statusBreakdown
+  return buildDoudianStatusBreakdown(displayOrders.value, displayRefundAftersales.value.length)
 })
 const trendOption = computed(() => {
-  const grossByDate = new Map<string, number>()
-  const ordersByDate = new Map<string, number>()
-  const refundByDate = new Map<string, number>()
-  const dates = new Set<string>()
-  const closedOrderIds = new Set<string>()
-  displayOrders.value.forEach((order) => {
-    const date = dayjs.unix(order.create_time).format('MM-DD')
-    dates.add(date)
-    ordersByDate.set(date, (ordersByDate.get(date) || 0) + 1)
-    if (!isClosedOrder(order)) {
-      grossByDate.set(date, (grossByDate.get(date) || 0) + Number(order.pay_amount || 0))
-    } else {
-      closedOrderIds.add(String(order.order_id))
-    }
-  })
-  displayAftersales.value.forEach((item) => {
-    if (closedOrderIds.has(String(item.order_id || ''))) return
-    const date = dayjs.unix(item.create_time).format('MM-DD')
-    dates.add(date)
-    refundByDate.set(date, (refundByDate.get(date) || 0) + Number(item.amount || 0))
-  })
-  const entries = [...dates].sort().map((date) => ({
-    date,
-    gmv: Math.max(0, (grossByDate.get(date) || 0) - (refundByDate.get(date) || 0)),
-    orders: ordersByDate.get(date) || 0,
-  }))
+  const entries =
+    backendSummary.value?.trend ||
+    buildDoudianTrend(displayOrders.value, successfulRefundOrderIds.value)
   return {
     tooltip: { trigger: 'axis' as const },
     grid: { left: 55, right: 20, top: 20, bottom: 20 },
@@ -459,20 +483,7 @@ function fmtTime(value: number) {
 }
 
 function orderStatus(orderOrStatus: any) {
-  const text = typeof orderOrStatus === 'object' ? orderOrStatus.status_text : ''
-  if (text) return text
-  const code = Number(typeof orderOrStatus === 'object' ? orderOrStatus.status : orderOrStatus)
-  if (code === 2) return '待发货'
-  if (code === 3) return '已发货'
-  if (code === 4) return '已关闭'
-  if (code === 5) return '已完成'
-  if (code === 21) return '已关闭'
-  return '待处理'
-}
-
-function isClosedOrder(orderOrStatus: any) {
-  const label = orderStatus(orderOrStatus)
-  return label.includes('关闭') || label.includes('取消') || label.includes('退款')
+  return doudianOrderStatus(orderOrStatus)
 }
 
 function orderStatusClass(orderOrStatus: any) {
@@ -484,13 +495,7 @@ function orderStatusClass(orderOrStatus: any) {
 }
 
 function aftersaleStatus(itemOrStatus: any) {
-  const text = typeof itemOrStatus === 'object' ? itemOrStatus.status_text : ''
-  if (text) return text
-  const code = Number(typeof itemOrStatus === 'object' ? itemOrStatus.status : itemOrStatus)
-  if ([12, 27].includes(code)) return '已退款'
-  if ([1, 2, 3, 6].includes(code)) return '处理中'
-  if ([7, 28].includes(code)) return '已关闭'
-  return '售后'
+  return doudianAftersaleStatus(itemOrStatus)
 }
 
 function hideImg(event: Event) {
@@ -510,10 +515,14 @@ async function getRequiredCompanionUrl() {
 }
 
 async function loadStores() {
-  const res = await doudianStoreApi.getStores()
-  stores.value = res.data || []
-  if (localStores.value.length === 0 && !activeCloudStoreId.value && stores.value[0]) {
-    activeCloudStoreId.value = stores.value[0].id
+  try {
+    const res = await doudianStoreApi.getStores()
+    stores.value = res.data || []
+    if (localStores.value.length === 0 && !activeCloudStoreId.value && stores.value[0]) {
+      activeCloudStoreId.value = stores.value[0].id
+    }
+  } catch (error) {
+    console.error('[Doudian] load stores failed', error)
   }
 }
 
@@ -538,14 +547,18 @@ async function loadLocalStores() {
 }
 
 async function loadData() {
+  lastLoadError.value = ''
   if (!activeStoreId.value) {
     orders.value = []
     products.value = []
     aftersales.value = []
+    summary.value = null
     return
   }
   loading.value = true
+  summary.value = null
   try {
+    const range = displayRange.value
     const [orderRes, productRes, aftersaleRes] = await Promise.all([
       doudianStoreApi.getOrders(activeStoreId.value),
       doudianStoreApi.getProducts(activeStoreId.value),
@@ -554,15 +567,33 @@ async function loadData() {
     orders.value = orderRes.data?.order_list || []
     products.value = productRes.data?.products || []
     aftersales.value = aftersaleRes.data?.list || []
+    try {
+      const summaryRes = await doudianStoreApi.getSummary(activeStoreId.value, {
+        start: range.start,
+        end: range.end,
+        mode: viewMode.value,
+      })
+      summary.value = summaryRes.data || null
+    } catch {
+      summary.value = null
+    }
+  } catch (error: any) {
+    console.error('[Doudian] load data failed', error)
+    lastLoadError.value = error?.message || '抖店数据加载失败'
+    ElMessage.error(lastLoadError.value)
   } finally {
     loading.value = false
   }
 }
 
 async function refreshAll() {
-  await loadLocalStores()
-  await loadStores()
-  await loadData()
+  try {
+    await loadLocalStores()
+    await loadStores()
+    await loadData()
+  } catch (error) {
+    console.error('[Doudian] refresh failed', error)
+  }
 }
 
 async function createStore() {
@@ -630,6 +661,7 @@ async function deleteActiveStore() {
   orders.value = []
   products.value = []
   aftersales.value = []
+  summary.value = null
   ElMessage.success('店铺已删除')
   await refreshAll()
 }
@@ -665,7 +697,9 @@ async function syncActive() {
         data?.aftersalesSaved || 0
       }`,
     )
-    await refreshAll()
+    await loadLocalStores()
+    await loadStores()
+    await loadData()
   } catch (error: any) {
     ElMessage.error(error?.message || '同步失败')
   } finally {
@@ -705,12 +739,21 @@ async function waitCompanionJob(companionUrl: string, jobId: string) {
   throw new Error('同步超时')
 }
 
-watch(activeLocalStoreId, () => loadData())
-watch(activeCloudStoreId, () => loadData())
+watch(activeLocalStoreId, () => {
+  void loadData()
+})
+watch(activeCloudStoreId, () => {
+  void loadData()
+})
+watch(viewMode, () => {
+  void loadData()
+})
 
 onMounted(async () => {
   await refreshAll()
-  timer = setInterval(refreshAll, 60_000)
+  timer = setInterval(() => {
+    void refreshAll()
+  }, 60_000)
 })
 
 onUnmounted(() => {

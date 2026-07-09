@@ -1,0 +1,42 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/dashboard/dashboard",
+    "pages/accounts/accounts",
+    "pages/report/report",
+    "pages/insights/insights"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#0a0b14",
+    "navigationBarTitleText": "MatrixFlow 数据",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0a0b14"
+  },
+  "tabBar": {
+    "color": "#6b7280",
+    "selectedColor": "#5b8cff",
+    "backgroundColor": "#11131f",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/dashboard/dashboard",
+        "text": "概览"
+      },
+      {
+        "pagePath": "pages/accounts/accounts",
+        "text": "账号"
+      },
+      {
+        "pagePath": "pages/report/report",
+        "text": "报告"
+      },
+      {
+        "pagePath": "pages/insights/insights",
+        "text": "洞察"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

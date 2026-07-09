@@ -333,39 +333,58 @@ export class PlatformsService {
         unfollows: pickNumber(metrics.unfollows),
       }
 
-      // 伴侣端未提供增量字段时，自动从前后两天快照差值计算
-      const hasAnyIncrement =
-        statData.followersIncrement !== undefined ||
-        statData.viewsIncrement !== undefined ||
-        statData.likesIncrement !== undefined ||
-        statData.commentsIncrement !== undefined ||
-        statData.sharesIncrement !== undefined
-      if (!hasAnyIncrement) {
-        const previousStats = await this.prisma.dailyStats.findFirst({
-          where: { accountId, date: { lt: targetDate } },
-          select: { followers: true, views: true, likes: true, comments: true, shares: true },
-          orderBy: { date: 'desc' },
-        })
-        if (previousStats) {
-          const diff = (today: number | undefined, prev: number | null) => {
-            if (today === undefined || today === null) return 0
-            return Math.max(0, today - (prev ?? 0))
+      // 对每个增量字段独立补算：伴侣可能只上报了部分新增字段。
+      // 只有当前/前次总量口径可信时才用差值，避免把累计总数误当日增量。
+      const previousStats = await this.prisma.dailyStats.findFirst({
+        where: { accountId, date: { lt: targetDate } },
+        select: { followers: true, views: true, likes: true, comments: true, shares: true },
+        orderBy: { date: 'desc' },
+      })
+      if (previousStats) {
+        const fillIncrement = (
+          incrementKey:
+            | 'followersIncrement'
+            | 'viewsIncrement'
+            | 'likesIncrement'
+            | 'commentsIncrement'
+            | 'sharesIncrement',
+          totalKey: 'followers' | 'views' | 'likes' | 'comments' | 'shares',
+        ) => {
+          const current = statData[totalKey]
+          const previous = previousStats[totalKey] ?? 0
+          if (current === undefined || current === null) return
+          const delta = Math.max(0, current - previous)
+          const reportedIncrement = statData[incrementKey]
+          const missingIncrement =
+            reportedIncrement === undefined ||
+            (reportedIncrement === 0 && delta > 0 && current > previous)
+          if (!missingIncrement) return
+
+          if (previous <= 0 && current > 0) {
+            this.logger.debug(
+              `reportMetrics: skip ${incrementKey} delta for ${accountId}; no trusted baseline`,
+            )
+            return
           }
-          statData.followersIncrement = diff(statData.followers, previousStats.followers)
-          statData.viewsIncrement = diff(statData.views, previousStats.views)
-          statData.likesIncrement = diff(statData.likes, previousStats.likes)
-          statData.commentsIncrement = diff(statData.comments, previousStats.comments)
-          statData.sharesIncrement = diff(statData.shares, previousStats.shares)
-          this.logger.log(
-            `reportMetrics: auto-computed increments account=${accountId} ` +
-              `followers+${statData.followersIncrement} views+${statData.viewsIncrement} ` +
-              `likes+${statData.likesIncrement} comments+${statData.commentsIncrement} shares+${statData.sharesIncrement}`,
-          )
-        } else {
-          this.logger.debug(
-            `reportMetrics: no previous stats for ${accountId}, increments stay 0 (first collection)`,
-          )
+          if (delta > 10000 && current > previous * 3) {
+            this.logger.debug(
+              `reportMetrics: skip ${incrementKey} delta for ${accountId}; metric source jump ${previous}->${current}`,
+            )
+            return
+          }
+
+          statData[incrementKey] = delta
         }
+
+        fillIncrement('followersIncrement', 'followers')
+        fillIncrement('viewsIncrement', 'views')
+        fillIncrement('likesIncrement', 'likes')
+        fillIncrement('commentsIncrement', 'comments')
+        fillIncrement('sharesIncrement', 'shares')
+      } else {
+        this.logger.debug(
+          `reportMetrics: no previous stats for ${accountId}, missing increments stay empty (first collection)`,
+        )
       }
 
       const statUpdateData = Object.fromEntries(

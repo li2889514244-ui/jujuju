@@ -1,0 +1,42 @@
+<!-- pages/accounts/accounts.wxml -->
+<view class="container">
+  <view class="page-head">
+    <text class="title">账号数据</text>
+    <text class="subtitle">共 {{list.length}} 个</text>
+  </view>
+
+  <block wx:if="{{loading && !list.length}}">
+    <view class="loading">加载中...</view>
+  </block>
+
+  <block wx:elif="{{!list.length}}">
+    <view class="empty">暂无账号数据</view>
+  </block>
+
+  <block wx:else>
+    <view
+      class="acc-card"
+      wx:for="{{list}}"
+      wx:key="id"
+      data-id="{{item.id}}"
+      data-nickname="{{item.nickname}}"
+      bindtap="onTapAccount"
+    >
+      <image class="avatar" src="{{item.avatar}}" mode="aspectFill" />
+      <view class="acc-info">
+        <view class="acc-name">{{item.nickname}}</view>
+        <view class="acc-plat">
+          <text class="tag">{{item.platform}}</text>
+          <text class="acc-status status-{{item.status}}">{{item.status}}</text>
+        </view>
+      </view>
+      <view class="acc-fans">
+        <view class="fans-num">{{item.followers}}</view>
+        <view class="fans-label">粉丝</view>
+      </view>
+    </view>
+
+    <view wx:if="{{loading && list.length}}" class="loading">加载更多...</view>
+    <view wx:if="{{!hasMore && list.length}}" class="loading">没有更多了</view>
+  </block>
+</view>

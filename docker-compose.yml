@@ -1,84 +1,70 @@
+# ============================================================================
+# ⚠️  WARNING — 此文件是生产环境的唯一 docker-compose 配置
+# ⚠️  数据库使用 postgres 用户 + matrixflow 数据库 + pgdata 卷
+# ⚠️  修改前务必阅读 backend/docker-compose.yml 中的配置说明
+# ⚠️  修改后必须运行 scripts/pre-deploy-check.sh 验证
+# ============================================================================
+#
+# 事故记录 (2026-07-03):
+#   此文件曾使用错误的用户名(matrixflow)和数据库名(matrixflow_erp)，
+#   导致重新部署时创建了空数据库，所有数据"消失"。
+#   已统一为 postgres 用户 + matrixflow 数据库 + pgdata 卷。
+# ============================================================================
+
 services:
-  # ---------- PostgreSQL ----------
-  postgres:
+  # ========== PostgreSQL 16 ==========
+  db:
     image: postgres:16-alpine
-    container_name: matrixflow-postgres
-    restart: unless-stopped
-    ports:
-      - '${DB_PORT:-5432}:5432'
+    container_name: matrixflow-db
+    restart: always
     environment:
-      POSTGRES_USER: ${DB_USERNAME:-matrixflow}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-matrixflow}
-      POSTGRES_DB: ${DB_NAME:-matrixflow_erp}
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: matrixflow
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U ${DB_USERNAME:-matrixflow}']
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     mem_limit: 1g
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
-  # ---------- Redis ----------
+  # ========== Redis 7 ==========
   redis:
     image: redis:7-alpine
     container_name: matrixflow-redis
-    restart: unless-stopped
-    ports:
-      - '${REDIS_PORT:-6379}:6379'
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASS}
     volumes:
-      - redis_data:/data
-    healthcheck:
-      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-}', 'ping']
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      - redisdata:/data
+    ports:
+      - "6379:6379"
     mem_limit: 512m
     security_opt:
       - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASS}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
-  # ---------- 后端 API ----------
-  backend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.backend
-    container_name: matrixflow-backend
-    restart: unless-stopped
-    ports:
-      - '${APP_PORT:-3000}:3000'
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - uploads_data:/app/uploads
-    mem_limit: 1g
-    security_opt:
-      - no-new-privileges:true
-
-  # ---------- 前端 (Nginx) ----------
-  frontend:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.frontend
-    container_name: matrixflow-frontend
-    restart: unless-stopped
-    ports:
-      - '80:80'
-    depends_on:
-      backend:
-        condition: service_started
-    mem_limit: 256m
+  # ========== Cloudflare Tunnel ==========
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: matrixflow-tunnel
+    restart: always
+    command: tunnel run --token ${CF_TUNNEL_TOKEN}
+    mem_limit: 64m
     security_opt:
       - no-new-privileges:true
 
 volumes:
-  postgres_data:
-  redis_data:
-  uploads_data:
+  pgdata:
+  redisdata:

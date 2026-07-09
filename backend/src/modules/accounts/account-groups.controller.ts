@@ -98,12 +98,18 @@ export class AccountGroupsController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '删除分组（不删除账号）' })
   async remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    // 先把该分组下的账号解绑
+    // 先验证归属
+    const group = await this.prisma.accountGroup.findFirst({ where: { id, userId } })
+    if (!group) {
+      throw new NotFoundException('分组不存在或无权操作')
+    }
+    // 把该分组下的账号解绑
     await this.prisma.account.updateMany({
       where: { groupId: id, userId },
       data: { groupId: null },
     })
-    return this.prisma.accountGroup.deleteMany({ where: { id, userId } })
+    await this.prisma.accountGroup.delete({ where: { id } })
+    return { success: true }
   }
 
   @Put(':id/accounts')

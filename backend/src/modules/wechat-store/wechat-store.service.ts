@@ -38,6 +38,8 @@ const safeStoreSelect = {
   updatedAt: true,
 } as const
 
+const SYNC_WINDOW_DAYS = 30
+
 @Injectable()
 export class WechatStoreService implements OnModuleInit {
   private readonly logger = new Logger(WechatStoreService.name)
@@ -173,9 +175,15 @@ export class WechatStoreService implements OnModuleInit {
   }
 
   async getOrderListAggregated(storeId: string, params: OrderQuery) {
-    const pageSize = 5000
+    const pageSize = params.page_size || 5000
     const where: any = { storeId }
     if (params.status !== undefined) where.status = params.status
+    if (params.start_time !== undefined || params.end_time !== undefined) {
+      where.createTime = {
+        ...(params.start_time !== undefined && { gte: params.start_time }),
+        ...(params.end_time !== undefined && { lte: params.end_time }),
+      }
+    }
 
     const rows = await this.prisma.wechatStoreOrder.findMany({
       where,
@@ -499,21 +507,26 @@ export class WechatStoreService implements OnModuleInit {
 
   private async collectOrderIds(storeId: string) {
     const ids: string[] = []
-    let nextKey: string | undefined
     const endTime = Math.floor(Date.now() / 1000)
-    const startTime = endTime - 7 * 86400
+    const startTime = endTime - SYNC_WINDOW_DAYS * 86400
+    const maxWindowSeconds = 7 * 86400 - 1
 
-    for (let page = 0; page < 20; page++) {
-      const res: any = await this.fetchOrderListRemote(storeId, {
-        page_size: 100,
-        next_key: nextKey,
-        start_time: startTime,
-        end_time: endTime,
-      })
-      if (res.errcode !== 0) throw new Error(res.errmsg || `order list error ${res.errcode}`)
-      ids.push(...((res.order_id_list || []) as string[]).map(String))
-      nextKey = res.next_key || res.nextKey
-      if (!nextKey) break
+    for (let windowStart = startTime; windowStart <= endTime; windowStart += maxWindowSeconds + 1) {
+      const windowEnd = Math.min(windowStart + maxWindowSeconds, endTime)
+      let nextKey: string | undefined
+
+      for (let page = 0; page < 20; page++) {
+        const res: any = await this.fetchOrderListRemote(storeId, {
+          page_size: 100,
+          next_key: nextKey,
+          start_time: windowStart,
+          end_time: windowEnd,
+        })
+        if (res.errcode !== 0) throw new Error(res.errmsg || `order list error ${res.errcode}`)
+        ids.push(...((res.order_id_list || []) as string[]).map(String))
+        nextKey = res.next_key || res.nextKey
+        if (!nextKey) break
+      }
     }
 
     return [...new Set(ids)]
@@ -542,8 +555,8 @@ export class WechatStoreService implements OnModuleInit {
     const now = Math.floor(Date.now() / 1000)
 
     // 微信 API 限制：售后查询区间不得超过 24 小时
-    // 逐天拉取最近 7 天的售后数据
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    // 逐天拉取最近 30 天的售后数据
+    for (let dayOffset = 0; dayOffset < SYNC_WINDOW_DAYS; dayOffset++) {
       const dayEnd = now - dayOffset * 86400
       const dayBegin = dayEnd - 86400
       let nextKey: string | undefined

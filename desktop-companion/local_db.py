@@ -318,7 +318,22 @@ def update_metrics(account_id: str, metrics: dict):
                     continue
                 current = metrics.get(total_key)
                 if isinstance(current, (int, float)):
-                    metrics[new_key] = max(0, int(current) - int(prev[prev_col] or 0))
+                    prev_val = int(prev[prev_col] or 0)
+                    delta = int(current) - prev_val
+                    # 指标源跳变保护：如果当前值是前值的 3 倍以上且增量超过 10000，
+                    # 很可能是采集方法变了（如从视频列表求和改为 profile API 总值），
+                    # 而不是真实的日增长。跳过这次 delta 计算，避免产生数百万的假增量。
+                    # 明天的 delta 会基于今天的正确基线计算。
+                    if prev_val > 0 and delta > 10000 and int(current) > prev_val * 3:
+                        print(f'[LocalDB] metric source jump detected: {total_key} '
+                              f'{prev_val} -> {int(current)} (skip delta for {new_key})')
+                        metrics.pop(new_key, None)
+                    elif prev_val == 0 and int(current) > 0:
+                        # 基线为 0 + 非零当前值 = 可能是首次采集或基线缺失
+                        # 不计算 delta，避免把全量当成日增量（如 new_followers = 总粉丝数）
+                        metrics.pop(new_key, None)
+                    else:
+                        metrics[new_key] = max(0, delta)
     except Exception as e:
         print(f'[LocalDB] increment compute warning {account_id}: {e}')
 

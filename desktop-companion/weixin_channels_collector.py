@@ -5,7 +5,7 @@ JS 代码放在同目录 .js 文件里，Python 读取后传入 page.evaluate()�
 
 用法:
     from weixin_channels_collector import collect_wechat_channels
-    result = asyncio.run(collect_wechat_channels(cdp_url="http://127.0.0.1:9222"))
+    result = asyncio.run(collect_wechat_channels(cdp_url="http://localhost:9222"))
 """
 import asyncio
 import json
@@ -159,7 +159,7 @@ async def _ensure_wechat_page(page, captured: dict = None):
 
 
 # ── 主入口 ─────────────────────────────────────────────
-async def collect_wechat_channels(cdp_url: str = "http://127.0.0.1:9222",
+async def collect_wechat_channels(cdp_url: str = "http://localhost:9222",
                                      account_id: str = "wechat_default") -> dict:
     from playwright.async_api import async_playwright
     from local_db import update_metrics, save_contents, update_collection_time, get_account
@@ -173,6 +173,14 @@ async def collect_wechat_channels(cdp_url: str = "http://127.0.0.1:9222",
     async with async_playwright() as pw:
         print(f"[WeChat] 连接 CDP: {cdp_url}")
         browser = await pw.chromium.connect_over_cdp(cdp_url)
+
+        # 注入反检测脚本到所有 context
+        try:
+            from stealth_patches import apply_stealth_to_context
+            for ctx in browser.contexts:
+                await apply_stealth_to_context(ctx)
+        except ImportError:
+            pass
 
         # 找已打开的视频号助手标签页
         page = None
@@ -258,7 +266,7 @@ def register_wechat_routes(app):
     @app.route('/api/wechat-collect', methods=['POST'])
     def wechat_collect():
         data      = request.get_json(silent=True) or {}
-        cdp_url    = data.get('cdp_url', 'http://127.0.0.1:9222')
+        cdp_url    = data.get('cdp_url', 'http://localhost:9222')
         account_id = data.get('account_id', 'wechat_default')
 
         def _run():

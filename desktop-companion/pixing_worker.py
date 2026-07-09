@@ -47,15 +47,22 @@ def _get_service_token() -> str:
     if env_token:
         return env_token
 
-    # 2. 从配置文件读取
+    # 2. 从配置文件读取（优先 AppData，回退到旧位置）
     try:
-        if getattr(__import__('sys'), 'frozen', False):
-            config_path = Path(__import__('sys').executable).parent / 'companion_config.json'
+        import sys as _sys
+        _config_candidates = [
+            Path.home() / 'AppData' / 'Local' / 'MatrixFlow' / 'companion_config.json',
+        ]
+        if getattr(_sys, 'frozen', False):
+            _config_candidates.append(Path(_sys.executable).parent / 'companion_config.json')
         else:
-            config_path = Path(__file__).parent / 'companion_config.json'
-        if config_path.exists():
-            cfg = json.loads(config_path.read_text(encoding='utf-8'))
-            return cfg.get('service_token', '')
+            _config_candidates.append(Path(__file__).parent / 'companion_config.json')
+        for config_path in _config_candidates:
+            if config_path.exists():
+                cfg = json.loads(config_path.read_text(encoding='utf-8'))
+                token = cfg.get('service_token', '')
+                if token:
+                    return token
     except Exception:
         pass
     return ''
@@ -183,7 +190,7 @@ async def _execute_task(task: dict):
             browser_path = _find_browser()
             launch_opts = {
                 "headless": False,  # 有头模式，方便调试
-                "args": ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--lang=zh-CN"],
+                "args": ["--disable-blink-features=AutomationControlled", "--no-sandbox", "--lang=zh-CN", "--disable-features=AutomationControlled"],
             }
             if browser_path:
                 launch_opts["executable_path"] = browser_path
@@ -193,6 +200,12 @@ async def _execute_task(task: dict):
                 viewport={"width": 1280, "height": 800},
                 locale="zh-CN",
             )
+            # 注入反检测脚本
+            try:
+                from stealth_patches import apply_stealth_to_context
+                await apply_stealth_to_context(context)
+            except ImportError:
+                pass
             page = await context.new_page()
 
             # ── 第1步：打开披星教育 ──

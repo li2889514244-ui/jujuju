@@ -9,6 +9,7 @@ import { AppModule } from './app.module'
 import { TransformInterceptor } from './common/interceptors/transform.interceptor'
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
+import { JsonLogger } from './common/logger/json-logger'
 
 function parseCorsOrigins(originStr: string): string[] | boolean {
   if (originStr === '*') return true
@@ -20,9 +21,10 @@ function parseCorsOrigins(originStr: string): string[] | boolean {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+  const jsonLogger = new JsonLogger({
+    logLevels: ['error', 'warn', 'log', 'debug', 'verbose'],
   })
+  const app = await NestFactory.create(AppModule, { logger: jsonLogger })
 
   const logger = new Logger('Bootstrap')
   const isDev = process.env.NODE_ENV !== 'production'

@@ -540,6 +540,13 @@ function openManualAdd() {
     position: relative;
     overflow: hidden;
 
+    @media (max-width: 768px) {
+      padding: $space-5;
+    }
+    @media (max-width: 480px) {
+      padding: $space-4;
+    }
+
     h2 {
       margin: $space-3 0;
       font-size: $text-h1;
@@ -620,6 +627,14 @@ function openManualAdd() {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: $space-4;
+
+  @media (max-width: 768px) {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: $space-3;
+  }
+  @media (max-width: 480px) {
+    grid-template-columns: 1fr;
+  }
 }
 
 .account-card {
@@ -641,6 +656,12 @@ function openManualAdd() {
   text-align: center;
   position: relative;
   overflow: hidden;
+
+  @media (max-width: 768px) {
+    min-height: 200px;
+    padding: $space-4 $space-3;
+    gap: $space-2;
+  }
 
   &::before {
     content: '';
@@ -723,6 +744,10 @@ function openManualAdd() {
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.02em;
     line-height: 1.1;
+
+    @media (max-width: 768px) {
+      font-size: 22px;
+    }
   }
   &__stat-label {
     font-size: $text-micro;
@@ -851,6 +876,16 @@ function openManualAdd() {
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   padding: $space-3 $space-5;
   z-index: 100;
+
+  @media (max-width: 768px) {
+    left: 12px;
+    right: 12px;
+    transform: none;
+    bottom: 12px;
+    padding: $space-2 $space-4;
+    gap: $space-3;
+    border-radius: $radius-lg;
+  }
   &__count {
     font-size: $text-body;
     font-weight: 500;

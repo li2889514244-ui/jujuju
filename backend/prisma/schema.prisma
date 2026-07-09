@@ -17,6 +17,7 @@ enum UserRole {
   VIEWER
   OWNER
   MANAGER
+  SUPER_ADMIN
 }
 
 enum AccountStatus {
@@ -83,15 +84,31 @@ model User {
 }
 
 model Organization {
-  id        String   @id @default(cuid())
-  name      String
-  plan      String   @default("FREE")
-  status    AccountStatus @default(ACTIVE)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String   @id @default(cuid())
+  name        String
+  plan        String   @default("FREE")
+  status      AccountStatus @default(ACTIVE)
+  maxAccounts Int      @default(20)
+  maxUsers    Int      @default(10)
+  expiresAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  users User[]
-  teams Team[]
+  users       User[]
+  teams       Team[]
+  accounts    Account[]
+  posts       Post[]
+  postStats   PostStats[]
+  dailyStats  DailyStats[]
+  competitors Competitor[]
+  competitorSnapshots CompetitorSnapshot[]
+  accountGroups AccountGroup[]
+  assets      Asset[]
+  notifications Notification[]
+  wechatStores WechatStore[]
+  doudianStores DoudianStore[]
+  pixingVideoTasks PixingVideoTask[]
+  calendarEvents CalendarEvent[]
 
   @@index([status])
 }
@@ -131,6 +148,8 @@ model Account {
   lastActiveAt   DateTime?
   storeScore     Float?
   storeDiagnosis String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -148,6 +167,7 @@ model Account {
   @@index([teamId])
   @@index([groupId])
   @@index([platform])
+  @@index([organizationId])
 }
 
 // ==================== 内容发布 ====================
@@ -164,6 +184,8 @@ model Post {
   platformUrl String?
   errorMsg    String?
   metadata    String? // JSON 字符串
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
@@ -175,6 +197,7 @@ model Post {
   @@index([status])
   @@index([publishAt])
   @@index([accountId, status])
+  @@index([organizationId])
 }
 
 // ==================== 互动统计 ====================
@@ -198,8 +221,11 @@ model PostStats {
 
   post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
   postId String @unique
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
 
   @@index([postId])
+  @@index([organizationId])
 }
 
 model DailyStats {
@@ -225,6 +251,8 @@ model DailyStats {
   commentsIncrement  Int     @default(0)
   sharesIncrement    Int     @default(0)
   unfollows          Int     @default(0)
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt      DateTime     @default(now())
 
   account   Account @relation(fields: [accountId], references: [id])
@@ -234,6 +262,7 @@ model DailyStats {
   @@index([accountId])
   @@index([date])
   @@index([accountId, date])
+  @@index([organizationId])
 }
 
 // ==================== 审计日志 ====================
@@ -269,6 +298,8 @@ model Competitor {
   following      Int          @default(0)
   status         AccountStatus @default(ACTIVE)
   note           String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
@@ -278,6 +309,7 @@ model Competitor {
   @@unique([platform, platformUserId, userId])
   @@index([userId])
   @@index([platform])
+  @@index([organizationId])
 }
 
 model CompetitorSnapshot {
@@ -292,10 +324,13 @@ model CompetitorSnapshot {
 
   competitor   Competitor @relation(fields: [competitorId], references: [id], onDelete: Cascade)
   competitorId String
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
 
   @@unique([competitorId, date])
   @@index([competitorId])
   @@index([date])
+  @@index([organizationId])
 }
 
 // ==================== 账号分组 ====================
@@ -305,6 +340,8 @@ model AccountGroup {
   name      String
   color     String   @default("#409EFF")
   sortOrder Int      @default(0)
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -312,6 +349,7 @@ model AccountGroup {
   accounts Account[]
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 // ==================== 素材库 ====================
@@ -328,6 +366,8 @@ model Asset {
   mimeType  String?
   tags      String? // JSON 字符串，逗号分隔
   folderId  String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -336,6 +376,7 @@ model Asset {
   @@index([userId])
   @@index([type])
   @@index([folderId])
+  @@index([organizationId])
 }
 
 // ==================== 通知 ====================
@@ -347,6 +388,8 @@ model Notification {
   content   String?
   read      Boolean  @default(false)
   metadata  String? // JSON 字符串
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt DateTime @default(now())
 
   userId String
@@ -355,6 +398,7 @@ model Notification {
   @@index([read])
   @@index([createdAt])
   @@index([userId, read, createdAt])
+  @@index([organizationId])
 }
 
 model TeamMember {
@@ -397,12 +441,16 @@ model WechatStore {
   lastSyncedAt DateTime?
   syncStatus   String   @default("pending")
   syncError    String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
   orders     WechatStoreOrder[]
   products   WechatStoreProduct[]
   aftersales WechatStoreAftersale[]
+
+  @@index([organizationId])
 }
 
 model WechatStoreOrder {
@@ -488,12 +536,16 @@ model DoudianStore {
   syncStatus   String   @default("pending")
   syncError    String?
   sessionStatus String  @default("unknown")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orders     DoudianStoreOrder[]
   products   DoudianStoreProduct[]
   aftersales DoudianStoreAftersale[]
+
+  @@index([organizationId])
 }
 
 model DoudianStoreOrder {
@@ -578,12 +630,15 @@ model PixingVideoTask {
   videoUrl   String?
   srtContent String?
   error      String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
   @@index([createdAt])
+  @@index([organizationId])
 }
 
 model CalendarEvent {
@@ -598,6 +653,8 @@ model CalendarEvent {
   location    String?
   userId      String
   teamId      String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  organizationId String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -606,4 +663,5 @@ model CalendarEvent {
   @@index([userId])
   @@index([teamId])
   @@index([startTime])
+  @@index([organizationId])
 }

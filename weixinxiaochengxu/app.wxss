@@ -1,0 +1,70 @@
+/* app.wxss - 全局样式（深色主题，对齐主站风格） */
+page {
+  background-color: #0a0b14;
+  color: #e6e8f0;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", Helvetica, sans-serif;
+  font-size: 28rpx;
+}
+
+.container {
+  padding: 24rpx;
+  box-sizing: border-box;
+}
+
+.card {
+  background: #151826;
+  border-radius: 16rpx;
+  padding: 28rpx;
+  margin-bottom: 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.card-title {
+  font-size: 26rpx;
+  color: #8b90a8;
+  margin-bottom: 16rpx;
+}
+
+.stat-num {
+  font-size: 44rpx;
+  font-weight: 600;
+  color: #fff;
+}
+
+.stat-label {
+  font-size: 24rpx;
+  color: #8b90a8;
+}
+
+.grid-2 {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20rpx;
+}
+
+.grid-2 .card {
+  width: calc(50% - 10rpx);
+  margin-bottom: 0;
+  box-sizing: border-box;
+}
+
+.loading {
+  text-align: center;
+  color: #6b7280;
+  padding: 60rpx 0;
+}
+
+.empty {
+  text-align: center;
+  color: #6b7280;
+  padding: 80rpx 0;
+}
+
+.tag {
+  display: inline-block;
+  font-size: 22rpx;
+  padding: 4rpx 14rpx;
+  border-radius: 8rpx;
+  background: rgba(91, 140, 255, 0.15);
+  color: #5b8cff;
+}

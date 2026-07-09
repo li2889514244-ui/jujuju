@@ -7,6 +7,9 @@ import { TrendPredictorService } from './services/trend-predictor';
 import { AnomalyDetectorService } from './services/anomaly-detector';
 import { ContentReviewerService } from './services/content-reviewer';
 
+// Import to trigger auto-registration of OpenAI provider
+import './providers/openai.provider';
+
 @Module({
   controllers: [AIController],
   providers: [

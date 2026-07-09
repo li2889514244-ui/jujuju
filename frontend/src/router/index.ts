@@ -31,6 +31,18 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '登录', requiresAuth: false },
   },
   {
+    path: '/terms',
+    name: 'Terms',
+    component: () => import('@/views/legal/TermsView.vue'),
+    meta: { title: '服务条款', requiresAuth: false },
+  },
+  {
+    path: '/privacy',
+    name: 'Privacy',
+    component: () => import('@/views/legal/PrivacyView.vue'),
+    meta: { title: '隐私政策', requiresAuth: false },
+  },
+  {
     path: '/',
     component: () => import('@/components/layout/AppLayout.vue'),
     redirect: '/dashboard',
@@ -64,13 +76,13 @@ const routes: RouteRecordRaw[] = [
         path: 'monetization',
         name: 'Monetization',
         component: () => import('@/views/monetization/MonetizationView.vue'),
-        meta: { title: '微信小店', icon: 'Money', section: '商业转化' },
+        meta: { title: '微信小店', icon: 'Shop', section: '商业转化' },
       },
       {
         path: 'doudian',
         name: 'Doudian',
         component: () => import('@/views/monetization/DoudianView.vue'),
-        meta: { title: '抖店', icon: 'Money', section: '商业转化' },
+        meta: { title: '抖店', icon: 'ShoppingCart', section: '商业转化' },
       },
       {
         path: 'team',
@@ -99,7 +111,7 @@ const routes: RouteRecordRaw[] = [
         path: 'mcp',
         name: 'MCPConnection',
         component: () => import('@/views/mcp/MCPConnectionView.vue'),
-        meta: { title: 'MCP 接入', icon: 'Connection', section: '组织设置' },
+        meta: { title: 'MCP 接入', icon: 'SetUp', section: '组织设置' },
       },
       {
         path: 'feishu',
@@ -114,12 +126,6 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '内容日历', icon: 'Calendar', section: '运营流程' },
       },
       {
-        path: 'ai',
-        name: 'AIAssistant',
-        component: () => import('@/views/ai/AIAssistantView.vue'),
-        meta: { title: 'AI 助手', icon: 'MagicStick', hidden: true },
-      },
-      {
         path: 'profile',
         name: 'Profile',
         component: () => import('@/views/settings/ProfileView.vue'),
@@ -130,6 +136,17 @@ const routes: RouteRecordRaw[] = [
         name: 'Password',
         component: () => import('@/views/settings/PasswordView.vue'),
         meta: { title: '修改密码', icon: 'Lock', hidden: true },
+      },
+      {
+        path: 'admin',
+        name: 'Admin',
+        component: () => import('@/views/admin/AdminView.vue'),
+        meta: {
+          title: '超管后台',
+          icon: 'Setting',
+          section: '系统',
+          roles: ['SUPER_ADMIN'],
+        },
       },
     ],
   },

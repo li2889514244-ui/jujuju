@@ -1,0 +1,59 @@
+/* pages/dashboard/dashboard.wxss */
+.page-head {
+  margin-bottom: 28rpx;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.head-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.logout-btn {
+  font-size: 26rpx;
+  color: #8b90a8;
+  padding: 8rpx 20rpx;
+  border: 1rpx solid rgba(255, 255, 255, 0.08);
+  border-radius: 10rpx;
+}
+
+.title {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #fff;
+  display: block;
+}
+
+.subtitle {
+  font-size: 24rpx;
+  color: #5b8cff;
+}
+
+.card-sub {
+  font-size: 22rpx;
+  color: #6b7280;
+  margin-top: 8rpx;
+}
+
+.platform-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid rgba(255, 255, 255, 0.04);
+}
+
+.platform-row:last-child {
+  border-bottom: none;
+}
+
+.plat-name {
+  color: #c7cbe0;
+  font-size: 28rpx;
+}
+
+.plat-count {
+  color: #8b90a8;
+  font-size: 26rpx;
+}

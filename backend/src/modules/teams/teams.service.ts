@@ -72,6 +72,102 @@ export class TeamsService {
   }
 
   /**
+   * 更新团队信息
+   */
+  async update(id: string, dto: { name?: string }, userId: string) {
+    const team = await this.prisma.team.findUnique({ where: { id } })
+    if (!team) {
+      throw new NotFoundException('团队不存在')
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true, role: true },
+    })
+    if (!user || user.organizationId !== team.organizationId) {
+      throw new ForbiddenException('无权操作此团队')
+    }
+    if (!['OWNER', 'ADMIN', 'MANAGER'].includes(user.role)) {
+      throw new ForbiddenException('无权修改团队信息')
+    }
+    const data: { name?: string } = {}
+    if (dto.name) data.name = dto.name
+    return this.prisma.team.update({
+      where: { id },
+      data,
+      include: {
+        organization: { select: { id: true, name: true } },
+      },
+    })
+  }
+
+  /**
+   * 删除团队（解绑账号，不删除账号）
+   */
+  async remove(id: string, userId: string) {
+    const team = await this.prisma.team.findUnique({ where: { id } })
+    if (!team) {
+      throw new NotFoundException('团队不存在')
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true, role: true },
+    })
+    if (!user || user.organizationId !== team.organizationId) {
+      throw new ForbiddenException('无权操作此团队')
+    }
+    if (!['OWNER', 'ADMIN'].includes(user.role)) {
+      throw new ForbiddenException('无权删除团队')
+    }
+    // 解绑团队下的账号
+    await this.prisma.account.updateMany({
+      where: { teamId: id },
+      data: { teamId: null },
+    })
+    // 删除团队成员关联
+    await this.prisma.teamMember.deleteMany({
+      where: { teamId: id },
+    })
+    // 删除团队权限配置
+    await this.prisma.teamPermission.deleteMany({
+      where: { teamId: id },
+    })
+    // 删除团队
+    await this.prisma.team.delete({ where: { id } })
+    this.logger.log(`团队删除成功: ${team.name} (${id})`)
+    return { success: true }
+  }
+
+  /**
+   * 接受邀请加入团队
+   * 当前实现：通过 organizationId 作为 token 直接加入
+   * 未来可扩展为 token 验证机制
+   */
+  async acceptInvite(token: string, userId: string) {
+    const organizationId = token
+    const org = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+    })
+    if (!org) {
+      throw new NotFoundException('邀请链接无效或组织不存在')
+    }
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    })
+    if (!user) {
+      throw new NotFoundException('用户不存在')
+    }
+    if (user.organizationId === organizationId) {
+      throw new ConflictException('您已在该组织中')
+    }
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { organizationId, role: 'MEMBER' },
+    })
+    this.logger.log(`用户 ${user.email} 通过邀请加入组织 ${org.name}`)
+    return { success: true, organization: { id: org.id, name: org.name } }
+  }
+
+  /**
    * 获取团队详情
    */
   async findById(id: string) {

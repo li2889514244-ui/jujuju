@@ -1,7 +1,9 @@
 <template>
-  <router-view />
+  <ErrorBoundary>
+    <router-view />
+  </ErrorBoundary>
 </template>
 
 <script setup lang="ts">
-// Root component - delegates to router
+import ErrorBoundary from '@/components/common/ErrorBoundary.vue'
 </script>
