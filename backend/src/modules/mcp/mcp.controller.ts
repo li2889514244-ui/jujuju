@@ -342,7 +342,8 @@ export class McpController {
   private getPublicBaseUrl(req: Request): string {
     const forwardedProto = this.firstHeader(req.headers['x-forwarded-proto'])
     const forwardedHost = this.firstHeader(req.headers['x-forwarded-host'])
-    const proto = forwardedProto || req.protocol || 'http'
+    // Default to https since the server is behind Cloudflare Tunnel
+    const proto = forwardedProto || 'https'
     const host = forwardedHost || req.headers.host || 'localhost:3000'
     return `${proto}://${host}`.replace(/\/$/, '')
   }
