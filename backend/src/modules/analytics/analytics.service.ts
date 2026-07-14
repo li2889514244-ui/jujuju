@@ -1344,6 +1344,28 @@ export class AnalyticsService {
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []
 
+      // ── 异常增量过滤 ──
+      // 计算各增量字段的中位数，过滤掉超过中位数20倍的异常值（数据源口径污染）
+      const incrementFieldMap: Record<MetricKey, string> = {
+        play: 'viewsIncrement',
+        like: 'likesIncrement',
+        comment: 'commentsIncrement',
+        share: 'sharesIncrement',
+        new_fans: 'followersIncrement',
+      }
+      const medianThresholds: Partial<Record<MetricKey, number>> = {}
+      for (const mk of metricKeys) {
+        const field = incrementFieldMap[mk]
+        const vals = stats
+          .map((s: any) => (s[field] as number) || 0)
+          .filter((v) => v > 0)
+          .sort((a, b) => a - b)
+        if (vals.length >= 3) {
+          const median = vals[Math.floor(vals.length / 2)]
+          medianThresholds[mk] = median * 20
+        }
+      }
+
       // 用 null 表示"无数据"，区分"真实0"和"缺失"
       let monthTotal: MetricTotal | null = null
       let weekTotal: MetricTotal | null = null
@@ -1352,12 +1374,21 @@ export class AnalyticsService {
       let latestStatsDate: Date | null = null
 
       for (const s of stats) {
-        const increments = {
+        const rawIncrements = {
           play: s.viewsIncrement || 0,
           like: s.likesIncrement || 0,
           comment: s.commentsIncrement || 0,
           share: s.sharesIncrement || 0,
           new_fans: s.followersIncrement || 0,
+        }
+
+        // 过滤异常增量值（超过中位数20倍）
+        const increments = { ...rawIncrements }
+        for (const mk of metricKeys) {
+          const threshold = medianThresholds[mk]
+          if (threshold && rawIncrements[mk] > threshold) {
+            increments[mk] = 0
+          }
         }
 
         // 月累计：全部历史数据

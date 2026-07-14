@@ -304,6 +304,8 @@ export class PlatformsService {
           delete normalized.month_total
         }
         if (typeof value.source === 'string') normalized.source = value.source
+        if (typeof value.trustedDailyIncrements === 'boolean')
+          normalized.trustedDailyIncrements = value.trustedDailyIncrements
         if (typeof value.collectedAt === 'string') normalized.collectedAt = value.collectedAt
         return normalized.day_total || normalized.week_total || normalized.month_total
           ? normalized
@@ -385,6 +387,60 @@ export class PlatformsService {
         this.logger.debug(
           `reportMetrics: no previous stats for ${accountId}, missing increments stay empty (first collection)`,
         )
+      }
+
+      // ── 总量跳变保护 ──
+      // 如果当前总量比前次跳变超过10倍，说明数据源口径可能变了，
+      // 跳过该总量字段的更新，保留前次可靠值。
+      if (previousStats) {
+        const totalFields: Array<{
+          key: 'views' | 'likes' | 'comments' | 'shares'
+          prev: number
+        }> = [
+          { key: 'views', prev: previousStats.views ?? 0 },
+          { key: 'likes', prev: previousStats.likes ?? 0 },
+          { key: 'comments', prev: previousStats.comments ?? 0 },
+          { key: 'shares', prev: previousStats.shares ?? 0 },
+        ]
+        for (const { key, prev } of totalFields) {
+          const curr = statData[key]
+          if (curr === undefined || curr === null) continue
+          if (prev > 0 && curr > prev * 10) {
+            this.logger.warn(
+              `reportMetrics: skip ${key} update for ${accountId}; jump ${prev}->${curr} (>10x), likely data source change`,
+            )
+            delete statData[key]
+          }
+        }
+      }
+
+      // ── 重复数据检测 ──
+      // 如果本次上报的所有字段与前次记录完全相同，跳过 upsert（避免6-16数据在7-04被复制）
+      if (previousStats) {
+        const allSame = [
+          'followers',
+          'views',
+          'likes',
+          'comments',
+          'shares',
+          'followersIncrement',
+          'viewsIncrement',
+          'likesIncrement',
+          'commentsIncrement',
+          'sharesIncrement',
+        ].every((k) => {
+          const curr = (statData as any)[k]
+          const prev = (previousStats as any)[k] ?? 0
+          // 只比较双方都有值的字段
+          if (curr === undefined) return true
+          return curr === prev
+        })
+        if (allSame && Object.values(statData).some((v) => v !== undefined && v !== 0)) {
+          this.logger.debug(
+            `reportMetrics: skip duplicate data for ${accountId} on ${targetDate.toISOString()}; identical to previous record`,
+          )
+          return { success: true, skipped: 'duplicate' }
+        }
       }
 
       const statUpdateData = Object.fromEntries(
