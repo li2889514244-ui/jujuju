@@ -1,4 +1,4 @@
-import { get } from './request'
+import { del, get, post } from './request'
 
 export interface McpCatalogEntry {
   name: string
@@ -9,14 +9,16 @@ export interface McpCatalogEntry {
 export interface McpConnectionInfo {
   enabled: boolean
   serverName: string
-  transport: 'streamable-http'
+  transports: string[]
   endpoint: string
   endpointPath: string
+  sseEndpoint: string
+  messagesEndpoint: string
   auth: {
     type: 'bearer'
     header: string
     keyCount: number
-    clients: Array<{ clientId: string }>
+    clients: Array<{ clientId: string; source: string }>
   }
   limits: {
     maxRows: number
@@ -28,19 +30,37 @@ export interface McpConnectionInfo {
   }
   tools: McpCatalogEntry[]
   resources: McpCatalogEntry[]
-  examples: {
-    genericHttp: {
-      type: 'http'
-      url: string
-      headers: {
-        Authorization: string
-      }
-    }
-  }
+}
+
+export interface McpKey {
+  id: string
+  clientId: string
+  token: string
+  createdBy: string | null
+  createdAt: string
+  updatedAt: string
+  source: 'db' | 'env'
+}
+
+export interface McpKeyList {
+  dbKeys: McpKey[]
+  envKeys: McpKey[]
 }
 
 export const mcpApi = {
   getConnectionInfo() {
     return get<McpConnectionInfo>('/mcp/connection')
+  },
+
+  listKeys() {
+    return get<McpKeyList>('/mcp/keys')
+  },
+
+  createKey(clientId: string) {
+    return post<McpKey>('/mcp/keys', { clientId })
+  },
+
+  deleteKey(id: string) {
+    return del<{ success: boolean }>(`/mcp/keys/${id}`)
   },
 }

@@ -5,7 +5,7 @@
         <h2>MCP 接入</h2>
         <p>把矩阵数据以只读 MCP 服务开放给外部 AI 客户端。</p>
       </div>
-      <el-button :loading="loading" @click="loadConnectionInfo">
+      <el-button :loading="loading" @click="loadAll">
         <el-icon><Refresh /></el-icon>
         刷新
       </el-button>
@@ -14,6 +14,7 @@
     <el-skeleton v-if="loading && !info" :rows="8" animated />
 
     <template v-else>
+      <!-- 状态条 -->
       <section class="status-strip" :class="{ 'status-strip--enabled': info?.enabled }">
         <div class="status-strip__icon">
           <el-icon>
@@ -28,13 +29,14 @@
           <div class="status-strip__text">
             {{
               info?.enabled
-                ? `当前后端已配置 ${info.auth.keyCount} 个 MCP key。`
-                : '后端还没有配置 MCP_API_KEYS，外部 AI 暂时无法读取数据。'
+                ? `已配置 ${info.auth.keyCount} 个 key，支持 ${info.transports?.join(' / ') || 'streamable-http'} 传输`
+                : '还没有配置 MCP key，请在下方创建一个 key。'
             }}
           </div>
         </div>
       </section>
 
+      <!-- 连接地址 -->
       <section class="connection-panel">
         <div class="connection-panel__main">
           <div class="section-title">
@@ -51,7 +53,7 @@
           <div class="meta-grid">
             <div>
               <span>传输协议</span>
-              <strong>{{ info?.transport || 'streamable-http' }}</strong>
+              <strong>{{ info?.transports?.join(' / ') || 'streamable-http' }}</strong>
             </div>
             <div>
               <span>认证方式</span>
@@ -59,65 +61,140 @@
             </div>
             <div>
               <span>单次最多行数</span>
-              <strong>{{ info?.limits.maxRows || 500 }}</strong>
+              <strong>{{ info?.limits?.maxRows || 500 }}</strong>
             </div>
             <div>
               <span>最大日期范围</span>
-              <strong>{{ info?.limits.maxRangeDays || 366 }} 天</strong>
+              <strong>{{ info?.limits?.maxRangeDays || 366 }} 天</strong>
             </div>
           </div>
         </div>
       </section>
 
-      <section class="setup-grid">
-        <div class="setup-panel">
-          <div class="section-title">
-            <el-icon><Key /></el-icon>
-            <span>生成 MCP key</span>
-          </div>
-          <div class="form-row">
-            <label>客户端名称</label>
-            <el-input v-model="clientId" maxlength="40" />
-          </div>
-          <div class="form-row">
-            <label>新 key</label>
-            <div class="copy-row">
-              <el-input :model-value="generatedKey" readonly spellcheck="false" />
-              <el-button @click="refreshKey">
-                <el-icon><Refresh /></el-icon>
-                换一个
+      <!-- Key 管理 -->
+      <section class="keys-panel">
+        <div class="section-title">
+          <el-icon><Key /></el-icon>
+          <span>Key 管理</span>
+        </div>
+
+        <!-- 创建 Key -->
+        <div class="create-key-row">
+          <el-input
+            v-model="newClientId"
+            placeholder="客户端名称，如 cursor、claude、cherry-studio"
+            maxlength="40"
+            class="create-key-row__input"
+            @keyup.enter="handleCreateKey"
+          />
+          <el-button type="primary" :loading="creating" @click="handleCreateKey">
+            <el-icon><Plus /></el-icon>
+            新建 Key
+          </el-button>
+        </div>
+
+        <!-- Key 列表 -->
+        <div class="key-list">
+          <div v-for="key in allKeys" :key="key.id" class="key-item">
+            <div class="key-item__info">
+              <span class="key-item__client">{{ key.clientId }}</span>
+              <span class="key-item__token">{{ key.token }}</span>
+              <el-tag :type="key.source === 'db' ? 'success' : 'info'" size="small">
+                {{ key.source === 'db' ? '数据库' : '环境变量' }}
+              </el-tag>
+            </div>
+            <div class="key-item__actions">
+              <el-button text size="small" @click="copy(key.token)">
+                <el-icon><CopyDocument /></el-icon>
+                复制 Token
+              </el-button>
+              <el-button text size="small" @click="selectKey(key.token)">
+                <el-icon><Select /></el-icon>
+                用于配置
+              </el-button>
+              <el-button
+                v-if="key.source === 'db'"
+                text
+                size="small"
+                type="danger"
+                @click="handleDeleteKey(key)"
+              >
+                <el-icon><Delete /></el-icon>
+                删除
               </el-button>
             </div>
           </div>
-          <p class="hint">
-            把下面这段写入后端环境变量并重启服务。已有 key 时，把新条目用英文逗号追加到
-            <code>MCP_API_KEYS</code>。
-          </p>
-          <pre class="code-block">{{ envSnippet }}</pre>
-          <el-button @click="copy(envSnippet)">
-            <el-icon><CopyDocument /></el-icon>
-            复制环境变量
-          </el-button>
-        </div>
-
-        <div class="setup-panel">
-          <div class="section-title">
-            <el-icon><Connection /></el-icon>
-            <span>外部 AI 配置</span>
+          <div v-if="allKeys.length === 0" class="key-list__empty">
+            暂无 MCP key，请在上方创建一个。
           </div>
-          <p class="hint">
-            支持 MCP Streamable HTTP 的客户端，填 URL 和请求头即可。请求头固定是
-            <code>Authorization: Bearer &lt;MCP key&gt;</code>。下面的示例使用左侧新
-            key，写入后端并重启后才会生效。
-          </p>
-          <pre class="code-block">{{ clientConfig }}</pre>
-          <el-button @click="copy(clientConfig)">
-            <el-icon><CopyDocument /></el-icon>
-            复制客户端配置
-          </el-button>
         </div>
       </section>
 
+      <!-- 客户端配置指引 -->
+      <section class="config-panel">
+        <div class="section-title">
+          <el-icon><Connection /></el-icon>
+          <span>AI 客户端配置</span>
+        </div>
+        <p class="hint">
+          选择一个客户端类型，复制对应配置并粘贴到客户端的 MCP 设置中。
+          <code>token</code> 会自动使用你刚才"用于配置"选中的 key（或第一个 key）。
+        </p>
+
+        <el-tabs v-model="activeTab" class="config-tabs">
+          <el-tab-pane label="Cursor" name="cursor">
+            <pre class="code-block">{{ cursorConfig }}</pre>
+            <el-button @click="copy(cursorConfig)">
+              <el-icon><CopyDocument /></el-icon>
+              复制配置
+            </el-button>
+          </el-tab-pane>
+
+          <el-tab-pane label="Claude Desktop" name="claude">
+            <p class="tab-hint">
+              Claude Desktop 不支持远程 HTTP MCP，需要通过
+              <code>mcp-remote</code> 做本地桥接。确保已安装 Node.js。
+            </p>
+            <pre class="code-block">{{ claudeConfig }}</pre>
+            <el-button @click="copy(claudeConfig)">
+              <el-icon><CopyDocument /></el-icon>
+              复制配置
+            </el-button>
+          </el-tab-pane>
+
+          <el-tab-pane label="Cline / VS Code" name="cline">
+            <pre class="code-block">{{ clineConfig }}</pre>
+            <el-button @click="copy(clineConfig)">
+              <el-icon><CopyDocument /></el-icon>
+              复制配置
+            </el-button>
+          </el-tab-pane>
+
+          <el-tab-pane label="SSE (Cherry Studio 等)" name="sse">
+            <p class="tab-hint">
+              部分国产 AI 客户端（如 Cherry Studio）使用旧版 SSE 传输协议。 请用以下地址配置：
+            </p>
+            <pre class="code-block">{{ sseConfig }}</pre>
+            <el-button @click="copy(sseConfig)">
+              <el-icon><CopyDocument /></el-icon>
+              复制配置
+            </el-button>
+          </el-tab-pane>
+
+          <el-tab-pane label="通用 HTTP / curl" name="curl">
+            <p class="tab-hint">
+              手动测试连接，先用 initialize 初始化，再用 tools/list 查看可用工具：
+            </p>
+            <pre class="code-block">{{ curlExample }}</pre>
+            <el-button @click="copy(curlExample)">
+              <el-icon><CopyDocument /></el-icon>
+              复制命令
+            </el-button>
+          </el-tab-pane>
+        </el-tabs>
+      </section>
+
+      <!-- 可用工具 -->
       <section class="catalog-panel">
         <div class="catalog-panel__column">
           <div class="section-title">
@@ -154,41 +231,48 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   CircleCheck,
   Connection,
   CopyDocument,
   DataAnalysis,
+  Delete,
   DocumentCopy,
   Key,
   Link,
+  Plus,
   Refresh,
+  Select,
   WarningFilled,
 } from '@element-plus/icons-vue'
-import { mcpApi, type McpConnectionInfo } from '@/api/mcp'
+import { mcpApi, type McpConnectionInfo, type McpKey } from '@/api/mcp'
 
 const loading = ref(false)
+const creating = ref(false)
 const info = ref<McpConnectionInfo | null>(null)
-const clientId = ref('ai-reader')
-const generatedKey = ref(generateToken())
+const keys = ref<McpKey[]>([])
+const selectedToken = ref<string>('')
+const newClientId = ref('')
+const activeTab = ref('cursor')
 
+const allKeys = computed(() => keys.value)
+
+const activeToken = computed(() => selectedToken.value || keys.value[0]?.token || '<MCP key>')
 const endpoint = computed(() => info.value?.endpoint || getFallbackEndpoint())
+const sseEndpoint = computed(() => info.value?.sseEndpoint || `${getFallbackBaseUrl()}/mcp/sse`)
+const messagesEndpoint = computed(
+  () => info.value?.messagesEndpoint || `${getFallbackBaseUrl()}/mcp/messages`,
+)
 
-const envSnippet = computed(() => {
-  const id = sanitizeClientId(clientId.value)
-  return `MCP_API_KEYS=${id}:${generatedKey.value}`
-})
-
-const clientConfig = computed(() =>
+const cursorConfig = computed(() =>
   JSON.stringify(
     {
       mcpServers: {
         matrixflow: {
-          type: 'http',
           url: endpoint.value,
           headers: {
-            Authorization: `Bearer ${generatedKey.value || '<MCP key>'}`,
+            Authorization: `Bearer ${activeToken.value}`,
           },
         },
       },
@@ -198,22 +282,150 @@ const clientConfig = computed(() =>
   ),
 )
 
+const claudeConfig = computed(() =>
+  JSON.stringify(
+    {
+      mcpServers: {
+        matrixflow: {
+          command: 'npx',
+          args: [
+            'mcp-remote',
+            endpoint.value,
+            '--header',
+            `Authorization: Bearer ${activeToken.value}`,
+          ],
+        },
+      },
+    },
+    null,
+    2,
+  ),
+)
+
+const clineConfig = computed(() =>
+  JSON.stringify(
+    {
+      mcpServers: {
+        matrixflow: {
+          type: 'http',
+          url: endpoint.value,
+          headers: {
+            Authorization: `Bearer ${activeToken.value}`,
+          },
+        },
+      },
+    },
+    null,
+    2,
+  ),
+)
+
+const sseConfig = computed(() =>
+  JSON.stringify(
+    {
+      mcpServers: {
+        matrixflow: {
+          type: 'sse',
+          url: sseEndpoint.value,
+          headers: {
+            Authorization: `Bearer ${activeToken.value}`,
+          },
+        },
+      },
+    },
+    null,
+    2,
+  ),
+)
+
+const curlExample = computed(
+  () =>
+    `# 1. 初始化连接\ncurl -X POST ${endpoint.value} \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: application/json, text/event-stream" \\
+  -H "Authorization: Bearer ${activeToken.value}" \\
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1.0.0"}}}'\n\n# 2. 列出工具\ncurl -X POST ${endpoint.value} \\
+  -H "Content-Type: application/json" \\
+  -H "Accept: application/json, text/event-stream" \\
+  -H "Authorization: Bearer ${activeToken.value}" \\
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'\n\n# SSE 方式（旧客户端）:\n# GET  ${sseEndpoint.value}  (建立 SSE 连接)\n# POST ${messagesEndpoint.value}?sessionId=<id>  (发送消息)`,
+)
+
 onMounted(() => {
-  loadConnectionInfo()
+  loadAll()
 })
 
-async function loadConnectionInfo() {
+async function loadAll() {
   loading.value = true
   try {
-    const res = await mcpApi.getConnectionInfo()
-    info.value = res.data
+    await Promise.all([loadConnectionInfo(), loadKeys()])
   } finally {
     loading.value = false
   }
 }
 
-function refreshKey() {
-  generatedKey.value = generateToken()
+async function loadConnectionInfo() {
+  try {
+    const res = await mcpApi.getConnectionInfo()
+    info.value = res.data
+  } catch {
+    // 静默
+  }
+}
+
+async function loadKeys() {
+  try {
+    const res = await mcpApi.listKeys()
+    keys.value = [...res.data.dbKeys, ...res.data.envKeys]
+  } catch {
+    // 静默
+  }
+}
+
+async function handleCreateKey() {
+  const clientId = newClientId.value.trim()
+  if (!clientId) {
+    ElMessage.warning('请输入客户端名称')
+    return
+  }
+
+  creating.value = true
+  try {
+    const res = await mcpApi.createKey(clientId)
+    keys.value.unshift(res.data)
+    selectedToken.value = res.data.token
+    ElMessage.success(`已创建 key: ${res.data.clientId}`)
+    newClientId.value = ''
+    await loadConnectionInfo()
+  } catch {
+    ElMessage.error('创建 key 失败')
+  } finally {
+    creating.value = false
+  }
+}
+
+async function handleDeleteKey(key: McpKey) {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除 key "${key.clientId}" 吗？删除后使用该 key 的 AI 客户端将无法连接。`,
+      '删除确认',
+      { type: 'warning' },
+    )
+    await mcpApi.deleteKey(key.id)
+    keys.value = keys.value.filter((k) => k.id !== key.id)
+    if (selectedToken.value === key.token) {
+      selectedToken.value = ''
+    }
+    ElMessage.success('已删除')
+    await loadConnectionInfo()
+  } catch {
+    // 取消
+  }
+}
+
+function selectKey(token: string) {
+  selectedToken.value = token
+  ElMessage.success('已选中该 key，下方配置将使用它')
 }
 
 async function copy(text: string) {
@@ -221,23 +433,14 @@ async function copy(text: string) {
   ElMessage.success('已复制')
 }
 
-function generateToken() {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  return btoa(String.fromCharCode(...bytes))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/g, '')
-}
-
-function sanitizeClientId(value: string) {
-  return value.trim().replace(/[^a-zA-Z0-9_-]/g, '-') || 'ai-reader'
+function getFallbackBaseUrl() {
+  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+  const baseUrl = new URL(apiBase, window.location.origin).toString().replace(/\/$/, '')
+  return baseUrl
 }
 
 function getFallbackEndpoint() {
-  const apiBase = import.meta.env.VITE_API_BASE_URL || '/api/v1'
-  const baseUrl = new URL(apiBase, window.location.origin).toString().replace(/\/$/, '')
-  return `${baseUrl}/mcp`
+  return `${getFallbackBaseUrl()}/mcp`
 }
 </script>
 
@@ -273,7 +476,8 @@ function getFallbackEndpoint() {
 
 .status-strip,
 .connection-panel,
-.setup-panel,
+.keys-panel,
+.config-panel,
 .catalog-panel {
   border: 1px solid $border-base;
   background: rgba(255, 255, 255, 0.025);
@@ -387,28 +591,79 @@ function getFallbackEndpoint() {
   }
 }
 
-.setup-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 16px;
+.keys-panel {
+  padding: 18px;
   margin-bottom: 16px;
 }
 
-.setup-panel {
-  padding: 18px;
-  min-width: 0;
+.create-key-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+
+  &__input {
+    flex: 1;
+  }
 }
 
-.form-row {
-  margin-bottom: 12px;
+.key-list {
+  display: grid;
+  gap: 8px;
 
-  label {
-    display: block;
-    margin-bottom: 6px;
+  &__empty {
+    padding: 20px;
+    text-align: center;
     color: $text-tertiary;
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 13px;
   }
+}
+
+.key-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid $border-subtle;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+
+  &__info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__client {
+    font-weight: 600;
+    font-size: 13px;
+    color: $text-primary;
+    flex-shrink: 0;
+  }
+
+  &__token {
+    font-family: $font-mono;
+    font-size: 12px;
+    color: $text-tertiary;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  &__actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+}
+
+.config-panel {
+  padding: 18px;
+  margin-bottom: 16px;
 }
 
 .hint {
@@ -423,11 +678,27 @@ function getFallbackEndpoint() {
   }
 }
 
+.tab-hint {
+  margin: 8px 0 12px;
+  color: $text-tertiary;
+  font-size: 13px;
+  line-height: 1.6;
+
+  code {
+    color: $accent-200;
+    font-family: $font-mono;
+  }
+}
+
+.config-tabs {
+  margin-top: 8px;
+}
+
 .code-block {
   min-height: 92px;
-  max-height: 280px;
+  max-height: 320px;
   margin: 0 0 12px;
-  padding: 12px;
+  padding: 14px;
   overflow: auto;
   border: 1px solid rgba(6, 182, 212, 0.18);
   border-radius: 8px;
@@ -485,7 +756,6 @@ function getFallbackEndpoint() {
   }
 
   .meta-grid,
-  .setup-grid,
   .catalog-panel {
     grid-template-columns: 1fr;
   }
@@ -493,11 +763,20 @@ function getFallbackEndpoint() {
 
 @media (max-width: 640px) {
   .mcp-access__header,
-  .copy-row {
+  .copy-row,
+  .create-key-row,
+  .key-item {
     flex-direction: column;
+    align-items: stretch;
   }
 
-  .copy-row .el-button {
+  .key-item__info {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .copy-row .el-button,
+  .create-key-row .el-button {
     width: 100%;
   }
 }

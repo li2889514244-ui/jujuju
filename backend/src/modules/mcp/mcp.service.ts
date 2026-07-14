@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, Logger } from '@nestjs/common'
+import { createHash, randomBytes } from 'crypto'
 import { Prisma } from '@prisma/client'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
@@ -20,6 +21,22 @@ export interface McpCatalogEntry {
 export interface McpCatalog {
   tools: McpCatalogEntry[]
   resources: McpCatalogEntry[]
+}
+
+export interface McpKeyEntry {
+  id: string
+  clientId: string
+  token: string
+  createdBy: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface ConfiguredKey {
+  id: string
+  clientId: string
+  token: string
+  source: 'db' | 'env'
 }
 
 type RankingMetric =
@@ -75,7 +92,87 @@ const EXPORT_COLUMNS = [
 
 @Injectable()
 export class McpService {
+  private readonly logger = new Logger(McpService.name)
+
   constructor(private readonly prisma: PrismaService) {}
+
+  // ==================== Key 管理 (DB CRUD) ====================
+
+  async listKeys(): Promise<McpKeyEntry[]> {
+    return this.prisma.mcpKey.findMany({
+      orderBy: { createdAt: 'desc' },
+    })
+  }
+
+  async createKey(clientId: string, createdBy?: string): Promise<McpKeyEntry> {
+    const sanitized = clientId.trim().replace(/[^a-zA-Z0-9_-]/g, '-') || 'mcp-client'
+    const token = this.generateToken()
+    return this.prisma.mcpKey.create({
+      data: { clientId: sanitized, token, createdBy },
+    })
+  }
+
+  async deleteKey(id: string): Promise<void> {
+    await this.prisma.mcpKey.delete({ where: { id } })
+  }
+
+  /**
+   * 从 DB 和环境变量合并获取所有已配置的 key。
+   * DB 优先，env 作为 fallback。
+   */
+  async getConfiguredKeys(): Promise<ConfiguredKey[]> {
+    const dbKeys = await this.prisma.mcpKey.findMany()
+    const envKeys = this.parseEnvKeys()
+
+    // DB key 优先，env key 中 clientId 不冲突的追加
+    const dbClientIds = new Set(dbKeys.map((k) => k.clientId))
+    const envExtras = envKeys.filter((k) => !dbClientIds.has(k.clientId))
+
+    return [
+      ...dbKeys.map((k) => ({
+        id: k.id,
+        clientId: k.clientId,
+        token: k.token,
+        source: 'db' as const,
+      })),
+      ...envExtras,
+    ]
+  }
+
+  private parseEnvKeys(): ConfiguredKey[] {
+    const raw = process.env.MCP_API_KEYS || process.env.MCP_READ_TOKEN || ''
+    return raw
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean)
+      .map((entry, index) => {
+        const separator = entry.indexOf(':')
+        if (separator > 0) {
+          return {
+            id: `env-${index}`,
+            clientId: entry.slice(0, separator).trim(),
+            token: entry.slice(separator + 1).trim(),
+            source: 'env' as const,
+          }
+        }
+        const fingerprint = createHash('sha256').update(entry).digest('hex').slice(0, 8)
+        return {
+          id: `env-${index}`,
+          clientId: `mcp-client-${index + 1}-${fingerprint}`,
+          token: entry,
+          source: 'env' as const,
+        }
+      })
+      .filter((entry) => entry.token.length > 0)
+  }
+
+  private generateToken(): string {
+    return randomBytes(32)
+      .toString('base64url')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/, '')
+  }
 
   getCatalog(): McpCatalog {
     return {

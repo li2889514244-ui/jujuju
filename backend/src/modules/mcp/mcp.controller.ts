@@ -1,40 +1,109 @@
-import { createHash, timingSafeEqual } from 'crypto'
-import { Controller, Delete, Get, HttpStatus, Logger, Post, Req, Res } from '@nestjs/common'
+import { timingSafeEqual } from 'crypto'
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Logger,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from '@nestjs/common'
 import { Request, Response } from 'express'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { Public } from '../../common/decorators/public.decorator'
-import { McpClientAuth, McpService } from './mcp.service'
-
-interface ConfiguredMcpKey {
-  clientId: string
-  token: string
-}
+import { McpService } from './mcp.service'
 
 @Controller('mcp')
 export class McpController {
   private readonly logger = new Logger(McpController.name)
+  private sseTransports = new Map<string, SSEServerTransport>()
 
   constructor(private readonly mcpService: McpService) {}
 
+  // ==================== Key 管理 (需要 JWT 登录) ====================
+
+  @Get('keys')
+  async listKeys() {
+    const [keys, configuredKeys] = await Promise.all([
+      this.mcpService.listKeys(),
+      this.mcpService.getConfiguredKeys(),
+    ])
+    const envKeys = configuredKeys.filter((k) => k.source === 'env')
+    return {
+      dbKeys: keys.map((k) => ({
+        id: k.id,
+        clientId: k.clientId,
+        token: k.token,
+        createdBy: k.createdBy,
+        createdAt: k.createdAt.toISOString(),
+        updatedAt: k.updatedAt.toISOString(),
+        source: 'db',
+      })),
+      envKeys: envKeys.map((k) => ({
+        id: k.id,
+        clientId: k.clientId,
+        token: k.token,
+        source: 'env',
+      })),
+    }
+  }
+
+  @Post('keys')
+  @HttpCode(HttpStatus.CREATED)
+  async createKey(@Body() body: { clientId: string }, @Req() req: Request) {
+    const createdBy = (req as any).user?.userId || null
+    const key = await this.mcpService.createKey(body.clientId, createdBy)
+    return {
+      id: key.id,
+      clientId: key.clientId,
+      token: key.token,
+      createdBy: key.createdBy,
+      createdAt: key.createdAt.toISOString(),
+      updatedAt: key.updatedAt.toISOString(),
+      source: 'db',
+    }
+  }
+
+  @Delete('keys/:id')
+  async deleteKey(@Param('id') id: string) {
+    await this.mcpService.deleteKey(id)
+    return { success: true }
+  }
+
+  // ==================== 连接信息 (需要 JWT 登录) ====================
+
   @Get('connection')
-  getConnectionInfo(@Req() req: Request) {
-    const configuredKeys = this.getConfiguredKeys()
+  async getConnectionInfo(@Req() req: Request) {
+    const configuredKeys = await this.mcpService.getConfiguredKeys()
     const catalog = this.mcpService.getCatalog()
     const endpointPath = '/api/v1/mcp'
     const endpoint = `${this.getPublicBaseUrl(req)}${endpointPath}`
+    const sseEndpoint = `${this.getPublicBaseUrl(req)}/api/v1/mcp/sse`
+    const messagesEndpoint = `${this.getPublicBaseUrl(req)}/api/v1/mcp/messages`
     const allowedOrigins = this.getAllowedOrigins()
 
     return {
       enabled: configuredKeys.length > 0,
       serverName: 'matrixflow-readonly',
-      transport: 'streamable-http',
+      transports: ['streamable-http', 'sse'],
       endpoint,
       endpointPath,
+      sseEndpoint,
+      messagesEndpoint,
       auth: {
         type: 'bearer',
         header: 'Authorization: Bearer <MCP key>',
         keyCount: configuredKeys.length,
-        clients: configuredKeys.map((key) => ({ clientId: key.clientId })),
+        clients: configuredKeys.map((key) => ({
+          clientId: key.clientId,
+          source: key.source,
+        })),
       },
       limits: {
         maxRows: Number(process.env.MCP_MAX_ROWS || 500),
@@ -46,22 +115,15 @@ export class McpController {
       },
       tools: catalog.tools,
       resources: catalog.resources,
-      examples: {
-        genericHttp: {
-          type: 'http',
-          url: endpoint,
-          headers: {
-            Authorization: 'Bearer <MCP key>',
-          },
-        },
-      },
     }
   }
+
+  // ==================== Streamable HTTP 传输 (无状态) ====================
 
   @Public()
   @Post()
   async handleMcpPost(@Req() req: Request, @Res() res: Response) {
-    const auth = this.authenticate(req, res)
+    const auth = await this.authenticate(req, res)
     if (!auth) return
 
     const server = this.mcpService.createServer(auth)
@@ -106,8 +168,8 @@ export class McpController {
 
   @Public()
   @Get()
-  handleMcpGet(@Req() req: Request, @Res() res: Response) {
-    const auth = this.authenticate(req, res)
+  async handleMcpGet(@Req() req: Request, @Res() res: Response) {
+    const auth = await this.authenticate(req, res)
     if (!auth) return
     this.writeMcpError(
       res,
@@ -119,8 +181,8 @@ export class McpController {
 
   @Public()
   @Delete()
-  handleMcpDelete(@Req() req: Request, @Res() res: Response) {
-    const auth = this.authenticate(req, res)
+  async handleMcpDelete(@Req() req: Request, @Res() res: Response) {
+    const auth = await this.authenticate(req, res)
     if (!auth) return
     this.writeMcpError(
       res,
@@ -130,7 +192,78 @@ export class McpController {
     )
   }
 
-  private authenticate(req: Request, res: Response): McpClientAuth | null {
+  // ==================== SSE 传输 (旧协议, 兼容更多客户端) ====================
+
+  @Public()
+  @Get('sse')
+  async handleSseConnection(@Req() req: Request, @Res() res: Response) {
+    const auth = await this.authenticate(req, res)
+    if (!auth) return
+
+    const transport = new SSEServerTransport('/api/v1/mcp/messages', res)
+    this.sseTransports.set(transport.sessionId, transport)
+
+    const server = this.mcpService.createServer(auth)
+
+    res.on('close', () => {
+      this.sseTransports.delete(transport.sessionId)
+      void server.close().catch(() => {})
+    })
+
+    try {
+      ;(req as any).auth = {
+        token: auth.token,
+        clientId: auth.clientId,
+        scopes: auth.scopes,
+      }
+      await server.connect(transport)
+    } catch (error) {
+      this.logger.error(
+        `SSE connection failed for ${auth.clientId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      )
+      this.sseTransports.delete(transport.sessionId)
+      if (!res.headersSent) {
+        this.writeMcpError(res, HttpStatus.INTERNAL_SERVER_ERROR, -32603, 'Internal server error')
+      }
+    }
+  }
+
+  @Public()
+  @Post('messages')
+  async handleSseMessage(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Query('sessionId') sessionId: string,
+  ) {
+    const auth = await this.authenticate(req, res)
+    if (!auth) return
+
+    const transport = this.sseTransports.get(sessionId)
+    if (!transport) {
+      this.writeMcpError(res, HttpStatus.NOT_FOUND, -32000, `Session not found: ${sessionId}`)
+      return
+    }
+
+    try {
+      ;(req as any).auth = {
+        token: auth.token,
+        clientId: auth.clientId,
+        scopes: auth.scopes,
+      }
+      await transport.handlePostMessage(req as any, res as any, req.body)
+    } catch (error) {
+      this.logger.error(
+        `SSE message handling failed for session ${sessionId}: ${error instanceof Error ? error.message : 'unknown'}`,
+      )
+      if (!res.headersSent) {
+        this.writeMcpError(res, HttpStatus.INTERNAL_SERVER_ERROR, -32603, 'Internal server error')
+      }
+    }
+  }
+
+  // ==================== 认证 ====================
+
+  private async authenticate(req: Request, res: Response) {
     if (!this.isOriginAllowed(req.headers.origin)) {
       this.writeMcpError(
         res,
@@ -141,13 +274,13 @@ export class McpController {
       return null
     }
 
-    const configuredKeys = this.getConfiguredKeys()
+    const configuredKeys = await this.mcpService.getConfiguredKeys()
     if (configuredKeys.length === 0) {
       this.writeMcpError(
         res,
         HttpStatus.SERVICE_UNAVAILABLE,
         -32000,
-        'MatrixFlow MCP is disabled until MCP_API_KEYS is configured.',
+        'MatrixFlow MCP is disabled until MCP keys are configured.',
       )
       return null
     }
@@ -164,7 +297,7 @@ export class McpController {
       return null
     }
 
-    this.logger.log(`MCP request authenticated for ${key.clientId}`)
+    this.logger.log(`MCP request authenticated for ${key.clientId} (source: ${key.source})`)
     return {
       clientId: key.clientId,
       token,
@@ -172,30 +305,7 @@ export class McpController {
     }
   }
 
-  private getConfiguredKeys(): ConfiguredMcpKey[] {
-    const raw = process.env.MCP_API_KEYS || process.env.MCP_READ_TOKEN || ''
-
-    return raw
-      .split(',')
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .map((entry, index) => {
-        const separator = entry.indexOf(':')
-        if (separator > 0) {
-          return {
-            clientId: entry.slice(0, separator).trim(),
-            token: entry.slice(separator + 1).trim(),
-          }
-        }
-
-        const fingerprint = createHash('sha256').update(entry).digest('hex').slice(0, 8)
-        return {
-          clientId: `mcp-client-${index + 1}-${fingerprint}`,
-          token: entry,
-        }
-      })
-      .filter((entry) => entry.token.length > 0)
-  }
+  // ==================== 工具方法 ====================
 
   private extractBearerToken(header: string | string[] | undefined): string | null {
     const value = Array.isArray(header) ? header[0] : header
