@@ -459,7 +459,7 @@ export class PlatformsService {
       // 采集端现在通过 post_list API 获取每个视频的累计数据并求和，
       // 提供了真实的累计总量（views/likes/comments/shares）。
       // 只有当采集端未提供累计值时，才从历史增量求和作为降级方案。
-      if (platform === 'WECHAT_VIDEO') {
+      if (platform === 'WECHAT_VIDEO' && metrics) {
         const hasCumulative =
           pickNumber(metrics.views) > 0 ||
           pickNumber(metrics.likes) > 0 ||
