@@ -1008,9 +1008,28 @@ def local_accounts_list():
                 print(f'[WARN] {type(_e).__name__}: {_e}')
 
         age_hours = ((now - refreshed_at) / 3600) if refreshed_at else None
+
+        # Check if state.json has enough cookies for WECHAT_VIDEO.
+        # storage_state() misses session cookies (compass_token etc.),
+        # so a profile_persisted=True with only 2 cookies is NOT usable.
+        has_enough_cookies = True
+        if profile and acc.get('platform') == 'WECHAT_VIDEO':
+            state_json = profile / 'state.json'
+            if state_json.exists():
+                try:
+                    state = json.loads(state_json.read_text('utf-8'))
+                    cookie_count = len(state.get('cookies', []))
+                    # WECHAT_VIDEO needs at least sessionid + wxuin + compass_token
+                    has_enough_cookies = cookie_count >= 3
+                except Exception:
+                    has_enough_cookies = False
+            else:
+                has_enough_cookies = False
+
         has_recent_full_profile = bool(
             acc.get('platform') == 'WECHAT_VIDEO'
             and profile_persisted
+            and has_enough_cookies
             and age_hours is not None
             and age_hours < _COOKIE_AGE_EXPIRED_HOURS
         )
