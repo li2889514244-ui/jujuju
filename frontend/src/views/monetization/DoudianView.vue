@@ -560,9 +560,15 @@ async function loadData() {
   try {
     const range = displayRange.value
     const [orderRes, productRes, aftersaleRes] = await Promise.all([
-      doudianStoreApi.getOrders(activeStoreId.value),
+      doudianStoreApi.getOrders(activeStoreId.value, {
+        start_time: range.start,
+        end_time: range.end,
+      }),
       doudianStoreApi.getProducts(activeStoreId.value),
-      doudianStoreApi.getAftersales(activeStoreId.value),
+      doudianStoreApi.getAftersales(activeStoreId.value, {
+        begin_create_time: range.start,
+        end_create_time: range.end,
+      }),
     ])
     orders.value = orderRes.data?.order_list || []
     products.value = productRes.data?.products || []
@@ -691,6 +697,7 @@ async function syncActive() {
     )
     const started = await resp.json()
     if (!resp.ok || started.code !== 0) throw new Error(started.msg || '同步启动失败')
+    ElMessage.info('抖店同步已开始，请保持桌面伴侣运行')
     const data = await waitCompanionJob(companionUrl, started.job_id)
     ElMessage.success(
       `同步完成：订单 ${data?.ordersSaved || 0}，商品 ${data?.productsSaved || 0}，售后 ${
@@ -728,7 +735,7 @@ async function checkCompanion() {
 }
 
 async function waitCompanionJob(companionUrl: string, jobId: string) {
-  for (let i = 0; i < 300; i++) {
+  for (let i = 0; i < 900; i++) {
     await new Promise((resolve) => setTimeout(resolve, 2000))
     const resp = await fetch(`${companionUrl}/api/doudian/jobs/${jobId}`)
     const data = await resp.json()
@@ -736,7 +743,7 @@ async function waitCompanionJob(companionUrl: string, jobId: string) {
     if (job.status === 'success') return job.result || {}
     if (job.status === 'error') throw new Error(job.message || '同步失败')
   }
-  throw new Error('同步超时')
+  throw new Error('同步仍在进行中，请稍后刷新数据')
 }
 
 watch(activeLocalStoreId, () => {

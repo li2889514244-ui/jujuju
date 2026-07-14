@@ -116,6 +116,31 @@ export class ContentService {
     return { success: true }
   }
 
+  async cancelSchedule(id: string, userId: string) {
+    const post = await this.prisma.post.findUnique({ where: { id } })
+    if (!post) throw new NotFoundException('内容不存在')
+    if (post.status !== 'SCHEDULED') throw new BadRequestException('仅定时发布的内容可取消')
+    return this.prisma.post.update({
+      where: { id },
+      data: { status: 'DRAFT', publishAt: null },
+      include: { account: { select: { id: true, platform: true, nickname: true } } },
+    })
+  }
+
+  async retryPublish(id: string, userId: string) {
+    const post = await this.prisma.post.findUnique({
+      where: { id },
+      include: { account: true },
+    })
+    if (!post) throw new NotFoundException('内容不存在')
+    if (post.status !== 'FAILED') throw new BadRequestException('仅发布失败的内容可重试')
+    return this.prisma.post.update({
+      where: { id },
+      data: { status: 'PUBLISHING' },
+      include: { account: { select: { id: true, platform: true, nickname: true } } },
+    })
+  }
+
   async publish(contentId: string, userId: string) {
     const post = await this.prisma.post.findUnique({
       where: { id: contentId },

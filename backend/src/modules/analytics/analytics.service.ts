@@ -1330,17 +1330,6 @@ export class AnalyticsService {
     // 这样采集断档或账号过期会在前端暴露为 null，便于运营排查。
     const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
     const isYesterday = (d: Date) => d.getTime() === yesterday.getTime()
-    const parseJsonObject = (value: unknown): Record<string, any> => {
-      if (!value) return {}
-      if (typeof value === 'object') return value as Record<string, any>
-      if (typeof value !== 'string') return {}
-      try {
-        const parsed = JSON.parse(value)
-        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
-      } catch {
-        return {}
-      }
-    }
     const metricKeys = ['play', 'like', 'comment', 'share', 'new_fans'] as const
     type MetricKey = (typeof metricKeys)[number]
     type MetricTotal = Record<MetricKey, number>
@@ -1351,48 +1340,6 @@ export class AnalyticsService {
       share: 0,
       new_fans: 0,
     })
-    const hasMetricValue = (value: MetricTotal | null | undefined) =>
-      !!value && metricKeys.some((key) => value[key] > 0)
-    const hasAdditionalMetricValue = (
-      value: MetricTotal | null | undefined,
-      baseline: MetricTotal | null | undefined,
-    ) => !!value && metricKeys.some((key) => value[key] > (baseline?.[key] ?? 0))
-    const isCumulativeAtLeast = (value: MetricTotal, baseline: MetricTotal) =>
-      metricKeys.every((key) => value[key] >= baseline[key])
-    const readMetricTotal = (value: any): MetricTotal | undefined => {
-      if (!value || typeof value !== 'object') return undefined
-      const total = {
-        play: Number(value.play) || 0,
-        like: Number(value.like) || 0,
-        comment: Number(value.comment) || 0,
-        share: Number(value.share) || 0,
-        new_fans: Number(value.new_fans) || 0,
-      }
-      return hasMetricValue(total) ? total : undefined
-    }
-    const readPeriodMetrics = (metadataValue: unknown) => {
-      const metadata = parseJsonObject(metadataValue)
-      const videoData = parseJsonObject(parseJsonObject(metadata.periodMetrics).videoData)
-      const dayTotal = readMetricTotal(videoData.day_total)
-      const weekTotal = readMetricTotal(videoData.week_total)
-      const monthTotal = readMetricTotal(videoData.month_total)
-      const validWeekTotal =
-        weekTotal && (!dayTotal || isCumulativeAtLeast(weekTotal, dayTotal)) ? weekTotal : undefined
-      const monthBaseline = validWeekTotal || dayTotal
-      const validMonthTotal =
-        monthTotal && (!monthBaseline || isCumulativeAtLeast(monthTotal, monthBaseline))
-          ? monthTotal
-          : undefined
-      return {
-        day_total: dayTotal,
-        week_total: validWeekTotal,
-        month_total: validMonthTotal,
-      }
-    }
-
-    // 快照回退时效限制：超过 STALE_DAYS 天的快照不再作为"日"数据回退
-    const STALE_DAYS = 3
-    const staleThreshold = this.getBeijingDayStart(-STALE_DAYS)
 
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []
@@ -1447,34 +1394,10 @@ export class AnalyticsService {
         if (!latestStatsDate || s.date > latestStatsDate) latestStatsDate = s.date
       }
 
-      // 快照回退：仅当无 DailyStats 数据时，用 metadata 快照补充
-      // 但"日"数据有时效限制：超过 STALE_DAYS 天的快照不再回退，避免过期数据误导
-      const periodMetrics = readPeriodMetrics(acc.metadata)
-      let dataDate: string | null = latestStatsDate
+      // 不再使用 metadata 快照回退：有 DailyStats 数据就展示，没有就返回 null
+      const dataDate: string | null = latestStatsDate
         ? latestStatsDate.toISOString().slice(0, 10)
         : null
-
-      if (periodMetrics.day_total && !hasMetricValue(dayTotal)) {
-        // 仅当快照时间在 STALE_DAYS 天内才回退到日数据
-        if (!latestStatsDate || latestStatsDate >= staleThreshold) {
-          dayTotal = { ...periodMetrics.day_total }
-          if (!dataDate) dataDate = 'snapshot'
-        }
-      }
-      if (
-        periodMetrics.week_total &&
-        !hasAdditionalMetricValue(weekTotal, dayTotal) &&
-        hasAdditionalMetricValue(periodMetrics.week_total, dayTotal)
-      ) {
-        weekTotal = { ...periodMetrics.week_total }
-      }
-      if (
-        periodMetrics.month_total &&
-        !hasAdditionalMetricValue(monthTotal, weekTotal) &&
-        hasAdditionalMetricValue(periodMetrics.month_total, weekTotal)
-      ) {
-        monthTotal = { ...periodMetrics.month_total }
-      }
 
       return {
         id: acc.id,

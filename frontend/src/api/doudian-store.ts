@@ -66,14 +66,17 @@ export const doudianStoreApi = {
       `/doudian-browser/stores/${id}/session`,
     )
   },
-  getOrders(storeId: string) {
-    return get<any>('/doudian-browser/shop/orders', { store_id: storeId })
+  getOrders(storeId: string, params?: { start_time?: number; end_time?: number }) {
+    return get<any>('/doudian-browser/shop/orders', { store_id: storeId, ...params })
   },
   getProducts(storeId: string) {
     return get<any>('/doudian-browser/shop/products', { store_id: storeId })
   },
-  getAftersales(storeId: string) {
-    return get<any>('/doudian-browser/shop/aftersale', { store_id: storeId })
+  getAftersales(
+    storeId: string,
+    params?: { begin_create_time?: number; end_create_time?: number },
+  ) {
+    return get<any>('/doudian-browser/shop/aftersale', { store_id: storeId, ...params })
   },
   getSummary(storeId: string, params: { start: number; end: number; mode: DoudianSummaryMode }) {
     return get<DoudianSummary>('/doudian-browser/shop/summary', {

@@ -10,19 +10,13 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-} from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiBearerAuth,
-  ApiQuery,
-} from '@nestjs/swagger';
-import { ContentService } from './content.service';
-import { CreateContentDto } from './dto/create-content.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { PostStatus } from '@prisma/client';
+} from '@nestjs/common'
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
+import { ContentService } from './content.service'
+import { CreateContentDto } from './dto/create-content.dto'
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
+import { CurrentUser } from '../../common/decorators/current-user.decorator'
+import { PostStatus } from '@prisma/client'
 
 @ApiTags('content')
 @ApiBearerAuth('access-token')
@@ -34,11 +28,8 @@ export class ContentController {
   @Post()
   @ApiOperation({ summary: '创建内容' })
   @ApiResponse({ status: 201, description: '创建成功' })
-  async create(
-    @Body() dto: CreateContentDto,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.contentService.create(dto, userId);
+  async create(@Body() dto: CreateContentDto, @CurrentUser('id') userId: string) {
+    return this.contentService.create(dto, userId)
   }
 
   @Get()
@@ -54,23 +45,23 @@ export class ContentController {
     @Query('limit') limit?: number,
     @CurrentUser('id') userId?: string,
   ) {
-    const pageNum = Math.max(1, page || 1);
-    const limitNum = Math.min(100, Math.max(1, limit || 20));
-    const skip = (pageNum - 1) * limitNum;
-    return this.contentService.findAll({ userId, accountId, status, skip, take: limitNum });
+    const pageNum = Math.max(1, page || 1)
+    const limitNum = Math.min(100, Math.max(1, limit || 20))
+    const skip = (pageNum - 1) * limitNum
+    return this.contentService.findAll({ userId, accountId, status, skip, take: limitNum })
   }
 
   @Get('scheduled')
   @ApiOperation({ summary: '获取待发布队列' })
   async getScheduled() {
-    return this.contentService.getScheduledPosts();
+    return this.contentService.getScheduledPosts()
   }
 
   @Get(':id')
   @ApiOperation({ summary: '获取内容详情' })
   @ApiResponse({ status: 404, description: '内容不存在' })
   async findOne(@Param('id') id: string) {
-    return this.contentService.findById(id);
+    return this.contentService.findById(id)
   }
 
   @Put(':id')
@@ -82,18 +73,15 @@ export class ContentController {
     @Body() dto: Partial<CreateContentDto>,
     @CurrentUser('id') userId: string,
   ) {
-    return this.contentService.update(id, dto, userId);
+    return this.contentService.update(id, dto, userId)
   }
 
   @Post(':id/publish')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '发布内容' })
   @ApiResponse({ status: 400, description: '当前状态不允许发布' })
-  async publish(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.contentService.publish(id, userId);
+  async publish(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.contentService.publish(id, userId)
   }
 
   @Post('batch-publish')
@@ -101,26 +89,40 @@ export class ContentController {
   @ApiOperation({ summary: '一键分发：同一内容发布到多个账号' })
   async batchPublish(
     @CurrentUser('id') userId: string,
-    @Body() dto: {
-      title: string;
-      content: string;
-      mediaUrls?: string[];
-      tags?: string[];
-      accountIds: string[];
-      publishAt?: string;
+    @Body()
+    dto: {
+      title: string
+      content: string
+      mediaUrls?: string[]
+      tags?: string[]
+      accountIds: string[]
+      publishAt?: string
     },
   ) {
-    return this.contentService.batchPublish(dto, userId);
+    return this.contentService.batchPublish(dto, userId)
+  }
+
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '取消定时发布' })
+  @ApiResponse({ status: 400, description: '非定时状态不可取消' })
+  async cancelSchedule(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.contentService.cancelSchedule(id, userId)
+  }
+
+  @Post(':id/retry')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '重试发布失败的内容' })
+  @ApiResponse({ status: 400, description: '非失败状态不可重试' })
+  async retryPublish(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.contentService.retryPublish(id, userId)
   }
 
   @Delete(':id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '删除内容' })
   @ApiResponse({ status: 400, description: '发布中的内容无法删除' })
-  async remove(
-    @Param('id') id: string,
-    @CurrentUser('id') userId: string,
-  ) {
-    return this.contentService.remove(id, userId);
+  async remove(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    return this.contentService.remove(id, userId)
   }
 }

@@ -8,6 +8,12 @@ import { DoudianBrowserService } from './doudian-browser.service'
 export class DoudianBrowserController {
   constructor(private readonly doudianBrowserService: DoudianBrowserService) {}
 
+  private toOptionalNumber(value?: string) {
+    if (value === undefined || value === '') return undefined
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
   @Public()
   @Get('stores')
   getStores() {
@@ -70,8 +76,15 @@ export class DoudianBrowserController {
 
   @Public()
   @Get('shop/orders')
-  getOrders(@Query('store_id') storeId: string) {
-    return this.doudianBrowserService.getOrders(storeId)
+  getOrders(
+    @Query('store_id') storeId: string,
+    @Query('start_time') startTime?: string,
+    @Query('end_time') endTime?: string,
+  ) {
+    return this.doudianBrowserService.getOrders(storeId, {
+      start_time: this.toOptionalNumber(startTime),
+      end_time: this.toOptionalNumber(endTime),
+    })
   }
 
   @Public()
@@ -82,8 +95,15 @@ export class DoudianBrowserController {
 
   @Public()
   @Get('shop/aftersale')
-  getAftersales(@Query('store_id') storeId: string) {
-    return this.doudianBrowserService.getAftersales(storeId)
+  getAftersales(
+    @Query('store_id') storeId: string,
+    @Query('begin_create_time') beginCreateTime?: string,
+    @Query('end_create_time') endCreateTime?: string,
+  ) {
+    return this.doudianBrowserService.getAftersales(storeId, {
+      begin_create_time: this.toOptionalNumber(beginCreateTime),
+      end_create_time: this.toOptionalNumber(endCreateTime),
+    })
   }
 
   @Public()

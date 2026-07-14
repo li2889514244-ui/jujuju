@@ -73,6 +73,15 @@ export class TenantMiddleware {
         }
       }
 
+      // count / aggregate / groupBy：注入 where 条件
+      if (action === 'count' || action === 'aggregate' || action === 'groupBy') {
+        params.args = params.args || {}
+        params.args.where = {
+          ...(params.args.where ?? {}),
+          organizationId,
+        }
+      }
+
       // 更新操作：注入 where 条件
       if (action === 'update' || action === 'updateMany') {
         params.args = params.args || {}

@@ -9,7 +9,7 @@ export function tokenStatusLabel(row: { tokenStatus?: string; hasCookies?: boole
 export function formatLargeNum(num: number): string {
   if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
   if (num >= 10000) return (num / 10000).toFixed(1) + '万'
-  if (num === 0) return '-'
+  if (num === 0) return '0'
   return num.toLocaleString()
 }
 

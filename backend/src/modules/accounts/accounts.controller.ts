@@ -119,6 +119,62 @@ export class AccountsController {
     return { success: true, count: body.cookies.length }
   }
 
+  @Post(':id/check-cookie')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '检查账号 Cookie 状态' })
+  async checkCookie(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id } })
+    if (!account) throw new NotFoundException('账号不存在')
+    await OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号')
+
+    const cookies = await this.accountsService.getCookies(id, userId)
+    const hasCookies = Array.isArray(cookies) && cookies.length > 0
+    return {
+      status: hasCookies ? 'valid' : 'missing',
+      count: hasCookies ? cookies.length : 0,
+    }
+  }
+
+  @Post(':id/refresh-cookie')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: '刷新账号 Cookie（提示用户重新通过桌面伴侣上传）' })
+  async refreshCookie(@Param('id') id: string, @CurrentUser('id') userId: string) {
+    const account = await this.prisma.account.findUnique({ where: { id } })
+    if (!account) throw new NotFoundException('账号不存在')
+    await OwnershipHelper.assertOwnershipOrAdmin(this.prisma, userId, account.userId, '账号')
+
+    return {
+      success: true,
+      message: '请通过桌面伴侣重新采集 Cookie',
+      accountId: id,
+    }
+  }
+
+  @Get(':id/history')
+  @ApiOperation({ summary: '获取账号历史数据' })
+  async getHistory(
+    @Param('id') id: string,
+    @Query('page') page?: number,
+    @Query('pageSize') pageSize?: number,
+    @CurrentUser('id') userId?: string,
+  ) {
+    const pageNum = Math.max(1, Number(page) || 1)
+    const limitNum = Math.min(100, Math.max(1, Number(pageSize) || 20))
+    const skip = (pageNum - 1) * limitNum
+
+    const [records, total] = await Promise.all([
+      this.prisma.dailyStats.findMany({
+        where: { accountId: id },
+        skip,
+        take: limitNum,
+        orderBy: { date: 'desc' },
+      }),
+      this.prisma.dailyStats.count({ where: { accountId: id } }),
+    ])
+
+    return { records, total, skip, take: limitNum }
+  }
+
   @Put(':id')
   @HttpCode(HttpStatus.OK)
   async update(

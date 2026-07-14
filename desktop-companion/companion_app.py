@@ -29,10 +29,17 @@ except Exception as _e:
 
 # ── Modular imports ──
 import companion_state as state
-from companion_state import APP_VERSION, DEFAULT_UPDATE_MANIFEST_URL, PLATFORMS, _ALLOWED_ORIGINS
+from companion_state import (
+    APP_VERSION,
+    DEFAULT_UPDATE_MANIFEST_URL,
+    PLATFORMS,
+    _ALLOWED_ORIGINS,
+    _COOKIE_AGE_EXPIRED_HOURS,
+    _COOKIE_AGE_WARN_HOURS,
+)
 from companion_crypto import _get_encryption_key, _encrypt_password, _decrypt_password, _HAS_CRYPTO
 from companion_config import _load_config, _save_config, CONFIG_FILE
-from companion_browser import _find_browser, _ensure_cdp_running, _stop_cdp_if_idle, _launch_browser_opts
+from companion_browser import _find_browser
 from companion_updater import (
     _is_newer_version, _get_update_manifest_url, _resolve_update_url,
     _fetch_update_manifest, _download_update_package, _start_update_process,
@@ -68,6 +75,38 @@ def _add_cors_headers(resp):
     return resp
 
 # ── Browser/CDP initialization (delegated to companion_browser) ──
+
+
+def _get_doudian_stores() -> list[dict]:
+    cfg = _load_config()
+    stores = cfg.get('doudian_stores') or []
+    return stores if isinstance(stores, list) else []
+
+
+def _save_doudian_stores(stores: list[dict]) -> None:
+    cfg = _load_config()
+    cfg['doudian_stores'] = stores
+    _save_config(cfg)
+    state._CONFIG_CACHE.update(cfg)
+
+
+def _get_doudian_collection_interval() -> int:
+    cfg = _load_config()
+    raw_minutes = cfg.get('doudian_sync_interval_minutes', 30)
+    try:
+        minutes = int(raw_minutes)
+    except Exception:
+        minutes = 30
+    minutes = max(10, min(minutes, 24 * 60))
+    return minutes * 60
+
+
+def _schedule_next_doudian_collection(delay_seconds: int | None = None) -> int:
+    interval = int(delay_seconds if delay_seconds is not None else _get_doudian_collection_interval())
+    interval = max(60, interval)
+    state._doudian_schedule_interval = interval
+    state._doudian_next_run_at = time.time() + interval
+    return interval
 state._BROWSER_PATH, state._BROWSER_CHANNEL = _find_browser()
 print(f'[Browser] path={state._BROWSER_PATH} channel={state._BROWSER_CHANNEL}')
 state._cdp = ChromeCDP(port=state._CDP_PORT, chrome_path=state._BROWSER_PATH)
@@ -621,7 +660,7 @@ def _run_doudian_scheduled_collection():
         stores = [
             store
             for store in _get_doudian_stores()
-            if store.get('cloud_store_id') and store.get('last_synced_at')
+            if store.get('cloud_store_id')
         ]
         if not stores:
             state._doudian_last_error = None
@@ -671,7 +710,7 @@ def _ensure_doudian_scheduler_started():
         if state._doudian_scheduler_started:
             return
         state._doudian_scheduler_started = True
-        _schedule_next_doudian_collection()
+        _schedule_next_doudian_collection(120)
         threading.Thread(target=_doudian_scheduler_loop, daemon=True).start()
 
 
@@ -823,8 +862,23 @@ def handle_config():
         for key in ('api_url', 'token', 'update_manifest_url'):
             if key in data:
                 cfg[key] = data[key].strip() if isinstance(data[key], str) else str(data[key])
+        auto_collect_enabled = None
+        if 'auto_collect_on_start' in data:
+            auto_collect_enabled = bool(data.get('auto_collect_on_start'))
+            cfg['auto_collect_on_start'] = auto_collect_enabled
         _save_config(cfg)
         state._CONFIG_CACHE = cfg
+        if auto_collect_enabled is True and not state._collector_running:
+            with state._collector_loop_lock:
+                if not state._collector_loop_started:
+                    state._collector_loop_started = True
+                    _schedule_next_collection()
+                    threading.Thread(target=_data_collector_loop, daemon=True).start()
+            threading.Thread(
+                target=_run_collection_once,
+                args=(0, 'full', 'auto_start_setting'),
+                daemon=True,
+            ).start()
         return jsonify({'status': 'ok'})
     safe = {k: v for k, v in state._CONFIG_CACHE.items() if k not in ('token', 'saved_password', 'refreshToken', 'accessToken', '_key')}
     if state._CONFIG_CACHE.get('token'):
@@ -908,19 +962,8 @@ def data_collection_trigger():
     if state._collector_running:
         return jsonify({'status': 'already_running'})
     body = request.get_json(silent=True) or {}
-    mode = str(body.get('mode') or request.args.get('mode') or 'quick').strip().lower()
-    if mode in ('full', 'all', 'complete'):
-        mode = 'full'
-        max_posts = 0
-    else:
-        mode = 'quick'
-        raw_max_posts = body.get('max_posts', request.args.get('max_posts', state._DEFAULT_QUICK_MAX_POSTS))
-        try:
-            max_posts = int(raw_max_posts)
-        except (TypeError, ValueError):
-            max_posts = state._DEFAULT_QUICK_MAX_POSTS
-        if max_posts <= 0:
-            max_posts = state._DEFAULT_QUICK_MAX_POSTS
+    mode = 'full'
+    max_posts = 0
     # 立即执行丢�次采�?
     t = threading.Thread(target=_run_collection_once, args=(max_posts, mode, 'manual'), daemon=True)
     t.start()
@@ -1140,11 +1183,6 @@ def scan_bind_trigger():
         return jsonify({'code':400,'msg':'缺少参数（platform/token/api_url）'}), 400
     if platform not in PLATFORMS:
         return jsonify({'code':400,'msg':f'不支持的平台: {platform}'}), 400
-    # v4.0: 按需启动 CDP
-    cdp_url = _ensure_cdp_running()
-    if not cdp_url and platform != 'WECHAT_VIDEO':
-        return jsonify({'code':503,'msg':'浏览器启动失败，请重试'}), 503
-
     info = PLATFORMS[platform]
     session_id = uuid.uuid4().hex[:12]
     queue = Queue()
@@ -1402,16 +1440,36 @@ def doudian_schedule_status():
         if state._doudian_next_run_at
         else None
     )
+    stores = _get_doudian_stores()
+    synced_times = [
+        str(store.get('last_synced_at') or '').strip()
+        for store in stores
+        if str(store.get('last_synced_at') or '').strip()
+    ]
+    last_synced_at = max(synced_times) if synced_times else None
+    store_errors = [
+        {
+            'id': store.get('id'),
+            'name': store.get('name') or store.get('id'),
+            'error': str(store.get('last_error') or '').strip(),
+        }
+        for store in stores
+        if str(store.get('last_error') or '').strip()
+    ]
+    last_error = state._doudian_last_error or (store_errors[-1]['error'] if store_errors else None)
     return jsonify({
         'code': 0,
         'data': {
             'started': state._doudian_scheduler_started,
             'running': state._doudian_sync_lock.locked(),
+            'store_count': len(stores),
             'interval_seconds': state._doudian_schedule_interval,
             'next_run_at': next_run_at_text,
             'countdown_seconds': countdown,
-            'last_run': state._doudian_last_run,
-            'last_error': state._doudian_last_error,
+            'last_run': state._doudian_last_run or last_synced_at,
+            'last_synced_at': last_synced_at,
+            'last_error': last_error,
+            'store_errors': store_errors,
         },
     })
 
@@ -1482,7 +1540,7 @@ if __name__ == '__main__':
                 print('[Main] Auto-starting background collector')
                 threading.Thread(
                     target=_run_collection_once,
-                    args=(state._DEFAULT_QUICK_MAX_POSTS, 'quick', 'auto_start'),
+                    args=(0, 'full', 'auto_start'),
                     daemon=True,
                 ).start()
                 threading.Thread(target=_data_collector_loop, daemon=True).start()
@@ -1520,9 +1578,9 @@ if __name__ == '__main__':
             import requests as _req
             try:
                 _req.post(f'{APP_URL}/api/data-collection/trigger',
-                          json={'mode': 'quick', 'max_posts': 20}, timeout=5)
+                          json={'mode': 'full', 'max_posts': 0}, timeout=5)
             except Exception as e:
-                print(f'[Tray] 快采触发失败: {e}')
+                print(f'[Tray] 全量采集触发失败: {e}')
 
         def _on_full_collect():
             import requests as _req

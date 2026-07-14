@@ -24,6 +24,16 @@ interface CapturedData {
   aftersaleCounts?: any
 }
 
+interface OrderListQuery {
+  start_time?: number
+  end_time?: number
+}
+
+interface AftersaleListQuery {
+  begin_create_time?: number
+  end_create_time?: number
+}
+
 const safeStoreSelect = {
   id: true,
   name: true,
@@ -38,7 +48,7 @@ const safeStoreSelect = {
 } as const
 
 const DEFAULT_PROFILE_ROOT = 'doudian_profiles'
-const MAX_PAGINATION_PAGES = 10
+const MAX_PAGINATION_PAGES = 60
 
 @Injectable()
 export class DoudianBrowserService implements OnModuleInit {
@@ -262,11 +272,20 @@ export class DoudianBrowserService implements OnModuleInit {
     }
   }
 
-  async getOrders(storeId: string) {
+  async getOrders(storeId: string, params: OrderListQuery = {}) {
+    const hasRange = params.start_time !== undefined || params.end_time !== undefined
+    const where: any = { storeId }
+    if (hasRange) {
+      where.createTime = {
+        ...(params.start_time !== undefined && { gte: params.start_time }),
+        ...(params.end_time !== undefined && { lte: params.end_time }),
+      }
+    }
+
     const rows = await (this.prisma as any).doudianStoreOrder.findMany({
-      where: { storeId },
+      where,
       orderBy: { createTime: 'desc' },
-      take: 1000,
+      ...(hasRange ? {} : { take: 1000 }),
     })
     return {
       errcode: 0,
@@ -314,11 +333,21 @@ export class DoudianBrowserService implements OnModuleInit {
     }
   }
 
-  async getAftersales(storeId: string) {
+  async getAftersales(storeId: string, params: AftersaleListQuery = {}) {
+    const hasRange = params.begin_create_time !== undefined || params.end_create_time !== undefined
+    const where: any = { storeId }
+    if (hasRange) {
+      const timeRange = {
+        ...(params.begin_create_time !== undefined && { gte: params.begin_create_time }),
+        ...(params.end_create_time !== undefined && { lte: params.end_create_time }),
+      }
+      where.OR = [{ createTime: timeRange }, { updateTime: timeRange }]
+    }
+
     const rows = await (this.prisma as any).doudianStoreAftersale.findMany({
-      where: { storeId },
+      where,
       orderBy: { createTime: 'desc' },
-      take: 1000,
+      ...(hasRange ? {} : { take: 1000 }),
     })
     const list = rows.map((row: any) => ({
       id: row.afterSaleId,

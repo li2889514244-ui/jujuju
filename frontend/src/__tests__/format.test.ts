@@ -9,7 +9,7 @@ describe('formatLargeNum', () => {
     expect(formatLargeNum(12345)).toBe('1.2万')
   })
   it('formats zero', () => {
-    expect(formatLargeNum(0)).toBe('-')
+    expect(formatLargeNum(0)).toBe('0')
   })
   it('formats small numbers', () => {
     expect(formatLargeNum(999)).toBe('999')

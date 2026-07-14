@@ -348,7 +348,7 @@ onMounted(() => {
 }
 
 .ci-section__hint {
-  color: #667085;
+  color: $text-tertiary;
   font-size: 12px;
 }
 
@@ -363,31 +363,31 @@ onMounted(() => {
   width: 26px;
   height: 26px;
   border-radius: 7px;
-  background: #eef2f7;
-  color: #344054;
+  background: rgba(255, 255, 255, 0.08);
+  color: $text-tertiary;
   font-size: 12px;
   font-weight: 600;
 
   &.rank-1 {
-    background: #f59e0b20;
-    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
   }
 
   &.rank-2 {
-    background: #94a3b820;
+    background: rgba(148, 163, 184, 0.15);
     color: #94a3b8;
   }
 
   &.rank-3 {
-    background: #d9770620;
-    color: #d97706;
+    background: rgba(217, 119, 6, 0.15);
+    color: #f59e0b;
   }
 }
 
 .ranking-title {
   max-width: 640px;
   overflow: hidden;
-  color: #1f2937;
+  color: $text-primary;
   font-size: 14px;
   font-weight: 600;
   text-overflow: ellipsis;
@@ -399,7 +399,7 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   margin-top: 3px;
-  color: #475467;
+  color: $text-tertiary;
   font-size: 12px;
 }
 
@@ -412,26 +412,26 @@ onMounted(() => {
 }
 
 .ci-tag {
-  color: #364fc7;
+  color: $accent-400;
   cursor: pointer;
   font-weight: 600;
   line-height: 1.2;
   transition: color 0.15s;
 
   &:hover {
-    color: #1e1b4b;
+    color: $accent-300;
   }
 
   &--active {
     color: #fff;
-    background: #364fc7;
+    background: $accent-500;
     padding: 2px 8px;
     border-radius: 6px;
   }
 
   sup {
     margin-left: 2px;
-    color: #667085;
+    color: $text-placeholder;
     font-size: 0.64em;
     font-weight: 500;
   }
@@ -442,26 +442,26 @@ onMounted(() => {
 }
 
 :deep(.ci-section .el-card__header) {
-  color: #111827;
+  color: $text-primary;
 }
 
 :deep(.ci-section .el-table) {
-  --el-table-text-color: #344054;
-  --el-table-header-text-color: #667085;
-  --el-table-row-hover-bg-color: #f1f5ff;
-  color: #344054;
+  --el-table-text-color: $text-secondary;
+  --el-table-header-text-color: $text-tertiary;
+  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.08);
+  color: $text-secondary;
 }
 
 :deep(.ci-section .el-table th.el-table__cell) {
-  color: #667085;
+  color: $text-tertiary;
 }
 
 :deep(.ci-section .el-table td.el-table__cell) {
-  color: #344054;
+  color: $text-secondary;
 }
 
 :deep(.ci-section .el-table__stripe .el-table__body tr.el-table__row--striped td.el-table__cell) {
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 @media (max-width: 900px) {

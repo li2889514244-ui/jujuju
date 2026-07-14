@@ -176,9 +176,10 @@ export class WechatStoreService implements OnModuleInit {
 
   async getOrderListAggregated(storeId: string, params: OrderQuery) {
     const pageSize = params.page_size || 5000
+    const hasRange = params.start_time !== undefined || params.end_time !== undefined
     const where: any = { storeId }
     if (params.status !== undefined) where.status = params.status
-    if (params.start_time !== undefined || params.end_time !== undefined) {
+    if (hasRange) {
       where.createTime = {
         ...(params.start_time !== undefined && { gte: params.start_time }),
         ...(params.end_time !== undefined && { lte: params.end_time }),
@@ -188,7 +189,7 @@ export class WechatStoreService implements OnModuleInit {
     const rows = await this.prisma.wechatStoreOrder.findMany({
       where,
       orderBy: { createTime: 'desc' },
-      take: pageSize,
+      ...(hasRange ? {} : { take: pageSize }),
     })
 
     return {
@@ -247,6 +248,8 @@ export class WechatStoreService implements OnModuleInit {
 
   async getAftersaleListAggregated(storeId: string, params: AftersaleQuery = {}) {
     const now = Math.floor(Date.now() / 1000)
+    const hasExplicitRange =
+      params.begin_create_time !== undefined || params.end_create_time !== undefined
     const begin = params.begin_create_time || now - 7 * 86400
     const end = params.end_create_time || now
     const rows = await this.prisma.wechatStoreAftersale.findMany({
@@ -255,7 +258,7 @@ export class WechatStoreService implements OnModuleInit {
         createTime: { gte: begin, lte: end },
       },
       orderBy: { createTime: 'desc' },
-      take: 1000,
+      ...(hasExplicitRange ? {} : { take: 1000 }),
     })
 
     const list = rows.map((row) => {
