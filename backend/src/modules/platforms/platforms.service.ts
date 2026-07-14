@@ -455,6 +455,43 @@ export class PlatformsService {
         create: { accountId, platform, date: targetDate, ...statCreateData },
       })
 
+      // ── 视频号累计总量计算 ──
+      // 视频号数据中心只提供日/周/月增量，不提供累计总量。
+      // 采集端已清除不可靠的累计值，后端从所有历史增量求和得到真实累计值。
+      if (platform === 'WECHAT_VIDEO') {
+        const allStats = await this.prisma.dailyStats.findMany({
+          where: { accountId, date: { lte: targetDate } },
+          select: {
+            viewsIncrement: true,
+            likesIncrement: true,
+            commentsIncrement: true,
+            sharesIncrement: true,
+          },
+          orderBy: { date: 'asc' },
+        })
+        const cumulative = allStats.reduce(
+          (acc, s) => ({
+            views: acc.views + (s.viewsIncrement || 0),
+            likes: acc.likes + (s.likesIncrement || 0),
+            comments: acc.comments + (s.commentsIncrement || 0),
+            shares: acc.shares + (s.sharesIncrement || 0),
+          }),
+          { views: 0, likes: 0, comments: 0, shares: 0 },
+        )
+        await this.prisma.dailyStats.update({
+          where: { accountId_date: { accountId, date: targetDate } },
+          data: {
+            views: cumulative.views,
+            likes: cumulative.likes,
+            comments: cumulative.comments,
+            shares: cumulative.shares,
+          },
+        })
+        this.logger.debug(
+          `reportMetrics: WECHAT_VIDEO ${accountId} cumulative recomputed: views=${cumulative.views} likes=${cumulative.likes} comments=${cumulative.comments} shares=${cumulative.shares}`,
+        )
+      }
+
       // Update Account fields
       const accountUpdates: any = {}
       if (metrics.followers && metrics.followers > 0) accountUpdates.followers = metrics.followers

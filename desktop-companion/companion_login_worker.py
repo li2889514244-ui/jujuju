@@ -496,28 +496,66 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             target_profile_path = Path(target_profile).resolve()
                             profile_root = PROFILE_ROOT.resolve()
                             if profile_root in source_profile.parents and profile_root in target_profile_path.parents:
+                                # Navigate to data-center to trigger compass_token cookie creation
+                                if page:
+                                    try:
+                                        await page.goto('https://channels.weixin.qq.com/platform/data-center',
+                                                        wait_until='domcontentloaded', timeout=15000)
+                                        await page.wait_for_timeout(3000)
+                                    except Exception:
+                                        pass
+
                                 source_state = source_profile / 'state.json'
                                 await context.storage_state(path=str(source_state))
 
-                                # CRITICAL: storage_state() misses session cookies (compass_token etc.)
-                                # Use context.cookies() to capture ALL cookies including session ones,
-                                # then merge into state.json so the scraper can restore them.
+                                # CRITICAL: storage_state() and context.cookies() both miss
+                                # session cookies (compass_token etc.) set by WeChat JS.
+                                # Use CDP (Chrome DevTools Protocol) to get ALL cookies
+                                # with decrypted values, including session cookies.
                                 try:
-                                    all_cookies = await context.cookies()
+                                    extra_cookies = []
+                                    # Try CDP approach first - gets all cookies including session
+                                    try:
+                                        cdp_page = page or (context.pages[0] if context.pages else None)
+                                        if cdp_page:
+                                            cdp_session = await context.new_cdp_session(cdp_page)
+                                            result = await cdp_session.send('Network.getAllCookies')
+                                            for c in result.get('cookies', []):
+                                                extra_cookies.append({
+                                                    'name': c.get('name', ''),
+                                                    'value': c.get('value', ''),
+                                                    'domain': c.get('domain', ''),
+                                                    'path': c.get('path', '/'),
+                                                    'expires': c.get('expires', -1),
+                                                    'httpOnly': c.get('httpOnly', False),
+                                                    'secure': c.get('secure', False),
+                                                    'sameSite': c.get('sameSite', 'Lax'),
+                                                })
+                                            await cdp_session.detach()
+                                            print(f'[Worker] WECHAT_VIDEO: CDP got {len(extra_cookies)} cookies')
+                                    except Exception as cdp_err:
+                                        print(f'[Worker] WECHAT_VIDEO: CDP cookie fetch failed: {cdp_err}')
+                                        # Fallback: context.cookies()
+                                        try:
+                                            ctx_cookies = await context.cookies()
+                                            extra_cookies = list(ctx_cookies)
+                                            print(f'[Worker] WECHAT_VIDEO: context.cookies() fallback got {len(extra_cookies)} cookies')
+                                        except Exception:
+                                            pass
+
                                     state_data = json.loads(source_state.read_text('utf-8'))
                                     existing_names = {(c.get('name'), c.get('domain'), c.get('path')) for c in state_data.get('cookies', [])}
                                     merged = list(state_data.get('cookies', []))
-                                    for c in all_cookies:
+                                    for c in extra_cookies:
                                         key = (c.get('name'), c.get('domain'), c.get('path'))
                                         if key not in existing_names:
                                             merged.append(c)
                                         else:
-                                            # Replace with the fresher version
                                             merged = [c if (m.get('name'), m.get('domain'), m.get('path')) == key else m for m in merged]
                                             existing_names.discard(key)
                                     state_data['cookies'] = merged
                                     source_state.write_text(json.dumps(state_data, ensure_ascii=False), encoding='utf-8')
-                                    print(f'[Worker] WECHAT_VIDEO: merged {len(all_cookies)} cookies into state.json (total: {len(merged)})')
+                                    print(f'[Worker] WECHAT_VIDEO: merged {len(extra_cookies)} cookies via CDP (total in state.json: {len(merged)})')
                                 except Exception as ce:
                                     print(f'[Worker] WECHAT_VIDEO: cookie merge warning: {ce}')
 
