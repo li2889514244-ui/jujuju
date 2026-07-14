@@ -456,40 +456,55 @@ export class PlatformsService {
       })
 
       // ── 视频号累计总量计算 ──
-      // 视频号数据中心只提供日/周/月增量，不提供累计总量。
-      // 采集端已清除不可靠的累计值，后端从所有历史增量求和得到真实累计值。
+      // 采集端现在通过 post_list API 获取每个视频的累计数据并求和，
+      // 提供了真实的累计总量（views/likes/comments/shares）。
+      // 只有当采集端未提供累计值时，才从历史增量求和作为降级方案。
       if (platform === 'WECHAT_VIDEO') {
-        const allStats = await this.prisma.dailyStats.findMany({
-          where: { accountId, date: { lte: targetDate } },
-          select: {
-            viewsIncrement: true,
-            likesIncrement: true,
-            commentsIncrement: true,
-            sharesIncrement: true,
-          },
-          orderBy: { date: 'asc' },
-        })
-        const cumulative = allStats.reduce(
-          (acc, s) => ({
-            views: acc.views + (s.viewsIncrement || 0),
-            likes: acc.likes + (s.likesIncrement || 0),
-            comments: acc.comments + (s.commentsIncrement || 0),
-            shares: acc.shares + (s.sharesIncrement || 0),
-          }),
-          { views: 0, likes: 0, comments: 0, shares: 0 },
-        )
-        await this.prisma.dailyStats.update({
-          where: { accountId_date: { accountId, date: targetDate } },
-          data: {
-            views: cumulative.views,
-            likes: cumulative.likes,
-            comments: cumulative.comments,
-            shares: cumulative.shares,
-          },
-        })
-        this.logger.debug(
-          `reportMetrics: WECHAT_VIDEO ${accountId} cumulative recomputed: views=${cumulative.views} likes=${cumulative.likes} comments=${cumulative.comments} shares=${cumulative.shares}`,
-        )
+        const hasCumulative =
+          pickNumber(metrics.views) > 0 ||
+          pickNumber(metrics.likes) > 0 ||
+          pickNumber(metrics.comments) > 0 ||
+          pickNumber(metrics.shares) > 0
+        if (!hasCumulative) {
+          this.logger.debug(
+            `reportMetrics: WECHAT_VIDEO ${accountId} no cumulative from collector, computing from increments`,
+          )
+          const allStats = await this.prisma.dailyStats.findMany({
+            where: { accountId, date: { lte: targetDate } },
+            select: {
+              viewsIncrement: true,
+              likesIncrement: true,
+              commentsIncrement: true,
+              sharesIncrement: true,
+            },
+            orderBy: { date: 'asc' },
+          })
+          const cumulative = allStats.reduce(
+            (acc, s) => ({
+              views: acc.views + (s.viewsIncrement || 0),
+              likes: acc.likes + (s.likesIncrement || 0),
+              comments: acc.comments + (s.commentsIncrement || 0),
+              shares: acc.shares + (s.sharesIncrement || 0),
+            }),
+            { views: 0, likes: 0, comments: 0, shares: 0 },
+          )
+          await this.prisma.dailyStats.update({
+            where: { accountId_date: { accountId, date: targetDate } },
+            data: {
+              views: cumulative.views,
+              likes: cumulative.likes,
+              comments: cumulative.comments,
+              shares: cumulative.shares,
+            },
+          })
+          this.logger.debug(
+            `reportMetrics: WECHAT_VIDEO ${accountId} cumulative from increments: views=${cumulative.views} likes=${cumulative.likes} comments=${cumulative.comments} shares=${cumulative.shares}`,
+          )
+        } else {
+          this.logger.debug(
+            `reportMetrics: WECHAT_VIDEO ${accountId} using collector cumulative: views=${pickNumber(metrics.views)} likes=${pickNumber(metrics.likes)} comments=${pickNumber(metrics.comments)} shares=${pickNumber(metrics.shares)}`,
+          )
+        }
       }
 
       // Update Account fields

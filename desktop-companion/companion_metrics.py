@@ -632,7 +632,57 @@ async def _fetch_wechat_auth_data_from_page(page) -> dict:
 
 
 async def _scrape_wechat_video_period_metrics(page) -> dict:
-    """Collect video-data key metrics for yesterday, 7 days, and 30 days."""
+    """Collect video-data key metrics for yesterday, 7 days, and 30 days.
+    Uses API interception (new_post_total_data) as primary source,
+    falls back to card text parsing."""
+    import json as _json
+
+    # ── API 拦截：捕获 new_post_total_data 响应 ──
+    captured_api = []  # list of {array_len, dataByTabtype, dataByFanstype}
+
+    async def _on_total_data_response(response):
+        if 'new_post_total_data' not in response.url:
+            return
+        try:
+            text = await response.text()
+            if not text.startswith('{'):
+                return
+            data = _json.loads(text)
+            if data.get('errCode') != 0:
+                return
+            inner = data.get('data', {})
+            by_tab = inner.get('dataByTabtype', [])
+            by_fans = inner.get('dataByFanstype', [])
+            if not by_tab and not by_fans:
+                return
+            # Determine array length from first tab's browse array
+            sample = None
+            for tab in by_tab:
+                arr = tab.get('data', {}).get('browse', [])
+                if arr:
+                    sample = arr
+                    break
+            if not sample and by_fans:
+                for fan_group in by_fans:
+                    for tab in fan_group.get('dataByTabtype', []):
+                        arr = tab.get('data', {}).get('browse', [])
+                        if arr:
+                            sample = arr
+                            break
+                    if sample:
+                        break
+            arr_len = len(sample) if sample else 0
+            captured_api.append({
+                'arr_len': arr_len,
+                'dataByTabtype': by_tab,
+                'dataByFanstype': by_fans,
+            })
+            print(f'[DC] WECHAT_VIDEO: new_post_total_data captured (arr_len={arr_len}, tabs={len(by_tab)}, fan_groups={len(by_fans)})')
+        except Exception as e:
+            print(f'[DC] WECHAT_VIDEO: API intercept error: {e}')
+
+    page.on('response', _on_total_data_response)
+
     periods = [
         ('day_total', '昨日数据'),
         ('week_total', '近7天'),
@@ -647,18 +697,114 @@ async def _scrape_wechat_video_period_metrics(page) -> dict:
     await _click_visible_text(page, '全部视频', exact=True)
     await _wait_for_page_text(page, ['关键指标', '播放'], timeout_ms=1200, min_count=1)
 
-    for key, label in periods:
-        selected = await _select_wechat_video_period(page, label)
-        if not selected:
-            print(f'[DC] WECHAT_VIDEO video-data {label}: period select failed')
-            continue
-        card_text = await _extract_wechat_key_metric_card_text(page)
-        parsed = _parse_wechat_key_metric_text(card_text)
-        if parsed:
-            period_metrics[key] = parsed
-            print(f'[DC] WECHAT_VIDEO video-data {label}: {parsed}')
-        else:
-            print(f'[DC] WECHAT_VIDEO video-data {label}: no metrics parsed')
+    # 等待 API 响应被捕获
+    await page.wait_for_timeout(3000)
+
+    # ── 优先使用 API 数据 ──
+    def _extract_from_api():
+        """从拦截的 API 响应中提取日/周/月增量数据"""
+        result = {}
+        for cap in captured_api:
+            arr_len = cap['arr_len']
+            # 找到 "全部" tab (tabType=999) 优先从 dataByFanstype
+            all_tab = None
+            for fan_group in cap.get('dataByFanstype', []):
+                for tab in fan_group.get('dataByTabtype', []):
+                    if tab.get('tabType') == 999 or tab.get('tabTypeName') == '全部':
+                        all_tab = tab.get('data', {})
+                        break
+                if all_tab:
+                    break
+            # 如果没有 dataByFanstype，则手动求和 dataByTabtype
+            if not all_tab:
+                all_tab = {}
+                by_tab = cap.get('dataByTabtype', [])
+                for tab in by_tab:
+                    tab_data = tab.get('data', {})
+                    for metric_key in ('browse', 'like', 'comment', 'forward', 'fav', 'follow'):
+                        arr = tab_data.get(metric_key, [])
+                        if arr:
+                            if metric_key not in all_tab:
+                                all_tab[metric_key] = [0] * len(arr)
+                            for i, v in enumerate(arr):
+                                try:
+                                    all_tab[metric_key][i] += int(v)
+                                except (ValueError, TypeError):
+                                    pass
+            if not all_tab:
+                continue
+            # 根据数组长度判断时间范围
+            browse_arr = all_tab.get('browse', [])
+            if not browse_arr:
+                continue
+            if arr_len <= 2:
+                # 昨日数据 (2-day array, last element = yesterday)
+                idx = -1
+                result['day_total'] = {
+                    'play': int(browse_arr[idx]),
+                    'like': int(all_tab.get('like', ['0','0'])[idx]),
+                    'comment': int(all_tab.get('comment', ['0','0'])[idx]),
+                    'share': int(all_tab.get('forward', ['0','0'])[idx]),
+                    'new_fans': int(all_tab.get('follow', ['0','0'])[idx]),
+                }
+            elif arr_len <= 7:
+                # 近7天 (7-day array, sum all elements)
+                result['week_total'] = {
+                    'play': sum(int(v) for v in browse_arr),
+                    'like': sum(int(v) for v in all_tab.get('like', ['0']*7)),
+                    'comment': sum(int(v) for v in all_tab.get('comment', ['0']*7)),
+                    'share': sum(int(v) for v in all_tab.get('forward', ['0']*7)),
+                    'new_fans': sum(int(v) for v in all_tab.get('follow', ['0']*7)),
+                }
+            elif arr_len <= 30:
+                # 近30天 (30-day array, sum all elements)
+                result['month_total'] = {
+                    'play': sum(int(v) for v in browse_arr),
+                    'like': sum(int(v) for v in all_tab.get('like', ['0']*30)),
+                    'comment': sum(int(v) for v in all_tab.get('comment', ['0']*30)),
+                    'share': sum(int(v) for v in all_tab.get('forward', ['0']*30)),
+                    'new_fans': sum(int(v) for v in all_tab.get('follow', ['0']*30)),
+                }
+        return result
+
+    api_metrics = _extract_from_api()
+    if api_metrics:
+        print(f'[DC] WECHAT_VIDEO: API-derived period metrics: {_json.dumps(api_metrics, ensure_ascii=False)}')
+        period_metrics = api_metrics
+
+    # ── 降级：如果 API 没有捕获到数据，使用卡片文本解析 ──
+    if not period_metrics:
+        print('[DC] WECHAT_VIDEO: API interception failed, falling back to card text parsing')
+        for key, label in periods:
+            selected = await _select_wechat_video_period(page, label)
+            if not selected:
+                print(f'[DC] WECHAT_VIDEO video-data {label}: period select failed')
+                continue
+            card_text = await _extract_wechat_key_metric_card_text(page)
+            print(f'[DC DEBUG] WECHAT {label} raw card_text ({len(card_text)} chars): {card_text[:600]}')
+            parsed = _parse_wechat_key_metric_text(card_text)
+            if parsed:
+                period_metrics[key] = parsed
+                print(f'[DC] WECHAT_VIDEO video-data {label}: {parsed}')
+            else:
+                print(f'[DC] WECHAT_VIDEO video-data {label}: no metrics parsed')
+
+    # ── 补充：如果 API 只有 day_total，尝试卡片解析补充 week/month ──
+    if api_metrics and len(period_metrics) < 2:
+        for key, label in periods:
+            if key in period_metrics:
+                continue
+            selected = await _select_wechat_video_period(page, label)
+            if not selected:
+                continue
+            card_text = await _extract_wechat_key_metric_card_text(page)
+            parsed = _parse_wechat_key_metric_text(card_text)
+            if parsed:
+                period_metrics[key] = parsed
+                print(f'[DC] WECHAT_VIDEO video-data {label} (card fallback): {parsed}')
+
+    # 移除监听器
+    page.remove_listener('response', _on_total_data_response)
 
     metric_keys = ('play', 'like', 'comment', 'share', 'new_fans')
     same_metrics = lambda a, b: bool(a and b) and all(
@@ -680,7 +826,7 @@ async def _scrape_wechat_video_period_metrics(page) -> dict:
         '_periodMetrics': {
             'videoData': {
                 **period_metrics,
-                'source': 'channels_data_center_video_data',
+                'source': 'new_post_total_data_api' if api_metrics else 'channels_data_center_video_data',
                 'trustedDailyIncrements': bool(day),
                 'collectedAt': time.strftime('%Y-%m-%d %H:%M:%S'),
             }
@@ -1090,8 +1236,10 @@ async def _scrape_data_center(page, platform: str) -> dict:
     if platform == 'WECHAT_VIDEO':
         try:
             period_result = await _scrape_wechat_video_period_metrics(page)
-            # 视频号平台不提供可靠的累计总量（views/likes/comments/shares），
-            # 只有日/周/月增量。一律清除累计值，避免把日增量误存为累计值。
+            # 视频号累计总量（views/likes/comments/shares）由 post_list API
+            # 返回的每个视频累计数据求和得到，在 _scrape_account_pages 中计算。
+            # 这里只清除可能从 dashboard 文本误提取的累计值，
+            # 真正的累计值稍后由 video_stats 求和覆盖。
             for key in ('views', 'likes', 'comments', 'shares'):
                 result.pop(key, None)
             if period_result.get('_periodMetrics'):
@@ -1911,6 +2059,21 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                     except Exception:
                         await page.wait_for_timeout(2000)
                 dc = await _scrape_data_center(page, platform)
+                # DEBUG: dump page text for analysis
+                if platform == 'WECHAT_VIDEO':
+                    try:
+                        import tempfile as _tf
+                        debug_text = await _get_page_text(page)
+                        debug_path = Path(_tf.gettempdir()) / 'dc_wechat_datacenter.txt'
+                        debug_path.write_text(debug_text[:20000], encoding='utf-8')
+                        print(f'[DC DEBUG] WECHAT datacenter text dumped: {len(debug_text)} chars -> {debug_path}')
+                        # Also dump the period metrics result
+                        pm = dc.get('_periodMetrics', {}).get('videoData', {})
+                        print(f'[DC DEBUG] WECHAT periodMetrics: {json.dumps(pm, ensure_ascii=False)[:500]}')
+                        print(f'[DC DEBUG] WECHAT dc result keys: {list(dc.keys())}')
+                        print(f'[DC DEBUG] WECHAT dc newViews={dc.get("newViews")} newLikes={dc.get("newLikes")} newComments={dc.get("newComments")} newShares={dc.get("newShares")} newFollowers={dc.get("newFollowers")}')
+                    except Exception as _de:
+                        print(f'[DC DEBUG] dump error: {_de}')
                 for k, v in dc.items():
                     prefer_video_period = platform == 'WECHAT_VIDEO' and k in {
                         '_periodMetrics',
@@ -1932,6 +2095,27 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                 else:
                     await page.wait_for_timeout(1200)
                 video_stats = await _scrape_video_list(page, platform, max_posts=max_posts)
+                # DEBUG: dump video list results
+                if platform == 'WECHAT_VIDEO':
+                    print(f'[DC DEBUG] WECHAT video_list: {len(video_stats)} videos')
+                    for i, v in enumerate(video_stats[:3]):
+                        print(f'[DC DEBUG]   video[{i}]: title={v.get("title","")[:30]} views={v.get("views",0)} likes={v.get("likes",0)} comments={v.get("comments",0)} shares={v.get("shares",0)}')
+                    if video_stats:
+                        tv = sum(v.get('views',0) for v in video_stats)
+                        tl = sum(v.get('likes',0) for v in video_stats)
+                        tc = sum(v.get('comments',0) for v in video_stats)
+                        ts = sum(v.get('shares',0) for v in video_stats)
+                        print(f'[DC DEBUG] WECHAT video sum: views={tv} likes={tl} comments={tc} shares={ts}')
+                        # 将累计总量写入 metrics（post_list API 返回的是每个视频的累计值，求和即为账号累计总量）
+                        metrics['views'] = tv
+                        metrics['likes'] = tl
+                        metrics['comments'] = tc
+                        metrics['shares'] = ts
+                        print(f'[DC] WECHAT_VIDEO: cumulative totals from post_list API: views={tv} likes={tl} comments={tc} shares={ts}')
+                    else:
+                        # Dump page text to see why no videos
+                        vl_text = await _get_page_text(page)
+                        print(f'[DC DEBUG] WECHAT video_list page text ({len(vl_text)} chars): {vl_text[:800]}')
             except Exception as e:
                 import traceback
                 print(f'[DC] video-list error {platform}: {e}')
@@ -2075,25 +2259,76 @@ async def _scrape_one_account(
     context = None
     browser = None
     try:
+        # Load per-account fingerprint
+        fp = None
+        try:
+            from fingerprint import load_fingerprint
+            fp = load_fingerprint(profile_dir, account_id)
+            print(f'[DC] Fingerprint for {nickname or account_id[:12]}: WebGL={fp.get("webgl_vendor","?")[:20]} Chrome/{fp.get("chrome_version","?")} HW={fp.get("hardware_concurrency","?")}cores')
+        except Exception as e:
+            print(f'[DC] Fingerprint load failed: {e}')
+
         # Use persistent context per account (separate Chrome instance for cookie isolation)
         launch_kw = {
             'user_data_dir': str(profile_dir), 'headless': True,
             'viewport': {'width': 1280, 'height': 800}, 'locale': 'zh-CN',
             **_collector_launch_args(True),
         }
+        # Set per-account User-Agent
+        if fp and fp.get('user_agent'):
+            launch_kw['user_agent'] = fp['user_agent']
         context = await pw.chromium.launch_persistent_context(**launch_kw)
-        # 注入反检测脚本
+        # 注入反检测脚本（每账号独立指纹）
         try:
             from stealth_patches import apply_stealth_to_context
-            await apply_stealth_to_context(context)
+            await apply_stealth_to_context(context, fingerprint=fp)
         except ImportError:
             pass
 
-        # Load cookies and localStorage from state.json (runs for both CDP and fallback paths)
+        # Load cookies via CDP (handles session cookies properly) + localStorage from state.json
         try:
             import json as _json
             state = _json.loads(state_json.read_text('utf-8'))
-            if state.get('cookies'): await context.add_cookies(state['cookies'])
+            saved_cookies = state.get('cookies') or []
+            if saved_cookies:
+                # Use CDP to set cookies — add_cookies() drops session cookies (expires=-1)
+                cdp_ok = False
+                try:
+                    cdp_page = context.pages[0] if context.pages else await context.new_page()
+                    cdp_session = await context.new_cdp_session(cdp_page)
+                    set_count = 0
+                    for c in saved_cookies:
+                        try:
+                            params = {
+                                'name': c.get('name', ''),
+                                'value': c.get('value', ''),
+                                'domain': c.get('domain', ''),
+                                'path': c.get('path', '/'),
+                                'httpOnly': c.get('httpOnly', False),
+                                'secure': c.get('secure', False),
+                            }
+                            exp = c.get('expires', -1)
+                            if exp and exp > 0:
+                                params['expires'] = exp
+                            ss = c.get('sameSite', 'Lax')
+                            if ss in ('Strict', 'Lax', 'None'):
+                                params['sameSite'] = ss
+                            await cdp_session.send('Network.setCookie', params)
+                            set_count += 1
+                        except Exception:
+                            pass
+                    await cdp_session.detach()
+                    cdp_ok = set_count > 0
+                    print(f'[DC] CDP set {set_count}/{len(saved_cookies)} cookies for {nickname or account_id[:12]}')
+                except Exception as cdp_err:
+                    print(f'[DC] CDP cookie injection failed: {cdp_err}')
+                # Fallback: add_cookies for any that CDP missed
+                if not cdp_ok:
+                    try:
+                        await context.add_cookies(saved_cookies)
+                        print(f'[DC] add_cookies fallback: {len(saved_cookies)} cookies')
+                    except Exception as ac_err:
+                        print(f'[DC] add_cookies fallback failed: {ac_err}')
             # Restore localStorage from state.json origins (critical for WECHAT_VIDEO auth)
             # Without finder_login_token etc. in localStorage, WeChat Video shows login page
             for origin_entry in state.get('origins', []):
