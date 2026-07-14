@@ -461,10 +461,10 @@ export class PlatformsService {
       // 只有当采集端未提供累计值时，才从历史增量求和作为降级方案。
       if (platform === 'WECHAT_VIDEO') {
         const hasCumulative =
-          pickNumber(metrics?.views) > 0 ||
-          pickNumber(metrics?.likes) > 0 ||
-          pickNumber(metrics?.comments) > 0 ||
-          pickNumber(metrics?.shares) > 0
+          (pickNumber(metrics?.views) ?? 0) > 0 ||
+          (pickNumber(metrics?.likes) ?? 0) > 0 ||
+          (pickNumber(metrics?.comments) ?? 0) > 0 ||
+          (pickNumber(metrics?.shares) ?? 0) > 0
         if (!hasCumulative) {
           this.logger.debug(
             `reportMetrics: WECHAT_VIDEO ${accountId} no cumulative from collector, computing from increments`,
