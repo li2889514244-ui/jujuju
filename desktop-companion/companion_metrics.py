@@ -408,9 +408,16 @@ def _parse_wechat_key_metric_text(text: str) -> dict:
                         continue
                     m = re.search(r'([+-]?\d[\d,.]*[万wW]?)', nxt)
                     if m:
+                        val2 = _parse_metric_num(m.group(1))
+                        if 2000 <= val2 <= 2099:
+                            m = None
+                            continue
                         break
             if m:
                 val = _parse_metric_num(m.group(1))
+                # 过滤年份（2000-2099）被误当作指标值
+                if 2000 <= val <= 2099:
+                    continue
                 if val >= 0:
                     metric[key] = val
                 break
