@@ -1,0 +1,615 @@
+import { BadRequestException, Injectable, Logger } from '@nestjs/common'
+import axios from 'axios'
+import { createHmac } from 'crypto'
+import { existsSync, readFileSync, writeFileSync } from 'fs'
+import { join } from 'path'
+import { NotificationType } from '../../common/prisma-enums'
+import { PrismaService } from '../../prisma/prisma.service'
+import {
+  FeishuOpenApiClient,
+  FeishuReceiveIdType,
+  FeishuSendResult,
+} from './feishu-open-api.client'
+
+interface NotificationCreateParams {
+  userId: string
+  organizationId?: string | null
+  type: NotificationType
+  title: string
+  content?: string
+  metadata?: Record<string, any>
+  pushFeishu?: boolean
+}
+
+export interface FeishuPushResult {
+  enabled: boolean
+  sent: boolean
+  message: string
+  status?: number
+}
+
+export interface FeishuSettings {
+  mode: 'webhook' | 'app'
+  enabled: boolean
+  configured: boolean
+  webhookUrl: string
+  webhookSecretConfigured: boolean
+  notifyTypes: NotificationType[]
+  envFileWritable: boolean
+}
+
+export interface FeishuAppSettings {
+  mode: 'webhook' | 'app'
+  enabled: boolean
+  configured: boolean
+  appId: string
+  appSecretConfigured: boolean
+  receiveIdType: FeishuReceiveIdType
+  receiveId: string
+  notifyTypes: NotificationType[]
+  envFileWritable: boolean
+}
+
+interface UpdateFeishuSettingsParams {
+  webhookUrl?: string
+  webhookSecret?: string
+  notifyTypes?: string[]
+  enabled?: boolean
+}
+
+interface UpdateFeishuAppSettingsParams {
+  appId?: string
+  appSecret?: string
+  receiveIdType?: string
+  receiveId?: string
+  notifyTypes?: string[]
+  enabled?: boolean
+}
+
+@Injectable()
+export class NotificationsService {
+  private readonly logger = new Logger(NotificationsService.name)
+
+  constructor(
+    private prisma: PrismaService,
+    private feishuClient: FeishuOpenApiClient,
+  ) {}
+
+  async create(params: NotificationCreateParams) {
+    const notification = await this.prisma.notification.create({
+      data: {
+        userId: params.userId,
+        organizationId:
+          params.organizationId !== undefined
+            ? params.organizationId
+            : await this.resolveUserOrganizationId(params.userId),
+        type: params.type,
+        title: params.title,
+        content: params.content || null,
+        metadata: params.metadata ? JSON.stringify(params.metadata) : undefined,
+      },
+    })
+
+    this.logger.log(`Notification created [${params.type}] ${params.title} -> ${params.userId}`)
+    if (params.pushFeishu !== false) {
+      void this.pushFeishuNotification(params).catch((error) => {
+        const message = error instanceof Error ? error.message : String(error)
+        this.logger.warn(`Feishu notification push failed: ${message}`)
+      })
+    }
+
+    return notification
+  }
+
+  // ── Webhook mode: test ──────────────────────────────
+
+  async sendFeishuTest(userId: string): Promise<FeishuPushResult> {
+    return this.pushFeishuNotification(
+      {
+        userId,
+        type: NotificationType.REPORT,
+        title: '📊 昨日订单汇总测试',
+        content: [
+          '📅 2026-07-28 订单汇总（测试）',
+          '已在发送前采集最新订单数据',
+          '',
+          '【总览】',
+          '店铺：微信小店 3 家 / 抖店 2 家',
+          '总订单：43 单',
+          '成交/有效订单：40 单',
+          '成交额：¥12,857.00（未扣退款）',
+          '退款：5 笔 / ¥1,495.00',
+          '扣退款后：¥11,362.00',
+          '',
+          '【微信小店】',
+          '- 唐商披星：24 单 / ¥7,176.00；退 3 笔 / ¥897.00',
+          '  来源：',
+          '  1. 心理学博士卢慧（视频号）：18单 / ¥5,382.00；退1笔 / ¥299.00',
+          '  2. 店铺出单（店铺自卖）：6单 / ¥1,794.00；退2笔 / ¥598.00',
+          '- 慧氏幸福觉醒：8 单 / ¥2,392.00；退 1 笔 / ¥299.00',
+          '  来源：',
+          '  1. 慧氏幸福觉醒（视频号）：5单 / ¥1,495.00',
+          '  2. 殷国辉老师（视频号）：3单 / ¥897.00；退1笔 / ¥299.00',
+          '- 心理学博士卢慧：0 单 / ¥0.00',
+          '  来源：暂无',
+          '',
+          '【抖店】',
+          '- 唐商披星：8 总单 / 7 成交有效 / ¥2,093.00；退 1 笔 / ¥299.00',
+          '  来源：',
+          '  1. 店铺自卖（小店自卖）：5单 / ¥1,495.00',
+          '  2. 心理学博士卢慧（精选联盟 / 短视频）：1单 / ¥299.00',
+          '  3. 卢慧家庭教育（精选联盟 / 直播）：1单 / ¥299.00；退1笔 / ¥299.00',
+          '- 披星教育：4 单 / ¥1,196.00',
+          '  来源：',
+          '  1. 店铺自卖（小店自卖）：4单 / ¥1,196.00',
+          '',
+          '口径：成交额未扣退款；退款仅统计成功退款。',
+          '说明：这是一条测试通知，用来预览真实日报格式，不代表真实订单金额。',
+        ].join('\n'),
+      },
+      true,
+    )
+  }
+
+  // ── App mode: test ──────────────────────────────────
+
+  async sendFeishuAppTest(): Promise<FeishuSendResult> {
+    if (!this.feishuClient.isAppConfigured()) {
+      return { sent: false, message: 'FEISHU_APP_ID or FEISHU_APP_SECRET is not configured.' }
+    }
+
+    const receiveId = this.feishuClient.getReceiveId()
+    if (!receiveId) {
+      return { sent: false, message: 'FEISHU_RECEIVE_ID is not configured.' }
+    }
+
+    const card = this.feishuClient.buildTestCard()
+    return this.feishuClient.sendCard(receiveId, this.feishuClient.getReceiveIdType(), card)
+  }
+
+  // ── Settings: webhook mode ──────────────────────────
+
+  getFeishuSettings(): FeishuSettings {
+    return {
+      mode: this.feishuClient.getMode(),
+      enabled: this.isFeishuEnabled(),
+      configured: Boolean(this.getFeishuWebhookUrl()),
+      webhookUrl: this.maskWebhookUrl(this.getFeishuWebhookUrl()),
+      webhookSecretConfigured: Boolean(this.getFeishuWebhookSecret()),
+      notifyTypes: this.getAllowedFeishuTypes(),
+      envFileWritable: this.isEnvFileWritable(),
+    }
+  }
+
+  updateFeishuSettings(params: UpdateFeishuSettingsParams): FeishuSettings {
+    const webhookUrl = typeof params.webhookUrl === 'string' ? params.webhookUrl.trim() : undefined
+    const webhookSecret =
+      typeof params.webhookSecret === 'string' ? params.webhookSecret.trim() : undefined
+    const enabled = params.enabled !== false
+    const notifyTypes = this.normalizeNotifyTypes(params.notifyTypes)
+
+    if (webhookUrl !== undefined && webhookUrl && !this.isValidFeishuWebhookUrl(webhookUrl)) {
+      throw new BadRequestException('Invalid Feishu webhook URL.')
+    }
+
+    const updates: Record<string, string> = {
+      FEISHU_NOTIFY_ENABLED: enabled ? 'true' : 'false',
+      FEISHU_NOTIFY_TYPES: notifyTypes.join(','),
+    }
+
+    if (webhookUrl !== undefined) {
+      updates.FEISHU_WEBHOOK_URL = webhookUrl
+    }
+
+    if (webhookSecret !== undefined) {
+      updates.FEISHU_WEBHOOK_SECRET = webhookSecret
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+      process.env[key] = value
+    })
+
+    this.persistEnvUpdates(updates)
+    return this.getFeishuSettings()
+  }
+
+  // ── Settings: app mode ──────────────────────────────
+
+  getFeishuAppSettings(): FeishuAppSettings {
+    return {
+      mode: this.feishuClient.getMode(),
+      enabled: this.isFeishuEnabled(),
+      configured: this.feishuClient.isAppConfigured() && Boolean(this.feishuClient.getReceiveId()),
+      appId: this.feishuClient.getAppId(),
+      appSecretConfigured: Boolean(this.feishuClient.getAppSecret()),
+      receiveIdType: this.feishuClient.getReceiveIdType(),
+      receiveId: this.feishuClient.getReceiveId(),
+      notifyTypes: this.getAllowedFeishuTypes(),
+      envFileWritable: this.isEnvFileWritable(),
+    }
+  }
+
+  updateFeishuAppSettings(params: UpdateFeishuAppSettingsParams): FeishuAppSettings {
+    const appId = typeof params.appId === 'string' ? params.appId.trim() : undefined
+    const appSecret = typeof params.appSecret === 'string' ? params.appSecret.trim() : undefined
+    const receiveId = typeof params.receiveId === 'string' ? params.receiveId.trim() : undefined
+    const enabled = params.enabled !== false
+    const notifyTypes = this.normalizeNotifyTypes(params.notifyTypes)
+
+    // 验证 receiveIdType
+    let receiveIdType: string | undefined
+    if (params.receiveIdType) {
+      const valid = ['open_id', 'user_id', 'union_id', 'email', 'chat_id']
+      if (!valid.includes(params.receiveIdType)) {
+        throw new BadRequestException(`Invalid receive_id_type: ${params.receiveIdType}`)
+      }
+      receiveIdType = params.receiveIdType
+    }
+
+    const updates: Record<string, string> = {
+      FEISHU_NOTIFY_MODE: 'app',
+      FEISHU_NOTIFY_ENABLED: enabled ? 'true' : 'false',
+      FEISHU_NOTIFY_TYPES: notifyTypes.join(','),
+    }
+
+    if (appId !== undefined) {
+      updates.FEISHU_APP_ID = appId
+    }
+
+    if (appSecret !== undefined) {
+      updates.FEISHU_APP_SECRET = appSecret
+    }
+
+    if (receiveIdType !== undefined) {
+      updates.FEISHU_RECEIVE_ID_TYPE = receiveIdType
+    }
+
+    if (receiveId !== undefined) {
+      updates.FEISHU_RECEIVE_ID = receiveId
+    }
+
+    Object.entries(updates).forEach(([key, value]) => {
+      process.env[key] = value
+    })
+
+    // 更新后清除 token 缓存（凭证可能已变更）
+    if (appId !== undefined || appSecret !== undefined) {
+      this.feishuClient.invalidateToken()
+    }
+
+    this.persistEnvUpdates(updates)
+    return this.getFeishuAppSettings()
+  }
+
+  // ── Notification queries ────────────────────────────
+
+  async findAll(userId: string, params: { skip?: number; take?: number; unreadOnly?: boolean }) {
+    const { skip = 0, take = 20, unreadOnly = false } = params
+
+    const where: any = { userId }
+    if (unreadOnly) where.read = false
+
+    const [notifications, total, unreadCount] = await Promise.all([
+      this.prisma.notification.findMany({
+        where,
+        skip,
+        take,
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.notification.count({ where }),
+      this.prisma.notification.count({ where: { userId, read: false } }),
+    ])
+
+    return { notifications, total, unreadCount, skip, take }
+  }
+
+  async getUnreadCount(userId: string) {
+    const count = await this.prisma.notification.count({
+      where: { userId, read: false },
+    })
+    return { unreadCount: count }
+  }
+
+  async markAsRead(id: string, userId: string) {
+    await this.prisma.notification.updateMany({
+      where: { id, userId },
+      data: { read: true },
+    })
+    return { success: true }
+  }
+
+  async markAllAsRead(userId: string) {
+    const result = await this.prisma.notification.updateMany({
+      where: { userId, read: false },
+      data: { read: true },
+    })
+    return { success: true, count: result.count }
+  }
+
+  async remove(id: string, userId: string) {
+    await this.prisma.notification.deleteMany({
+      where: { id, userId },
+    })
+    return { success: true }
+  }
+
+  async clearRead(userId: string) {
+    const result = await this.prisma.notification.deleteMany({
+      where: { userId, read: true },
+    })
+    return { success: true, count: result.count }
+  }
+
+  // ── Push logic ──────────────────────────────────────
+
+  private async pushFeishuNotification(
+    params: NotificationCreateParams,
+    force = false,
+  ): Promise<FeishuPushResult> {
+    if (!this.isFeishuEnabled()) {
+      return { enabled: false, sent: false, message: 'Feishu notifications are disabled.' }
+    }
+
+    if (!force && !this.isAllowedFeishuType(params.type)) {
+      return {
+        enabled: true,
+        sent: false,
+        message: `Notification type ${params.type} is filtered by FEISHU_NOTIFY_TYPES.`,
+      }
+    }
+
+    // 根据模式分发
+    const mode = this.feishuClient.getMode()
+    if (mode === 'app') {
+      return this.pushViaAppBot(params)
+    }
+
+    return this.pushViaWebhook(params)
+  }
+
+  // ── App bot push ────────────────────────────────────
+
+  private async pushViaAppBot(params: NotificationCreateParams): Promise<FeishuPushResult> {
+    if (!this.feishuClient.isAppConfigured()) {
+      return {
+        enabled: true,
+        sent: false,
+        message: 'FEISHU_APP_ID or FEISHU_APP_SECRET is not configured.',
+      }
+    }
+
+    const receiveId = this.feishuClient.getReceiveId()
+    if (!receiveId) {
+      return {
+        enabled: true,
+        sent: false,
+        message: 'FEISHU_RECEIVE_ID is not configured.',
+      }
+    }
+
+    const card = this.feishuClient.buildCard({
+      type: params.type,
+      title: params.title,
+      content: params.content,
+      metadata: params.metadata,
+      userId: params.userId,
+    })
+
+    const result = await this.feishuClient.sendCard(
+      receiveId,
+      this.feishuClient.getReceiveIdType(),
+      card,
+    )
+
+    return {
+      enabled: true,
+      sent: result.sent,
+      message: result.message,
+    }
+  }
+
+  // ── Webhook push (original) ─────────────────────────
+
+  private async pushViaWebhook(params: NotificationCreateParams): Promise<FeishuPushResult> {
+    const webhookUrl = this.getFeishuWebhookUrl()
+    if (!webhookUrl) {
+      return {
+        enabled: false,
+        sent: false,
+        message: 'FEISHU_WEBHOOK_URL is not configured.',
+      }
+    }
+
+    const payload: Record<string, any> = {
+      msg_type: 'text',
+      content: {
+        text: this.buildFeishuText(params),
+      },
+    }
+
+    const secret = this.getFeishuWebhookSecret()
+    if (secret) {
+      Object.assign(payload, this.createFeishuSignature(secret))
+    }
+
+    const response = await axios.post(webhookUrl, payload, {
+      timeout: 5000,
+      headers: { 'Content-Type': 'application/json' },
+      validateStatus: (status) => status >= 200 && status < 500,
+    })
+
+    const responseData = response.data as {
+      code?: number
+      msg?: string
+      StatusCode?: number
+      StatusMessage?: string
+    }
+    const feishuCode = responseData?.code ?? responseData?.StatusCode
+    if (response.status >= 400 || (typeof feishuCode === 'number' && feishuCode !== 0)) {
+      const reason = responseData?.msg || responseData?.StatusMessage || `HTTP ${response.status}`
+      this.logger.warn(`Feishu notification was rejected: ${reason}`)
+      return { enabled: true, sent: false, status: response.status, message: reason }
+    }
+
+    return { enabled: true, sent: true, status: response.status, message: 'sent' }
+  }
+
+  // ── Webhook helpers ─────────────────────────────────
+
+  private getFeishuWebhookUrl(): string {
+    return (process.env.FEISHU_WEBHOOK_URL || process.env.LARK_WEBHOOK_URL || '').trim()
+  }
+
+  private getFeishuWebhookSecret(): string {
+    return (process.env.FEISHU_WEBHOOK_SECRET || process.env.LARK_WEBHOOK_SECRET || '').trim()
+  }
+
+  private isFeishuEnabled(): boolean {
+    return (process.env.FEISHU_NOTIFY_ENABLED || 'true').toLowerCase() !== 'false'
+  }
+
+  private isAllowedFeishuType(type: NotificationType): boolean {
+    const allowed = this.getAllowedFeishuTypes()
+    if (allowed.length === 0 || allowed.includes(type)) return true
+    return type === NotificationType.REFUND_ALERT && allowed.includes(NotificationType.REPORT)
+  }
+
+  private getAllowedFeishuTypes(): NotificationType[] {
+    return this.normalizeNotifyTypes(
+      (process.env.FEISHU_NOTIFY_TYPES || process.env.LARK_NOTIFY_TYPES || '')
+        .split(',')
+        .map((item) => item.trim()),
+    )
+  }
+
+  private normalizeNotifyTypes(types?: string[]): NotificationType[] {
+    const valid = new Set(Object.values(NotificationType))
+    return Array.from(
+      new Set((types || []).map((item) => item.trim()).filter((item) => valid.has(item as any))),
+    ) as NotificationType[]
+  }
+
+  private isValidFeishuWebhookUrl(value: string): boolean {
+    try {
+      const url = new URL(value)
+      return (
+        url.protocol === 'https:' &&
+        (url.hostname === 'open.feishu.cn' || url.hostname === 'open.larksuite.com') &&
+        url.pathname.includes('/open-apis/bot/')
+      )
+    } catch {
+      return false
+    }
+  }
+
+  private maskWebhookUrl(value: string): string {
+    if (!value) return ''
+    const visible = 12
+    if (value.length <= visible * 2) return value
+    return `${value.slice(0, visible)}...${value.slice(-visible)}`
+  }
+
+  // ── .env persistence ────────────────────────────────
+
+  private isEnvFileWritable(): boolean {
+    try {
+      const envPath = this.getEnvFilePath()
+      return existsSync(envPath) || existsSync(process.cwd())
+    } catch {
+      return false
+    }
+  }
+
+  private persistEnvUpdates(updates: Record<string, string>) {
+    const envPath = this.getEnvFilePath()
+    try {
+      const lines = existsSync(envPath) ? readFileSync(envPath, 'utf8').split(/\r?\n/) : []
+      const seen = new Set<string>()
+      const next = lines.map((line) => {
+        if (!line || line.trimStart().startsWith('#') || !line.includes('=')) return line
+        const key = line.split('=', 1)[0].trim()
+        if (!(key in updates)) return line
+        seen.add(key)
+        return `${key}=${updates[key]}`
+      })
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (!seen.has(key)) next.push(`${key}=${value}`)
+      })
+
+      writeFileSync(envPath, `${next.join('\n').replace(/\n+$/, '')}\n`, 'utf8')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.logger.warn(`Failed to persist Feishu settings to .env: ${message}`)
+    }
+  }
+
+  private getEnvFilePath(): string {
+    const cwdPath = join(process.cwd(), '.env')
+    if (existsSync(cwdPath)) return cwdPath
+
+    const distPath = join(__dirname, '..', '..', '..', '.env')
+    if (existsSync(distPath)) return distPath
+
+    const envConfigPath = process.env.DOTENV_CONFIG_PATH
+    if (envConfigPath && existsSync(envConfigPath)) return envConfigPath
+
+    return cwdPath
+  }
+
+  // ── Webhook signature ───────────────────────────────
+
+  private createFeishuSignature(secret: string) {
+    const timestamp = Math.floor(Date.now() / 1000).toString()
+    const stringToSign = `${timestamp}\n${secret}`
+    const sign = createHmac('sha256', stringToSign).update('').digest('base64')
+    return { timestamp, sign }
+  }
+
+  // ── Webhook text builder ────────────────────────────
+
+  private buildFeishuText(params: NotificationCreateParams): string {
+    if (params.type === NotificationType.REPORT || params.type === NotificationType.REFUND_ALERT) {
+      const lines = [`[披星云] ${params.title}`]
+      if (params.content) {
+        lines.push('', this.truncate(params.content, 5600))
+      }
+      lines.push('', `发送时间：${this.formatBeijingTime(new Date())}`)
+      return this.truncate(lines.join('\n'), 6000)
+    }
+
+    const lines = [
+      `[披星云] ${params.title}`,
+      `Type: ${params.type}`,
+      `User: ${params.userId}`,
+      `Time: ${this.formatBeijingTime(new Date())}`,
+    ]
+
+    if (params.content) {
+      lines.push('', this.truncate(params.content, 1200))
+    }
+
+    if (params.metadata) {
+      lines.push('', `Metadata: ${this.truncate(JSON.stringify(params.metadata), 800)}`)
+    }
+
+    return this.truncate(lines.join('\n'), 3500)
+  }
+
+  private formatBeijingTime(date: Date): string {
+    return date.toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false })
+  }
+
+  private truncate(value: string, maxLength: number): string {
+    if (value.length <= maxLength) return value
+    return `${value.slice(0, maxLength - 3)}...`
+  }
+
+  private async resolveUserOrganizationId(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true },
+    })
+    return user?.organizationId || null
+  }
+}

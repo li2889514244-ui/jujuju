@@ -1,0 +1,447 @@
+// MatrixFlow v6 - Global skin (Deep Space Quiet)
+// 顺序：@use 在最前 → :root CSS 变量 → 基础重置 → 排版 → 工具类 → 响应式
+
+@use './element-overrides';
+
+// ============================================================
+// CSS Custom Properties（运行时令牌，让 var(--color-*) 引用直接生效）
+// ============================================================
+:root,
+.dark {
+  // 背景层次
+  --color-bg-deep: #{$bg-deep};
+  --color-bg-base: #{$bg-base};
+  --color-bg-primary: #{$bg-base};
+  --color-bg-secondary: #{$bg-base};
+  --color-bg-tertiary: #{$bg-elevated};
+  --color-bg-elevated: #{$bg-elevated};
+  --color-bg-overlay: #{$bg-overlay};
+  --color-bg-hover: #{$bg-hover};
+
+  // 文本层次
+  --color-text-primary: #{$text-primary};
+  --color-text-secondary: #{$text-secondary};
+  --color-text-tertiary: #{$text-tertiary};
+  --color-text-placeholder: #{$text-placeholder};
+
+  // 强调色
+  --color-accent: #{$accent-500};
+  --color-accent-alt: #{$accent-400};
+  --color-accent-300: #{$accent-300};
+  --color-accent-500: #{$accent-500};
+  --color-accent-600: #{$accent-600};
+  --color-accent-glow: #{$accent-glow};
+
+  // 语义色
+  --color-success: #{$color-success};
+  --color-warning: #{$color-warning};
+  --color-danger: #{$color-danger};
+  --color-info: #{$color-info};
+
+  // 边框
+  --color-border: #{$border-base};
+  --color-border-subtle: #{$border-subtle};
+  --color-border-strong: #{$border-strong};
+  --color-border-hover: #{$border-strong};
+  --color-border-active: #{$border-focus};
+  --color-separator: #{$border-subtle};
+
+  // 阴影
+  --shadow-sm: #{$shadow-sm};
+  --shadow-md: #{$shadow-md};
+  --shadow-lg: #{$shadow-lg};
+  --shadow-glow: #{$shadow-glow};
+
+  // 半径
+  --radius-sm: #{$radius-sm};
+  --radius-md: #{$radius-md};
+  --radius-lg: #{$radius-lg};
+  --radius-xl: #{$radius-xl};
+  --radius-full: #{$radius-full};
+
+  // 缓动
+  --ease-out: #{$ease-out};
+  --ease-smooth: #{$ease-smooth};
+  --ease-spring: #{$ease-spring};
+
+  // 字体
+  --font-sans: #{$font-sans};
+  --font-mono: #{$font-mono};
+
+  // 平台色
+  --color-douyin: #{$douyin-color};
+  --color-kuaishou: #{$kuaishou-color};
+  --color-xiaohongshu: #{$xiaohongshu-color};
+  --color-bilibili: #{$bilibili-color};
+  --color-weibo: #{$weibo-color};
+  --color-wechat: #{$wechat-color};
+
+  color-scheme: dark;
+}
+
+// ============================================================
+// 基础重置
+// ============================================================
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+// 安全区域 padding（刘海屏 / 底部 Home 条）
+@supports (padding: max(0px)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+body {
+  font-family: $font-sans;
+  font-size: 14px;
+  line-height: 1.5;
+  color: $text-primary;
+  background-color: $bg-deep;
+  background-image:
+    radial-gradient(ellipse 80% 60% at 12% 0%, rgba(99, 102, 241, 0.08), transparent 60%),
+    radial-gradient(ellipse 60% 50% at 88% 100%, rgba(6, 182, 212, 0.05), transparent 60%);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+// ============================================================
+// 排版
+// ============================================================
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: $text-primary;
+  font-family: $font-sans;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+h1 { font-size: $text-h1; }
+h2 { font-size: $text-h2; }
+h3 { font-size: $text-h3; }
+
+a {
+  color: $accent-400;
+  text-decoration: none;
+  transition: color 0.18s $ease-out;
+
+  &:hover {
+    color: $accent-300;
+  }
+}
+
+p {
+  line-height: 1.65;
+  color: $text-secondary;
+}
+
+small,
+.text-caption {
+  color: $text-tertiary;
+  font-size: $text-sm;
+}
+
+.text-micro {
+  font-size: $text-xs;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: $text-tertiary;
+  font-weight: 600;
+}
+
+code,
+pre {
+  font-family: $font-mono;
+}
+
+// ============================================================
+// 滚动条（细 6px，无装饰）
+// ============================================================
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: $radius-full;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  transition: background-color 0.2s $ease-out;
+
+  &:hover {
+    background-color: rgba(255, 255, 255, 0.16);
+    background-clip: padding-box;
+  }
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+// Firefox
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+// ============================================================
+// 选择 / 聚焦
+// ============================================================
+::selection {
+  background: rgba(99, 102, 241, 0.4);
+  color: $text-primary;
+}
+
+:focus-visible {
+  outline: 2px solid $accent-500;
+  outline-offset: 2px;
+  border-radius: $radius-sm;
+}
+
+// ============================================================
+// NProgress（顶部进度条）
+// ============================================================
+#nprogress {
+  pointer-events: none;
+
+  .bar {
+    background: linear-gradient(90deg, $accent-500, $accent-400);
+    height: 2px;
+  }
+
+  .peg {
+    box-shadow: 0 0 12px $accent-500, 0 0 6px $accent-400;
+  }
+}
+
+// ============================================================
+// 过渡动画
+// ============================================================
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s $ease-out;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition:
+    opacity 0.25s $ease-out,
+    transform 0.25s $ease-out;
+}
+
+.slide-up-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
+.slide-up-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+
+.stagger-item {
+  opacity: 0;
+  transform: translateY(12px);
+  transition:
+    opacity 0.4s $ease-out,
+    transform 0.4s $ease-out;
+}
+
+.stagger-item.stagger-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+// ============================================================
+// 工具类
+// ============================================================
+.card-default {
+  @include card;
+  @include card-hover;
+  padding: $space-6;
+}
+
+.card-flat {
+  @include card-flat;
+  padding: $space-6;
+}
+
+.glass-card {
+  @include glass;
+  border-radius: $radius-lg;
+  padding: $space-6;
+}
+
+.section-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: $accent-400;
+  font-size: $text-xs;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+
+  &::before {
+    content: '';
+    width: 16px;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+  }
+}
+
+.rule-line {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, $border-base, transparent);
+}
+
+.display-number {
+  font-family: $font-mono;
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, $text-primary, $accent-300);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+// ============================================================
+// 响应式
+// ============================================================
+@media (max-width: 1439px) {
+  .app-layout__content {
+    padding: $space-6 $space-5;
+  }
+
+  .account-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-layout__content {
+    padding: $space-5;
+  }
+
+  .account-grid,
+  .dashboard__charts {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .app-layout__content {
+    padding: $space-3 !important;
+  }
+
+  .el-form--inline {
+    flex-wrap: wrap;
+  }
+
+  .el-form--inline .el-form-item {
+    margin-right: 8px;
+    margin-bottom: 8px;
+  }
+
+  .el-dialog {
+    width: 94% !important;
+    margin-top: 6vh !important;
+  }
+
+  // 表格在移动端允许横向滚动
+  .el-table {
+    .el-table__inner-wrapper {
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+
+  // 分页组件精简
+  .el-pagination {
+    .el-pagination__sizes,
+    .el-pagination__jump {
+      display: none !important;
+    }
+    .el-pager li:not(.is-active):not(:first-child):not(:last-child):not(.more) {
+      display: none;
+    }
+  }
+
+  // 卡片内边距缩小
+  .el-card__body {
+    padding: $space-4;
+  }
+  .el-card__header {
+    padding: $space-3 $space-4;
+  }
+
+  // Section header 在移动端换行
+  .md-section__header,
+  .ci-section__header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-layout__content {
+    padding: $space-2 !important;
+  }
+
+  .hero-value {
+    font-size: 42px !important;
+  }
+
+  // 超小屏下卡片内边距再减
+  .el-card__body {
+    padding: $space-3;
+  }
+
+  // 表单 select / input 在超小屏占满
+  .el-form--inline .el-form-item {
+    margin-right: 0;
+    width: 100%;
+    .el-select,
+    .el-input {
+      width: 100% !important;
+    }
+  }
+}

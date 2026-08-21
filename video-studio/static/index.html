@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Studio - 视频后处理工具</title>
+<style>
+:root{--pri:#6366f1;--pri-d:#4f46e5;--pri-l:#eef2ff;--ok:#10b981;--ok-l:#ecfdf5;--warn:#f59e0b;--warn-l:#fffbeb;--err:#ef4444;--err-l:#fef2f2;--bg:#f0f2f5;--card:#fff;--tx:#1e293b;--tx2:#64748b;--tx3:#94a3b8;--brd:#e2e8f0;--radius:10px;--shadow:0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.04);--shadow-lg:0 10px 30px rgba(0,0,0,.1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--tx);font:14px/1.6 "Microsoft YaHei","Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+#app{max-width:1100px;margin:0 auto;padding:20px}
+.header{display:flex;align-items:center;justify-content:space-between;margin-bottom:24px}
+.header h1{font-size:24px;font-weight:700;display:flex;align-items:center;gap:10px}
+.header .logo{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff}
+.header .ver{font-size:12px;color:var(--tx3);font-weight:500}
+.card{background:var(--card);border:1px solid var(--brd);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:20px;overflow:hidden}
+.card-h{padding:14px 20px;border-bottom:1px solid var(--brd);background:#f8fafc;display:flex;align-items:center;justify-content:space-between}
+.card-h h2{font-size:16px;font-weight:600}
+.card-b{padding:20px}
+.steps{display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap}
+.step{flex:1;min-width:120px;padding:10px 14px;border-radius:8px;background:#f1f5f9;border:2px solid transparent;text-align:center;transition:all .2s}
+.step.active{background:var(--pri-l);border-color:var(--pri)}
+.step.done{background:var(--ok-l);border-color:var(--ok)}
+.step .step-num{font-size:11px;color:var(--tx3);font-weight:700;text-transform:uppercase}
+.step .step-name{font-size:13px;font-weight:600;margin-top:2px}
+.form-group{margin-bottom:14px}
+.form-group label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+.form-group input,.form-group select,.form-group textarea{width:100%;height:40px;border:1px solid var(--brd);border-radius:8px;padding:0 12px;font:inherit;background:#fff;transition:border .2s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{outline:none;border-color:var(--pri);box-shadow:0 0 0 3px rgba(99,102,241,.1)}
+.form-group textarea{height:auto;padding:10px 12px;resize:vertical}
+.hint{font-size:12px;color:var(--tx3);margin-top:4px}
+.btn{border:none;border-radius:8px;padding:10px 20px;cursor:pointer;font:inherit;font-weight:600;font-size:14px;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-pri{background:linear-gradient(135deg,var(--pri),var(--pri-d));color:#fff;box-shadow:0 4px 12px rgba(99,102,241,.25)}
+.btn-pri:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(99,102,241,.3)}
+.btn-pri:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-ghost{background:#fff;color:var(--tx2);border:1px solid var(--brd)}
+.btn-ghost:hover{background:#f8fafc}
+.btn-ok{background:linear-gradient(135deg,#10b981,#059669);color:#fff}
+.btn-sm{padding:6px 14px;font-size:12px}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap}
+.progress-bar{height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;margin:10px 0}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--pri),#8b5cf6);border-radius:4px;transition:width .3s}
+.status-msg{font-size:13px;color:var(--tx2);margin-top:4px;min-height:20px}
+.tag{display:inline-flex;align-items:center;gap:4px;background:var(--pri-l);color:var(--pri);font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px;margin:2px}
+.tag.ok{background:var(--ok-l);color:var(--ok)}
+.tag.warn{background:var(--warn-l);color:var(--warn)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 12px;border-bottom:2px solid var(--brd);color:var(--tx2);font-weight:600;font-size:12px}
+td{padding:8px 12px;border-bottom:1px solid var(--brd)}
+tr:hover td{background:#f8fafc}
+.result-box{padding:16px;background:var(--ok-l);border:1px solid #a7f3d0;border-radius:8px;margin-top:12px}
+.result-box .path{font-family:monospace;font-size:12px;color:var(--ok);word-break:break-all;margin-top:4px}
+.tabs{display:flex;gap:2px;border-bottom:2px solid var(--brd);margin-bottom:20px}
+.tab{padding:10px 20px;cursor:pointer;font-weight:600;font-size:14px;color:var(--tx2);border-bottom:2px solid transparent;margin-bottom:-2px;transition:all .2s}
+.tab:hover{color:var(--pri)}
+.tab.active{color:var(--pri);border-bottom-color:var(--pri)}
+.panel{display:none}
+.panel.active{display:block}
+.clips{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-top:10px}
+.clip{padding:10px;background:#f8fafc;border:1px solid var(--brd);border-radius:8px;font-size:12px}
+.clip .clip-provider{font-weight:600;color:var(--pri)}
+.clip .clip-term{color:var(--tx2);margin-top:2px}
+.clip .clip-file{color:var(--tx3);margin-top:2px;word-break:break-all}
+.empty{text-align:center;padding:30px;color:var(--tx3)}
+.badge{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}
+.badge.pending{background:#f1f5f9;color:var(--tx2)}
+.badge.running{background:var(--warn-l);color:var(--warn)}
+.badge.done{background:var(--ok-l);color:var(--ok)}
+.badge.error{background:var(--err-l);color:var(--err)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:100}
+.modal{background:#fff;border-radius:14px;padding:28px;max-width:420px;width:90%;box-shadow:var(--shadow-lg)}
+.modal h3{font-size:18px;margin-bottom:8px}
+.modal p{color:var(--tx2);margin-bottom:16px;font-size:13px}
+</style>
+</head>
+<body>
+<div id="app">
+<div class="header">
+<h1><span class="logo">🎬</span> Video Studio <span class="ver">v1.0</span></h1>
+<div class="btn-row">
+<button class="btn btn-ghost btn-sm" onclick="loadConfig()">⚙️ 配置</button>
+<button class="btn btn-ghost btn-sm" onclick="checkHealth()">🔄 检查</button>
+</div>
+</div>
+
+<div class="tabs">
+<div class="tab active" onclick="switchTab('autoprocess')">🚀 一键处理</div>
+<div class="tab" onclick="switchTab('manual')">🔧 手动分步</div>
+<div class="tab" onclick="switchTab('output')">📂 输出文件</div>
+<div class="tab" onclick="switchTab('config')">⚙️ 配置</div>
+</div>
+
+<!-- 一键处理 -->
+<div id="panel-autoprocess" class="panel active">
+<div class="card">
+<div class="card-h"><h2>全自动视频后处理</h2></div>
+<div class="card-b">
+<div class="steps">
+<div class="step" id="step-1"><div class="step-num">Step 1</div><div class="step-name">识别字幕</div></div>
+<div class="step" id="step-2"><div class="step-num">Step 2</div><div class="step-name">优化文案</div></div>
+<div class="step" id="step-3"><div class="step-num">Step 3</div><div class="step-name">搜索B-roll</div></div>
+<div class="step" id="step-4"><div class="step-num">Step 4</div><div class="step-name">背景音乐</div></div>
+<div class="step" id="step-5"><div class="step-num">Step 5</div><div class="step-name">渲染输出</div></div>
+</div>
+<div class="form-group">
+<label>视频文件路径</label>
+<input type="text" id="auto-video-path" placeholder="C:\Users\...\video.mp4 或拖拽文件">
+<div class="hint">粘贴披星教育下载的无字幕数字人视频路径</div>
+</div>
+<div class="form-group">
+<label>背景音乐（可选）</label>
+<select id="auto-bgm"><option value="">不添加背景音乐</option></select>
+<div class="hint">从本地音乐库选择，或先在"配置"页上传</div>
+</div>
+<div class="form-group">
+<label>语言</label>
+<select id="auto-lang">
+<option value="zh">中文</option>
+<option value="en">英文</option>
+<option value="ja">日文</option>
+</select>
+</div>
+<button class="btn btn-pri" id="auto-btn" onclick="autoProcess()">🚀 一键开始处理</button>
+<div class="progress-bar" id="auto-progress-bar" style="display:none"><div class="progress-fill" id="auto-fill" style="width:0%"></div></div>
+<div class="status-msg" id="auto-status"></div>
+<div id="auto-result"></div>
+</div>
+</div>
+</div>
+
+<!-- 手动分步 -->
+<div id="panel-manual" class="panel">
+<div class="card">
+<div class="card-h"><h2>① 字幕识别</h2></div>
+<div class="card-b">
+<div class="form-group"><label>视频路径</label><input type="text" id="sub-video-path" placeholder="视频文件路径"></div>
+<button class="btn btn-pri" onclick="recognizeSubtitle()">识别字幕</button>
+<div class="progress-bar" id="sub-progress" style="display:none"><div class="progress-fill" id="sub-fill" style="width:0%"></div></div>
+<div class="status-msg" id="sub-status"></div>
+<div id="sub-result"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-h"><h2>② B-roll 搜索</h2></div>
+<div class="card-b">
+<div class="form-group"><label>搜索关键词（英文，逗号分隔）</label><input type="text" id="mat-keyword" placeholder="如: coffee, city, nature"></div>
+<button class="btn btn-pri" onclick="searchMaterial()">搜索素材</button>
+<button class="btn btn-ghost" onclick="searchBySubtitle()">根据字幕自动搜索</button>
+<div class="status-msg" id="mat-status"></div>
+<div class="clips" id="mat-result"></div>
+</div>
+</div>
+<div class="card">
+<div class="card-h"><h2>③ 渲染输出</h2></div>
+<div class="card-b">
+<div class="form-group"><label>视频路径</label><input type="text" id="ren-video" placeholder="原始视频路径"></div>
+<div class="form-group"><label>ASS 字幕文件</label><input type="text" id="ren-ass" placeholder="字幕 .ass 文件路径（可选）"></div>
+<div class="form-group"><label>B-roll 文件路径（每行一个）</label><textarea id="ren-broll" rows="3" placeholder="C:\...\broll1.mp4&#10;C:\...\broll2.mp4"></textarea></div>
+<div class="form-group"><label>背景音乐</label><select id="ren-bgm"><option value="">不添加</option></select></div>
+<div class="form-group"><label>音乐音量</label><input type="number" id="ren-vol" value="0.15" min="0" max="1" step="0.05"></div>
+<button class="btn btn-pri" onclick="renderVideo()">开始渲染</button>
+<div class="progress-bar" id="ren-progress" style="display:none"><div class="progress-fill" id="ren-fill" style="width:0%"></div></div>
+<div class="status-msg" id="ren-status"></div>
+<div id="ren-result"></div>
+</div>
+</div>
+</div>
+
+<!-- 输出文件 -->
+<div id="panel-output" class="panel">
+<div class="card">
+<div class="card-h"><h2>输出文件</h2><button class="btn btn-ghost btn-sm" onclick="loadOutputFiles()">刷新</button></div>
+<div class="card-b">
+<div id="output-files"><div class="empty">点击"刷新"加载</div></div>
+</div>
+</div>
+</div>
+
+<!-- 配置 -->
+<div id="panel-config" class="panel">
+<div class="card">
+<div class="card-h"><h2>配置</h2><button class="btn btn-pri btn-sm" onclick="saveConfig()">保存</button></div>
+<div class="card-b" id="config-form"><div class="empty">点击"⚙️ 配置"加载</div></div>
+</div>
+<div class="card">
+<div class="card-h"><h2>上传背景音乐</h2></div>
+<div class="card-b">
+<input type="file" id="bgm-upload" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.opus,.wma">
+<button class="btn btn-pri btn-sm" onclick="uploadBgm()">上传</button>
+<div class="status-msg" id="bgm-upload-status"></div>
+</div>
+</div>
+</div>
+
+</div>
+
+<script>
+const API='';
+function switchTab(name){
+document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['autoprocess','manual','output','config'][i]===name)});
+document.querySelectorAll('.panel').forEach(p=>p.classList.toggle('active',p.id==='panel-'+name));
+if(name==='output')loadOutputFiles();
+if(name==='config')loadConfig();
+}
+
+async function checkHealth(){
+try{const r=await fetch(API+'/api/health');const j=await r.json();
+alert(j.ok?'✅ Video Studio 正常运行 ('+j.version+')':'❌ 服务异常')}catch(e){alert('❌ 无法连接: '+e)}
+}
+
+// ─── 一键处理 ───
+let autoTaskId=null;
+async function autoProcess(){
+const vp=document.getElementById('auto-video-path').value.trim();
+if(!vp){alert('请输入视频路径');return}
+const bgm=document.getElementById('auto-bgm').value;
+const lang=document.getElementById('auto-lang').value;
+document.getElementById('auto-btn').disabled=true;
+document.getElementById('auto-progress-bar').style.display='block';
+document.getElementById('auto-fill').style.width='0%';
+document.getElementById('auto-status').textContent='提交中...';
+document.getElementById('auto-result').innerHTML='';
+document.querySelectorAll('.step').forEach(s=>{s.classList.remove('active','done')});
+
+try{
+const r=await fetch(API+'/api/autoprocess',{method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({video_path:vp,bgm_name:bgm||null,language:lang})});
+const j=await r.json();
+if(j.error){alert(j.error);document.getElementById('auto-btn').disabled=false;return}
+autoTaskId=j.task_id;
+pollAuto();
+}catch(e){alert('请求失败: '+e);document.getElementById('auto-btn').disabled=false}
+}
+
+async function pollAuto(){
+if(!autoTaskId)return;
+try{
+const r=await fetch(API+'/api/task/'+autoTaskId);
+const j=await r.json();
+document.getElementById('auto-fill').style.width=j.progress+'%';
+document.getElementById('auto-status').textContent=j.message||'';
+
+// 更新步骤显示
+const p=j.progress;
+const steps=document.querySelectorAll('.step');
+steps.forEach((s,i)=>{
+s.classList.remove('active','done');
+const thresholds=[20,35,60,65,100];
+if(p>=thresholds[i])s.classList.add('done');
+else if(p>=(i>0?thresholds[i-1]:0))s.classList.add('active');
+});
+
+if(j.status==='done'){
+document.getElementById('auto-btn').disabled=false;
+const res=j.result;
+document.getElementById('auto-result').innerHTML=
+'<div class="result-box">✅ '+j.message+
+'<div class="path">📁 '+res.output_path+'</div>'+
+'<div style="margin-top:8px"><span class="tag ok">字幕 '+res.subtitle_count+' 条</span>'+
+'<span class="tag ok">B-roll '+res.broll_count+' 个</span>'+
+(res.keywords||[]).map(k=>'<span class="tag">'+k+'</span>').join('')+
+'</div><div style="margin-top:10px"><a href="'+API+'/api/files/download?file='+encodeURIComponent(res.output_path.split(/[\\/]/).pop())+'" class="btn btn-ok btn-sm">⬇️ 下载视频</a></div>'+
+'</div>';
+return;
+}
+if(j.status==='error'){
+document.getElementById('auto-btn').disabled=false;
+document.getElementById('auto-status').innerHTML='<span style="color:var(--err)">❌ '+j.error+'</span>';
+return;
+}
+}catch(e){}
+setTimeout(pollAuto,1000);
+}
+
+// ─── 字幕识别 ───
+let subTaskId=null;
+let lastSegments=[];  // 存储最后一次识别的字幕，供 B-roll 搜索使用
+async function recognizeSubtitle(){
+const vp=document.getElementById('sub-video-path').value.trim();
+if(!vp){alert('请输入视频路径');return}
+document.getElementById('sub-progress').style.display='block';
+document.getElementById('sub-fill').style.width='0%';
+document.getElementById('sub-status').textContent='提交中...';
+
+try{
+const r=await fetch(API+'/api/subtitle/recognize',{method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({video_path:vp})});
+const j=await r.json();
+if(j.error){alert(j.error);return}
+subTaskId=j.task_id;pollSub();
+}catch(e){alert('请求失败: '+e)}
+}
+
+async function pollSub(){
+if(!subTaskId)return;
+try{
+const r=await fetch(API+'/api/task/'+subTaskId);
+const j=await r.json();
+document.getElementById('sub-fill').style.width=j.progress+'%';
+document.getElementById('sub-status').textContent=j.message||'';
+if(j.status==='done'){
+const res=j.result;
+lastSegments=res.segments;  // 保存字幕供后续使用
+let html='<div class="result-box"><b>字幕识别完成</b> ('+res.count+' 条)<br>';
+html+='<div style="margin-top:8px;font-size:12px;max-height:200px;overflow-y:auto">';
+res.segments.forEach((s,i)=>{html+=(i+1)+'. ['+s.start.toFixed(1)+'-'+s.end.toFixed(1)+'s] '+s.text+'<br>'});
+html+='</div>';
+html+='<div style="margin-top:8px"><span class="tag">ASS: '+res.ass_path+'</span><br><span class="tag">SRT: '+res.srt_path+'</span></div>';
+html+='<button class="btn btn-ghost btn-sm" id="fill-ass-btn">填入渲染表单</button></div>';
+document.getElementById('sub-result').innerHTML=html;
+document.getElementById('fill-ass-btn').onclick=function(){document.getElementById('ren-ass').value=res.ass_path};
+return;
+}
+if(j.status==='error'){document.getElementById('sub-status').innerHTML='<span style="color:var(--err)">❌ '+j.error+'</span>';return}
+}catch(e){}
+setTimeout(pollSub,1000);
+}
+
+// ─── B-roll 搜索 ───
+async function searchMaterial(){
+const kw=document.getElementById('mat-keyword').value.trim();
+if(!kw){alert('请输入关键词');return}
+document.getElementById('mat-status').textContent='搜索中...';
+document.getElementById('mat-result').innerHTML='';
+try{
+const r=await fetch(API+'/api/material/search?keyword='+encodeURIComponent(kw));
+const j=await r.json();
+if(j.error){document.getElementById('mat-status').textContent='❌ '+j.error;return}
+document.getElementById('mat-status').textContent='找到 '+j.total_found+' 个，已下载 '+j.downloaded+' 个';
+renderClips(j.clips);
+}catch(e){document.getElementById('mat-status').textContent='❌ '+e}
+}
+
+async function searchBySubtitle(){
+if(!lastSegments||!lastSegments.length){document.getElementById('mat-status').textContent='❗ 请先识别字幕';return}
+document.getElementById('mat-status').textContent='提交中...';
+try{
+const r=await fetch(API+'/api/material/search-by-subtitle',{method:'POST',headers:{'Content-Type':'application/json'},
+body:JSON.stringify({segments:lastSegments})});
+const j=await r.json();
+if(j.error){document.getElementById('mat-status').textContent='需要先识别字幕';return}
+// 轮询
+const tid=j.task_id;
+const poll=async()=>{
+const tr=await fetch(API+'/api/task/'+tid);
+const tj=await tr.json();
+document.getElementById('mat-status').textContent=tj.message||'';
+if(tj.status==='done'){renderClips(tj.result.clips);return}
+if(tj.status==='error'){document.getElementById('mat-status').textContent='❌ '+tj.error;return}
+setTimeout(poll,1000)
+};
+poll();
+}catch(e){document.getElementById('mat-status').textContent='❌ '+e}
+}
+
+function renderClips(clips){
+if(!clips||!clips.length){document.getElementById('mat-result').innerHTML='<div class="empty">无素材</div>';return}
+let html='';
+clips.forEach(c=>{
+const fn=c.local_path?c.local_path.split(/[\\/]/).pop():'';
+html+='<div class="clip"><div class="clip-provider">'+c.provider+'</div><div class="clip-term">'+c.search_term+'</div><div class="clip-file">'+fn+'</div></div>'
+});
+document.getElementById('mat-result').innerHTML=html;
+}
+
+// ─── 渲染 ───
+let renTaskId=null;
+async function renderVideo(){
+const data={video_path:document.getElementById('ren-video').value.trim(),
+ass_path:document.getElementById('ren-ass').value.trim()||null,
+broll_paths:document.getElementById('ren-broll').value.trim().split(/\r?\n/).map(x=>x.trim()).filter(x=>x),
+bgm_name:document.getElementById('ren-bgm').value||null,
+bgm_volume:parseFloat(document.getElementById('ren-vol').value)||0.15};
+if(!data.video_path){alert('请输入视频路径');return}
+document.getElementById('ren-progress').style.display='block';
+document.getElementById('ren-fill').style.width='0%';
+document.getElementById('ren-status').textContent='提交中...';
+try{
+const r=await fetch(API+'/api/render',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+const j=await r.json();
+if(j.error){alert(j.error);return}
+renTaskId=j.task_id;pollRen();
+}catch(e){alert('请求失败: '+e)}
+}
+
+async function pollRen(){
+if(!renTaskId)return;
+try{
+const r=await fetch(API+'/api/task/'+renTaskId);
+const j=await r.json();
+document.getElementById('ren-fill').style.width=j.progress+'%';
+document.getElementById('ren-status').textContent=j.message||'';
+if(j.status==='done'){
+document.getElementById('ren-result').innerHTML='<div class="result-box">✅ '+j.message+'<div class="path">📁 '+j.result.output_path+'</div><a href="'+API+'/api/files/download?file='+encodeURIComponent(j.result.output_path.split(/[\\/]/).pop())+'" class="btn btn-ok btn-sm">⬇️ 下载</a></div>';
+return}
+if(j.status==='error'){document.getElementById('ren-status').innerHTML='<span style="color:var(--err)">❌ '+j.error+'</span>';return}
+}catch(e){}
+setTimeout(pollRen,1000);
+}
+
+// ─── 输出文件 ───
+async function loadOutputFiles(){
+try{
+const r=await fetch(API+'/api/files/output');
+const j=await r.json();
+if(!j.files.length){document.getElementById('output-files').innerHTML='<div class="empty">暂无输出文件</div>';return}
+let html='<table><tr><th>文件名</th><th>大小</th><th>时间</th><th>操作</th></tr>';
+j.files.forEach(f=>{html+='<tr><td>'+f.name+'</td><td>'+f.size_mb+' MB</td><td>'+f.modified+'</td><td><a href="'+API+'/api/files/download?file='+encodeURIComponent(f.name)+'" class="btn btn-ghost btn-sm">下载</a></td></tr>'});
+html+='</table>';
+document.getElementById('output-files').innerHTML=html;
+}catch(e){document.getElementById('output-files').innerHTML='<div class="empty">加载失败: '+e+'</div>'}
+}
+
+// ─── 配置 ───
+async function loadConfig(){
+try{
+const r=await fetch(API+'/api/config');
+const j=await r.json();
+let html='';
+for(const[section,values]of Object.entries(j)){
+html+='<h3 style="margin:16px 0 8px;font-size:15px">'+section+'</h3>';
+for(const[k,v]of Object.entries(values)){
+const id='cfg-'+section+'-'+k;
+html+='<div class="form-group"><label>'+k+'</label><input type="text" id="'+id+'" value="'+(v||'')+'" data-section="'+section+'" data-key="'+k+'"></div>'
+}
+}
+document.getElementById('config-form').innerHTML=html;
+loadBgmList();
+}catch(e){document.getElementById('config-form').innerHTML='<div class="empty">加载失败: '+e+'</div>'}
+}
+
+async function saveConfig(){
+const inputs=document.querySelectorAll('#config-form input');
+const data={};
+inputs.forEach(inp=>{
+const s=inp.dataset.section,k=inp.dataset.key;
+if(!data[s])data[s]={};
+if(inp.value==='***')return; // 不修改敏感字段
+data[s][k]=inp.value
+});
+try{
+const r=await fetch(API+'/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+const j=await r.json();
+alert(j.ok?'✅ 配置已保存':'❌ '+j.error);
+}catch(e){alert('保存失败: '+e)}
+}
+
+// ─── BGM 列表 ───
+async function loadBgmList(){
+try{
+const r=await fetch(API+'/api/bgm/list');
+const j=await r.json();
+const opts='<option value="">不添加背景音乐</option>'+
+j.music.map(m=>'<option value="'+m.name+'">'+m.name+' ('+m.size_mb+'MB)</option>').join('');
+document.getElementById('auto-bgm').innerHTML=opts;
+document.getElementById('ren-bgm').innerHTML=opts;
+}catch(e){}
+}
+
+async function uploadBgm(){
+const f=document.getElementById('bgm-upload').files[0];
+if(!f){alert('请选择文件');return}
+document.getElementById('bgm-upload-status').textContent='上传中...';
+const fd=new FormData();fd.append('file',f);
+try{
+const r=await fetch(API+'/api/bgm/upload',{method:'POST',body:fd});
+const j=await r.json();
+if(j.ok){document.getElementById('bgm-upload-status').textContent='✅ '+j.name+' 上传成功';loadBgmList()}
+else{document.getElementById('bgm-upload-status').textContent='❌ '+j.error}
+}catch(e){document.getElementById('bgm-upload-status').textContent='❌ '+e}
+}
+
+// 初始化
+loadBgmList();
+</script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+import { get, post } from './request'
+import type { LoginForm, RegisterForm, LoginResponse, UserInfo } from '@/types'
+
+export const authApi = {
+  login(form: LoginForm) {
+    return post<LoginResponse>('/auth/login', form)
+  },
+
+  register(form: Omit<RegisterForm, 'confirmPassword'>) {
+    return post<LoginResponse>('/auth/register', form)
+  },
+
+  getUserInfo() {
+    return get<UserInfo>('/auth/me')
+  },
+
+  refreshToken(refreshToken: string) {
+    return post<{ accessToken: string; refreshToken: string }>('/auth/refresh', { refreshToken })
+  },
+
+  logout() {
+    return post('/auth/logout')
+  },
+
+  updateProfile(data: Partial<UserInfo>) {
+    return post<UserInfo>('/auth/profile', data)
+  },
+
+  changePassword(data: { oldPassword: string; newPassword: string }) {
+    return post('/auth/change-password', data)
+  },
+
+  authingCallback(data: { code: string; state: string }) {
+    return post<LoginResponse>('/auth/authing/callback', data)
+  },
+
+  getAuthingUrl(method?: string) {
+    return get<{ url: string; state: string }>('/auth/authing/url', { method })
+  },
+
+  getFeishuUrl(redirect?: string) {
+    return get<{ url: string; state: string }>('/auth/feishu/url', { redirect })
+  },
+
+  feishuCallback(data: { code: string; state: string }) {
+    return post<LoginResponse & { redirect?: string }>('/auth/feishu/callback', data)
+  },
+}

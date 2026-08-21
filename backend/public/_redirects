@@ -1,0 +1,6 @@
+# 排除 API 路径 — 返回 404 而非 SPA index.html
+# 防止 VITE_API_BASE_URL 配置遗漏时 API 调用被 SPA 拦截
+/api/*    /api-not-found    404
+
+# SPA fallback — 前端路由（/login, /dashboard, /publish 等）回退到 index.html
+/*        /index.html       200

@@ -1,0 +1,13 @@
+name = "matrixflow-origin-proxy"
+main = "src/worker.js"
+compatibility_date = "2026-07-27"
+
+routes = [
+  { pattern = "ddddkiii.com/*", zone_name = "ddddkiii.com" },
+  { pattern = "www.ddddkiii.com/*", zone_name = "ddddkiii.com" }
+]
+
+[vars]
+ORIGIN_PROTOCOL = "http:"
+ORIGIN_HOST = "ddddkiii.com"
+ORIGIN_RESOLVE_HOST = "origin.ddddkiii.com"

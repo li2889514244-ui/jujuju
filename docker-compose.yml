@@ -1,0 +1,81 @@
+# ============================================================================
+# ⚠️  WARNING — 此文件是生产环境的唯一 docker-compose 配置
+# ⚠️  数据库使用 postgres 用户 + matrixflow 数据库 + pgdata 卷
+# ⚠️  修改前务必阅读 backend/docker-compose.yml 中的配置说明
+# ⚠️  修改后必须运行 scripts/pre-deploy-check.sh 验证
+# ============================================================================
+#
+# 事故记录 (2026-07-03):
+#   此文件曾使用错误的用户名(matrixflow)和数据库名(matrixflow_erp)，
+#   导致重新部署时创建了空数据库，所有数据"消失"。
+#   已统一为 postgres 用户 + matrixflow 数据库 + pgdata 卷。
+# ============================================================================
+
+services:
+  # ========== PostgreSQL 16 ==========
+  db:
+    image: postgres:16-alpine
+    container_name: matrixflow-db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: matrixflow
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"
+    mem_limit: 1g
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ========== Redis 7 ==========
+  redis:
+    image: redis:7-alpine
+    container_name: matrixflow-redis
+    restart: always
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASS}
+    volumes:
+      - redisdata:/data
+    ports:
+      - "127.0.0.1:6379:6379"
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASS}', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ========== Cloudflare Tunnel ==========
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: matrixflow-tunnel
+    restart: always
+    network_mode: host
+    command: tunnel --region us --edge-ip-version 4 --protocol quic run --dns-resolver-addrs 100.100.2.136:53 --dns-resolver-addrs 100.100.2.138:53 --token ${CF_TUNNEL_TOKEN}
+    mem_limit: 64m
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ['CMD', 'cloudflared', '--version']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  pgdata:
+    name: pgdata
+    external: true
+  redisdata:
+    name: redisdata
+    external: true

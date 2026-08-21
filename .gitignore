@@ -1,0 +1,226 @@
+# 依赖
+node_modules/
+.pnp
+.pnp.js
+
+# 构建输出（只忽略后端dist，前端dist需跟踪以支持ECS部署）
+backend/dist/
+!backend/dist/main.js
+build/
+*.tsbuildinfo
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 测试覆盖率
+coverage/
+*.lcov
+
+# 安全扫描报告
+security-scan-report-*.md
+
+# 日志
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Prisma
+
+# Docker
+.docker/
+
+# Playwright
+browser-engine/test-results/
+browser-engine/playwright-report/
+doudian_profiles/
+doudian_probe_profile/
+doudian_login_status.json
+
+# 构建缓存
+.vite/
+*.local
+
+# 临时文件
+tmp/
+temp/
+
+# 证书文件
+*.pem
+*.key
+*.p12
+.pnpm-approved-builds.json
+*.ps1
+social-auto-upload/*
+!social-auto-upload/conf.py
+!social-auto-upload/sau_backend.py
+!social-auto-upload/start.bat
+!social-auto-upload/setup.bat
+
+# 调试脚本
+_*.js
+_*.py
+migrate-monet.js
+*.bat
+!setup.bat
+!start.bat
+!install.bat
+
+# 密钥文件（含生产凭证，禁止提交）
+secrets.env
+
+# 部署脚本（含阿里云凭证，禁止提交）
+deploy-ali.js
+deploy-ali.ps1
+deploy-frontend.js
+deploy-frontend-only.js
+deploy-all.js
+check-ecs.js
+scan-ecs.js
+sshconn.py
+check-cmd.js
+test-cmd.js
+gen-secrets.js
+genkey.bat
+deploy-ecs.py
+rotate_ecs.py
+rotate_ecs.ps1
+fix-ecs.js
+deploy-chunk.js
+deploy-direct.js
+deploy-fast.js
+deploy-pixing.js
+deploy-pixing-master.js
+deploy-backend-build.js
+build-backend.js
+scripts/deploy-backend.sh
+scripts/deploy-quick.sh
+scripts/ecs-run.js
+scripts/test-wechat-api.sh
+
+# 自动生成文件
+frontend/src/auto-imports.d.ts
+frontend/src/components.d.ts
+frontend/.eslintrc-auto-import.json
+
+# Python
+__pycache__/
+*.pyc
+*.spec
+
+# 桌面伴侣
+desktop-companion/*
+!desktop-companion/*.py
+!desktop-companion/*.bat
+!desktop-companion/companion_config.json.example
+
+# 外部爬虫工具
+bazhuayu_style_scraper.py_debug_archive/
+
+# MatrixFlow repo hygiene guardrails
+frontend/dist/
+backend/public/assets/
+artifacts/
+desktop-companion/dist/
+desktop-companion/build/
+cloudflare/**/dist-dry-run/
+chrome_debug_profile/
+doudian_probe_profile/
+**/chrome_profile/
+**/.chrome_profile/
+**/.chrome_shipinhao/
+**/User Data/
+screenshot*.png
+wechat_*.png
+*.tar.gz
+*.zip
+*.sql.gz
+k8s/secrets.yaml
+*.secret
+token_output.txt
+
+# Local audit/debug artifacts and one-off scripts
+accounts_list.json
+all_accounts_full.json
+all_local_accounts.json
+chrome_cookies*.json
+wechat_cookie_details.json
+wechat_state.json
+wechat_debug/
+profile_dirs.json
+food_accounts.json
+orphan_content.json
+wechat_accounts.txt
+audit_*.py
+check_*.py
+cleanup_*.py
+compare_*.py
+debug_*.py
+deploy_*.py
+diag_*.py
+dump_*.py
+extract_*.py
+final_check.py
+find_*.py
+fix_*.py
+full_*test.py
+list_accounts*.py
+list_all_accounts.py
+poll_status.py
+quick_*.py
+read_*cookies.py
+search_*accounts.py
+test_headless*.py
+test_keepalive.py
+test_*api.py
+test_*collect.py
+test_*cookies.py
+test_*data.py
+test_*fix.py
+test_*isolation.py
+test_*real.py
+trace_*.py
+trigger_check.py
+verify_*.py
+wait_and_check.py
+
+# Deployment scripts with secrets
+scripts/*
+scripts/**
+!scripts/
+!scripts/diagnose-production.py
+!scripts/deploy-frontend-fast.py
+!scripts/deploy-backend-safe.py
+!scripts/deploy-cloudflare-worker.py
+!scripts/install-tunnel-guard.py
+
+# Local build tools and vendored third-party sources (not part of the repo)
+tools/inno/
+tools/crv-src/
+tools/crv-runtime/
+innosetup-installer.exe
+douyin-*diagnose*.png
+backups/worker-cache-*/
+desktop-companion/upload_3249.py
+
+# Sensitive local data - never upload
+cookies_copy.db
+backend/prisma/data/
+backups/matrixflow_*
+github_payload.json
+proc_info.txt

@@ -1,0 +1,33 @@
+<!-- pages/dashboard/dashboard.wxml -->
+<view class="container">
+  <view class="page-head">
+    <view class="head-left">
+      <text class="title">数据概览</text>
+      <text class="subtitle">实时同步</text>
+    </view>
+    <text class="logout-btn" bindtap="onLogout">退出</text>
+  </view>
+
+  <block wx:if="{{loading && !cards.length}}">
+    <view class="loading">加载中...</view>
+  </block>
+
+  <block wx:else>
+    <view class="grid-2">
+      <view class="card" wx:for="{{cards}}" wx:key="label">
+        <view class="stat-num">{{item.value}}</view>
+        <view class="stat-label">{{item.label}}</view>
+        <view class="card-sub">{{item.sub}}</view>
+      </view>
+    </view>
+
+    <view class="card">
+      <view class="card-title">平台分布</view>
+      <view class="platform-row" wx:for="{{overview.accounts.byPlatform}}" wx:key="*this" wx:for-index="plat" wx:for-item="count">
+        <text class="plat-name">{{plat}}</text>
+        <text class="plat-count">{{count}} 个账号</text>
+      </view>
+      <view wx:if="{{!overview.accounts.byPlatform}}" class="empty">暂无数据</view>
+    </view>
+  </block>
+</view>

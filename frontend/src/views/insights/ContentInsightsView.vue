@@ -1,0 +1,500 @@
+<template>
+  <div class="content-insights">
+    <div class="ci-header">
+      <div>
+        <h2>内容洞察</h2>
+        <p>查看内容排行榜和标签表现</p>
+      </div>
+      <div class="ci-header__actions">
+        <el-select
+          v-model="groupId"
+          class="ci-filter ci-filter--group"
+          clearable
+          placeholder="全部老师"
+          @change="loadAll"
+        >
+          <el-option
+            v-for="g in groups"
+            :key="g.id"
+            :value="g.id"
+            :label="`${g.name} (${groupAccountCount(g)}账号)`"
+          />
+        </el-select>
+        <el-select
+          v-model="platform"
+          class="ci-filter"
+          clearable
+          placeholder="全部平台"
+          @change="loadAll"
+        >
+          <el-option v-for="p in platforms" :key="p.value" :value="p.value" :label="p.label" />
+        </el-select>
+        <el-button type="primary" :loading="loading" @click="loadAll">刷新</el-button>
+      </div>
+    </div>
+
+    <el-alert
+      v-if="error"
+      :title="error"
+      type="error"
+      show-icon
+      closable
+      class="ci-error"
+      @close="error = null"
+    />
+
+    <el-card shadow="hover" class="ci-section">
+      <template #header>
+        <div class="ci-section__header">
+          <span>排行榜</span>
+          <el-radio-group v-model="rankingPeriod" size="small" @change="loadRanking">
+            <el-radio-button value="week">周榜</el-radio-button>
+            <el-radio-button value="month">月榜</el-radio-button>
+            <el-radio-button value="all">总榜</el-radio-button>
+          </el-radio-group>
+        </div>
+      </template>
+
+      <div class="ci-ranking-tabs">
+        <el-radio-group v-model="rankingTab" size="small" @change="loadRanking">
+          <el-radio-button value="views">播放量排行</el-radio-button>
+          <el-radio-button value="engagement">互动率排行</el-radio-button>
+        </el-radio-group>
+      </div>
+
+      <el-table
+        v-loading="rankingLoading"
+        :data="currentRanking"
+        stripe
+        size="small"
+        max-height="620"
+        empty-text="暂无排行数据"
+        @row-click="handleRankingClick"
+      >
+        <el-table-column label="#" width="52" align="center">
+          <template #default="{ row }">
+            <span class="rank-badge" :class="'rank-' + Math.min(row.rank, 3)">{{ row.rank }}</span>
+          </template>
+        </el-table-column>
+        <el-table-column label="内容" min-width="320">
+          <template #default="{ row }">
+            <div class="ranking-title">{{ row.title || '无标题' }}</div>
+            <div class="ranking-meta">
+              <PlatformIcon :platform="row.platform" />
+              <span>{{ row.accountName }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="播放量" prop="views" width="110" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.views) }}</template>
+        </el-table-column>
+        <el-table-column label="点赞" prop="likes" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.likes) }}</template>
+        </el-table-column>
+        <el-table-column label="评论" prop="comments" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.comments) }}</template>
+        </el-table-column>
+        <el-table-column label="转发" prop="shares" width="90" align="right" sortable>
+          <template #default="{ row }">{{ formatNum(row.shares) }}</template>
+        </el-table-column>
+        <el-table-column label="互动率" prop="engagementRate" width="100" align="right" sortable>
+          <template #default="{ row }">{{ Number(row.engagementRate || 0).toFixed(1) }}%</template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <el-card shadow="hover" class="ci-section">
+      <template #header>
+        <div class="ci-section__header">
+          <span>标签表现</span>
+          <span class="ci-section__hint">按内容标签出现次数排序</span>
+        </div>
+      </template>
+      <el-skeleton v-if="tagsLoading" :rows="3" animated />
+      <div v-else-if="tags.length > 0" class="ci-tags">
+        <span
+          v-for="tag in tags"
+          :key="tag.name"
+          class="ci-tag"
+          :class="{ 'ci-tag--active': activeTag === tag.name }"
+          :style="{ fontSize: tagSize(tag.count) + 'px' }"
+          @click="toggleTag(tag.name)"
+        >
+          {{ tag.name }}<sup>{{ tag.count }}</sup>
+        </span>
+      </div>
+      <div v-if="activeTag" class="ci-tag-clear">
+        <el-button size="small" type="info" plain @click="clearTag">
+          清除标签筛选：{{ activeTag }}
+        </el-button>
+      </div>
+      <el-empty v-else description="暂无标签数据" :image-size="96" />
+    </el-card>
+
+    <PostDetailDrawer ref="detailDrawerRef" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { analyticsApi } from '@/api/analytics'
+import { accountsApi } from '@/api/accounts'
+import PlatformIcon from '@/components/common/PlatformIcon.vue'
+import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
+import { PLATFORM_LABELS, type AccountGroup } from '@/types'
+import { toBackend } from '@/utils/platform'
+
+type RankingPeriod = 'week' | 'month' | 'all'
+type RankingTab = 'views' | 'engagement'
+
+interface RankingItem {
+  rank: number
+  postId: string
+  title: string
+  platform: string
+  accountName: string
+  accountAvatar: string
+  views: number
+  likes: number
+  comments: number
+  shares: number
+  engagementRate: number
+  publishedAt: string
+}
+
+interface TagItem {
+  name: string
+  count: number
+}
+
+const loading = ref(false)
+const rankingLoading = ref(false)
+const tagsLoading = ref(false)
+const error = ref<string | null>(null)
+const platform = ref('')
+const groupId = ref('')
+const groups = ref<AccountGroup[]>([])
+const rankingPeriod = ref<RankingPeriod>('all')
+const rankingTab = ref<RankingTab>('views')
+const viewsRanking = ref<RankingItem[]>([])
+const engagementRanking = ref<RankingItem[]>([])
+const tags = ref<TagItem[]>([])
+const detailDrawerRef = ref()
+const activeTag = ref('')
+
+const platforms = Object.entries(PLATFORM_LABELS).map(([value, label]) => ({ value, label }))
+const currentRanking = computed(() => {
+  const list = rankingTab.value === 'views' ? viewsRanking.value : engagementRanking.value
+  if (!activeTag.value) return list
+  return list.filter((item) => {
+    const tags = (item.title || '').match(/#[\u4e00-\u9fa5\w]+/g)?.map((t) => t.slice(1)) || []
+    return tags.includes(activeTag.value)
+  })
+})
+
+function filterParams() {
+  return {
+    platform: platform.value ? toBackend(platform.value) : undefined,
+    groupId: groupId.value || undefined,
+  }
+}
+
+function groupAccountCount(group: AccountGroup): number {
+  return (
+    group.count ??
+    (group as AccountGroup & { _count?: { accounts?: number } })._count?.accounts ??
+    0
+  )
+}
+
+async function loadRanking() {
+  rankingLoading.value = true
+  error.value = null
+  try {
+    const params = {
+      limit: 80,
+      period: rankingPeriod.value,
+      ...filterParams(),
+    }
+    if (rankingTab.value === 'views') {
+      const res = await analyticsApi.getViewsRanking(params)
+      viewsRanking.value = res.data?.ranking || []
+    } else {
+      const res = await analyticsApi.getEngagementRanking(params)
+      engagementRanking.value = res.data?.ranking || []
+    }
+  } catch (e: any) {
+    error.value = e.message || '排行榜加载失败'
+  } finally {
+    rankingLoading.value = false
+  }
+}
+
+async function loadTags() {
+  tagsLoading.value = true
+  try {
+    const res = await analyticsApi.getTags({ groupId: groupId.value || undefined })
+    tags.value = res.data || []
+  } catch (e: any) {
+    error.value = e.message || '标签加载失败'
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
+async function loadGroups() {
+  const res = await accountsApi.getGroups()
+  groups.value = res.data || []
+}
+
+async function loadAll() {
+  loading.value = true
+  viewsRanking.value = []
+  engagementRanking.value = []
+  try {
+    await Promise.all([loadRanking(), loadTags(), loadGroups()])
+  } finally {
+    loading.value = false
+  }
+}
+
+function formatNum(n: number): string {
+  if (!n) return '0'
+  if (n >= 100000000) return (n / 100000000).toFixed(1) + '亿'
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万'
+  return n.toLocaleString()
+}
+
+function tagSize(count: number): number {
+  const max = tags.value[0]?.count || 1
+  return 14 + (count / max) * 12
+}
+
+function handleRankingClick(row: RankingItem) {
+  detailDrawerRef.value?.open(row)
+}
+
+function toggleTag(tagName: string) {
+  if (activeTag.value === tagName) {
+    activeTag.value = ''
+  } else {
+    activeTag.value = tagName
+  }
+}
+
+function clearTag() {
+  activeTag.value = ''
+}
+
+onMounted(() => {
+  loadAll()
+})
+</script>
+
+<style lang="scss" scoped>
+.content-insights {
+  padding: 32px;
+  max-width: 1440px;
+  margin: 0 auto;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.ci-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+
+  h2 {
+    margin: 0;
+    color: var(--color-text-primary);
+    font-size: 24px;
+    font-weight: 600;
+  }
+
+  p {
+    margin: 6px 0 0;
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+  }
+
+  &__actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+}
+
+.ci-filter {
+  width: 120px;
+
+  &--group {
+    width: 170px;
+  }
+}
+
+.ci-error,
+.ci-section {
+  margin-bottom: 24px;
+}
+
+.ci-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.ci-section__hint {
+  color: $text-tertiary;
+  font-size: 12px;
+}
+
+.ci-ranking-tabs {
+  margin-bottom: 12px;
+}
+
+.rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.08);
+  color: $text-tertiary;
+  font-size: 12px;
+  font-weight: 600;
+
+  &.rank-1 {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+  }
+
+  &.rank-2 {
+    background: rgba(148, 163, 184, 0.15);
+    color: #94a3b8;
+  }
+
+  &.rank-3 {
+    background: rgba(217, 119, 6, 0.15);
+    color: #f59e0b;
+  }
+}
+
+.ranking-title {
+  max-width: 640px;
+  overflow: hidden;
+  color: $text-primary;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ranking-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+  color: $text-tertiary;
+  font-size: 12px;
+}
+
+.ci-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 14px;
+  padding: 16px 0 8px;
+}
+
+.ci-tag {
+  color: $accent-400;
+  cursor: pointer;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: color 0.15s;
+
+  &:hover {
+    color: $accent-300;
+  }
+
+  &--active {
+    color: #fff;
+    background: $accent-500;
+    padding: 2px 8px;
+    border-radius: 6px;
+  }
+
+  sup {
+    margin-left: 2px;
+    color: $text-placeholder;
+    font-size: 0.64em;
+    font-weight: 500;
+  }
+}
+
+.ci-tag-clear {
+  margin-top: 8px;
+}
+
+:deep(.ci-section .el-card__header) {
+  color: $text-primary;
+}
+
+:deep(.ci-section .el-table) {
+  --el-table-text-color: $text-secondary;
+  --el-table-header-text-color: $text-tertiary;
+  --el-table-row-hover-bg-color: rgba(99, 102, 241, 0.08);
+  color: $text-secondary;
+}
+
+:deep(.ci-section .el-table th.el-table__cell) {
+  color: $text-tertiary;
+}
+
+:deep(.ci-section .el-table td.el-table__cell) {
+  color: $text-secondary;
+}
+
+:deep(.ci-section .el-table__stripe .el-table__body tr.el-table__row--striped td.el-table__cell) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+@media (max-width: 900px) {
+  .content-insights {
+    padding: 20px;
+  }
+
+  .ci-header {
+    flex-direction: column;
+
+    &__actions {
+      width: 100%;
+      flex-wrap: wrap;
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .content-insights {
+    padding: 12px;
+  }
+
+  .ci-header {
+    h2 {
+      font-size: 20px;
+    }
+  }
+
+  .ci-filter {
+    width: 100%;
+    &--group {
+      width: 100%;
+    }
+  }
+}
+</style>

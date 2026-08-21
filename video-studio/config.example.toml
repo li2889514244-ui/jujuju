@@ -1,0 +1,118 @@
+# Video Studio 配置文件
+# 复制此文件为 config.toml 并填入你自己的 key
+
+[app]
+# WebUI 端口
+port = 5600
+# 日志级别: DEBUG, INFO, WARNING, ERROR
+log_level = "INFO"
+
+# ─── 字幕设置 ───
+[subtitle]
+# 识别引擎: "tiny" (快速，CPU可跑) 或 "whisper" (更准确，需配置模型大小)
+provider = "tiny"
+
+# Whisper 模型 (仅 provider="whisper" 时生效)
+# tiny < base < small < medium < large-v3
+# tiny 最快但准确度低，large-v3 最准但需要好显卡
+whisper_model = "medium"
+whisper_device = "cpu"  # "cpu" 或 "cuda"
+
+# ASS 字幕样式 ── 按你的字体规范配置
+# 字体名称（Windows 常见：微软雅黑、思源黑体、黑体、楷体）
+font_name = "微软雅黑"
+# 字号
+font_size = 48
+# 字体颜色（ASS十六进制 &HAABBGGRR，注意是 BGR 不是 RGB）
+# &H00FFFFFF = 白色, &H0000FFFF = 黄色, &H000000FF = 红色
+primary_color = "&H00FFFFFF"
+# 描边颜色
+outline_color = "&H00000000"
+# 描边宽度
+outline_width = 2
+# 阴影
+shadow = 1
+# 字幕位置: 底部="bottom" 中间="middle" 顶部="top"
+position = "bottom"
+# 距离边缘的边距（像素）
+margin_v = 60
+
+# ─── B-roll 素材搜索 ───
+[material]
+# 素材源: "pixabay" (国内可访问) 或 "pexels" 或 "local"
+source = "pixabay"
+# Pixabay API Key (免费注册: https://pixabay.com/api/docs/)
+pixabay_api_key = ""
+# Pexels API Key (免费注册: https://www.pexels.com/api/)
+pexels_api_key = ""
+# 下载素材保存目录
+download_dir = "storage/materials"
+# 搜索结果数量
+results_count = 10
+# 最小素材时长（秒）
+min_duration = 5
+
+# 本地素材目录（source="local" 时使用，放你自己的素材文件）
+local_dir = "storage/local_materials"
+
+# ─── AI 关键词提取 ───
+[ai]
+# LLM 提供商: "deepseek" 或 "openai" 或 "qwen" 或 "moonshot" 或 "none"
+provider = "deepseek"
+
+# DeepSeek (最便宜，1元百万token)
+deepseek_api_key = ""
+deepseek_base_url = "https://api.deepseek.com/v1"
+deepseek_model = "deepseek-chat"
+
+# 通义千问（有免费额度）
+qwen_api_key = ""
+qwen_base_url = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+qwen_model = "qwen-plus"
+
+# 月之暗面 Kimi（有免费额度）
+moonshot_api_key = ""
+moonshot_base_url = "https://api.moonshot.cn/v1"
+moonshot_model = "moonshot-v1-8k"
+
+# OpenAI 兼容
+openai_api_key = ""
+openai_base_url = "https://api.openai.com/v1"
+openai_model = "gpt-4o-mini"
+
+# provider="none" 时，使用简单的关键词分词，不调用 AI
+
+# ─── 背景音乐 ───
+[bgm]
+# 音乐来源: "local" (本地文件) 或 "none" (不加音乐)
+source = "local"
+# 本地音乐目录
+music_dir = "storage/music"
+# 默认音量 (0.0 ~ 1.0)
+volume = 0.15
+# 是否淡入淡出
+fade = true
+
+# ─── FFmpeg 设置 ───
+[ffmpeg]
+# FFmpeg 路径，留空则使用 imageio-ffmpeg 自带的
+path = ""
+# 视频编码器: libx264 (兼容性最好) 或 h264_nvenc (NVIDIA硬解) 或 h264_qsv (Intel硬解)
+video_codec = "libx264"
+# 视频质量 (CRF值，越小质量越高，18~28推荐)
+crf = 23
+# 音频编码器
+audio_codec = "aac"
+# 音频比特率
+audio_bitrate = "192k"
+# 输出分辨率: "original" (保持原分辨率) 或 "1080x1920" (竖屏) 或 "1920x1080" (横屏)
+output_resolution = "original"
+
+# ─── 输出设置 ───
+[output]
+# 输出目录
+dir = "storage/output"
+# 是否保留中间文件（ASS字幕、下载的B-roll等）
+keep_intermediate = true
+# 中间文件目录
+intermediate_dir = "storage/intermediate"

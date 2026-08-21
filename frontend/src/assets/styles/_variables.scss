@@ -1,0 +1,243 @@
+﻿// MatrixFlow v6 - Deep Space Quiet design tokens
+// 注意：本文件仅暴露 SCSS 变量与 mixin，由 vite additionalData 自动注入。
+// 任何 CSS 输出（:root、html、body 等）请放在 global.scss / _element-overrides.scss。
+
+// ============================================================
+// 1. 背景层次（5 层，从最底到悬停态）
+// ============================================================
+$bg-deep:      #0a0b14;   // 页面最底
+$bg-base:      #0f1018;   // 主内容区
+$bg-elevated:  #161823;   // 卡片
+$bg-overlay:   #1c1f2e;   // Dialog / Popover
+$bg-hover:     #232639;   // 悬停态
+
+// 旧别名（保持向后兼容）
+$color-bg-deep:      $bg-deep;
+$color-bg-primary:   $bg-base;
+$color-bg-secondary: $bg-base;
+$color-bg-tertiary:  $bg-elevated;
+$color-bg-elevated:  $bg-elevated;
+$color-bg-hover:     $bg-hover;
+
+// ============================================================
+// 2. 文本层次（4 阶）
+// ============================================================
+$text-primary:     #e6e8f0;
+$text-secondary:   #c0c4d4;
+$text-tertiary:    #8a90a8;
+$text-placeholder: #5e6480;
+
+$color-text-primary:     $text-primary;
+$color-text-secondary:   $text-secondary;
+$color-text-tertiary:    $text-tertiary;
+$color-text-placeholder: $text-placeholder;
+
+// ============================================================
+// 3. 强调色 - 靛紫 Indigo Nebula（7 阶）
+// ============================================================
+$accent-50:   #eef0ff;
+$accent-100:  #e0e4ff;
+$accent-200:  #c7ccff;
+$accent-300:  #a5b0ff;
+$accent-400:  #818cf8;
+$accent-500:  #6366f1;   // ★ 主强调
+$accent-600:  #5558e3;   // 按下
+$accent-700:  #4348c7;   // 深色文字 on light
+$accent-glow: rgba(99, 102, 241, 0.35);
+
+// 旧别名
+$color-accent:     $accent-500;
+$color-accent-alt: $accent-400;  // 用作渐变第二色 / hover
+$primary-color:    $accent-500;
+
+// ============================================================
+// 4. 语义色
+// ============================================================
+$color-success: #10b981;   // emerald
+$color-warning: #f59e0b;   // amber
+$color-danger:  #ef4444;   // red
+$color-info:    #06b6d4;   // cyan
+
+$success-color: $color-success;
+$warning-color: $color-warning;
+$danger-color:  $color-danger;
+$info-color:    $color-info;
+
+// ============================================================
+// 5. 边框 / 分隔（4 阶 + Focus）
+// ============================================================
+$border-subtle:  rgba(255, 255, 255, 0.06);
+$border-base:    rgba(255, 255, 255, 0.08);
+$border-strong:  rgba(255, 255, 255, 0.12);
+$border-focus:   rgba(99, 102, 241, 0.5);
+
+$color-border:        $border-base;
+$color-border-hover:  $border-strong;
+$color-border-active: $border-focus;
+$color-separator:     $border-subtle;
+
+// ============================================================
+// 6. 阴影（3 级 + 强调发光）
+// ============================================================
+$shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+$shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.04);
+$shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06);
+$shadow-glow: 0 0 24px rgba(99, 102, 241, 0.18);
+
+// ============================================================
+// 7. 间距（4px 基线）
+// ============================================================
+$space-1:  4px;
+$space-2:  8px;
+$space-3:  12px;
+$space-4:  16px;
+$space-5:  20px;
+$space-6:  24px;
+$space-8:  32px;
+$space-10: 40px;
+$space-12: 48px;
+$space-16: 64px;
+$space-20: 80px;
+
+// 旧别名（按原命名映射）
+$space-xs:  $space-2;
+$space-sm:  $space-3;
+$space-md:  $space-4;
+$space-lg:  $space-6;
+$space-xl:  $space-8;
+$space-2xl: $space-12;
+$space-3xl: $space-16;
+$space-4xl: $space-20;
+$section-gap: 56px;
+
+// ============================================================
+// 8. 圆角
+// ============================================================
+$radius-sm:   6px;
+$radius-md:   10px;
+$radius-lg:   14px;
+$radius-xl:   20px;
+$radius-full: 9999px;
+
+// ============================================================
+// 9. 缓动
+// ============================================================
+$ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
+$ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+$ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+$ease-in-out: cubic-bezier(0.45, 0, 0.15, 1);
+
+// ============================================================
+// 10. 布局
+// ============================================================
+$sidebar-width:           240px;
+$sidebar-collapsed-width: 64px;
+$topbar-height:           56px;
+$content-max-width:       1440px;
+$content-padding:         32px;
+
+// ============================================================
+// 11. 断点
+// ============================================================
+$bp-sm: 640px;
+$bp-md: 768px;
+$bp-lg: 1024px;
+$bp-xl: 1280px;
+
+// ============================================================
+// 12. 字体
+// ============================================================
+$font-sans:
+  'Inter',
+  'Noto Sans SC',
+  -apple-system,
+  BlinkMacSystemFont,
+  'Segoe UI',
+  'PingFang SC',
+  'Microsoft YaHei',
+  sans-serif;
+$font-mono:
+  'JetBrains Mono',
+  'SF Mono',
+  'Cascadia Code',
+  Consolas,
+  Menlo,
+  monospace;
+
+// 旧别名
+$font-body:    $font-sans;
+$font-heading: $font-sans;
+
+// 字阶
+$text-display:  56px;
+$text-hero:     48px;   // 旧别名
+$text-h1:       32px;
+$text-h2:       24px;
+$text-h3:       18px;
+$text-headline: $text-h2;
+$text-title:    $text-h3;
+$text-body:     14px;
+$text-sm:       13px;
+$text-caption:  $text-sm;
+$text-xs:       12px;
+$text-micro:    11px;
+
+// ============================================================
+// 13. 平台色（用于平台徽标 / 数据图例）
+// ============================================================
+$douyin-color:      #ffffff;
+$kuaishou-color:    #ff6a21;
+$xiaohongshu-color: #ff3d57;
+$bilibili-color:    #00a1d6;
+$weibo-color:       #ff8200;
+$wechat-color:      #07c160;
+
+// ============================================================
+// 14. Mixins
+// ============================================================
+@mixin card {
+  background: $bg-elevated;
+  border: 1px solid $border-base;
+  border-radius: $radius-lg;
+  box-shadow: $shadow-sm;
+}
+
+@mixin card-hover {
+  transition:
+    transform 0.2s $ease-out,
+    border-color 0.2s $ease-out,
+    box-shadow 0.2s $ease-out,
+    background 0.2s $ease-out;
+
+  &:hover {
+    transform: translateY(-2px);
+    border-color: $border-strong;
+    box-shadow: $shadow-md;
+  }
+}
+
+@mixin card-flat {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid $border-subtle;
+  border-radius: $radius-md;
+}
+
+@mixin focus-ring {
+  outline: none;
+  box-shadow:
+    0 0 0 2px $bg-deep,
+    0 0 0 4px $border-focus;
+  border-color: $accent-500;
+}
+
+@mixin glass {
+  background: rgba(28, 31, 46, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid $border-base;
+}
+
+@mixin tabular-num {
+  font-feature-settings: 'tnum';
+  font-variant-numeric: tabular-nums;
+}

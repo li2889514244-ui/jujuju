@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: matrixflow
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: matrixflow-erp
+data:
+  NODE_ENV: 'production'
+  PORT: '3000'
+  LOG_LEVEL: 'info'
+  CORS_ORIGIN: 'https://ddddkiii.com'
+  # PostgreSQL connection (host references the k8s service)
+  DATABASE_HOST: 'postgres'
+  DATABASE_PORT: '5432'
+  DATABASE_NAME: 'matrixflow'
+  # Redis connection
+  REDIS_HOST: 'redis'
+  REDIS_PORT: '6379'
+  # Rate limiting
+  THROTTLE_TTL: '60'
+  THROTTLE_LIMIT: '100'
+  # JWT
+  JWT_ACCESS_EXPIRES: '15m'
+  JWT_REFRESH_EXPIRES: '365d'
+  # MCP read-only server
+  MCP_ALLOWED_ORIGINS: 'https://ddddkiii.com'
+  MCP_MAX_ROWS: '500'
+  MCP_MAX_RANGE_DAYS: '366'
+  # Feishu / Lark notifications
+  FEISHU_NOTIFY_ENABLED: 'true'
+  FEISHU_NOTIFY_TYPES: ''
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: matrixflow
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: matrixflow-erp
+data:
+  redis.conf: |
+    maxmemory 256mb
+    maxmemory-policy allkeys-lru
+    save 900 1
+    save 300 10
+    save 60 10000
+    appendonly yes
+    appendfsync everysec
+    tcp-keepalive 300
+    timeout 0
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init
+  namespace: matrixflow
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: matrixflow-erp
+data:
+  01-init.sql: |
+    -- MatrixFlow ERP Database Initialization
+    CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+    CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+    CREATE EXTENSION IF NOT EXISTS "btree_gin";
+
+    -- Create indexes for full-text search
+    -- (Application migrations will handle schema creation)

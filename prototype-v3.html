@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>披星云 — 设计系统原型</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+/* ============ RESET ============ */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+/* ============ DESIGN TOKENS ============ */
+:root{
+  --void:#060b14;
+  --abyss:#0a101f;
+  --deep:#0e1527;
+  --surface:#111a30;
+  --surface-elevated:#152036;
+  --cyan:#5ee4ff;
+  --cyan-dim:rgba(94,228,255,0.05);
+  --cyan-subtle:rgba(94,228,255,0.12);
+  --cyan-mid:rgba(94,228,255,0.25);
+  --cyan-glow:rgba(94,228,255,0.18);
+  --amber:#eba456;
+  --amber-dim:rgba(235,164,86,0.06);
+  --amber-subtle:rgba(235,164,86,0.14);
+  --purple:rgba(123,94,167,0.15);
+  --blue-nova:rgba(30,80,160,0.12);
+  --white:#e4ecf5;
+  --text-primary:#d4dde6;
+  --text-secondary:#7a8899;
+  --text-tertiary:#465366;
+  --text-disabled:#2a3545;
+  --border:rgba(94,228,255,0.06);
+  --border-active:rgba(94,228,255,0.18);
+  --border-hover:rgba(94,228,255,0.10);
+  --radius-sm:4px;
+  --radius-md:8px;
+  --radius-lg:12px;
+  --radius-pill:9999px;
+  --font-display:'Barlow Semi Condensed',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-body:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
+  --font-mono:'DM Mono',monospace;
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+}
+
+html,body{
+  height:100%;font-family:var(--font-body);font-size:14px;line-height:1.5;
+  color:var(--text-primary);background:var(--void);
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+
+/* ============ COSMOS (CSS-only) ============ */
+.cosmos{
+  position:fixed;inset:0;pointer-events:none;z-index:0;
+}
+/* Nebula layers */
+.cosmos::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 40% at 30% -10%, var(--purple) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 30% at 70% 105%, var(--blue-nova) 0%, transparent 50%),
+    radial-gradient(ellipse 50% 25% at 50% 50%, rgba(94,228,255,0.04) 0%, transparent 40%);
+}
+/* Stars */
+.cosmos::after{
+  content:'';position:absolute;inset:0;
+  background-image:
+    radial-gradient(1px 1px at 8% 12%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1.5px 1.5px at 22% 28%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 38% 8%, rgba(255,255,255,0.8), transparent),
+    radial-gradient(1.5px 1.5px at 52% 42%, rgba(94,228,255,0.6), transparent),
+    radial-gradient(1px 1px at 68% 18%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1.5px 1.5px at 82% 52%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 12% 68%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 32% 78%, rgba(94,228,255,0.5), transparent),
+    radial-gradient(1.5px 1.5px at 58% 72%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 78% 82%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 4% 48%, rgba(255,255,255,0.3), transparent),
+    radial-gradient(1.5px 1.5px at 48% 4%, rgba(235,164,86,0.5), transparent),
+    radial-gradient(1px 1px at 88% 38%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 18% 88%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 72% 62%, rgba(94,228,255,0.3), transparent),
+    radial-gradient(1px 1px at 44% 55%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 92% 20%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 25% 48%, rgba(94,228,255,0.4), transparent);
+}
+
+/* ============ LAYOUT SHELL ============ */
+.shell{position:relative;z-index:1;display:flex;height:100vh}
+.sidebar{width:224px;flex-shrink:0;display:flex;flex-direction:column;background:rgba(10,16,31,0.92);border-right:1px solid var(--border);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);z-index:10}
+.sidebar__logo{display:flex;align-items:center;gap:10px;padding:0 20px;height:56px;border-bottom:1px solid var(--border);text-decoration:none}
+.sidebar__logo-svg{width:24px;height:24px;flex-shrink:0}
+.sidebar__logo-text{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--white);letter-spacing:0.02em}
+.sidebar__nav{flex:1;padding:8px 12px;display:flex;flex-direction:column;gap:1px;overflow-y:auto}
+.sidebar__item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:6px;color:var(--text-secondary);text-decoration:none;font-size:13px;font-weight:450;transition:all 0.2s var(--ease-out);position:relative}
+.sidebar__item:hover{background:var(--cyan-dim);color:var(--text-primary)}
+.sidebar__item--active{background:var(--cyan-subtle);color:var(--cyan)}
+.sidebar__item--active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;background:var(--cyan);border-radius:0 2px 2px 0}
+.sidebar__item-dot{width:16px;height:16px;display:flex;align-items:center;justify-content:center;opacity:0.65}
+.sidebar__item--active .sidebar__item-dot{opacity:1}
+.sidebar__bottom{padding:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.sidebar__status{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;background:rgba(107,158,108,0.06);font-family:var(--font-mono);font-size:10px;color:var(--text-tertiary)}
+.sidebar__status-dot{width:5px;height:5px;border-radius:50%;background:#6b9e6c;animation:statusPulse 3s ease-in-out infinite}
+@keyframes statusPulse{0%,100%{opacity:1}50%{opacity:0.3}}
+
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.topbar{height:48px;display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--border);flex-shrink:0;background:rgba(10,16,31,0.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+.topbar__bread{font-size:12px;color:var(--text-tertiary)}
+.topbar__bread b{color:var(--text-secondary);font-weight:450}
+.topbar__bread-sep{margin:0 8px;color:var(--text-disabled)}
+.topbar__right{display:flex;align-items:center;gap:18px;font-size:12px;color:var(--text-secondary)}
+.topbar__user{color:var(--cyan);font-family:var(--font-mono);font-size:11px}
+.content{flex:1;overflow-y:auto;overflow-x:hidden;position:relative}
+.content::-webkit-scrollbar{width:3px}
+.content::-webkit-scrollbar-track{background:transparent}
+.content::-webkit-scrollbar-thumb{background:rgba(94,228,255,0.08);border-radius:10px}
+
+/* ============ PATTERN SWITCHER ============ */
+.pattern-bar{
+  position:fixed;bottom:0;left:224px;right:0;z-index:50;
+  display:flex;gap:0;background:rgba(10,16,31,0.94);
+  border-top:1px solid var(--border);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  overflow-x:auto;
+}
+.pattern-bar::-webkit-scrollbar{height:0}
+.pattern-tab{
+  flex:1;min-width:fit-content;padding:10px 16px;
+  font-family:var(--font-mono);font-size:10px;text-transform:uppercase;
+  letter-spacing:0.1em;color:var(--text-tertiary);
+  background:none;border:none;cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all 0.2s var(--ease-out);white-space:nowrap;
+}
+.pattern-tab:hover{color:var(--text-secondary);background:var(--cyan-dim)}
+.pattern-tab--active{color:var(--cyan);border-bottom-color:var(--cyan);background:var(--cyan-dim)}
+
+/* ============ PATTERN PANEL ============ */
+.pattern{display:none;padding:40px;animation:fadeUp 0.4s var(--ease-out)}
+.pattern--active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+/* ============ SECTION LABELS ============ */
+.section-hd{display:flex;align-items:baseline;gap:10px;margin-bottom:20px}
+.section-hd__label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.25em;color:var(--text-tertiary)}
+.section-hd__count{font-family:var(--font-mono);font-size:12px;color:var(--cyan)}
+.section-hd__link{margin-left:auto;font-size:12px;color:var(--text-tertiary);text-decoration:none;transition:color 0.2s}
+.section-hd__link:hover{color:var(--cyan)}
+
+/* ============ CARDS UNIVERSAL ============ */
+.card{
+  background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--radius-lg);padding:24px;
+  transition:border-color 0.3s var(--ease-out),box-shadow 0.3s var(--ease-out);
+  position:relative;overflow:hidden;
+}
+.card:hover{border-color:var(--border-hover);box-shadow:0 4px 24px rgba(0,0,0,0.3),inset 0 1px 0 rgba(255,255,255,0.02)}
+.card--flat{background:var(--deep)}
+
+/* ============ FORM ELEMENTS ============ */
+.input{
+  width:100%;padding:10px 14px;background:var(--deep);border:1px solid var(--border);
+  border-radius:var(--radius-md);color:var(--text-primary);font-size:13px;
+  font-family:var(--font-body);outline:none;transition:border-color 0.2s;
+}
+.input:focus{border-color:var(--cyan-mid);box-shadow:0 0 0 3px var(--cyan-dim)}
+.input::placeholder{color:var(--text-disabled)}
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 18px;
+  border-radius:var(--radius-pill);font-size:12px;font-weight:500;
+  font-family:var(--font-body);cursor:pointer;transition:all 0.2s var(--ease-out);
+  border:1px solid var(--border);background:var(--surface);color:var(--text-secondary);
+}
+.btn:hover{border-color:var(--border-active);color:var(--text-primary);background:var(--surface-elevated)}
+.btn--primary{background:var(--cyan-subtle);border-color:var(--cyan-mid);color:var(--cyan)}
+.btn--primary:hover{background:rgba(94,228,255,0.2);box-shadow:0 0 12px var(--cyan-glow)}
+.btn--danger{color:#d4534a;border-color:rgba(212,83,74,0.2)}
+.btn--danger:hover{background:rgba(212,83,74,0.08);border-color:rgba(212,83,74,0.3)}
+.btn--sm{padding:5px 12px;font-size:11px}
+.btn--icon{padding:8px;border-radius:var(--radius-sm);width:32px;height:32px;justify-content:center}
+.tag{
+  display:inline-flex;align-items:center;padding:2px 10px;border-radius:var(--radius-pill);
+  font-size:11px;font-weight:500;
+}
+.tag--live{background:rgba(94,228,255,0.1);color:var(--cyan)}
+.tag--warn{background:rgba(235,164,86,0.1);color:var(--amber)}
+.tag--dead{background:rgba(70,83,102,0.15);color:var(--text-tertiary)}
+.tag--success{background:rgba(107,158,108,0.1);color:#6b9e6c}
+
+/* ============ BADGE ============ */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px}
+.badge__dot{width:5px;height:5px;border-radius:50%;flex-shrink:0}
+.badge__dot--live{background:var(--cyan);box-shadow:0 0 6px var(--cyan-glow)}
+.badge__dot--warn{background:var(--amber);box-shadow:0 0 4px rgba(235,164,86,0.4)}
+.badge__dot--dead{background:var(--text-tertiary)}
+
+/* ============ TABLE ============ */
+.tbl{width:100%;border-collapse:collapse}
+.tbl th{text-align:left;padding:10px 14px;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-tertiary);border-bottom:1px solid var(--border);font-weight:400}
+.tbl td{padding:12px 14px;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-secondary)}
+.tbl tr:hover td{background:var(--cyan-dim);color:var(--text-primary)}
+.tbl__num{font-family:var(--font-mono);font-size:12px;text-align:right}
+.tbl__name{color:var(--text-primary);font-weight:500}
+
+/* ============ FLOAT BAR ============ */
+.float-bar{
+  display:flex;align-items:center;gap:16px;padding:10px 24px;
+  background:var(--surface-elevated);border:1px solid var(--border-active);
+  border-radius:var(--radius-pill);position:fixed;bottom:52px;left:50%;
+  transform:translateX(-50%);z-index:40;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5),0 0 24px var(--cyan-dim);
+}
+.float-bar__count{font-family:var(--font-mono);font-size:11px;color:var(--cyan)}
+.float-bar__sep{width:1px;height:14px;background:var(--border-active)}
+
+/* ============ PAGINATION ============ */
+.pg{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:20px}
+.pg__btn{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);font-size:12px;color:var(--text-tertiary);background:none;border:none;cursor:pointer;transition:all 0.15s}
+.pg__btn:hover{background:var(--cyan-dim);color:var(--text-primary)}
+.pg__btn--active{background:var(--cyan-subtle);color:var(--cyan)}
+.pg__btn--disabled{opacity:0.3;pointer-events:none}
+
+/* ============ 1. DASHBOARD ============ */
+.dash-hero{display:flex;flex-direction:column;align-items:center;padding:20px 0 40px}
+.dash-hero__label{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.3em;color:var(--text-tertiary);margin-bottom:8px}
+.dash-hero__value{font-family:var(--font-display);font-size:88px;font-weight:700;line-height:1;color:var(--white);letter-spacing:-0.02em}
+.dash-hero__line{width:36px;height:1px;background:linear-gradient(90deg,transparent,var(--cyan-mid),transparent);margin-top:18px}
+.dash-metrics{display:flex;justify-content:center;gap:64px;margin-bottom:40px}
+.dash-metric{display:flex;flex-direction:column;align-items:center;gap:4px}
+.dash-metric__val{font-family:var(--font-display);font-size:28px;font-weight:600;color:var(--text-primary);line-height:1}
+.dash-metric__lbl{font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.2em;color:var(--text-tertiary)}
+.dash-metric__dlt{font-size:11px;display:flex;align-items:center;gap:2px}
+.dash-metric__dlt--up{color:#6b9e6c}
+.dash-charts{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:40px}
+.dash-chart-placeholder{height:200px;display:flex;align-items:flex-end;gap:3px;padding:0 10px}
+.dash-bar{flex:1;border-radius:2px 2px 0 0;background:linear-gradient(180deg,var(--cyan) 0%,rgba(94,228,255,0.05) 100%);transition:background 0.3s;min-width:3px}
+.dash-bar:hover{background:linear-gradient(180deg,var(--amber) 0%,rgba(235,164,86,0.1) 100%)}
+.dash-accts{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:32px}
+.acct-card{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--deep);border:1px solid var(--border);border-radius:var(--radius-md);text-decoration:none;transition:all 0.25s var(--ease-out);position:relative;overflow:hidden}
+.acct-card::after{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--cyan-dim) 0%,transparent 50%);opacity:0;transition:opacity 0.3s}
+.acct-card:hover{border-color:var(--border-hover);transform:translateY(-2px);box-shadow:0 4px 20px rgba(0,0,0,0.3)}
+.acct-card:hover::after{opacity:1}
+.acct-card__avatar{width:34px;height:34px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:600;color:var(--white)}
+.acct-card__info{flex:1;min-width:0}
+.acct-card__name{font-size:13px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-card__plat{font-size:10px;color:var(--text-tertiary);margin-top:1px}
+.acct-card__arrow{color:var(--text-disabled);opacity:0;transform:translateX(-4px);transition:all 0.3s var(--ease-out);font-size:14px}
+.acct-card:hover .acct-card__arrow{opacity:1;transform:translateX(0);color:var(--cyan)}
+
+/* ============ 2. LIST (Accounts) ============ */
+.filter-bar{display:flex;align-items:center;gap:12px;padding:16px 20px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);margin-bottom:20px}
+.filter-bar__item{display:flex;align-items:center;gap:8px}
+.filter-bar__label{font-size:11px;color:var(--text-tertiary);white-space:nowrap}
+.select{position:relative}
+.select select{appearance:none;-webkit-appearance:none;padding:7px 32px 7px 12px;background:var(--deep);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text-secondary);font-size:12px;font-family:var(--font-body);cursor:pointer;min-width:120px}
+.select::after{content:'▾';position:absolute;right:10px;top:50%;transform:translateY(-50%);color:var(--text-tertiary);font-size:10px;pointer-events:none}
+.filter-bar__right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.list-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;margin-bottom:20px}
+.list-card{display:flex;flex-direction:column;gap:14px;padding:20px;background:var(--deep);border:1px solid var(--border);border-radius:var(--radius-md);cursor:pointer;transition:all 0.25s var(--ease-out);position:relative}
+.list-card:hover{border-color:var(--border-hover)}
+.list-card--selected{border-color:var(--cyan-mid);background:var(--cyan-dim)}
+.list-card__check{position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--border-active);display:flex;align-items:center;justify-content:center}
+.list-card--selected .list-card__check{background:var(--cyan);border-color:var(--cyan)}
+.list-card__top{display:flex;align-items:center;gap:12px}
+.list-card__avatar{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:var(--white);flex-shrink:0}
+.list-card__meta{flex:1;min-width:0}
+.list-card__name{font-size:14px;font-weight:500;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list-card__plat{font-size:11px;color:var(--text-tertiary);margin-top:1px}
+.list-card__stats{display:flex;gap:20px;padding-top:8px;border-top:1px solid var(--border)}
+.list-card__stat{display:flex;flex-direction:column;gap:1px}
+.list-card__stat-val{font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--text-primary)}
+.list-card__stat-lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.06em}
+
+/* ============ 3. DETAIL ============ */
+.detail-back{display:inline-flex;align-items:center;gap:6px;color:var(--text-tertiary);text-decoration:none;font-size:12px;margin-bottom:20px;transition:color 0.2s}
+.detail-back:hover{color:var(--cyan)}
+.detail-layout{display:grid;grid-template-columns:280px 1fr;gap:20px}
+.detail-side{padding:28px;display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center}
+.detail-avatar{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:700;color:var(--white)}
+.detail-name{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--white)}
+.detail-platform{font-size:12px;color:var(--text-secondary)}
+.detail-divider{width:100%;height:1px;background:var(--border)}
+.detail-info{width:100%;display:flex;flex-direction:column;gap:8px}
+.detail-info-row{display:flex;justify-content:space-between;font-size:12px}
+.detail-info-row dt{color:var(--text-tertiary)}
+.detail-info-row dd{color:var(--text-secondary);font-family:var(--font-mono);font-size:11px}
+.detail-main{display:flex;flex-direction:column;gap:16px}
+.detail-metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.detail-metric{padding:16px;text-align:center}
+.detail-metric__val{font-family:var(--font-display);font-size:24px;font-weight:600;color:var(--text-primary)}
+.detail-metric__lbl{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px}
+
+/* ============ 4. EDITOR ============ */
+.editor-layout{display:grid;grid-template-columns:1fr 380px;gap:20px;min-height:calc(100vh - 200px)}
+.editor-main{display:flex;flex-direction:column;gap:16px}
+.editor-toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-md) var(--radius-md) 0 0}
+.editor-toolbar__btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:none;border:none;color:var(--text-tertiary);cursor:pointer;font-size:12px;transition:all 0.15s}
+.editor-toolbar__btn:hover{background:var(--cyan-dim);color:var(--cyan)}
+.editor-toolbar__sep{width:1px;height:16px;background:var(--border);margin:0 4px}
+.editor-textarea{flex:1;min-height:300px;padding:16px;background:var(--deep);border:1px solid var(--border);border-top:none;border-radius:0 0 var(--radius-md) var(--radius-md);color:var(--text-primary);font-size:15px;font-family:var(--font-body);resize:none;outline:none;line-height:1.7}
+.editor-textarea:focus{border-color:var(--border-active)}
+.editor-side{display:flex;flex-direction:column;gap:12px}
+.editor-preview{padding:16px;min-height:200px;display:flex;align-items:center;justify-content:center;color:var(--text-tertiary);font-size:12px}
+.editor-meta{display:flex;flex-direction:column;gap:8px}
+.editor-meta__label{font-size:10px;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:2px}
+.editor-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:auto}
+
+/* ============ 5. CALENDAR ============ */
+.cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-nav{display:flex;align-items:center;gap:12px}
+.cal-nav__title{font-family:var(--font-display);font-size:18px;font-weight:600;color:var(--white);min-width:140px}
+.cal-nav__btn{width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:var(--radius-sm);background:none;border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-size:12px;transition:all 0.15s}
+.cal-nav__btn:hover{background:var(--cyan-dim);border-color:var(--border-hover)}
+.cal-actions{display:flex;gap:8px;align-items:center}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:0;border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden}
+.cal-grid__day-name{padding:8px;text-align:center;font-family:var(--font-mono);font-size:10px;text-transform:uppercase;letter-spacing:0.15em;color:var(--text-tertiary);background:var(--surface);border-bottom:1px solid var(--border)}
+.cal-grid__cell{padding:4px;min-height:100px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--deep);transition:background 0.15s}
+.cal-grid__cell:nth-child(7n){border-right:none}
+.cal-grid__cell:hover{background:var(--surface)}
+.cal-grid__cell--today{background:var(--cyan-dim)}
+.cal-grid__cell--other{opacity:0.4}
+.cal-grid__num{padding:2px 6px;font-size:12px;color:var(--text-secondary)}
+.cal-grid__cell--today .cal-grid__num{color:var(--cyan);font-weight:600}
+.cal-event{padding:2px 6px;margin-bottom:1px;border-radius:2px;font-size:10px;cursor:pointer;border-left:3px solid var(--cyan);color:var(--text-secondary);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;transition:all 0.15s}
+.cal-event:hover{background:var(--cyan-dim);color:var(--text-primary)}
+
+/* ============ 6. LOGIN ============ */
+.login-screen{display:flex;align-items:center;justify-content:center;min-height:80vh}
+.login-card{width:380px;padding:40px;background:rgba(17,26,48,0.8);border:1px solid var(--border);border-radius:var(--radius-lg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);box-shadow:0 16px 48px rgba(0,0,0,0.5)}
+.login-header{text-align:center;margin-bottom:32px}
+.login-header__title{font-family:var(--font-display);font-size:26px;font-weight:700;color:var(--white);letter-spacing:0.02em}
+.login-header__sub{font-size:13px;color:var(--text-tertiary);margin-top:4px}
+.login-tabs{display:flex;margin-bottom:24px;background:var(--deep);border-radius:var(--radius-md);padding:3px}
+.login-tab{flex:1;padding:8px;text-align:center;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-tertiary);background:none;border:none;cursor:pointer;transition:all 0.2s}
+.login-tab--active{background:var(--surface);color:var(--text-primary)}
+.login-form{display:flex;flex-direction:column;gap:14px}
+.login-submit{width:100%;padding:12px;border-radius:var(--radius-pill);background:var(--cyan-subtle);border:1px solid var(--cyan-mid);color:var(--cyan);font-size:14px;font-weight:500;cursor:pointer;transition:all 0.2s;margin-top:4px}
+.login-submit:hover{background:rgba(94,228,255,0.2);box-shadow:0 0 16px var(--cyan-glow)}
+
+/* ============ EMPTY STATE ============ */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:50vh;gap:20px;text-align:center}
+.empty__ring{width:72px;height:72px;border-radius:50%;border:1px solid var(--border-active);box-shadow:0 0 30px var(--cyan-glow);display:flex;align-items:center;justify-content:center}
+.empty__ring-inner{width:14px;height:14px;border-radius:50%;background:var(--cyan);box-shadow:0 0 16px var(--cyan-glow)}
+.empty__title{font-family:var(--font-display);font-size:20px;font-weight:600;color:var(--white)}
+.empty__desc{font-size:13px;color:var(--text-secondary);max-width:280px;line-height:1.6}
+
+/* ============ RESPONSIVE ============ */
+@media(max-width:1200px){
+  .dash-accts{grid-template-columns:repeat(3,1fr)}
+  .dash-hero__value{font-size:64px}
+  .detail-layout{grid-template-columns:1fr}
+}
+@media(max-width:900px){
+  .sidebar{width:60px}.sidebar__logo-text,.sidebar__item span:not(.sidebar__item-dot),.sidebar__status-text{display:none}
+  .dash-accts,.list-grid{grid-template-columns:repeat(2,1fr)}
+  .dash-charts,.editor-layout{grid-template-columns:1fr}
+  .dash-metrics{gap:32px}
+  .pattern-bar{left:60px}
+  .detail-metrics{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+
+<div class="cosmos"></div>
+
+<div class="shell">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <a href="#" class="sidebar__logo">
+      <svg class="sidebar__logo-svg" viewBox="0 0 28 28" fill="none">
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#5ee4ff"/><stop offset="100%" stop-color="#7b5ea7"/></linearGradient></defs>
+        <rect width="28" height="28" rx="6" fill="url(#lg)" opacity="0.9"/>
+        <path d="M9 20V8l12 6-12 6z" fill="#e4ecf5" opacity="0.9"/>
+      </svg>
+      <span class="sidebar__logo-text">披星云</span>
+    </a>
+    <nav class="sidebar__nav">
+      <a href="#" class="sidebar__item sidebar__item--active"><span class="sidebar__item-dot">◈</span> <span>仪表盘</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">●</span> <span>账号管理</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">◇</span> <span>内容编辑</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">◆</span> <span>发布管理</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">◉</span> <span>数据中心</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">○</span> <span>内容日历</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">◎</span> <span>团队管理</span></a>
+      <a href="#" class="sidebar__item"><span class="sidebar__item-dot">◐</span> <span>平台管理</span></a>
+    </nav>
+    <div class="sidebar__bottom">
+      <div class="sidebar__status"><span class="sidebar__status-dot"></span><span class="sidebar__status-text">v0.2.1</span></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div class="topbar__bread">首页 <span class="topbar__bread-sep">/</span> <b id="currentPageName">仪表盘</b></div>
+      <div class="topbar__right">
+        <span class="badge"><span class="badge__dot badge__dot--live"></span> 系统在线</span>
+        <span class="topbar__user">hl@deepspace</span>
+      </div>
+    </header>
+
+    <!-- CONTENT -->
+    <div class="content" id="contentArea">
+
+      <!-- ====== 1. DASHBOARD ====== -->
+      <div class="pattern pattern--active" id="pattern-dashboard">
+        <section class="dash-hero">
+          <p class="dash-hero__label">Total Reach</p>
+          <h1 class="dash-hero__value">12,847</h1>
+          <div class="dash-hero__line"></div>
+        </section>
+        <div class="dash-metrics">
+          <div class="dash-metric"><span class="dash-metric__val">4.2M</span><span class="dash-metric__lbl">播放量</span><span class="dash-metric__dlt dash-metric__dlt--up">↑ 12%</span></div>
+          <div class="dash-metric"><span class="dash-metric__val">892K</span><span class="dash-metric__lbl">点赞</span><span class="dash-metric__dlt dash-metric__dlt--up">↑ 8%</span></div>
+          <div class="dash-metric"><span class="dash-metric__val">3,647</span><span class="dash-metric__lbl">内容数</span><span class="dash-metric__dlt" style="color:#c56b6b">↓ 3%</span></div>
+          <div class="dash-metric"><span class="dash-metric__val">11</span><span class="dash-metric__lbl">活跃账号</span><span class="dash-metric__dlt dash-metric__dlt--up">↑ 2</span></div>
+        </div>
+        <div class="dash-charts">
+          <div class="card">
+            <div class="section-hd"><span class="section-hd__label">增长趋势</span></div>
+            <div class="dash-chart-placeholder">
+              <div class="dash-bar" style="height:35%"></div><div class="dash-bar" style="height:42%"></div><div class="dash-bar" style="height:38%"></div><div class="dash-bar" style="height:48%"></div><div class="dash-bar" style="height:52%"></div><div class="dash-bar" style="height:50%"></div><div class="dash-bar" style="height:58%"></div><div class="dash-bar" style="height:62%"></div><div class="dash-bar" style="height:60%"></div><div class="dash-bar" style="height:68%"></div><div class="dash-bar" style="height:72%"></div><div class="dash-bar" style="height:78%"></div><div class="dash-bar" style="height:75%"></div><div class="dash-bar" style="height:82%"></div><div class="dash-bar" style="height:88%"></div><div class="dash-bar" style="height:85%"></div><div class="dash-bar" style="height:92%"></div><div class="dash-bar" style="height:90%"></div><div class="dash-bar" style="height:95%"></div><div class="dash-bar" style="height:100%"></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-hd"><span class="section-hd__label">平台分布</span></div>
+            <div style="display:flex;align-items:center;justify-content:center;height:200px;gap:40px">
+              <div style="width:120px;height:120px;border-radius:50%;background:conic-gradient(var(--cyan) 0% 35%,var(--amber) 35% 58%,rgba(123,94,167,0.7) 58% 78%,rgba(94,228,255,0.4) 78% 92%,rgba(235,164,86,0.4) 92% 100%);mask:radial-gradient(circle,transparent 54%,black 55%);-webkit-mask:radial-gradient(circle,transparent 54%,black 55%)"></div>
+              <div style="display:flex;flex-direction:column;gap:6px;font-size:11px">
+                <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--cyan)"></span> 抖音 35%</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:var(--amber)"></span> 快手 23%</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:rgba(123,94,167,0.7)"></span> 视频号 20%</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:rgba(94,228,255,0.4)"></span> 小红书 14%</div>
+                <div style="display:flex;align-items:center;gap:6px"><span style="width:6px;height:6px;border-radius:50%;background:rgba(235,164,86,0.4)"></span> 其他 8%</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section-hd"><span class="section-hd__label">已连接账号</span><span class="section-hd__count">11</span><a href="#" class="section-hd__link">查看全部 →</a></div>
+        <div class="dash-accts">
+          <a href="#" class="acct-card"><div class="acct-card__avatar" style="background:linear-gradient(135deg,#5ee4ff,#1a4060)">恒</div><div class="acct-card__info"><div class="acct-card__name">恒德-人生破局</div><div class="acct-card__plat">抖音 · <span class="badge__dot badge__dot--live" style="display:inline-block;width:4px;height:4px"></span> 已连接</div></div><span class="acct-card__arrow">→</span></a>
+          <a href="#" class="acct-card"><div class="acct-card__avatar" style="background:linear-gradient(135deg,#eba456,#5a3a20)">孙</div><div class="acct-card__info"><div class="acct-card__name">孙校教育规划</div><div class="acct-card__plat">视频号 · <span class="badge__dot badge__dot--live" style="display:inline-block;width:4px;height:4px"></span> 已连接</div></div><span class="acct-card__arrow">→</span></a>
+          <a href="#" class="acct-card"><div class="acct-card__avatar" style="background:linear-gradient(135deg,#7b5ea7,#2a1a40)">王</div><div class="acct-card__info"><div class="acct-card__name">王晶说实话</div><div class="acct-card__plat">快手 · <span class="badge__dot badge__dot--warn" style="display:inline-block;width:4px;height:4px"></span> 即将过期</div></div><span class="acct-card__arrow">→</span></a>
+          <a href="#" class="acct-card"><div class="acct-card__avatar" style="background:linear-gradient(135deg,#5ee4ff,#1a4060)">晶</div><div class="acct-card__info"><div class="acct-card__name">晶哥来了</div><div class="acct-card__plat">微博 · <span class="badge__dot badge__dot--live" style="display:inline-block;width:4px;height:4px"></span> 已连接</div></div><span class="acct-card__arrow">→</span></a>
+        </div>
+      </div>
+
+      <!-- ====== 2. ACCOUNT LIST ====== -->
+      <div class="pattern" id="pattern-list">
+        <div class="filter-bar">
+          <div class="filter-bar__item"><span class="filter-bar__label">平台</span><div class="select"><select><option>全部平台</option><option>抖音</option><option>快手</option><option>视频号</option></select></div></div>
+          <div class="filter-bar__item"><span class="filter-bar__label">分组</span><div class="select"><select><option>全部分组</option><option>IP1</option><option>IP2</option></select></div></div>
+          <div class="filter-bar__item"><span class="filter-bar__label">状态</span><div class="select"><select><option>全部状态</option><option>已连接</option><option>即将过期</option><option>已失效</option></select></div></div>
+          <div class="filter-bar__right">
+            <span style="font-size:11px;color:var(--text-tertiary)">共 11 个账号</span>
+            <button class="btn btn--primary btn--sm">添加账号</button>
+            <button class="btn btn--sm">刷新</button>
+          </div>
+        </div>
+        <div class="list-grid">
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#5ee4ff,#1a4060)">恒</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">恒德-人生破局</div>
+                <div class="list-card__plat">抖音 · <span class="tag tag--live">已连接</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">12.8K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">1.2M</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">356</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#eba456,#5a3a20)">孙</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">孙校教育规划</div>
+                <div class="list-card__plat">视频号 · <span class="tag tag--warn">即将过期</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">8.4K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">890K</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">245</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#7b5ea7,#2a1a40)">王</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">王晶说实话</div>
+                <div class="list-card__plat">快手 · <span class="tag tag--live">已连接</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">6.2K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">560K</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">180</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#5ee4ff,#1a4060)">卢</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">心理学博士卢慧</div>
+                <div class="list-card__plat">B站 · <span class="tag tag--dead">已失效</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">3.1K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">320K</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">92</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#eba456,#5a3a20)">听</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">听卢慧说</div>
+                <div class="list-card__plat">小红书 · <span class="tag tag--live">已连接</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">5.7K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">480K</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">156</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+          <div class="list-card">
+            <div class="list-card__top">
+              <div class="list-card__avatar" style="background:linear-gradient(135deg,#7b5ea7,#2a1a40)">慧</div>
+              <div class="list-card__meta">
+                <div class="list-card__name">慧氏幸福觉醒</div>
+                <div class="list-card__plat">抖音 · <span class="tag tag--live">已连接</span></div>
+              </div>
+            </div>
+            <div class="list-card__stats">
+              <div class="list-card__stat"><span class="list-card__stat-val">4.9K</span><span class="list-card__stat-lbl">粉丝</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">410K</span><span class="list-card__stat-lbl">播放</span></div>
+              <div class="list-card__stat"><span class="list-card__stat-val">134</span><span class="list-card__stat-lbl">帖子</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="pg">
+          <button class="pg__btn pg__btn--disabled">‹</button>
+          <button class="pg__btn pg__btn--active">1</button>
+          <button class="pg__btn">2</button>
+          <button class="pg__btn">3</button>
+          <button class="pg__btn">›</button>
+        </div>
+      </div>
+
+      <!-- ====== 3. ACCOUNT DETAIL ====== -->
+      <div class="pattern" id="pattern-detail">
+        <a href="#" class="detail-back">← 返回账号列表</a>
+        <div class="detail-layout">
+          <div class="card detail-side">
+            <div class="detail-avatar" style="background:linear-gradient(135deg,#5ee4ff,#1a4060)">恒</div>
+            <div class="detail-name">恒德-人生破局</div>
+            <div class="detail-platform">抖音 · <span class="tag tag--live">已连接</span></div>
+            <div class="detail-divider"></div>
+            <dl class="detail-info">
+              <div class="detail-info-row"><dt>账号ID</dt><dd>dy_8x7k2p</dd></div>
+              <div class="detail-info-row"><dt>分组</dt><dd>IP1</dd></div>
+              <div class="detail-info-row"><dt>绑定时间</dt><dd>2026-05-10</dd></div>
+              <div class="detail-info-row"><dt>最后活跃</dt><dd>2 分钟前</dd></div>
+            </dl>
+          </div>
+          <div class="detail-main">
+            <div class="detail-metrics">
+              <div class="card card--flat detail-metric"><div class="detail-metric__val">12,847</div><div class="detail-metric__lbl">粉丝</div></div>
+              <div class="card card--flat detail-metric"><div class="detail-metric__val">1.24M</div><div class="detail-metric__lbl">播放量</div></div>
+              <div class="card card--flat detail-metric"><div class="detail-metric__val">89.2K</div><div class="detail-metric__lbl">点赞</div></div>
+              <div class="card card--flat detail-metric"><div class="detail-metric__val">3.6K</div><div class="detail-metric__lbl">评论</div></div>
+            </div>
+            <div class="card">
+              <div class="section-hd"><span class="section-hd__label">最近帖子</span></div>
+              <table class="tbl">
+                <thead><tr><th>标题</th><th>发布时间</th><th>播放</th><th>点赞</th><th>评论</th></tr></thead>
+                <tbody>
+                  <tr><td class="tbl__name">人生的底层逻辑是什么</td><td>05-21</td><td class="tbl__num">45.2K</td><td class="tbl__num">3.1K</td><td class="tbl__num">286</td></tr>
+                  <tr><td class="tbl__name">为什么你越努力越焦虑</td><td>05-20</td><td class="tbl__num">38.7K</td><td class="tbl__num">2.8K</td><td class="tbl__num">194</td></tr>
+                  <tr><td class="tbl__name">三个改变我人生的习惯</td><td>05-19</td><td class="tbl__num">52.1K</td><td class="tbl__num">4.2K</td><td class="tbl__num">358</td></tr>
+                  <tr><td class="tbl__name">普通人如何抓住AI时代</td><td>05-18</td><td class="tbl__num">61.3K</td><td class="tbl__num">5.1K</td><td class="tbl__num">412</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 4. CONTENT EDITOR ====== -->
+      <div class="pattern" id="pattern-editor">
+        <div class="editor-layout">
+          <div class="editor-main">
+            <input class="input" value="人生的底层逻辑是什么" style="font-size:18px;font-weight:600;margin-bottom:0">
+            <div class="editor-toolbar">
+              <button class="editor-toolbar__btn" title="Bold"><b>B</b></button>
+              <button class="editor-toolbar__btn" title="Italic"><i>I</i></button>
+              <button class="editor-toolbar__btn" title="Underline"><u>U</u></button>
+              <div class="editor-toolbar__sep"></div>
+              <button class="editor-toolbar__btn">H1</button>
+              <button class="editor-toolbar__btn">H2</button>
+              <div class="editor-toolbar__sep"></div>
+              <button class="editor-toolbar__btn">◆</button>
+              <button class="editor-toolbar__btn">◈</button>
+              <button class="editor-toolbar__btn">⟐</button>
+            </div>
+            <textarea class="editor-textarea" placeholder="开始创作...">
+在这个信息爆炸的时代，每个人都在被焦虑裹挟着向前奔跑。
+但我们真正需要的，不是更多的信息，而是更深的思考。
+
+今天，我想和你分享三个改变我人生的底层逻辑...
+            </textarea>
+          </div>
+          <div class="editor-side">
+            <div class="card editor-preview">📱 预览区域 — 发布后将显示在各平台</div>
+            <div class="card">
+              <div class="editor-meta">
+                <div class="editor-meta__label">发布平台</div>
+                <div style="display:flex;gap:6px">
+                  <span class="tag tag--live">抖音</span><span class="tag tag--live">快手</span><span class="tag tag--live">视频号</span><span class="tag">微博</span><span class="tag">B站</span>
+                </div>
+              </div>
+              <div class="editor-meta" style="margin-top:12px">
+                <div class="editor-meta__label">定时发布</div>
+                <input class="input" type="datetime-local" value="2026-05-23T09:00" style="font-size:12px">
+              </div>
+            </div>
+            <div class="editor-actions">
+              <button class="btn">存草稿</button>
+              <button class="btn btn--primary">发布</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ====== 5. CALENDAR ====== -->
+      <div class="pattern" id="pattern-calendar">
+        <div class="cal-header">
+          <div class="cal-nav">
+            <button class="cal-nav__btn">‹</button>
+            <span class="cal-nav__title">2026年 5月</span>
+            <button class="cal-nav__btn">›</button>
+          </div>
+          <div class="cal-actions">
+            <button class="btn btn--sm">今天</button>
+            <button class="btn btn--primary btn--sm">添加事件</button>
+          </div>
+        </div>
+        <div class="cal-grid">
+          <div class="cal-grid__day-name">日</div><div class="cal-grid__day-name">一</div><div class="cal-grid__day-name">二</div><div class="cal-grid__day-name">三</div><div class="cal-grid__day-name">四</div><div class="cal-grid__day-name">五</div><div class="cal-grid__day-name">六</div>
+          <!-- 35 cells representing May 2026 -->
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">26</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">27</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">28</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">29</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">30</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">1</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">2</div><div class="cal-event" style="border-left-color:var(--cyan)">发布IP1内容</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">3</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">4</div><div class="cal-event" style="border-left-color:var(--amber)">视频号直播</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">5</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">6</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">7</div><div class="cal-event" style="border-left-color:var(--cyan)">发布IP2内容</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">8</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">9</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">10</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">11</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">12</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">13</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">14</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">15</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">16</div></div>
+          <div class="cal-grid__cell cal-grid__cell--today"><div class="cal-grid__num">17</div><div class="cal-event" style="border-left-color:var(--cyan)">抖音新视频</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">18</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">19</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">20</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">21</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">22</div><div class="cal-event" style="border-left-color:#6b9e6c">数据复盘</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">23</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">24</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">25</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">26</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">27</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">28</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">29</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">30</div></div>
+          <div class="cal-grid__cell"><div class="cal-grid__num">31</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">1</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">2</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">3</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">4</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">5</div></div>
+          <div class="cal-grid__cell cal-grid__cell--other"><div class="cal-grid__num">6</div></div>
+        </div>
+      </div>
+
+      <!-- ====== 6. LOGIN ====== -->
+      <div class="pattern" id="pattern-login">
+        <div class="login-screen">
+          <div class="login-card">
+            <div class="login-header">
+              <div class="login-header__title">披星云</div>
+              <div class="login-header__sub">矩阵账号管理平台</div>
+            </div>
+            <div class="login-tabs">
+              <button class="login-tab login-tab--active">登录</button>
+              <button class="login-tab">注册</button>
+            </div>
+            <div class="login-form">
+              <input class="input" placeholder="邮箱" type="email">
+              <input class="input" placeholder="密码" type="password">
+              <button class="login-submit">登录</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- PATTERN SWITCHER -->
+<div class="pattern-bar" id="patternBar">
+  <button class="pattern-tab pattern-tab--active" data-pattern="dashboard">◈ 概览</button>
+  <button class="pattern-tab" data-pattern="list">● 列表</button>
+  <button class="pattern-tab" data-pattern="detail">◎ 详情</button>
+  <button class="pattern-tab" data-pattern="editor">◇ 编辑</button>
+  <button class="pattern-tab" data-pattern="calendar">◉ 日历</button>
+  <button class="pattern-tab" data-pattern="login">○ 登录</button>
+</div>
+
+<script>
+/* Minimal tab switching — no framework needed */
+const tabs = document.querySelectorAll('.pattern-tab');
+const panels = document.querySelectorAll('.pattern');
+const pageName = document.getElementById('currentPageName');
+const names = {
+  dashboard:'仪表盘', list:'账号管理', detail:'账号详情',
+  editor:'内容编辑', calendar:'内容日历', login:'登录'
+};
+
+tabs.forEach(tab => {
+  tab.addEventListener('click', () => {
+    tabs.forEach(t => t.classList.remove('pattern-tab--active'));
+    panels.forEach(p => p.classList.remove('pattern--active'));
+    tab.classList.add('pattern-tab--active');
+    const target = document.getElementById('pattern-' + tab.dataset.pattern);
+    if(target) target.classList.add('pattern--active');
+    if(pageName && names[tab.dataset.pattern]) pageName.textContent = names[tab.dataset.pattern];
+    document.getElementById('contentArea').scrollTop = 0;
+  });
+});
+</script>
+</body>
+</html>

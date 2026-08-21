@@ -1,0 +1,13 @@
+{
+  "version": "3.2.46",
+  "url": "https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.46.zip",
+  "kind": "portable",
+  "filename": "pixingyun-mate-portable-3.2.46.zip",
+  "sha256": "672560ed0178da6cd9b2bddbdae4cac95f2745bcd84c8db2cc9932d69ea524a4",
+  "size": 83804347,
+  "published_at": "2026-08-06T19:34:00+08:00",
+  "notes": "修复抖音扫码登录两个问题：(1) Timeout 30000ms — 抖音创作者中心是重 SPA 页面，30秒不够加载完成。改为 60秒超时 + commit 等待策略 + 失败重试；(2) 未识别到平台账号身份 — 扫码后页面停在 creator.douyin.com，其 localStorage/window 变量不含 sec_uid。增加多级回退策略：先从当前页面 DOM 提取，失败则导航到 www.douyin.com/user/self 获取重定向 URL 中的 sec_uid。同时修复更新后出现英文系统提醒的问题：添加 Unblock-File 去除 Mark of the Web，PowerShell 窗口隐藏运行。",
+  "installer_url": "https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.42.exe",
+  "installer_sha256": "02c2e0c268c40318650e25a15f796f303db7a3ed88864db72ecdf6375c8c29fe",
+  "installer_size": 268182320
+}

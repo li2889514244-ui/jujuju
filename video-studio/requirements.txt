@@ -1,0 +1,33 @@
+# Video Studio - 独立视频后处理工具
+# 与 desktop-companion 完全隔离，使用独立的虚拟环境
+
+# Web 框架
+flask==3.0.3
+flask-cors==4.0.1
+
+# FFmpeg（便携版，不需要系统安装）
+imageio-ffmpeg==0.5.1
+
+# 语音识别（字幕生成）— 必须安装，两种 provider 都依赖它
+faster-whisper==1.0.3
+
+# 视频处理
+moviepy==1.0.3
+
+# HTTP 请求（B-roll 搜索）
+requests==2.32.3
+
+# AI 关键词提取（DeepSeek/Qwen/Kimi/OpenAI 均兼容）
+openai==1.51.0
+
+# 字幕处理
+pysubs2==1.7.1
+
+# 工具库
+loguru==0.7.2
+tomli==2.0.1; python_version < "3.11"
+tomli-w==1.0.0
+Pillow==10.4.0
+
+# 进度条
+tqdm==4.66.5

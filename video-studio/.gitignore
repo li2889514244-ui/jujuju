@@ -1,0 +1,11 @@
+# 忽略配置文件（包含 API key，不提交）
+config.toml
+
+# 忽略运行时数据
+storage/
+__pycache__/
+*.pyc
+*.pyo
+
+# 忽略日志
+*.log

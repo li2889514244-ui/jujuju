@@ -1,0 +1,639 @@
+capcut-cli -- fast edits to CapCut projects
+
+Usage: capcut <command> <project> [options]
+
+  <project> = path to draft_content.json, draft_info.json, or their parent directory
+
+Global flags:
+  -H, --human     Human-readable table output (default: JSON)
+  -v, --version   Print the installed CLI version
+  -q, --quiet     No output on success, exit code only (write commands)
+  --dry-run       Preview a mutating command: print the result (with
+                  "dryRun":true) but leave the draft and its .bak untouched
+  --force-write   Override editor-running, changed-on-disk, and
+                  version-boundary safety checks
+  --jianying      Use JianYing enum namespace (default: CapCut) for
+                  transition, mask, text-anim, image-anim, add-effect, enums
+
+Overview (start here):
+  info       <project>                          Project overview + material summary
+  tracks     <project>                          List all tracks
+  materials  <project>                          List all material types + counts
+  materials  <project> --type <type>            List items of one material type
+  version    <project>                          Detect CapCut/JianYing version + schema flags + support status
+  lint       <project>                          Schema-aware checks (overlaps, line length, missing
+             files, main-track gaps, media outside the draft folder)
+             Options:
+               --max-chars <n>     Caption line cap (default 42)
+               --max-cue-secs <n>  Caption duration cap (default 7)
+               --min-gap-ms <n>    Min gap between captions (default 0)
+               --no-check-paths    Skip local-file existence checks
+               --fix               Auto-repair issues stamped fixable:true
+                                   (cue-too-long, caption-overlap,
+                                   caption-gap-too-small, line-too-long,
+                                   main-track-gap, media-outside-draft).
+                                   Never shrinks a caption below 100ms,
+                                   never splits words, only closes a
+                                   main-track gap when no other track has
+                                   content at or after it, and stages
+                                   external media into assets/ only when
+                                   the source file still exists; instances
+                                   it cannot repair are reported with
+                                   fixable:false.
+                                   Combine with --dry-run to preview.
+             Exit codes: 0 clean · 1 warnings · 2 errors. Info-level issues
+             (e.g. unknown-effect-slug, which store-downloaded effects from
+             the CapCut app trigger legitimately) never affect the exit code.
+
+Browse:
+  segments   <project> [--track <type>]         List segments with timing
+  texts      <project>                          List all text/subtitle content
+
+Detail (drill into one item):
+  segment    <project> <id>                     Full detail for one segment + its material
+  material   <project> <id>                     Full detail for one material
+
+Create:
+  init       <name> [--template <dir>] [--drafts <dir>]
+             Create a new empty draft from template. Defaults:
+               --template   bundled minimal template (no external repo needed)
+               --drafts     this OS's CapCut draft store (CAPCUT_DRAFT_DIR overrides;
+                            run capcut doctor to see the detected paths)
+  quickstart <name> [--video <f>] [--audio <f>] [--srt <f>] [--drafts <dir>]
+             One-command first draft: create + add one input + lint + print the
+             exact "open in CapCut" step. The fastest path from a file to an
+             editable project. Pass at least one of --video / --audio / --srt.
+             Durations come from ffprobe when available (5s placeholder if not).
+             Exit codes: 0 created & lint-clean · 2 created but lint errors
+  compile    <spec.json> [--out <draftdir>] [--drafts <dir>] [--data <rows.jsonl|->]
+             Build a whole draft from a declarative JSON spec (the inverse of
+             describe). Times are in seconds. Media paths resolve relative to
+             the spec file. Validates the full spec before writing anything.
+             --data <rows.jsonl|->  Build ONE DRAFT PER JSONL ROW: {{key}}
+             placeholders in the spec's string values (and so the draft name)
+             are substituted from each row. Mirrors batch's per-line error
+             contract: the first bad row aborts with its row number before
+             any draft is written; --continue-on-error builds the rows that
+             validate and exits 1 if any failed. Prints a summary JSON array
+             (row, ok, name, draft_path | error). Each row names its own
+             draft, so use --drafts (not --out) with --data.
+
+Preview:
+  render     <project> [--out <file.mp4>] [options]
+             Render a low-res ffmpeg PROXY preview of the timeline so you can
+             watch an edit without opening CapCut. Flattens the main video
+             track (trim + per-segment speed) and mixes audio segments; it is
+             NOT CapCut's final render (no multi-track compositing/effects).
+             Options:
+               --scale <f>        Proxy scale of canvas dims (default 0.5)
+               --fps <n>          Output fps (default draft fps)
+               --burn-captions    Draw text-track segments onto the video
+               --ffmpeg-cmd <p>   ffmpeg binary (default ffmpeg)
+               --dry-run          Print the ffmpeg plan; do not execute
+
+Analyze:
+  detect-scenes <video> [--threshold <n>] [--min-gap <s>] [--limit <n>]
+             Detect scene-change cut points in a raw video file (ffmpeg scene
+             filter — deterministic, no draft needed). Prints each cut as
+             seconds + hh:mm:ss.mmm + score, plus the resulting segment list
+             in seconds AND microseconds (the draft-native unit), ready to
+             seed a long-form-to-shorts split: feed the segments into
+             "capcut compile" (one clip per segment) or "capcut cut".
+             The final segment ends at the VIDEO stream's real duration
+             (read via ffprobe), so it never overruns the video when a
+             longer audio track pads the container; without ffprobe it
+             falls back to the container duration and duration_source
+             says so. Detection only — it never touches a draft. Options:
+               --threshold <n>    Scene score a cut must exceed, 0..1 (default 0.4)
+               --min-gap <s>      Merge cuts closer than <s> seconds, keeping
+                                  the strongest (default 2)
+               --limit <n>        Keep only the <n> strongest cuts
+               --ffmpeg-cmd <p>   ffmpeg binary (default ffmpeg)
+               --ffprobe-cmd <p>  ffprobe binary for the video-stream
+                                  duration (default ffprobe)
+               --json             Force JSON output (the default; overrides -H)
+
+Add:
+  add-audio  <project> <file-or-wikimedia-url> <start> <duration> [options]
+             Add an audio segment (VO, music, SFX). URLs to wikipedia.org /
+             commons.wikimedia.org / upload.wikimedia.org are resolved via
+             the Commons imageinfo API, license-checked, then downloaded to
+             assets/audio/wikimedia/. Options:
+               --volume <n>       Volume 0.0-1.0 (default: 1.0)
+               --track-name <s>   Track name (default: "audio")
+               --force-license    Bypass refusal on restrictive/unknown license
+
+  add-video  <project> <file-or-wikimedia-url> <start> <duration> [options]
+             Add a video or image segment. Accepts Wikimedia URLs (same as
+             add-audio). Type auto-detected from extension.
+             Options:
+               --track-name <s>   Track name (default: "video")
+               --width <n>        Source width in px (default: auto-probed via
+                                  ffprobe, else 1920)
+               --height <n>       Source height in px (default: auto-probed via
+                                  ffprobe, else 1080)
+               --force-license    Bypass refusal on restrictive/unknown license
+
+  add-text   <project> <start> <duration> <text> [options]
+             Add a text segment. Options:
+               --font-size <n>    Font size (default: 15)
+               --color <hex>      Text color (default: #FFFFFF)
+               --align <0|1|2>    Left/center/right (default: 1)
+               --x <n> --y <n>    Position (-1 to 1, default: 0,0)
+               --track-name <s>   Track name (default: "text")
+               --preset <file>    Apply a make-preset style preset; explicit
+                                  flags override preset values
+
+Edit:
+  set-text   <project> <id> <text>              Change text content
+  shift      <project> <id> <offset>            Shift segment timing (e.g. +0.5s, -1s)
+  shift-all  <project> <offset> [--track <type>] Shift all segments on a track
+  speed      <project> <id> <multiplier>        Set playback speed
+  volume     <project> <id> <level>             Set volume (0.0-1.0)
+  trim       <project> <id> <start> <duration>  Trim segment (times in seconds)
+  opacity    <project> <id> <alpha>             Set opacity (0.0-1.0)
+  crop       <project> <segment-id> [options]   Read or set the source-material crop
+             No flags: read-only — print the material's crop struct as JSON
+             (plus source width/height when stored) and write nothing.
+             Options:
+               --ratio <r>        free|1:1|16:9|9:16|4:3|3:4 — centered maximal
+                                  crop of that aspect against the source
+                                  width/height stored in the draft (errors if
+                                  the dims are missing/zero: pass --rect)
+               --rect <x,y,w,h>   Explicit normalized rect, 0..1 fractions of
+                                  the source frame; overrides --ratio
+               --reset            Restore the full frame
+             When the material carries a crop_ratio field it is stamped
+             "free" (CapCut's preset enum values are not published), so the
+             app recomputes from the corner points.
+  duplicate  <project> <segment-id> [--track <track-name> | --new-track]
+             Duplicate a segment at the SAME timeline position/duration onto a
+             track that renders ABOVE the source (the PIP local-retouch flow
+             from issue #44: copy the clip above itself, then mask the copy).
+             Default and --new-track: a fresh same-type track directly above
+             the source. --track <track-name>: use that existing same-type
+             track; exits 1 when the target range is occupied there. The media
+             file on disk stays shared, but the material entry and every
+             per-segment companion (speed, canvas, mask, ...) are cloned with
+             fresh ids, so edits like crop/mix-mode on the copy never touch
+             the source segment.
+  remove     <project> <segment-id> [--keep-track] [--keep-materials]
+             Delete a segment in place. A track left empty by the removal is
+             dropped too (--keep-track keeps it). Materials no surviving
+             segment references are swept in the same pass prune runs —
+             including materials that were already orphaned (--keep-materials
+             skips the sweep). Recomputes the project duration to the max
+             remaining segment end across all tracks. Undo with restore.
+  export-srt <project> [options]                Export subtitles to SRT/WebVTT
+  export-timeline <project> [--out <f.otio>]    Export the cut as OpenTimelineIO for an NLE
+  import-timeline <f.otio> (--out <dir> | --into <project>)  Import an OpenTimelineIO cut
+  batch      <project>                          Run multiple edits from stdin (JSONL)
+  restore    <project> [--step N | --list]      Undo writes (latest .bak, or N writes back; --list history)
+
+Maintenance & inspection:
+  harvest-enums <project> [--apply] [--catalogue <path>]
+             Learn store resource ids from an app-authored draft into the
+             per-user catalogue (~/.config/capcut-cli/user-enums.json):
+             harvested ids stop lint-flagging as unknown, and named effects/
+             filters/transitions/masks/sfx become writable slugs. Plan by
+             default; --apply writes the catalogue (never the draft).
+  prune      <project>                          Remove materials no segment references
+  register   <project-dir> [--apply] [--drafts <dir>]  Repair an EXISTING draft's
+             registration metadata so the CapCut app lists it again (init only
+             registers drafts it creates): recreates a missing/corrupt
+             draft_meta_info.json sidecar and inserts/updates the draft's entry
+             in the store's root_meta_info.json. id/name/duration derive from
+             draft_content.json, which is never written. Prints the per-target
+             plan (needs_repair + detail) by default; --apply writes atomically
+             with a .bak per file modified and no-ops (applied: []) when the
+             draft is already registered. A draft that does not live inside a
+             known store root (parent with root_meta_info.json, a managed
+             com.lveditor.draft path, or --drafts <dir>) is reported explicitly
+             and nothing is written. Refuses to write while the editor is
+             running unless --force-write. Exits 2 on --apply when a target
+             stays blocked (unknown store root, unreadable root_meta_info.json).
+  rename     <project> <new-name> [--drafts <dir>]  Rename a draft after
+             creation: the draft folder on disk, plus draft_name and every
+             self-referential path field in draft_meta_info.json and in the
+             draft's entry in the store's root_meta_info.json — one
+             transaction (a failed step restores the rewritten files and puts
+             the folder back), same atomic writes as register with a .bak per
+             rewritten file. Refuses when the target folder already exists,
+             when a metadata file exists but does not parse (repair with
+             register --apply first), and while the editor is running unless
+             --force-write. A missing sidecar/index entry is reported and the
+             folder is renamed anyway (register --apply recreates them).
+             Timeline files are never touched; media references under the old
+             folder path are counted (stale_media_refs) with the exact relink
+             repair command printed. --dry-run previews.
+  relink     <project> --dir <d> | --from <p> --to <q>  Repair broken media paths
+  replace-media <project> <segment-id> <new-file> [--retime]
+             Swap a segment's source clip (placeholder > final render) while
+             keeping its timeline position, timing, effects, and keyframes.
+             Refreshes duration/dimensions via ffprobe. --retime fits the
+             segment to the new clip; default preserves the original in/out.
+  timeline   <project> [--cols N]               Show track/segment layout (JSON, or -H ASCII bars)
+  projects   [query] [--drafts <dir>] [--names] List CapCut/JianYing draft folders on disk
+  diff       <projectA> <projectB>             Compare two drafts (added/removed/changed)
+  concat     <projectA> <draftB> [--out <p>]   Append draftB onto projectA's timeline (id-safe)
+  config                                       Show resolved .capcutrc + effective defaults
+  describe                                      Emit the full command surface as JSON (agent tool spec)
+  diagnose   <project> [--bundle <report.json>] Inspect canonical draft files and divergence
+  fixture    <project> --out <dir>              Build a shareable, redacted compatibility bundle
+             (timeline JSON only, no media; home paths + emails redacted) to
+             attach to a version-support issue like #35.
+  sync-timelines <project-dir> [--apply]        Reconcile timeline mirrors (template-2.tmp,
+             draft_info.json) that drifted from draft_content.json, so a CLI
+             edit is honored by CapCut >= 8.7 (issue #35). Prints the plan
+             (with each file's mtime) by default; --apply rewrites ONLY the
+             drifted mirrors — draft_content.json and in-sync mirrors are
+             never touched — with a .bak per file written. Refuses to write
+             while the editor is running, or when draft_content.json is older
+             than a drifted mirror (the app may have saved newer edits there),
+             unless --force-write. Accepts the project directory or its
+             draft_content.json path. Exits 2 when a mirror exists that the
+             CLI cannot reconcile (binary/encrypted template-2.tmp).
+
+Animate:
+  keyframe   <project> <id> <property> <time> <value> [--easing <name>]
+             Add a keyframe to a segment. Single-shot.
+  keyframe   <project> <id> --batch [--easing <name>]
+             Read JSONL from stdin; each line = {"property","time","value"}
+             plus optional "easing" overriding --easing per line.
+             Properties: position_x, position_y, rotation, scale_x, scale_y,
+                         uniform_scale, alpha, saturation, contrast, brightness, volume
+             Values: "1.5", "50%" (alpha/volume), "45deg" (rotation),
+                     "+0.5"/"-0.3" (saturation/contrast/brightness)
+             Easing: linear (default), ease-in, ease-out, ease-in-out — written
+                     as CapCut bezier handles (ease-out = the UI's "Cubic Out").
+                     Easing needs an adjacent keyframe on the same property: a
+                     lone eased keyframe stays linear (warns) and picks up the
+                     curve when its pair is added with an easing. A linear
+                     insert between eased keyframes resets the neighbours'
+                     facing handles, so both new sub-segments render linear.
+
+  transition <project> <id> <slug> [--duration <s>]
+             Attach a transition to a video/image segment. Slug examples:
+               dissolve, rgb-glitch, radial-blur, horizontal-blur, twinkle-zoom,
+               urban-glitch, shake-3, vertical-blur-ii
+  mask       <project> <id> <slug> [options]  |  <project> <id> --off
+             Attach/remove a mask. Slugs: linear, mirror, circle, rectangle,
+             heart, star. Options: --center-x --center-y --size --rotation
+             --feather --invert --rect-width --round-corner (rect only).
+  bg-blur    <project> <id> <1|2|3|4>  |  <project> <id> --off
+             Set background blur level (0.0625 / 0.375 / 0.75 / 1.0).
+  text-style <project> <id> [options]
+             Rich text styling on an existing text segment. Options:
+               --alpha --vertical --fixed-width --fixed-height
+               --shadow --shadow-alpha --shadow-angle --shadow-color
+               --shadow-distance --shadow-smoothing
+               --border-width --border-color --border-alpha
+               --bg-color --bg-alpha --bg-style --bg-round-radius
+               --bg-width --bg-height --bg-h-offset --bg-v-offset
+               --preset <file>  Apply a make-preset style preset; explicit
+                                flags override preset values
+  text-ranges <project> <id> --styles @path.json  |  --styles '<inline-json>'
+             Multi-colour text — write multiple styles to one text segment.
+             JSON array of { "start": int, "end": int,
+               "font_color":"#RRGGBB", "font_size":18, "font_alpha":1,
+               "bold":true, "italic":true, "underline":true }.
+             start/end are JS string code-unit indices (char-level for BMP).
+             Gaps are auto-filled with the baseline style.
+  text-anim  <project> <id> [--intro <slug>] [--outro <slug>]
+                          [--intro-duration <s>] [--outro-duration <s>]
+             Slugs: fade-in, fade-out, typewriter, pop-up, throw-out,
+                    blur-text-in, zoom-in-text.
+  image-anim <project> <id> [--intro <slug>] [--outro <slug>] [--combo <slug>]
+                          [--intro-duration <s>] [--outro-duration <s>]
+                          [--combo-duration <s>]
+             Video/image intro/outro/combo animations. Slugs:
+               fade-in, flash-in, pulsing-zooms, scroll-up, stripe-merge,
+               zoom-out (intros); fade-out, blur-out, smoke (outros).
+
+Tracks (Phase 2):
+  bubble-text <project> <text-segment-id> --bubble <slug>
+             Apply a speech-bubble shape to an existing text segment. Writes
+             a materials.filters[] entry (type:text_shape) referenced from
+             the segment, plus stamps bubble_effect_id / bubble_resource_id
+             on the text material. Slugs: rectangle, rounded, cloud, oval,
+             star, heart, burst (or pass --effect-id / --resource-id
+             explicitly from your own CapCut draft).
+             Discovery: capcut enums --bubbles
+  add-filter <project> <slug-or-name> (<start> <duration> | --full) [options]
+             Colour filter on a dedicated filter track. Slugs (capcut):
+               vintage, warm, cool, bw, sepia, vivid, contrast, faded,
+               dramatic, soft (+ enums --filters --jianying for 468 more).
+             Options:
+               --track-name <s>      Filter track name (default: "filter")
+               --jianying            Use the JianYing namespace
+               --resource-id <id>    Raw catalogue resource ID (skips slug
+                                     lookup; wins over a matching slug). The
+                                     <slug-or-name> positional becomes the
+                                     display name. CapCut must have the
+                                     resource in its store cache.
+               --effect-id <id>      Raw effect ID (defaults to --resource-id;
+                                     requires --resource-id)
+               --intensity <n>       Filter strength 0-1 (default 1)
+               --full                Whole timeline (start 0, duration = draft
+                                     duration); wins over <start> <duration>
+  add-cover  <project> <image-path> [--time <ms>]
+             Set the draft's cover frame (thumbnail) to an image. Writes a
+             cover object on the draft root with {path, type, time, time_ms,
+             custom_cover_id}. CapCut/JianYing re-renders the thumbnail on
+             next open. --time defaults to 0 (start of timeline).
+  audio-fade <project> <segment-id> [--in <sec>] [--fade-out <sec>]
+             Apply audio fade-in / fade-out on an audio segment. Writes
+             a materials.audio_fades[] entry referenced from the segment.
+             At least one of --in or --fade-out (>0) is required.
+             Note: --out is the global output-path flag; use --fade-out here.
+  mix-mode   <project> <segment-id> <mode>
+             Set blend mode on a video segment. Modes: normal, multiply,
+             screen, overlay, soft-light, hard-light, color-dodge, color-burn,
+             darken, lighten, difference, exclusion.
+  add-sticker <project> <resource-id> <start> <duration> [options]
+             Creates a sticker segment on a sticker track. Options:
+               --x <n> --y <n>       Position (-1 to 1)
+               --scale <n>           Uniform scale (default 1)
+               --rotation <deg>      Clockwise rotation
+               --track-name <s>      Sticker track name (default: "sticker")
+  add-effect <project> <slug-or-name> (<start> <duration> | --full) [options]
+             Scene/character effect on an effect track. Slugs:
+               shake, vhs, cinematic, light-leak, film-grain, chromatic,
+               vignette.
+             Options:
+               --params <json-array> Effect parameters (0-100 each)
+               --track-name <s>      Effect track name (default: "effect")
+               --resource-id <id>    Raw catalogue resource ID (skips slug
+                                     lookup; wins over a matching slug; raw
+                                     ids are scene effects). The <slug-or-name>
+                                     positional becomes the display name.
+                                     CapCut must have the resource in its
+                                     store cache.
+               --effect-id <id>      Raw effect ID (defaults to --resource-id;
+                                     requires --resource-id)
+               --intensity <n>       Effect strength 0-1 (default 1)
+               --full                Whole timeline (start 0, duration = draft
+                                     duration); wins over <start> <duration>
+               --bind <segment-id>   Experimental: attach the effect to one
+                                     segment instead of the whole frame
+
+Templates:
+  save-template <project> <id> <name> --out <path>
+             Extract any segment as a reusable template (text, sticker, video, audio)
+  apply-template <project> <template.json> <start> <duration> [text override]
+             Stamp a template into a project at the given time
+             Options: --x <n> --y <n> (override position)
+  make-preset <project> <text-segment-id> --out <preset.json>
+             Extract the text styling of a segment as a reusable preset
+             (font, colors, shadow/border/background box, alignment/position,
+             bubble, text ranges). Apply with --preset on add-text,
+             text-style, or caption; explicit CLI flags override preset
+             values (including per-range colours/sizes for the span they
+             cover). A preset applies in full: a preset WITHOUT text ranges
+             resets the target to one uniform style, clearing any existing
+             karaoke/highlight ranges. Honors --dry-run (no file written).
+  templates
+             Show available templates in the template library.
+             Use -H for a table.
+
+Project:
+  cut        <project> <start> <end> --out <path>
+             Extract a time range into a new project (long-form → short)
+
+Discovery (Phase 3):
+  enums      --transitions | --masks | --image-intros | --image-outros |
+             --image-combos | --text-intros | --text-outros |
+             --text-loop-anims | --scene-effects | --character-effects |
+             --audio-effects | --fonts
+             List valid enum slugs (CapCut namespace by default).
+             Add --jianying to switch namespace. Use -H for a table.
+
+Caption (v0.4 — real subtitle objects, fixes import-srt mimicry):
+  caption    <project> --audio <path> [options]
+  caption    <project> --from-segment <id> [options]
+             Auto-caption via whisper; emits real CapCut subtitle-track objects.
+             Options:
+               --whisper-cmd <cmd>  Path to whisper binary (default: "whisper")
+               --whisper-model <m>  Model name (default: "base")
+               --language <code>    ISO code or "auto" (default)
+               --track-name <s>     Caption track name (default: "captions")
+               --style-ref <seg-id> Mirror styling from existing text segment
+               --preset <file>      Base style from a make-preset file
+                                    (same coverage as --style-ref)
+               --highlight-words <w1,w2,...|@file>
+                                    Emphasize these words in every cue
+                                    (case-insensitive whole-word match;
+                                    @file = one word/phrase per line)
+               --keyword-color <#RRGGBB>
+                                    Emphasis colour (default #FFD700, the
+                                    same gold --karaoke uses)
+               --keyword-size <n>   Emphasis size as a multiplier on the
+                                    cue's base font size (default 1.2)
+               --color-cycle <#hex1,#hex2,...>
+                                    Rotate the BASE text colour per cue in
+                                    list order (independent of emphasis)
+             Precedence: --color-cycle wins over the style-ref/preset base
+             colour per cue; keyword emphasis sits on top of base/karaoke
+             styling and overrides the matched words' colour/size; with
+             --karaoke, karaoke ranges are built first and keyword matches
+             override those words.
+
+Translate (v0.4 — multi-language draft clone):
+  translate  <project> --to <lang> --out <path> [options]
+             Translate every text segment via Anthropic API, write a new draft.
+             Options:
+               --from <lang>        Source language (default: "auto")
+               --api-key <key>      Override ANTHROPIC_API_KEY env var
+               --model <id>         Model (default: claude-haiku-4-5-20251001)
+               --dry-run            List what would be translated, no API call
+
+Migrate (v0.4 — survive JianYing/CapCut version jumps):
+  migrate    <project> --from <ver> --to <ver>
+             Apply known schema migrations. Implemented: mask <-> common_masks
+             across the JianYing 5.9 / CapCut 9.6 boundary, consolidating the
+             CapCut-variant common_mask[] into the target array too.
+
+Sound effects + chroma (v0.5):
+  add-sfx    <project> <slug> <start> <duration> [options]
+             First-class SFX on a dedicated track. Slugs: capcut enums --audio-effects
+             Options: --track-name --volume
+  chroma     <project> <id> --color <#RRGGBB> [--intensity N]
+  chroma     <project> <id> --off
+             Apply chroma key (green-screen) to a video segment.
+             --intensity: how aggressively to key out the color (0-1, default 0.5).
+
+Render queue (v0.4 — experimental):
+  export     <drafts-dir> --batch [options]
+             EXPERIMENTAL UI-automated render queue. macOS only currently.
+             Options: --dry-run, --app capcut|jianying
+
+Encryption (v0.6 — detection scaffold):
+  decrypt    <project>
+             Detect JianYing 6.0+ encryption and report next steps.
+             (Decryption algorithm not bundled; clear error UX + workaround docs.)
+  doctor
+             Check the environment, not a draft: Node version, whisper binary
+             (for caption), ANTHROPIC_API_KEY (for translate), and the default
+             CapCut/JianYing project directory. Exit 1 only on hard failures.
+
+Stateless queue runner (v0.5):
+  serve      [--queue <path>] [--fail-fast]
+             Read {cmd, project, args} JSONL from stdin or --queue, dispatch
+             each to the CLI, write JSONL results. No daemon, no port, no state.
+
+Subtitles (Phase 3):
+  import-ass <project> <ass-path-or--> [options]
+             Parse an ASS / SSA file ([Events] section, Dialogue lines)
+             and create one text segment per cue. Inline override codes
+             ({\b1\an8}, \N) are stripped from the displayed text.
+             Same flags as import-srt below.
+  import-srt <project> <srt-path-or--> [options]
+             Parse an SRT file and create one text segment per cue.
+             Options:
+               --track-name <s>      Text track (default: "subtitle")
+               --time-offset <s>     Shift all cue timings (e.g. +0.5s)
+               --style-ref <seg-id>  Copy styling from an existing text segment
+               --font-size --color --align --x --y
+               --alpha --vertical --shadow --shadow-color --shadow-distance
+               --border-width --border-color --border-alpha
+               --bg-color --bg-alpha --bg-style --bg-round-radius --bg-h-offset
+               --highlight-words <w1,w2,...|@file>
+                                     Emphasize these words in every cue
+                                     (case-insensitive whole-word match;
+                                     @file = one word/phrase per line)
+               --keyword-color <#RRGGBB>
+                                     Emphasis colour (default #FFD700, the
+                                     same gold caption --karaoke uses)
+               --keyword-size <n>    Emphasis size as a multiplier on the
+                                     cue's base font size (default 1.2)
+               --color-cycle <#hex1,#hex2,...>
+                                     Rotate the BASE text colour per cue in
+                                     list order (independent of emphasis)
+             Precedence: --color sets the base colour for all cues unless
+             --color-cycle is given (then the cycle wins per cue); keyword
+             emphasis sits on top of the base styling and overrides the
+             matched words' colour/size.
+  export-srt <project> [options]
+             Export subtitles to stdout.
+             Options:
+               --granularity <line|word>  One cue per caption (default: line)
+                                          or per word (karaoke).
+               --format <srt|vtt>         SRT (default) or WebVTT. WebVTT word
+                                          cues use inline <timestamps>; WebVTT
+                                          cue text escapes & < > as entities.
+             Word timings are real where the draft stores them (caption
+             --karaoke word segments); elsewhere they are interpolated within
+             each cue, weighted by word character length.
+  export-timeline <project> [--out <file.otio>]
+             Export video/audio tracks as OpenTimelineIO JSON (stdout, or
+             --out): clip order, trims, gaps, and speed (LinearTimeWarp) —
+             the exit ramp when an app build rejects the draft. DaVinci
+             Resolve imports .otio natively. Text tracks are skipped with a
+             pointer to export-srt.
+  import-timeline <file.otio> (--out <new-project> | --into <project>)
+             The inverse of export-timeline: read OpenTimelineIO JSON (the
+             schema set export-timeline emits) and build the cut as a draft.
+             Clips become video/audio segments with their source ranges, gaps
+             become timeline offsets, LinearTimeWarp becomes segment speed.
+             Media that exists on disk is staged into assets/ (the add-video
+             copy); missing media becomes a placeholder material to swap with
+             replace-media. Unsupported OTIO features are reported in the
+             JSON result (skipped), never silently dropped.
+             --out <new-project>   Build a fresh draft directory at this path
+                                   [--template <dir> overrides the template]
+             --into <project>      Append onto an existing draft as NEW
+                                   tracks (existing segments are never
+                                   touched or overlapped)
+
+Navigation: info → tracks/materials → segments → segment <id>
+            info → materials --type X → material <id>
+Time formats: 1.5s, 500ms, 1:30, +0.5s, -200ms
+IDs: first 6+ chars of segment/material ID (prefix match)
+
+Full viral-shorts pipeline (Claude skill + hooks + templates):
+  https://renezander.gumroad.com/l/viral-youtube-shorts-blueprint
+Guides & docs:  https://renezander.com/guides/capcut-automation
+Sponsor:        https://github.com/sponsors/renezander030
+Hire me:        https://renezander.com/contact
+
+Generated command index:
+  capcut info <project>                                                        Project overview + material summary.
+  capcut version <project>                                                     Detect CapCut/JianYing version, schema flags, and support status.
+  capcut lint <project> [options]                                              Schema-aware checks (overlaps, line length, missing files, main-track gaps, external media); exit 0/1/2 for CI.
+  capcut tracks <project>                                                      List all tracks.
+  capcut segments <project> [--track <type>]                                   List segments with timing; filter by --track <type>.
+  capcut texts <project>                                                       List all text/subtitle content.
+  capcut set-text <project> <id> <text>                                        Change a text segment's content.
+  capcut shift <project> <id> <offset>                                         Shift one segment's timing by an offset (e.g. +0.5s).
+  capcut shift-all <project> <offset> [--track <type>]                         Shift all segments (optionally on one --track) by an offset.
+  capcut speed <project> <id> <multiplier>                                     Set a segment's playback speed.
+  capcut volume <project> <id> <level>                                         Set a segment's volume (0.0-1.0).
+  capcut trim <project> <id> <start> <duration>                                Trim a segment to a start/duration window.
+  capcut opacity <project> <id> <alpha>                                        Set a segment's opacity (0.0-1.0).
+  capcut export-srt <project> [options]                                        Export subtitles to SRT or WebVTT on stdout, per line or per word.
+  capcut export-timeline <project> [--out <file.otio>]                         Export video/audio tracks as OpenTimelineIO JSON for NLE handoff (DaVinci Resolve imports .otio natively).
+  capcut import-timeline <file.otio> (--out <new-project> | --into <project>)  Import OpenTimelineIO JSON (the export-timeline schema set) as a new draft (--out) or append it onto an existing one (--into); unsupported OTIO features are reported, never silent.
+  capcut materials <project> [--type <type>]                                   List material types and counts; filter with --type.
+  capcut segment <project> <id>                                                Full detail for one segment and its material.
+  capcut material <project> <id>                                               Full detail for one material.
+  capcut add-audio <project> <file-or-url> <start> [duration] [options]        Add a local or Wikimedia audio file on an audio track.
+  capcut add-video <project> <file-or-url> <start> [duration] [options]        Add a local or Wikimedia video/image on a video track.
+  capcut add-text <project> <start> <duration> <text> [options]                Add a text segment with font/color/position options.
+  capcut crop <project> <segment-id> [--ratio <r> | --rect <x,y,w,h> | --reset] Read or set a video/photo segment's source-material crop (--ratio preset, --rect x,y,w,h, or --reset).
+  capcut cut <project> <start> <end> --out <path>                              Extract a time range into a new standalone draft.
+  capcut duplicate <project> <segment-id> [--track <track-name>] [--new-track] Duplicate a segment at its same timeline position onto a track above the source.
+  capcut remove <project> <segment-id> [--keep-track] [--keep-materials]       Remove a segment, its emptied track, and the materials that orphans.
+  capcut keyframe <project> <id> <property> <time> <value> [--easing <name>] | --batch Add a keyframe (position/scale/rotation/alpha/volume); single or --batch.
+  capcut transition <project> <id> <slug> [--duration <time>]                  Add a transition between segments.
+  capcut mask <project> <id> <slug> [options] | --off                          Apply a mask (linear/circle/heart/...) with geometry flags, or --off.
+  capcut bg-blur <project> <id> <level> | --off                                Set background blur level 1-4, or --off.
+  capcut text-style <project> <id> [options]                                   Style text (alpha/shadow/border/background box).
+  capcut text-anim <project> <id> [options]                                    Add intro/outro/combo text animation.
+  capcut image-anim <project> <id> [options]                                   Add intro/outro/combo animation to an image/video segment.
+  capcut add-sticker <project> <resource-id> <start> <duration> [options]      Add a sticker on its own track with transform.
+  capcut mix-mode <project> <id> <mode>                                        Set a video segment's blend mode.
+  capcut audio-fade <project> <id> [--in <seconds>] [--fade-out <seconds>]     Add fade-in/fade-out to an audio segment (--in / --fade-out).
+  capcut add-cover <project> <image> [--time <milliseconds>]                   Set the project cover/thumbnail from a local image.
+  capcut add-filter <project> <slug-or-name> (<start> <duration> | --full) [options] Add a colour filter on its own track.
+  capcut bubble-text <project> <id> --bubble <slug>                            Apply a speech-bubble shape to a text segment.
+  capcut add-effect <project> <slug-or-name> (<start> <duration> | --full) [options] Add a scene effect on its own track.
+  capcut save-template <project> <id> <name> --out <path>                      Extract a segment as a reusable template JSON.
+  capcut apply-template <project> <template> <start> <duration> [text] [options] Stamp a template into a project with new timing/text.
+  capcut make-preset <project> <text-segment-id> --out <preset.json>           Extract a text segment's styling as a reusable preset JSON (apply via --preset).
+  capcut templates <project>                                                   List bundled reusable templates.
+  capcut batch <project> [--continue-on-error] < operations.jsonl              Run multiple edits from stdin (JSONL), one file write.
+  capcut import-srt <project> <srt-or-> [options]                              Import an SRT file/stdin as one text segment per cue.
+  capcut import-ass <project> <ass-or-> [options]                              Import an ASS/SSA subtitle file as text segments.
+  capcut text-ranges <project> <id> --styles <json-or-@file>                   Apply byte-accurate multi-style ranges to a text segment.
+  capcut caption <project> (--audio <path> | --from-segment <id>) [options]    Transcribe audio via whisper into real caption-track segments.
+  capcut translate <project> --to <language> --out <path> [options]            Clone a draft into another language via the Anthropic API.
+  capcut migrate <project> --from <version> --to <version>                     Apply known schema migrations across version boundaries.
+  capcut add-sfx <project> <slug> <start> <duration> [options]                 Add a sound effect on a dedicated track.
+  capcut chroma <project> <id> (--color <hex> | --off) [options]               Green-screen / chroma key a video segment, or --off.
+  capcut prune <project>                                                       Remove materials no segment references.
+  capcut register <project-dir> [--apply] [--drafts <dir>]                     Repair an existing draft's registration metadata (draft_meta_info.json + root_meta_info.json entry) from a read-only draft_content.json so the CapCut app lists it (plan by default; --apply writes with .bak).
+  capcut rename <project> <new-name> [--drafts <dir>]                          Rename a draft after creation: the folder on disk plus draft_name and every self-referential path in draft_meta_info.json and the store's root_meta_info.json entry, transactionally (refuses when the target folder exists).
+  capcut relink <project> (--dir <path> | --from <prefix> --to <prefix>)       Repair broken media paths (--dir or --from/--to).
+  capcut replace-media <project> <segment-id> <new-file> [--retime]            Swap a segment's source file (placeholder > final) keeping its timing, effects, and keyframes.
+  capcut timeline <project> [--cols <number>]                                  Show the track/segment layout (JSON, or -H ASCII bars).
+  capcut projects [query] [--drafts <path>] [--names]                          List CapCut/JianYing draft folders on disk.
+  capcut diff <project-a> <project-b>                                          Compare two drafts (segments/materials/tracks added/removed/changed).
+  capcut concat <project-a> <project-b> [--out <path>]                         Append one draft onto another's timeline (id-safe), write to --out or in place.
+  capcut config                                                                Show the resolved config (.capcutrc + effective defaults).
+  capcut describe                                                              Emit the full command surface as JSON (agent tool spec).
+  capcut completions <bash|zsh|fish>                                           Generate shell completions (bash|zsh|fish).
+  capcut enums <category-flag> [--jianying]                                    List enum slugs (transitions, masks, effects, ...) by category.
+  capcut harvest-enums <project> [--apply] [--catalogue <path>]                Learn store resource ids from an app-authored draft into the per-user catalogue (lint + writable slugs).
+  capcut doctor                                                                Environment preflight (Node, whisper, API key, project dir).
+  capcut diagnose <project> [--bundle <report.json>]                           Inspect canonical draft files, divergence, and editor-write safety.
+  capcut fixture <project> --out <dir>                                         Build a shareable, redacted compatibility bundle (timeline JSON only) for a version-support issue, including the mask-keyframe evidence report (#44).
+  capcut sync-timelines <project-dir> [--apply]                                Reconcile drifted timeline mirrors (template-2.tmp, draft_info.json) from a read-only draft_content.json (plan with mtimes by default; --apply rewrites only the drifted mirrors).
+  capcut restore <project> [--step <number> | --list]                          Undo writes from .bak / snapshot history (--step N, --list).
+  capcut serve [--queue <path>] [options]                                      Run a stateless JSONL job queue from stdin/--queue.
+  capcut decrypt <project-or-file>                                             Detect JianYing 6.0+ encryption and explain the workaround.
+  capcut export <drafts-dir> --batch [options]                                 EXPERIMENTAL UI-automated render queue (macOS).
+  capcut init <name> [--template <dir>] [--drafts <dir>]                       Create a new empty draft from a template.
+  capcut quickstart <name> [--video <f>] [--audio <f>] [--srt <f>] [--drafts <dir>] One-command first draft: create + add one input + lint + print the open-in-CapCut step.
+  capcut compile <spec.json> [--out <draftdir>] [--data <rows.jsonl|->] [--check | --plan] Build a draft from a declarative JSON spec (the inverse of describe).
+  capcut render <project> [--out <preview.mp4>] [options]                      Render a low-res ffmpeg proxy preview (trim+speed+audio, --burn-captions); not CapCut's final render.
+  capcut detect-scenes <video> [options]                                       Detect scene-change cut points in a video (ffmpeg scene filter); prints cuts + segments to seed compile/cut.

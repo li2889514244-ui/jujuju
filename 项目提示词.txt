@@ -1,0 +1,85 @@
+我是 MatrixFlow ERP（多平台矩阵账号管理）的项目所有者，非技术用户，
+用 Windows 11 + PowerShell + 中文沟通。偏好你直接用 API/CLI 操作，
+不要给我「点 Settings 然后点 Variables」这种界面引导。
+
+== 项目仓库 ==
+GitHub: https://github.com/li2889514244-ui/jujuju (public, 主分支 master)
+- frontend/ : Vue 3 + Vite + Element Plus + Pinia
+- backend/  : NestJS + Prisma + Postgres + Redis
+
+== 部署位置 ==
+前端 → Cloudflare Pages
+  URL : https://jujuju-28b.pages.dev
+  Account ID: b47f88a1b8b3837796143701fbdf5d43
+  Project   : jujuju (id 94d6920f-1d40-4ea9-ad17-80ff741f94cf)
+
+后端 → Railway
+  URL : https://jujuju-backend-production.up.railway.app
+  API 全局前缀 /api/v1
+  Project : adventurous-nourishment (id 372d8faa-0cd5-42cd-b59d-aa36a1f180d6)
+  Service : jujuju-backend
+  数据库  : Postgres (jujuju-postgres) + Redis (matrixflow-redis)
+
+推 master 分支会同时触发 CF Pages 和 Railway 自动重新构建部署。
+
+== 我能给你的访问凭据 ==
+- Railway CLI（我本地已登录），你可以直接调用 railway 命令查变量、查日志、设变量
+- GitHub fine-grained PAT（按需创建，仅 jujuju 仓库 + Contents 读写）
+- Cloudflare API token（cfut_ 开头，按需创建，权限：Pages Edit + Account Read + User Read）
+注意：cfk_ 开头的是旧版 Global API Key，CF Pages 不认，要 cfut_ 开头的。
+
+== 已知踩坑（别再踩） ==
+1. 后端 CORS_ORIGIN 环境变量一旦设置，就完全替代源代码里的正则兜底。
+   当前值要包含: https://jujuju-28b.pages.dev,https://www.ddddkiii.com,https://ddddkiii.com
+   加新域名要追加进去，别覆盖。
+2. 前端处理登录响应字段名是 accessToken / refreshToken，不是 token。
+   涉及文件: frontend/src/store/user.ts, src/types/index.ts, src/api/auth.ts。
+   改 auth 相关类型时这三个文件要在同一个 commit 里推（用 Git Trees API），
+   单文件 PUT 会导致 TS 编译失败、CF 构建挂掉。
+3. 前端 Pinia 用 sessionStorage 持久化，key 是 matrixflow-user。
+   改 auth 流程后让用户「关闭标签页再重开」，光刷新清不掉。
+4. 后端这些接口前端调了但还没实现（返回 404，需要时要我加）：
+   GET /api/v1/auth/me, POST /api/v1/auth/profile
+5. frontend/src/views/dashboard/DashboardView.vue 的数字（128 账号、2.8M 粉丝
+   等）全是写死的 mock 数据，onMounted 是空的，还没接真实 API。
+6. 密码规则: 至少 8 位 + 含大写字母 + 含数字（如 Test12345）。
+7. 注册成功后不会自动登录，会切换到登录 tab。
+
+== 当前进度（本轮已改但未推送的代码） ==
+后端：
+- backend/src/modules/auth/auth.controller.ts — 新增 GET /auth/me + POST /auth/profile
+- backend/src/modules/auth/auth.service.ts — 新增 getProfile() + updateProfile()
+- backend/src/modules/competitors/ — 新建竞对监测模块（controller + service + module）
+- backend/src/modules/analytics/analytics.service.ts — 新增 generateReport() 报表方法
+- backend/src/modules/analytics/analytics.controller.ts — 新增 GET /analytics/report
+- backend/src/modules/content/content.controller.ts — 新增 POST /content/batch-publish 一键分发
+- backend/src/modules/content/content.service.ts — 新增 batchPublish() 方法
+- backend/prisma/schema.prisma — 新增 Competitor + CompetitorSnapshot 模型
+- backend/src/app.module.ts — 注册 CompetitorsModule
+
+前端：
+- frontend/src/views/dashboard/DashboardView.vue — 去掉 mock，接真实 analytics API
+- frontend/src/views/accounts/AccountListView.vue — 新增"添加账号"按钮+对话框
+- frontend/src/api/accounts.ts — 新增 create() 方法
+- frontend/src/api/content.ts — 修复路由路径（/contents → /content）
+- frontend/src/api/competitors.ts — 新建竞对 API
+- frontend/src/types/index.ts — 新增 CreateAccountForm 类型
+
+== 还没做完的 ==
+- 前端竞对监测页面（CompetitorView.vue）+ 路由注册
+- 前端一键分发页面（选多个账号发同一内容）
+- 前端数据报表页面（调 /analytics/report，支持导出 Excel）
+- 后端 content.service.ts 需要 import BadRequestException 和 ForbiddenException
+- 推送代码到 master + 跑 prisma migrate（新增 Competitor 表）
+
+== 工作风格期望 ==
+- 我描述需求只说「想要什么」，不说「改 xxx.ts 第几行」，你自己看代码定方案
+- 涉及删数据/删字段/force push/破坏性操作，先把方案给我确认再动手
+- 拿到我的 token 不要在聊天里回显，干完提醒我删 token
+- 多文件改动用 GitHub Git Trees API 在同一个 commit 推送
+- 实在改不动或方向有歧义就问我，别瞎猜
+
+== GitHub PAT 推荐配置 ==
+- 入口 https://github.com/settings/personal-access-tokens/new
+- Repository access: 只勾选 li2889514244-ui/jujuju
+- Repository permissions → Contents: Read and write
