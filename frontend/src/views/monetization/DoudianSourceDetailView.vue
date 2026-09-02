@@ -21,9 +21,9 @@
 
     <div class="source-page__kpi">
       <div class="kpi-card">
-        <div class="kpi-card__label">{{ rangeLabel }}出单</div>
-        <div class="kpi-card__value">{{ sourceOrders.length }}</div>
-        <div class="kpi-card__sub">有效订单</div>
+        <div class="kpi-card__label">{{ rangeLabel }}有效订单</div>
+        <div class="kpi-card__value">{{ sourceValidOrderCount }}</div>
+        <div class="kpi-card__sub">总订单 {{ sourceTotalOrderCount }} · 退款 {{ sourceRefundedOrderCount }}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeLabel }}销售额</div>
@@ -33,7 +33,7 @@
       <div class="kpi-card">
         <div class="kpi-card__label">退款</div>
         <div class="kpi-card__value kpi-card__value--danger">¥{{ centToYuan(sourceRefundAmount) }}</div>
-        <div class="kpi-card__sub">{{ sourceRefundCount }} 笔成功退款</div>
+        <div class="kpi-card__sub">退款 {{ sourceRefundedOrderCount }} 单</div>
       </div>
     </div>
 
@@ -95,6 +95,7 @@ import {
   type DoudianAftersaleMetric,
   type DoudianOrderMetric,
 } from '@/utils/doudianStoreMetrics'
+import { useLoadingStore } from '@/store/loading'
 
 const route = useRoute()
 const router = useRouter()
@@ -141,7 +142,14 @@ const sourceGmv = computed(() =>
 const sourceRefundAmount = computed(() =>
   sourceRefunds.value.reduce((sum, item) => sum + Number(item.amount || 0), 0),
 )
-const sourceRefundCount = computed(() => sourceRefunds.value.length)
+// 统一口径：总订单 = 有效 + 退款，主数字为去退款单数
+const sourceTotalOrderCount = computed(() => sourceOrders.value.length)
+const sourceRefundedOrderCount = computed(
+  () => new Set(sourceRefunds.value.map((item) => String(item.order_id))).size,
+)
+const sourceValidOrderCount = computed(
+  () => sourceTotalOrderCount.value - sourceRefundedOrderCount.value,
+)
 
 const trendEntries = computed(() => {
   const entries = buildDoudianTrend(sourceOrders.value, successfulRefundOrderIds.value)
@@ -223,32 +231,41 @@ function hideImg(event: Event) {
   ;(event.target as HTMLImageElement).style.display = 'none'
 }
 
+// 请求时序守卫：仅最新一次 loadData 的结果允许写入，避免快速切换周/月时旧数据覆盖新数据
+let latestRequestId = 0
+
 async function loadData() {
+  const requestId = ++latestRequestId
   if (!storeId.value || !sourceKey.value) {
     orders.value = []
     aftersales.value = []
     return
   }
 
+  const { start, end } = detailRange.value
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
-    const { start, end } = detailRange.value
     const [orderRes, aftersaleRes] = await Promise.all([
       doudianStoreApi.getOrders(storeId.value, {
         start_time: start,
         end_time: end,
       }),
-      doudianStoreApi.getAftersales(storeId.value, {
-        begin_create_time: start,
-        end_create_time: end,
-      }),
+      // 拉取全量售后：退款统一按订单归属日归集
+      doudianStoreApi.getAftersales(storeId.value),
     ])
+    if (requestId !== latestRequestId) return
     orders.value = orderRes.data?.order_list || []
     aftersales.value = aftersaleRes.data?.list || []
   } catch (error: any) {
+    if (requestId !== latestRequestId) return
     ElMessage.error(error?.message || '来源详情加载失败')
   } finally {
-    loading.value = false
+    loadingStore.stop()
+    if (requestId === latestRequestId) {
+      loading.value = false
+    }
   }
 }
 

@@ -104,6 +104,15 @@
       <el-card shadow="hover" class="md-section">
         <div class="md-section__header">
           <span>数据总览</span>
+          <el-tooltip
+            effect="light"
+            content="顶部汇总仅统计当前周期的完整与部分数据账号；历史参考数据不参与汇总"
+            placement="bottom"
+          >
+            <span v-if="periodCompletenessLabel" class="md-period-summary">{{
+              periodCompletenessLabel
+            }}</span>
+          </el-tooltip>
           <el-radio-group v-model="dateType" size="small">
             <el-radio-button value="day">日</el-radio-button>
             <el-radio-button value="week">周</el-radio-button>
@@ -125,7 +134,9 @@
             @keydown.space.prevent="openStatDrilldown(stat)"
           >
             <div class="md-stat-item__label">{{ stat.text }}</div>
-            <div class="md-stat-item__value">{{ formatNum(stat.value) }}</div>
+            <div class="md-stat-item__value">
+              <AnimatedNumber :value="stat.value" :format="formatNum" :duration="280" />
+            </div>
             <div
               v-if="
                 aggregatedTrends[stat.type] !== undefined && aggregatedTrends[stat.type] !== null
@@ -224,19 +235,6 @@
                 <el-button text type="primary" class="account-link" @click.stop="openAccountDetail(row)">
                   {{ row.nickname }}
                 </el-button>
-                <el-tooltip
-                  v-if="row.isStale"
-                  :content="
-                    row.dataDate
-                      ? `最近数据日期: ${row.dataDate}；${row.staleLabel}，可切换周/月查看已有数据`
-                      : '该账号还没有成功采集记录，请登录桌面伴侣并完成初始采集同步'
-                  "
-                  placement="top"
-                >
-                  <el-tag size="small" type="warning" effect="plain" class="stale-tag"
-                    >{{ row.staleLabel }}</el-tag
-                  >
-                </el-tooltip>
               </div>
             </template>
           </el-table-column>
@@ -359,12 +357,15 @@
     </template>
 
     <el-drawer v-model="drilldownVisible" :title="drilldownTitle" size="520px" class="md-drilldown">
+      <div class="md-drilldown__section-title">
+        参与汇总 · {{ drilldownActiveRows.length }} 个账号
+      </div>
       <el-table
-        :data="drilldownRows"
+        :data="drilldownActiveRows"
         stripe
         size="small"
         max-height="620"
-        empty-text="暂无账号明细"
+        empty-text="当前周期暂无参与汇总的账号"
         @row-click="openAccountDetail"
       >
         <el-table-column label="账号" min-width="190">
@@ -390,7 +391,54 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="syncLabel" label="同步状态" width="120" align="right">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.syncType" effect="plain">
+              {{ row.syncLabel }}
+            </el-tag>
+          </template>
+        </el-table-column>
       </el-table>
+
+      <el-collapse v-if="drilldownHistoricalRows.length > 0" class="md-drilldown__history">
+        <el-collapse-item>
+          <template #title>
+            <span class="md-drilldown__history-title">
+              历史参考账号（{{ drilldownHistoricalRows.length }}）
+              <em>不参与当前{{ dateTypeLabel }}汇总</em>
+            </span>
+          </template>
+          <el-table
+            :data="drilldownHistoricalRows"
+            size="small"
+            max-height="420"
+            empty-text="暂无历史参考账号"
+            @row-click="openAccountDetail"
+          >
+            <el-table-column label="账号" min-width="180">
+              <template #default="{ row }">
+                <div class="drilldown-account drilldown-account--historical">
+                  <el-avatar :size="30" :src="row.avatar">
+                    {{ (row.nickname || '?').charAt(0) }}
+                  </el-avatar>
+                  <div class="drilldown-account__meta">
+                    <el-button text type="primary" class="account-link" @click.stop="openAccountDetail(row)">
+                      {{ row.nickname }}
+                    </el-button>
+                    <PlatformIcon :platform="row.platform" show-label />
+                  </div>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="valueFormatted" label="数值" width="100" align="right" />
+            <el-table-column prop="dataStatusLabel" label="状态" min-width="140" align="right">
+              <template #default="{ row }">
+                <el-tag size="small" type="info" effect="plain">{{ row.dataStatusLabel }}</el-tag>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-collapse-item>
+      </el-collapse>
     </el-drawer>
   </div>
 </template>
@@ -401,6 +449,7 @@ import { useRouter } from 'vue-router'
 import { useMatrixDashboard } from '@/composables/useMatrixDashboard'
 import { useChartTheme } from '@/composables/useChartTheme'
 import DataChart from '@/components/common/DataChart.vue'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import { CaretTop, CaretBottom } from '@element-plus/icons-vue'
@@ -423,6 +472,7 @@ const {
   overview,
   kpiCards,
   aggregatedStats,
+  periodCompletenessLabel,
   aggregatedTrends,
   platformStats,
   platformTableData,
@@ -442,8 +492,9 @@ const drilldownVisible = ref(false)
 const drilldownMetric = ref<DrilldownMetric>('fans')
 const drilldownTitle = ref('')
 
-const drilldownRows = computed(() => {
+const drilldownActiveRows = computed(() => {
   return accountTableData.value
+    .filter((row: any) => row.periodState === 'complete' || row.periodState === 'partial')
     .map((row: any) => {
       const rawValue = getRowMetricValue(row, drilldownMetric.value)
       return {
@@ -452,12 +503,23 @@ const drilldownRows = computed(() => {
         valueFormatted: rawValue === null ? '-' : formatNum(rawValue),
       }
     })
-    .sort((a: any, b: any) => {
-      if (a.value === null && b.value === null) return 0
-      if (a.value === null) return 1
-      if (b.value === null) return -1
-      return b.value - a.value
+    .filter((row: any) => row.value !== null)
+    .sort((a: any, b: any) => b.value - a.value)
+})
+
+const drilldownHistoricalRows = computed(() => {
+  return accountTableData.value
+    .filter((row: any) => row.periodState === 'historical')
+    .map((row: any) => {
+      const rawValue = getRowMetricValue(row, drilldownMetric.value)
+      return {
+        ...row,
+        value: rawValue,
+        valueFormatted: rawValue === null ? '-' : formatNum(rawValue),
+      }
     })
+    .filter((row: any) => row.value !== null)
+    .sort((a: any, b: any) => b.value - a.value)
 })
 
 function getRowMetricValue(row: any, metric: DrilldownMetric): number | null {
@@ -816,6 +878,11 @@ onMounted(() => {
     flex-wrap: wrap;
   }
 }
+.md-period-summary {
+  color: var(--color-text-tertiary);
+  font-size: 12px;
+  margin-left: auto;
+}
 
 // ─── Platform Row ───
 .md-platform-row {
@@ -1092,9 +1159,38 @@ onMounted(() => {
     gap: 3px;
     min-width: 0;
   }
+
+  &--historical {
+    opacity: 0.72;
+  }
 }
-.stale-tag {
-  flex-shrink: 0;
+.md-drilldown__section-title {
+  margin-bottom: 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+.md-drilldown__history {
+  margin-top: 14px;
+  border-top: 1px solid var(--el-border-color-lighter);
+
+  :deep(.el-collapse-item__header) {
+    background: transparent;
+  }
+
+  &-title {
+    color: var(--color-text-tertiary);
+    font-size: 13px;
+    font-weight: 600;
+
+    em {
+      margin-left: 8px;
+      color: var(--color-text-quaternary, #8b90a8);
+      font-size: 12px;
+      font-style: normal;
+      font-weight: 400;
+    }
+  }
 }
 .collection-tag {
   display: inline-flex;

@@ -85,3 +85,79 @@ def _get_config_cache() -> dict:
 def _update_config_cache(cfg: dict):
     """Update the shared config cache."""
     state._CONFIG_CACHE.update(cfg)
+
+
+def get_device_id() -> str:
+    """返回稳定设备标识：首次生成后持久化到 config，随机器唯一、跨升级不变。"""
+    cfg = _get_config_cache()
+    existing = str(cfg.get('device_id') or '').strip()
+    if existing:
+        return existing
+    import hashlib
+    import platform
+    import uuid
+
+    raw = f"{platform.node()}|{uuid.getnode()}|{platform.machine()}|{platform.system()}"
+    device_id = hashlib.sha1(raw.encode('utf-8')).hexdigest()[:16]
+    cfg['device_id'] = device_id
+    try:
+        _save_config(cfg)
+    except Exception as _e:
+        print(f'[WARN] device_id save failed: {_e}')
+    return device_id
+
+
+def install_companion_request_headers() -> None:
+    """给所有发往披星云服务器的出站请求统一注入版本号 + 设备标识请求头。
+
+    在启动早期调用一次即可；通过猴子补丁 requests.Session.request 覆盖所有
+    requests 调用路径（账号/抖店/微信上传、保活、鉴权等），且只对本站域名生效。
+    """
+    try:
+        import requests
+        from urllib.parse import urlparse
+
+        from companion_state import APP_VERSION
+
+        device_id = get_device_id()
+        api_host = 'ddddkiii.com'
+        try:
+            api_host = (urlparse(str(_get_config_cache().get('api_url') or '')).hostname) or api_host
+        except Exception:
+            pass
+        api_host = (api_host or '').lower()
+
+        original_request = requests.sessions.Session.request
+
+        def _patched_request(self, method, url, **kwargs):
+            is_own = False
+            try:
+                host = (urlparse(url).hostname or '').lower()
+                is_own = bool(host and (host == api_host or host.endswith('.' + api_host)))
+                if is_own:
+                    headers = kwargs.get('headers')
+                    if headers is None:
+                        headers = {}
+                    if not hasattr(headers, 'setdefault'):
+                        headers = dict(headers)
+                    headers.setdefault('X-Companion-Version', APP_VERSION)
+                    headers.setdefault('X-Companion-Device-Id', device_id)
+                    kwargs['headers'] = headers
+            except Exception:
+                is_own = False
+            resp = original_request(self, method, url, **kwargs)
+            # 监控中心：统计本站 403/404/500 响应次数（心跳周期内增量）
+            if is_own:
+                try:
+                    code = getattr(resp, 'status_code', None)
+                    if code in (403, 404, 500):
+                        from companion_heartbeat import note_http_error
+                        note_http_error(int(code))
+                except Exception:
+                    pass
+            return resp
+
+        requests.sessions.Session.request = _patched_request
+        print(f'[Headers] companion request headers installed (device={device_id})')
+    except Exception as _e:
+        print(f'[WARN] companion request header install failed: {_e}')

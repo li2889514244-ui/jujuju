@@ -5,6 +5,7 @@ import { AccountsService } from '../../src/modules/accounts/accounts.service'
 import { AccountsController } from '../../src/modules/accounts/accounts.controller'
 import { PrismaService } from '../../src/prisma/prisma.service'
 import { CookieManager } from '../../src/modules/uploader/cookie-manager'
+import { PermissionService } from '../../src/modules/teams/permission.service'
 import { mockPrismaService, resetPrismaMocks } from '../mocks/prisma.mock'
 import { mockAccounts } from '../fixtures'
 import { Platform } from '../../src/common/prisma-enums'
@@ -22,6 +23,10 @@ describe('Accounts integration', () => {
         {
           provide: CookieManager,
           useValue: { saveCookies: jest.fn(), loadCookies: jest.fn() },
+        },
+        {
+          provide: PermissionService,
+          useValue: { assertUserPermission: jest.fn().mockResolvedValue(undefined) },
         },
       ],
     }).compile()
@@ -129,7 +134,7 @@ describe('Accounts integration', () => {
         _count: { posts: 0 },
       })
 
-      const result = await accountsController.findOne('acc-001')
+      const result = await accountsController.findOne('acc-001', 'user-001')
 
       expect(result).toHaveProperty('id', 'acc-001')
     })
@@ -137,7 +142,7 @@ describe('Accounts integration', () => {
     it('throws 404 when the account does not exist', async () => {
       mockPrismaService.account.findUnique.mockResolvedValue(null)
 
-      await expect(accountsController.findOne('nonexistent')).rejects.toThrow(
+      await expect(accountsController.findOne('nonexistent', 'user-001')).rejects.toThrow(
         NotFoundException,
       )
     })
@@ -161,6 +166,12 @@ describe('Accounts integration', () => {
     })
 
     it('allows shared-mode account updates by another user', async () => {
+      // 共享模式：请求用户与账号主人在同一组织，应放行
+      mockPrismaService.user.findUnique.mockImplementation(async (args: any) => {
+        const id = args?.where?.id
+        if (id === 'user-other') return { role: 'MEMBER', organizationId: 'org-1' }
+        return { organizationId: 'org-1' }
+      })
       mockPrismaService.account.findUnique.mockResolvedValue(mockAccounts.douyin)
       mockPrismaService.account.update.mockResolvedValue({
         ...mockAccounts.douyin,
@@ -188,6 +199,12 @@ describe('Accounts integration', () => {
     })
 
     it('allows shared-mode account deletes by another user', async () => {
+      // 共享模式：请求用户与账号主人在同一组织，应放行
+      mockPrismaService.user.findUnique.mockImplementation(async (args: any) => {
+        const id = args?.where?.id
+        if (id === 'user-other') return { role: 'MEMBER', organizationId: 'org-1' }
+        return { organizationId: 'org-1' }
+      })
       mockPrismaService.account.findUnique.mockResolvedValue(mockAccounts.douyin)
       mockPrismaService.account.delete.mockResolvedValue(mockAccounts.douyin)
 

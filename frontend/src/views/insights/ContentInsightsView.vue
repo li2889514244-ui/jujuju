@@ -139,6 +139,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { analyticsApi } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
+import { useLoadingStore } from '@/store/loading'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import PostDetailDrawer from '@/components/common/PostDetailDrawer.vue'
 import { PLATFORM_LABELS, type AccountGroup } from '@/types'
@@ -251,10 +252,13 @@ async function loadAll() {
   loading.value = true
   viewsRanking.value = []
   engagementRanking.value = []
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     await Promise.all([loadRanking(), loadTags(), loadGroups()])
   } finally {
     loading.value = false
+    loadingStore.stop()
   }
 }
 

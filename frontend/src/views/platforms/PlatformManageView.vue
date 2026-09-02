@@ -129,6 +129,19 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="数据同步" min-width="180">
+        <template #default="{ row }">
+          <div class="sync-cell">
+            <el-tag size="small" :type="getCollectStatusType(row)">
+              {{ getCollectStatusText(row) }}
+            </el-tag>
+            <span class="time-text">
+              {{ row.lastSuccessfulCollectAt ? `更新：${formatDate(row.lastSuccessfulCollectAt)}` : '暂无成功同步' }}
+            </span>
+          </div>
+        </template>
+      </el-table-column>
+
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button size="small" :loading="row._collecting" @click="collectData(row)">
@@ -194,6 +207,7 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { platformsApi, type SupportedPlatform, type AuthorizedAccount } from '@/api/platforms'
+import { useLoadingStore } from '@/store/loading'
 import type { Platform } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -295,6 +309,22 @@ function getTokenStatusText(status: string): string {
   return map[status] || '未知'
 }
 
+function getCollectStatusType(
+  account: AuthorizedAccount,
+): 'success' | 'warning' | 'danger' | 'info' {
+  if (account.lastCollectStatus === 'COLLECTING') return 'warning'
+  if (account.lastCollectStatus === 'FAILED') return 'danger'
+  if (account.lastSuccessfulCollectAt) return 'success'
+  return 'info'
+}
+
+function getCollectStatusText(account: AuthorizedAccount): string {
+  if (account.lastCollectStatus === 'COLLECTING') return '正在同步'
+  if (account.lastCollectStatus === 'FAILED') return '同步失败'
+  if (account.lastSuccessfulCollectAt) return '已同步'
+  return '未同步'
+}
+
 function filterByPlatform(platformKey: string) {
   filterPlatform.value = filterPlatform.value === platformKey ? '' : platformKey
   currentPage.value = 1
@@ -312,6 +342,8 @@ async function loadPlatforms() {
 
 async function loadAccounts() {
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     const { data } = await platformsApi.getAuthorizedAccounts({
       platform: filterPlatform.value || undefined,
@@ -330,6 +362,7 @@ async function loadAccounts() {
     ElMessage.error('加载账号列表失败')
   } finally {
     loading.value = false
+    loadingStore.stop()
   }
 }
 async function authorizePlatform(platform: SupportedPlatform) {
@@ -548,6 +581,13 @@ onMounted(async () => {
 .time-text {
   font-size: $text-body;
   color: $text-tertiary;
+}
+
+.sync-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
 }
 
 .pagination-wrapper {

@@ -143,6 +143,7 @@ import dayjs from 'dayjs'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useAccountStore } from '@/store/account'
 import { accountsApi } from '@/api/accounts'
+import { useLoadingStore } from '@/store/loading'
 import type { AccountAnalytics } from '@/types'
 import PlatformIcon from '@/components/common/PlatformIcon.vue'
 import StatusBadge from '@/components/common/StatusBadge.vue'
@@ -181,11 +182,14 @@ const analyticsCards = computed(() => {
 
 onMounted(async () => {
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     await accountStore.fetchAccountDetail(accountId)
     await Promise.all([loadAnalytics(), loadPosts()])
   } finally {
     loading.value = false
+    loadingStore.stop()
   }
 })
 

@@ -11,6 +11,7 @@ UI_HTML = r'''<!doctype html>
 html,body{height:100%}
 body{background:radial-gradient(circle at 14% -10%,rgba(37,99,235,.12),transparent 32%),linear-gradient(140deg,#eef3f8 0%,#f8fafc 48%,#edf4f1 100%);color:var(--tx);font:14px/1.6 "Microsoft YaHei","Segoe UI",system-ui,Arial,sans-serif;-webkit-font-smoothing:antialiased;overflow:hidden}
 #app{display:grid;grid-template-columns:236px 1fr;height:100vh}
+[v-cloak]{display:none!important}
 
 /* ── Sidebar ── */
 aside{position:relative;background:linear-gradient(180deg,#111827 0%,#151d2b 55%,#101722 100%);display:flex;flex-direction:column;overflow:hidden;border-right:1px solid rgba(255,255,255,.08);box-shadow:18px 0 50px rgba(15,23,42,.16)}
@@ -82,6 +83,13 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
 .toast-wrap{position:fixed;right:28px;top:22px;z-index:300;max-width:min(420px,calc(100vw - 56px));pointer-events:none}
 .toast{border:1px solid var(--brd);border-left-width:4px;border-radius:8px;background:#fff;box-shadow:var(--shadow-lg);padding:11px 14px;color:var(--tx);font-size:13px;font-weight:650;animation:toastIn .18s ease both}
 .toast.info{border-left-color:var(--pri)}.toast.ok{border-left-color:var(--ok)}.toast.warn{border-left-color:var(--warn)}.toast.err{border-left-color:var(--err)}
+.update-mask{position:fixed;inset:0;z-index:400;background:rgba(15,23,42,.55);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(2px)}
+.update-modal{width:min(480px,calc(100vw - 40px));background:#fff;border-radius:14px;box-shadow:0 24px 64px rgba(0,0,0,.35);overflow:hidden;animation:updrop .25s ease}
+@keyframes updrop{from{transform:translateY(-18px);opacity:0}to{transform:none;opacity:1}}
+.update-modal .um-head{background:linear-gradient(135deg,var(--pri),#4f46e5);color:#fff;padding:18px 22px;font-size:17px;font-weight:700;display:flex;align-items:center;gap:10px}
+.update-modal .um-body{padding:20px 22px;font-size:13px;color:#334155;line-height:1.7;max-height:260px;overflow:auto;white-space:pre-wrap}
+.update-modal .um-foot{display:flex;gap:10px;padding:14px 22px 20px;justify-content:flex-end}
+.update-modal .um-foot .btn{margin:0}
 .busy-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:8px;padding:10px 12px;font-size:13px;font-weight:650}
 .busy-banner .muted{color:#b45309;font-size:12px;font-weight:500}
 @keyframes toastIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
@@ -209,7 +217,7 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
 </style>
 </head>
 <body>
-<div id="app">
+<div id="app" v-cloak>
 
   <!-- ═══════ Login Screen ═══════ -->
   <div v-if="!configured" class="login-wrap">
@@ -233,12 +241,14 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
       </div>
       <button class="btn-pri" style="width:100%;height:40px;justify-content:center" @click="doLogin" :disabled="loginLoading">
         <span v-if="loginLoading" class="spinner" style="width:16px;height:16px;border-width:2px"></span>
-        {{loginLoading?'登录中…':'登 录'}}
+        <span v-if="loginLoading">登录中…</span>
+        <span v-else>登 录</span>
       </button>
       <div class="login-divider"><span>或</span></div>
       <button class="btn-feishu" @click="startFeishuLogin" :disabled="feishuLoading">
         <span v-if="feishuLoading" class="spinner" style="width:16px;height:16px;border-width:2px"></span>
-        {{feishuLoading?'等待授权…':'飞书登录'}}
+        <span v-if="feishuLoading">等待授权…</span>
+        <span v-else>飞书登录</span>
       </button>
       <div v-if="feishuLoading&&feishuLoginUrl" class="feishu-fallback">
         <button type="button" @click="openFeishuLoginUrl">浏览器没打开？点这里继续授权</button>
@@ -301,6 +311,37 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
   <main>
     <div class="toast-wrap" v-if="toast.show">
       <div class="toast" :class="toast.type">{{toast.message}}</div>
+    </div>
+    <!-- 更新强提醒弹窗：检测到新版本即弹出；点击更新后原地显示下载进度条 -->
+    <div class="update-mask" v-if="updateReminder">
+      <div class="update-modal">
+        <div class="um-head">{{updating?('正在更新 v'+updateReminder.version):('🔔 发现披星云伴侣新版本 v'+updateReminder.version)}}</div>
+        <div class="um-body" v-if="!updating">{{updateReminder.notes||'新版本已发布，建议尽快更新以获得修复与新功能。'}}
+          当前版本：v{{appVersion}} · 安装包大小：{{fmtSize(updateReminder.size)}}</div>
+        <div class="um-body" v-else>
+          <div style="display:flex;align-items:center;justify-content:space-between;font-size:13px">
+            <span>{{updatePhaseText(updateStatus)}}</span>
+            <span>{{updatePercent(updateStatus)}}%</span>
+          </div>
+          <div style="height:10px;border-radius:999px;background:#eef2ff;overflow:hidden;margin-top:10px">
+            <div :style="{width:updatePercent(updateStatus)+'%',height:'100%',background:'linear-gradient(90deg,var(--pri),#4f46e5)'}"></div>
+          </div>
+          <div v-if="updateStatus&&updateStatus.total" style="margin-top:10px;font-size:12px;color:#667085">
+            已下载 {{formatBytes(updateStatus.downloaded)}} / {{formatBytes(updateStatus.total)}}（8线程分片，支持暂停续传）
+          </div>
+          <div v-if="updateStatus&&updateStatus.phase==='error'" style="margin-top:10px;font-size:12px;color:var(--err)">{{updateStatus.error||'更新失败'}}</div>
+          <div v-if="updateStatus&&updateStatus.phase==='restarting'" style="margin-top:10px;font-size:12px">本地伴侣正在重启，如果窗口关闭，稍等几秒再从桌面打开即可。</div>
+        </div>
+        <div class="um-foot" v-if="!updating">
+          <button class="btn" @click="reminderSnooze">稍后提醒（30分钟）</button>
+          <button class="btn-pri" @click="reminderApply">立即更新</button>
+        </div>
+        <div class="um-foot" v-else>
+          <button class="btn-ghost btn-sm" v-if="updateStatus&&updateStatus.phase==='downloading'" @click="pauseUpdateDownload">⏸ 暂停下载</button>
+          <button class="btn-pri btn-sm" v-if="updateStatus&&updateStatus.phase==='paused'" @click="resumeUpdateDownload">▶ 继续下载</button>
+          <button class="btn" v-if="updateStatus&&updateStatus.phase==='error'" @click="updateReminder=null">关闭</button>
+        </div>
+      </div>
     </div>
     <div class="busy-banner" v-if="collecting">
       <div>{{collectionBusyText}}</div>
@@ -793,6 +834,10 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
             <div v-if="updateStatus&&updateStatus.total" style="margin-top:6px;font-size:12px;color:var(--tx3)">
               已下载 {{formatBytes(updateStatus.downloaded)}} / {{formatBytes(updateStatus.total)}}
             </div>
+            <div v-if="updateStatus&&(updateStatus.phase==='downloading'||updateStatus.phase==='paused')" style="margin-top:8px;display:flex;gap:10px">
+              <button class="btn-ghost btn-sm" v-if="updateStatus.phase==='downloading'" @click="pauseUpdateDownload">⏸ 暂停下载</button>
+              <button class="btn-pri btn-sm" v-if="updateStatus.phase==='paused'" @click="resumeUpdateDownload">▶ 继续下载</button>
+            </div>
             <div v-if="updateStatus&&updateStatus.phase==='restarting'" style="margin-top:6px;font-size:12px;color:var(--tx3)">
               本地伴侣正在重启，如果窗口关闭，稍等几秒再从桌面打开即可。
             </div>
@@ -827,15 +872,119 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
     <!-- ═══ AI 剪辑 ═══ -->
     <template v-if="page==='editor'">
       <div class="page-head">
-        <div><h1>AI 剪辑</h1><div class="sub">DeepSeek + capcut-cli，用 AI 驱动剪映</div></div>
-        <button class="btn-ghost btn-sm" @click="loadVeEnv" :disabled="veLoadingEnv">刷新环境</button>
+        <div><h1>AI 剪辑</h1><div class="sub">一键完成气口、字幕、素材和成片</div></div>
+        <span class="badge" :class="veEnv?.deepseek_key_set?'ok':'warn'">AI服务：{{veEnv?.deepseek_key_set?'已配置':'未配置'}}</span>
       </div>
 
-      <!-- 模式切换 -->
       <div style="display:flex;gap:0;margin-bottom:16px;border:1px solid var(--brd);border-radius:8px;overflow:hidden;width:fit-content">
-        <button :class="veMode==='standard'?'btn-pri':'btn-ghost'" style="border-radius:0;box-shadow:none" @click="veMode='standard'">📋 标准模式</button>
-        <button :class="veMode==='custom'?'btn-pri':'btn-ghost'" style="border-radius:0;box-shadow:none;border-left:1px solid var(--brd)" @click="veMode='custom'">💬 自定义模式</button>
+        <button :class="veMode==='standard'?'btn-pri':'btn-ghost'" style="border-radius:0;box-shadow:none" @click="veMode='standard'">基础剪辑</button>
+        <button :class="veMode==='advanced'?'btn-pri':'btn-ghost'" style="border-radius:0;box-shadow:none;border-left:1px solid var(--brd)" @click="veMode='advanced'">高级剪辑</button>
+        <button :class="veMode==='tools'?'btn-pri':'btn-ghost'" style="border-radius:0;box-shadow:none;border-left:1px solid var(--brd)" @click="veMode='tools'">高级工具</button>
       </div>
+
+      <template v-if="veMode==='standard'">
+        <div class="card">
+            <div class="card-h"><h2>AI 基础剪辑</h2><span v-if="veTaskStatus" class="badge" :class="veStatusBadge">{{veStatusText}}</span></div>
+            <div class="card-b">
+              <div style="font-size:13px;color:var(--tx2);margin-bottom:16px">适合数字人、口播视频，一键完成气口、字幕、素材和成片。</div>
+              <div v-if="!veBasicReady" style="font-size:13px;color:var(--warn);background:var(--warn-l);border:1px solid #fed7aa;border-radius:8px;padding:10px 12px;margin-bottom:14px">
+                剪辑能力检查：{{veBasicReadinessText}}
+              </div>
+              <div class="form-group">
+                <label>视频</label>
+                <button class="btn-ghost" @click="pickVeVideo">选择视频</button>
+              <div v-if="veVideoPath" style="margin-top:10px;font-size:13px;line-height:1.9;background:#f8fafc;border:1px solid var(--brd2);border-radius:8px;padding:10px 12px">
+                <div>文件名：{{veVideoName}}</div>
+                <div>时长：{{fmtDuration(veVideoInfo?.duration)}}</div>
+                <div>分辨率：{{veVideoInfo?.width||'-'}} × {{veVideoInfo?.height||'-'}}</div>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>剪辑节奏</label><select v-model="vePace"><option value="natural">自然</option><option value="compact">紧凑</option><option value="fast">极致</option></select><div class="hint">{{vePaceHint}}</div></div>
+              <div class="form-group"><label>字幕样式</label><select v-model="veSubtitleTemplate"><option value="minimal">极简</option><option value="yellow">黄白重点</option><option value="business">商业</option><option value="emotion">情感</option></select></div>
+              <div class="form-group"><label>素材</label><select v-model="veMaterialDensity"><option value="off">不加素材</option><option value="low">少量</option><option value="normal">正常</option><option value="high">丰富</option></select></div>
+            </div>
+            <div class="form-group">
+              <label>素材库</label>
+              <div class="btn-row"><button class="btn-ghost" @click="pickVeMaterialFolder">选择素材库</button><button class="btn-ghost" @click="refreshVeMaterials" :disabled="!veMaterialLibrary">刷新素材</button></div>
+              <div class="hint">当前素材库：{{veMaterialLibrary||defaultMaterialLibrary}} · 共 {{veMaterialCount}} 个素材</div>
+            </div>
+            <div class="btn-row">
+              <button class="btn-pri" @click="startStandardEdit" :disabled="!veVideoPath||veTaskRunning||(veEnv&&!veEnv.ffmpeg?.available)">{{veTaskRunning?'AI剪辑处理中...':'开始一键剪辑'}}</button>
+              <button class="btn-err" v-if="veTaskRunning" @click="cancelVeTask">取消</button>
+            </div>
+          </div>
+        </div>
+        <div class="card" v-if="veTaskStatus&&veTaskRunning">
+          <div class="card-h"><h2>AI剪辑处理中</h2></div>
+          <div class="card-b">
+            <div v-for="s in veProgressSteps" :key="s" style="font-size:13px;padding:4px 0">{{veStepDone(s)?'✓':'○'}} {{s}}</div>
+            <div class="progress"><div class="progress-bar" :style="{width:(veTaskStatus.progress||0)+'%'}"></div></div>
+            <div style="margin-top:8px;font-size:13px;color:var(--tx2)">{{veTaskStatus.progress||0}}% · {{veTaskStatus.current_step}}</div>
+          </div>
+        </div>
+        <div class="card" v-if="veTaskStatus&&veTaskStatus.status==='done'">
+          <div class="card-h"><h2>剪辑完成</h2></div>
+          <div class="card-b">
+            <div class="grid3">
+              <div>原视频：<b>{{fmtDuration(veTaskStatus.stats?.source_duration)}}</b></div>
+              <div>成片：<b>{{fmtDuration(veTaskStatus.stats?.output_duration)}}</b></div>
+              <div>删除停顿：<b>{{fmtDuration(veTaskStatus.stats?.removed_silence)}}</b></div>
+              <div>字幕：<b>{{veTaskStatus.stats?.subtitle_count||0}} 条</b></div>
+              <div>素材：<b>{{veTaskStatus.stats?.material_count||0}} 段</b></div>
+              <div>耗时：<b>{{fmtDuration(veTaskStatus.stats?.processing_seconds)}}</b></div>
+            </div>
+            <div v-if="veTaskStatus.warnings&&veTaskStatus.warnings.length" style="margin-top:12px;font-size:13px;color:var(--warn);background:var(--warn-l);border:1px solid #fed7aa;border-radius:8px;padding:10px 12px">
+              提醒：{{veWarningText}}
+            </div>
+            <div class="btn-row" style="margin-top:16px"><button class="btn-pri" @click="playVeOutput(veTaskStatus.output_path)">播放成片</button><button class="btn-ghost" @click="openVeOutput(veTaskStatus.output_path)">打开文件夹</button><button class="btn-ghost" @click="resetVeBasic">再剪一个</button></div>
+          </div>
+        </div>
+      </template>
+
+      <template v-if="veMode==='advanced'">
+        <div class="card">
+          <div class="card-h"><h2>高级剪辑</h2><span v-if="veTaskStatus" class="badge" :class="veStatusBadge">{{veStatusText}}</span></div>
+          <div class="card-b">
+            <button class="btn-ghost" @click="pickVeVideo">选择视频</button>
+            <div v-if="veVideoPath" style="margin:10px 0;font-size:13px">{{veVideoName}} · {{fmtDuration(veVideoInfo?.duration)}}</div>
+            <div class="form-group"><label>我要剪什么</label><textarea v-model="veInstruction" rows="4" style="height:auto;resize:vertical" placeholder="帮我剪一条 1~2 分钟、开头观点冲突一点的短视频。"></textarea></div>
+            <div class="form-row">
+              <div class="form-group"><label>目标时长</label><select v-model="veDurationMode"><option value="short">30~60秒</option><option value="medium">1~2分钟</option><option value="long">2~3分钟</option></select></div>
+              <div class="form-group"><label>剪辑风格</label><select v-model="veAdvancedStyle"><option value="faithful">保留原意</option><option value="viral">爆款优先</option><option value="emotion">情绪优先</option><option value="dense">干货密度优先</option></select></div>
+            </div>
+            <div class="btn-row"><button class="btn-pri" @click="startAdvancedAnalyze" :disabled="!veVideoPath||!veInstruction||veTaskRunning">AI分析视频</button><button class="btn-err" v-if="veTaskRunning" @click="cancelVeTask">取消</button></div>
+          </div>
+        </div>
+        <div class="card" v-if="veTaskStatus&&veTaskStatus.plan&&veTaskStatus.status==='awaiting_confirmation'">
+          <div class="card-h"><h2>{{veTaskStatus.plan.title}}</h2><span>{{fmtDuration(veTaskStatus.plan.estimated_duration)}}</span></div>
+          <div class="card-b">
+            <div v-for="clip in veTaskStatus.plan.clips" :key="clip.id" style="border:1px solid var(--brd2);border-radius:8px;padding:12px;margin-bottom:10px">
+              <div style="display:flex;justify-content:space-between"><b>{{fmtDuration(clip.source_start)}} - {{fmtDuration(clip.source_end)}} · {{clip.role}}</b><label><input type="checkbox" v-model="clip.enabled"> 启用</label></div>
+              <div style="margin:8px 0">{{clip.text}}</div>
+              <div style="font-size:12px;color:var(--tx2)">理由：{{clip.reason}}</div>
+              <div class="btn-row" style="margin-top:8px"><button class="btn-ghost btn-sm" @click="moveVeClip(clip,-1)">上移</button><button class="btn-ghost btn-sm" @click="moveVeClip(clip,1)">下移</button></div>
+            </div>
+            <div class="btn-row"><button class="btn-ghost" @click="saveVePlan">保存调整</button><button class="btn-pri" @click="renderAdvanced">生成成片</button></div>
+          </div>
+        </div>
+      </template>
+
+      <div class="card">
+        <div class="card-h"><h2>最近任务</h2></div>
+        <div class="card-b">
+          <div v-for="t in veTasks" :key="t.id" class="list-row">
+            <div class="list-main"><div class="list-title">{{fileName(t.source_path)}} · {{t.mode==='advanced'?'高级剪辑':'基础剪辑'}}</div><div class="list-sub">{{t.created_at}} · {{t.current_step||t.status}}</div></div>
+            <span class="badge" :class="t.status==='done'?'ok':t.status==='error'?'err':t.status==='awaiting_confirmation'?'warn':'gray'">{{t.status}}</span>
+            <button class="btn-ghost btn-sm" v-if="t.output_path" @click="playVeOutput(t.output_path)">播放</button>
+            <button class="btn-ghost btn-sm" v-if="t.output_path" @click="openVeOutput(t.output_path)">文件夹</button>
+            <button class="btn-ghost btn-sm" v-if="t.status==='error'" @click="rerunVeTask(t)">重新执行</button>
+          </div>
+          <div v-if="!veTasks.length" class="empty">暂无剪辑任务</div>
+        </div>
+      </div>
+
+      <template v-if="veMode==='tools'">
 
       <!-- 环境状态 -->
       <div class="card" v-if="veEnv">
@@ -858,10 +1007,16 @@ button:disabled,.btn:disabled{opacity:.55;cursor:not-allowed;transform:none;box-
               <span class="badge" :class="veEnv.ffmpeg?.available?'ok':'gray'">{{veEnv.ffmpeg?.available?'可用':'不可用'}}</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px">
-              <span class="pulse" :class="veEnv.whisper?.available?'ok':'gray'"></span>
-              <span style="font-size:13px;font-weight:600">Whisper</span>
-              <span class="badge" :class="veEnv.whisper?.available?'ok':'gray'">{{veEnv.whisper?.available?'可用':'不可用'}}</span>
+              <span class="pulse" :class="veEnv.speech_to_text_ready?'ok':'gray'"></span>
+              <span style="font-size:13px;font-weight:600">字幕识别</span>
+              <span class="badge" :class="veEnv.speech_to_text_ready?'ok':'gray'">{{veEnv.speech_to_text_ready?'可用':'无模型'}}</span>
             </div>
+          </div>
+          <div v-if="veEnv.speech_to_text_ready&&!veEnv.faster_whisper?.model_ready&&veEnv.whisper?.cached_model" style="margin-top:10px;font-size:12px;color:var(--tx2);background:var(--pri-l);padding:8px 12px;border-radius:6px">
+            字幕将使用本机 Whisper 缓存模型：{{veEnv.whisper.cached_model}}
+          </div>
+          <div v-if="!veEnv.speech_to_text_ready" style="margin-top:10px;font-size:12px;color:var(--warn);background:var(--warn-l);padding:8px 12px;border-radius:6px">
+            未检测到本地字幕模型；基础剪辑仍可先导出无字幕成片。
           </div>
           <div v-if="!veEnv.capcut?.available" style="margin-top:10px;font-size:12px;color:var(--warn);background:var(--warn-l);padding:8px 12px;border-radius:6px">
             capcut-cli 未安装，请在终端运行: <code style="background:#fff;padding:2px 6px;border-radius:4px">npm install -g capcut-cli</code>
@@ -1092,6 +1247,8 @@ AI 将根据字幕内容，从剪映内置 912 个场景特效 + 468 个滤镜�
         </div>
       </div>
     </template>
+    </template>
+  </main>
   </template>
 </div>
 
@@ -1137,7 +1294,7 @@ createApp({
       configInfo:{},savingSettings:false,startupStatus:null,
 
       // Update
-      updateInfo:null,updateStatus:null,updateError:'',updating:false,updatePollTimer:null,
+      updateInfo:null,updateStatus:null,updateError:'',updating:false,updatePollTimer:null,updateReminder:null,updateReminderTimer:null,
 
       // Video Editor
       veEnv:null,veDrafts:[],veDraftDir:'',veLoadingEnv:false,veCreating:false,
@@ -1148,7 +1305,12 @@ createApp({
       ],veInstruction:'',
       veTaskId:null,veTaskStatus:null,vePollTimer:null,
       veSelectedDraft:'',veCmdResult:null,veRawCmd:'',veRunningRaw:false,
-      veMode:'standard', // 'standard' | 'custom'
+      veMode:'standard', // standard | advanced | tools
+      veTasks:[],veVideoInfo:null,veMaterialLibrary:'',veMaterialCount:0,
+      vePace:'compact',veSubtitleTemplate:'yellow',veMaterialDensity:'normal',
+      veDurationMode:'medium',veAdvancedStyle:'viral',
+      defaultMaterialLibrary:'',
+      veProgressSteps:['分析视频','剪辑气口','识别字幕','字幕排版','匹配素材','合成视频'],
       // 标准模式选项
       veVideoPath:'',veFontSize:48,veSubtitleColor:'#FFFFFF',
       veSilenceThreshold:0.5,veEffectsEnabled:true,
@@ -1213,18 +1375,41 @@ createApp({
     veStatusBadge(){
       const s=this.veTaskStatus?.status;
       if(!s)return'';
-      const map={pending:'gray',thinking:'info',executing:'warn',done:'ok',partial:'warn',error:'err'};
+      const map={queued:'gray',pending:'gray',thinking:'info',executing:'warn',cutting_silence:'warn',transcribing:'warn',subtitles:'warn',materials:'warn',rendering:'warn',analyzing:'info',planning:'info',awaiting_confirmation:'ok',done:'ok',partial:'warn',cancelled:'warn',error:'err'};
       return map[s]||'gray';
     },
     veStatusText(){
       const s=this.veTaskStatus?.status;
       if(!s)return'';
-      const map={pending:'等待中',thinking:'AI思考中',executing:'执行中',done:'完成',partial:'部分失败',error:'错误'};
+      const map={queued:'排队中',pending:'等待中',thinking:'AI思考中',executing:'执行中',cutting_silence:'剪气口',transcribing:'识别字幕',subtitles:'生成字幕',materials:'匹配素材',rendering:'合成中',analyzing:'分析中',planning:'生成方案',awaiting_confirmation:'待确认',done:'完成',partial:'部分完成',cancelled:'已取消',error:'错误'};
       return map[s]||s;
+    },
+    veBasicReady(){
+      if(!this.veEnv)return true;
+      return !!this.veEnv.ffmpeg?.available && !!this.veEnv.speech_to_text_ready;
+    },
+    veBasicReadinessText(){
+      if(!this.veEnv)return'正在检查本机剪辑环境...';
+      if(!this.veEnv.ffmpeg?.available)return'缺少 FFmpeg，当前无法导出视频。';
+      if(!this.veEnv.speech_to_text_ready)return`字幕识别模型未就绪；当前仍可先导出无字幕剪辑成片。模型目录：${this.veEnv.faster_whisper?.model_dir||''}`;
+      return'本机环境正常。';
+    },
+    veWarningText(){
+      const labels={MODEL_REQUIRED:'字幕识别模型未就绪，本次已导出无字幕成片',ASR_FAILED:'字幕识别失败，本次已导出无字幕成片',ASR_TIMEOUT:'字幕识别超时，本次已导出无字幕成片',MATERIAL_LIBRARY_EMPTY:'未找到本地素材，本次未插入素材'};
+      return (this.veTaskStatus?.warnings||[]).map(x=>labels[x]||x).join('；');
     },
     veModelHint(){
       const m=(this.veModels||[]).find(x=>x.id===this.veModel);
       return m?.description||'选择 DeepSeek 模型';
+    },
+    veTaskRunning(){
+      return ['queued','pending','thinking','executing','cutting_silence','transcribing','subtitles','materials','rendering','analyzing','planning'].includes(this.veTaskStatus?.status);
+    },
+    veVideoName(){
+      return this.fileName(this.veVideoPath);
+    },
+    vePaceHint(){
+      return {natural:'保留更多呼吸和停顿',compact:'适合短视频口播',fast:'节奏更快、信息密度更高'}[this.vePace]||'';
     },
     veStepStatus(){
       return (i)=>{
@@ -1247,6 +1432,7 @@ createApp({
         this.configured=!!j.configured;
         this.appVersion=j.app_version||this.appVersion;
         this.configInfo=j;
+
         if(j.saved_identifier||j.saved_email)this.loginEmail=j.saved_identifier||j.saved_email;
         this.settingsForm.api_url=j.api_url||'https://ddddkiii.com/api/v1';
         this.settingsForm.update_manifest_url=j.update_manifest_url||'';
@@ -1721,6 +1907,7 @@ createApp({
         idle:'空闲',
         queued:'准备更新',
         downloading:'正在下载安装包',
+        paused:'已暂停下载',
         verifying:'正在校验安装包',
         verified:'校验完成',
         starting:'正在启动更新程序',
@@ -1769,15 +1956,59 @@ createApp({
         this.notify(this.updateError,'warn');
       }
     },
+    fmtSize(n){
+      if(!n&&n!==0)return '未知';
+      if(n>1048576)return (n/1048576).toFixed(1)+' MB';
+      if(n>1024)return (n/1024).toFixed(0)+' KB';
+      return n+' B';
+    },
     async checkUpdateReminder(){
+      if(this.updateReminderTimer)return;
+      const tick=async()=>{
+        try{
+          const j=await(await fetch('/api/update/available')).json();
+          if(j.code===0){
+            this.updateReminder=(j.available&&j.latest)?j.latest:null;
+            if(this.updateReminder){
+              this.updateInfo={code:0,current_version:j.current_version,available:true,latest:j.latest};
+            }
+          }
+        }catch(e){}
+      };
+      await tick();
+      this.updateReminderTimer=setInterval(tick,15000);
+    },
+    async reminderSnooze(){
+      const version=this.updateReminder?.version||'';
       try{
-        const j=await(await fetch('/api/update/reminder')).json();
-        if(j.code===0&&j.should_prompt){
-          this.updateInfo={code:0,current_version:j.current_version,available:j.available,latest:j.latest,update_status:j.update_status};
-          const v=j.latest&&j.latest.version?` v${j.latest.version}`:'';
-          this.notify('发现披星云伴侣新版本'+v+'，可在关于页安装。','info',9000);
-        }
-      }catch(e){}
+        await fetch('/api/update/snooze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({version,minutes:30})});
+        this.updateReminder=null;
+        this.notify('已设置 30 分钟后再提醒','ok');
+      }catch(e){
+        this.notify('稍后提醒设置失败：'+e.message,'err');
+      }
+    },
+    async reminderApply(){
+      if(!this.updateReminder)return;
+      if(!confirm('现在安装更新并重启本地伴侣吗？'))return;
+      this.updateInfo={code:0,current_version:this.appVersion,available:true,latest:this.updateReminder};
+      await this.applyUpdate();
+    },
+    async pauseUpdateDownload(){
+      try{
+        const j=await(await fetch('/api/update/pause',{method:'POST'})).json();
+        if(j.code===0)this.notify('下载已暂停，可随时继续','info');
+        this.updateStatus=j.status||this.updateStatus;
+        this.startUpdatePoll();
+      }catch(e){this.notify('暂停失败：'+e.message,'err');}
+    },
+    async resumeUpdateDownload(){
+      try{
+        const j=await(await fetch('/api/update/resume',{method:'POST'})).json();
+        if(j.code===0)this.notify('继续下载中','ok');
+        this.updateStatus=j.status||this.updateStatus;
+        this.startUpdatePoll();
+      }catch(e){this.notify('继续失败：'+e.message,'err');}
     },
     async snoozeUpdate(){
       const version=this.updateInfo?.latest?.version||'';
@@ -1818,12 +2049,23 @@ createApp({
     platColor(k){const m={DOUYIN:'#f0f0f5',WECHAT_VIDEO:'#e6f9f0',KUAISHOU:'#fff0ed',XIAOHONGSHU:'#ffe8ec'};return m[k]||'var(--pri-l)'},
 
     // ── AI 剪辑 ──
+    fileName(p){return String(p||'').split(/[\\/]/).pop()||''},
+    fmtDuration(v){
+      const n=Math.max(0,Number(v||0)); const m=Math.floor(n/60), s=Math.floor(n%60);
+      return `${m}:${String(s).padStart(2,'0')}`;
+    },
+    veStepDone(label){
+      const p=Number(this.veTaskStatus?.progress||0);
+      const map={'分析视频':8,'剪辑气口':20,'识别字幕':45,'字幕排版':62,'匹配素材':75,'合成视频':90};
+      return p>=map[label];
+    },
     async loadVeEnv(){
       this.veLoadingEnv=true;
       try{
-        const j=await(await fetch('/api/video-editor/env')).json();
+        const j=await(await fetch('/api/video-editor/v2/env')).json();
         if(j.code===0){
           this.veEnv=j.data;
+          this.defaultMaterialLibrary=(j.data?.default_material_library)||((this.settingsForm?.user_home||'')+'\\Videos\\PixingyunAssets');
           if(Array.isArray(j.data?.deepseek_models)&&j.data.deepseek_models.length){
             this.veModels=j.data.deepseek_models;
           }
@@ -1834,6 +2076,30 @@ createApp({
         else this.notify(j.error||'环境检查失败','err');
       }catch(e){this.notify('环境检查失败: '+e.message,'err')}
       this.veLoadingEnv=false;
+    },
+    async loadVeTasks(){
+      try{
+        const j=await(await fetch('/api/video-editor/v2/tasks')).json();
+        if(j.code===0)this.veTasks=j.data||[];
+      }catch(e){}
+    },
+    async pickVeVideo(){
+      try{
+        const j=await(await fetch('/api/video-editor/v2/pick-video',{method:'POST'})).json();
+        if(j.code===0&&!j.data?.cancelled){this.veVideoPath=j.data.path;this.veVideoInfo=j.data.info;this.notify('已选择视频','ok')}
+      }catch(e){this.notify('选择视频失败：'+e.message,'err')}
+    },
+    async pickVeMaterialFolder(){
+      try{
+        const j=await(await fetch('/api/video-editor/v2/pick-material-folder',{method:'POST'})).json();
+        if(j.code===0&&!j.data?.cancelled){this.veMaterialLibrary=j.data.folder;this.veMaterialCount=j.data.material_count||0;this.notify('素材库已选择','ok')}
+      }catch(e){this.notify('选择素材库失败：'+e.message,'err')}
+    },
+    async refreshVeMaterials(){
+      try{
+        const j=await(await fetch('/api/video-editor/v2/materials/scan',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({folder:this.veMaterialLibrary})})).json();
+        if(j.code===0){this.veMaterialCount=(j.data.materials||[]).length;this.notify('素材库已刷新','ok')}
+      }catch(e){this.notify('刷新素材失败：'+e.message,'err')}
     },
     async loadVeDrafts(){
       try{
@@ -1865,30 +2131,60 @@ createApp({
       }catch(e){}
     },
     async startStandardEdit(){
-      if(!this.veVideoPath){this.notify('请输入视频文件路径','warn');return}
-      if(!this.veSelectedDraft){this.notify('请先选择一个剪映草稿','warn');return}
+      if(!this.veVideoPath){this.notify('请先选择视频','warn');return}
+      if(this.veEnv&&!this.veEnv.ffmpeg?.available){this.notify('缺少 FFmpeg，无法导出视频','err');return}
       try{
         const body={
-          project:this.veDraftDir+'\\'+this.veSelectedDraft,
-          video_path:this.veVideoPath,
-          api_key:this.veApiKey,
-          base_url:this.veBaseUrl,
-          model:this.veModel,
-          font_size:this.veFontSize,
-          subtitle_color:this.veSubtitleColor,
-          silence_threshold:this.veSilenceThreshold,
-effects_enabled:this.veEffectsEnabled,
+          source_path:this.veVideoPath,
+          pace:this.vePace,
+          subtitle_template:this.veSubtitleTemplate,
+          material_density:this.veMaterialDensity,
+          material_library:this.veMaterialLibrary||this.defaultMaterialLibrary,
         };
-        const j=await(await fetch('/api/video-editor/standard-edit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+        const j=await(await fetch('/api/video-editor/v2/basic',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
         if(j.code===0){
           this.veTaskId=j.data.task_id;
-          this.veTaskStatus={status:'pending',message:'标准模式流水线已启动...',steps:[]};
+          this.veTaskStatus={status:'queued',progress:0,current_step:'等待剪辑任务',stats:{}};
           this.pollVeTask();
         }else{
           this.notify(j.error||'启动失败','err');
         }
       }catch(e){this.notify('启动失败: '+e.message,'err')}
     },
+    async startAdvancedAnalyze(){
+      if(!this.veVideoPath||!this.veInstruction){this.notify('请先选择视频并填写剪辑要求','warn');return}
+      try{
+        const body={source_path:this.veVideoPath,instruction:this.veInstruction,duration_mode:this.veDurationMode,style:this.veAdvancedStyle};
+        const j=await(await fetch('/api/video-editor/v2/advanced/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+        if(j.code===0){this.veTaskId=j.data.task_id;this.veTaskStatus={status:'queued',progress:0,current_step:'等待 AI 分析'};this.pollVeTask()}
+        else this.notify(j.error||'启动失败','err');
+      }catch(e){this.notify('启动失败: '+e.message,'err')}
+    },
+    async saveVePlan(){
+      const plan=this.veTaskStatus?.plan;if(!plan)return;
+      const clips=(plan.clips||[]).map((c,i)=>({id:c.id,enabled:!!c.enabled,order:i+1}));
+      const j=await(await fetch(`/api/video-editor/v2/advanced/${this.veTaskId}/plan`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:plan.title,clips})})).json();
+      if(j.code===0){this.veTaskStatus.plan=j.data;this.notify('方案已保存','ok')}
+    },
+    moveVeClip(clip,delta){
+      const list=this.veTaskStatus?.plan?.clips||[];const i=list.indexOf(clip);const j=i+delta;
+      if(i<0||j<0||j>=list.length)return;[list[i],list[j]]=[list[j],list[i]];
+    },
+    async renderAdvanced(){
+      await this.saveVePlan();
+      const body={pace:this.vePace,subtitle_template:this.veSubtitleTemplate,material_density:this.veMaterialDensity,material_library:this.veMaterialLibrary||this.defaultMaterialLibrary};
+      const j=await(await fetch(`/api/video-editor/v2/advanced/${this.veTaskId}/render`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})).json();
+      if(j.code===0){this.veTaskStatus.status='rendering';this.veTaskStatus.progress=5;this.pollVeTask()}else this.notify(j.error||'生成失败','err');
+    },
+    async cancelVeTask(){
+      if(!this.veTaskId)return;
+      await fetch(`/api/video-editor/v2/tasks/${this.veTaskId}/cancel`,{method:'POST'});
+      this.notify('已请求取消','info');
+    },
+    async playVeOutput(path){await fetch('/api/video-editor/v2/play',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})},
+    async openVeOutput(path){await fetch('/api/video-editor/v2/open-output',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({path})})},
+    resetVeBasic(){this.veTaskId=null;this.veTaskStatus=null;this.veVideoPath='';this.veVideoInfo=null},
+    rerunVeTask(t){this.veVideoPath=t.source_path;this.veMode=t.mode==='advanced'?'advanced':'standard';this.veTaskStatus=null;this.veTaskId=null},
     async startAiEdit(){
       if(!this.veInstruction){this.notify('请输入剪辑需求','warn');return}
       if(!this.veApiKey){this.notify('请配置 DeepSeek API Key','warn');return}
@@ -1910,13 +2206,16 @@ effects_enabled:this.veEffectsEnabled,
       const check=async()=>{
         if(!this.veTaskId)return;
         try{
-          const j=await(await fetch('/api/video-editor/task/'+this.veTaskId)).json();
+          const j=await(await fetch('/api/video-editor/v2/tasks/'+this.veTaskId)).json();
           if(j.code===0){
             this.veTaskStatus=j.data;
-            if(['done','partial','error'].includes(j.data.status)){
+            this.loadVeTasks();
+            if(['done','partial','error','cancelled','awaiting_confirmation'].includes(j.data.status)){
               clearInterval(this.vePollTimer);this.vePollTimer=null;
-              if(j.data.status==='done')this.notify('AI 剪辑完成！打开剪映查看结果','ok');
-              else if(j.data.status==='error')this.notify('AI 剪辑出错: '+(j.data.message||''),'err');
+              if(j.data.status==='done')this.notify('AI 剪辑完成','ok');
+              else if(j.data.status==='awaiting_confirmation')this.notify('剪辑方案已生成','ok');
+              else if(j.data.status==='error')this.notify('AI 剪辑出错: '+(j.data.error||j.data.error_message||j.data.message||j.data.current_step||'未知错误'),'err');
+              else if(j.data.status==='cancelled')this.notify('任务已取消','warn');
               else this.notify('AI 剪辑部分完成','warn');
               this.loadVeDrafts();
             }
@@ -1944,6 +2243,8 @@ effects_enabled:this.veEffectsEnabled,
       this.loadDoudianStores();
       this.loadDoudianSchedule();
       this.loadCookieStatus();
+      this.loadVeEnv();
+      this.loadVeTasks();
     });
     this.ping();
     this.pollStatus();

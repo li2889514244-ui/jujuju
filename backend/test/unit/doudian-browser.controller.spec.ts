@@ -4,6 +4,7 @@ import { DoudianBrowserController } from '../../src/modules/doudian-browser/doud
 describe('DoudianBrowserController', () => {
   function createController() {
     const service = {
+      assertStoreAccess: jest.fn().mockResolvedValue(undefined),
       getSummary: jest.fn().mockResolvedValue({ ok: true }),
     }
     return {
@@ -20,13 +21,13 @@ describe('DoudianBrowserController', () => {
     expect(service.getSummary).toHaveBeenCalledWith('store-1', 100, 200, 'today')
   })
 
-  it('rejects malformed summary ranges before they reach the service', () => {
+  it('rejects malformed summary ranges before they reach the service', async () => {
     const { controller, service } = createController()
 
-    expect(() => controller.getSummary('store-1', 'abc', '200', 'today')).toThrow(
+    await expect(controller.getSummary('store-1', 'abc', '200', 'today')).rejects.toThrow(
       BadRequestException,
     )
-    expect(() => controller.getSummary('store-1', '200', '100', 'today')).toThrow(
+    await expect(controller.getSummary('store-1', '200', '100', 'today')).rejects.toThrow(
       BadRequestException,
     )
     expect(service.getSummary).not.toHaveBeenCalled()

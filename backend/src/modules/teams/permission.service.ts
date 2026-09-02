@@ -19,15 +19,17 @@ const DEFAULT_PERMISSIONS: Record<PermissionRoleType, Record<string, boolean>> =
     manage_team: true,
     manage_permissions: false,
   },
+  // 成员默认可绑定/管理账号与浏览器会话（扫码绑定账号需要 manage_accounts + manage_browser），
+  // 有团队的租户仍可通过团队权限配置把这两项改回关闭。
   member: {
     view_accounts: true,
-    manage_accounts: false,
+    manage_accounts: true,
     view_content: true,
     create_content: true,
     publish_content: false,
     view_analytics: true,
     export_data: false,
-    manage_browser: false,
+    manage_browser: true,
     manage_team: false,
     manage_permissions: false,
   },
@@ -44,7 +46,7 @@ export class PermissionService {
     })
     if (!user) throw new ForbiddenException('User not found')
     if (ADMIN_ROLES.has(user.role)) return
-    if (!user.organizationId) throw new ForbiddenException('No organization access')
+    if (!user.organizationId) throw new ForbiddenException('无组织访问权限')
 
     const roleType: PermissionRoleType = user.role === UserRole.MANAGER ? 'admin' : 'member'
     const teams = await this.prisma.team.findMany({
@@ -66,6 +68,6 @@ export class PermissionService {
         : null
 
     if (saved?.enabled === true || (saved == null && DEFAULT_PERMISSIONS[roleType]?.[permissionId] === true)) return
-    throw new ForbiddenException(`Permission denied: ${permissionId}`)
+    throw new ForbiddenException(`权限不足：${permissionId}`)
   }
 }

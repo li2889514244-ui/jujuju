@@ -44,13 +44,16 @@ from chrome_cdp import ChromeCDP
 from douyin_api_collector import collect_douyin_data
 
 try:
-    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    for _stream in (sys.stdout, sys.stderr):
+        if _stream is not None and hasattr(_stream, 'reconfigure'):
+            _stream.reconfigure(encoding='utf-8', errors='replace')
 except Exception as _e:
-    print(f'[WARN] {type(_e).__name__}: {_e}')
+    if sys.stdout is not None:
+        print(f'[WARN] {type(_e).__name__}: {_e}')
 
 # ── Modular imports ──
 import companion_state as state
+from companion_encoding import read_text_file
 from companion_state import (
     APP_VERSION,
     DEFAULT_UPDATE_MANIFEST_URL,
@@ -66,6 +69,7 @@ from companion_updater import (
     _is_newer_version, _get_update_manifest_url, _resolve_update_url,
     _fetch_update_manifest, _download_update_package, _start_update_process,
     _begin_update_status, _finish_update_status, _fail_update_status,
+    _friendly_update_failure,
     _get_update_status, _set_update_status,
     _should_prompt_update, _mark_update_prompt_shown, _snooze_update_prompt,
 )
@@ -73,6 +77,7 @@ from companion_auth import _login_with_saved_credentials, _check_and_refresh_tok
 from companion_collector import (
     _run_collection_once, _data_collector_loop, _get_collection_interval,
     _schedule_next_collection, _record_scan_time, _get_cookie_status,
+    _run_startup_collection_if_stale,
 )
 from companion_metrics import _scrape_all, _sanitize_text, _parse_metric_num
 from companion_login_worker import _make_login_worker
@@ -742,6 +747,33 @@ def _resolve_companion_auth(body: dict | None = None) -> tuple[str, str]:
 
 
 def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: str | None = None) -> dict:
+    """抖店同步入口（带失败打点包装）。
+
+    Phase 2 复查结论：旧实现只在成功路径调用 record_sync，
+    失败路径直接抛异常 → lastSync.success 永远不会是 false，
+    「连续3次同步失败」告警无法真实触发。现在任何异常都会记录
+    success=false（错误码取自异常，缺省 SYNC_ERROR），随后原样上抛。
+    """
+    try:
+        return _run_doudian_store_sync_impl(local_id, api_url, token)
+    except Exception as exc:
+        try:
+            from companion_heartbeat import record_sync
+            store = _find_doudian_store(local_id) or {}
+            record_sync(
+                success=False,
+                upload_count=0,
+                error_code=str(getattr(exc, 'code', '') or 'SYNC_ERROR')[:80],
+                kind='doudian',
+                store_id=str(store.get('cloud_store_id') or ''),
+                store_name=str(store.get('name') or ''),
+            )
+        except Exception:
+            pass
+        raise
+
+
+def _run_doudian_store_sync_impl(local_id: str, api_url: str | None = None, token: str | None = None) -> dict:
     store = _find_doudian_store(local_id)
     if not store:
         raise RuntimeError('Local Doudian store not found')
@@ -752,13 +784,22 @@ def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: st
     api_url = (api_url or cfg.get('api_url') or 'https://ddddkiii.com/api/v1').rstrip('/')
     token = token or cfg.get('token') or ''
 
-    from doudian_store_collector import collect_store, run_async, upload_store_data
+    from doudian_store_collector import (
+        DoudianUploadError,
+        collect_store,
+        rebind_companion_store,
+        relink_companion_store,
+        run_async,
+        upload_store_data,
+    )
 
     profile_id = store.get('profile_id') or local_id
     try:
         captured = run_async(asyncio.wait_for(
             collect_store(profile_id, state._BROWSER_PATH, state._BROWSER_CHANNEL),
-            timeout=480,
+            # 大店铺（唐商披星）订单+售后全量翻页约 6~8 分钟，480s 会掐断正在等待的浏览器
+            # 页面，报 Page.wait_for_timeout: Connection closed。给足余量。
+            timeout=660,
         ))
     except Exception:
         _cleanup_doudian_profile_processes(profile_id)
@@ -787,6 +828,40 @@ def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: st
     }
     try:
         result = upload_store_data(api_url, token, store.get('cloud_store_id'), upload_payload)
+    except DoudianUploadError as upload_error:
+        code = getattr(upload_error, 'code', None)
+        if code not in ('STALE_COMPANION_BINDING', 'DOUDIAN_STORE_NOT_FOUND'):
+            _cleanup_doudian_profile_processes(profile_id)
+            raise
+        cloud_id = store.get('cloud_store_id')
+        try:
+            rebind_companion_store(
+                api_url,
+                token,
+                cloud_id,
+                upload_payload['localProfileId'],
+                store_name,
+            )
+        except DoudianUploadError as rebind_error:
+            if getattr(rebind_error, 'code', None) != 'DOUDIAN_STORE_NOT_FOUND':
+                _cleanup_doudian_profile_processes(profile_id)
+                raise
+            # 本地保存的 cloud_store_id 已失效（云端店铺被重建）：按店名找回唯一同名店铺并重绑
+            cloud_id = relink_companion_store(api_url, token, store_name)
+            rebind_companion_store(
+                api_url,
+                token,
+                cloud_id,
+                upload_payload['localProfileId'],
+                store_name,
+            )
+            stores_list = _get_doudian_stores()
+            for item in stores_list:
+                if item.get('id') == local_id:
+                    item['cloud_store_id'] = cloud_id
+                    break
+            _save_doudian_stores(stores_list)
+        result = upload_store_data(api_url, token, cloud_id, upload_payload)
     except Exception as upload_error:
         response = getattr(upload_error, 'response', None)
         if getattr(response, 'status_code', None) != 401:
@@ -817,6 +892,17 @@ def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: st
             break
     _save_doudian_stores(stores)
     _cleanup_doudian_profile_processes(profile_id)
+    try:
+        from companion_heartbeat import record_sync
+        record_sync(
+            success=True,
+            upload_count=int((result or {}).get('orderCount') or 0) if isinstance(result, dict) else 0,
+            kind='doudian',
+            store_id=str(store.get('cloud_store_id') or ''),
+            store_name=str(store_name or ''),
+        )
+    except Exception:
+        pass
     return {
         **(result or {}),
         'storeName': store_name,
@@ -824,8 +910,40 @@ def _run_doudian_store_sync(local_id: str, api_url: str | None = None, token: st
     }
 
 
+_DOUDIAN_NETWORK_ERROR_CODES = {
+    'CONNECTION_RESET',
+    'CONNECTION_REFUSED',
+    'DNS_FAILURE',
+    'TLS_ERROR',
+    'TIMEOUT',
+    'NETWORK_ERROR',
+}
+
+_DOUDIAN_NETWORK_FRIENDLY = {
+    'CONNECTION_RESET': '抖店数据上传被本地网络中断（连接被重置）。若电脑开启了代理/VPN（如 Clash），请把披星云服务器设为直连后重试',
+    'CONNECTION_REFUSED': '披星云服务器拒绝连接，请稍后重试',
+    'DNS_FAILURE': '无法解析披星云服务器域名，请检查网络与 DNS 设置',
+    'TLS_ERROR': '与披星云服务器的安全连接失败（证书校验异常），请检查系统时间与网络',
+    'TIMEOUT': '披星云服务器响应超时，请稍后重试',
+    'NETWORK_ERROR': '上传披星云服务器失败，请检查网络后重试',
+}
+
+
 def _friendly_doudian_error(error: Exception | str) -> str:
+    error_code = getattr(error, 'code', None)
+    if error_code in _DOUDIAN_NETWORK_FRIENDLY:
+        return _DOUDIAN_NETWORK_FRIENDLY[error_code]
+    if error_code == 'STALE_COMPANION_BINDING':
+        return '\u5f53\u524d\u6296\u5e97\u7ed1\u5b9a\u5df2\u5931\u6548\uff0c\u8bf7\u5728\u62ab\u661f\u4e91\u4f34\u4fa3\u91cc\u91cd\u65b0\u7ed1\u5b9a\u540e\u540c\u6b65'
+    if getattr(error, 'code', None) == 'DOUDIAN_STORE_NOT_FOUND':
+        return '\u4e91\u7aef\u6296\u5e97\u5e97\u94fa\u4e0d\u5b58\u5728\uff0c\u8bf7\u91cd\u65b0\u7ed1\u5b9a\u540e\u540c\u6b65'
+    if getattr(error, 'code', None) == 'DOUDIAN_STORE_AMBIGUOUS':
+        return '\u4e91\u7aef\u5b58\u5728\u591a\u5bb6\u540c\u540d\u6296\u5e97\u5e97\u94fa\uff0c\u8bf7\u5728\u7f51\u7ad9\u91cd\u65b0\u7ed1\u5b9a\u540e\u518d\u540c\u6b65'
     msg = str(error)[:500]
+    if 'STALE_COMPANION_BINDING' in msg or 'Invalid companion upload store binding' in msg:
+        return '\u5f53\u524d\u6296\u5e97\u7ed1\u5b9a\u5df2\u5931\u6548\uff0c\u8bf7\u5728\u62ab\u661f\u4e91\u4f34\u4fa3\u91cc\u91cd\u65b0\u7ed1\u5b9a\u540e\u540c\u6b65'
+    if '400 Client Error' in msg and '/doudian-browser/stores/' in msg:
+        return '\u6296\u5e97\u540c\u6b65\u88ab\u670d\u52a1\u5668\u62d2\u7edd\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u6216\u91cd\u65b0\u7ed1\u5b9a\u8be5\u5e97\u94fa\u540e\u518d\u540c\u6b65'
     mismatch = re.search(
         r'Doudian store binding mismatch: local store "(.+?)" is logged into "(.+?)"\.',
         msg,
@@ -845,6 +963,9 @@ def _friendly_doudian_error(error: Exception | str) -> str:
         )
     if isinstance(error, TimeoutError) or error.__class__.__name__ == 'TimeoutError':
         return '\u6296\u5e97\u91c7\u96c6\u8d85\u65f6\uff0c\u8bf7\u5173\u95ed\u6296\u5e97\u6d4f\u89c8\u5668\u7a97\u53e3\u540e\u91cd\u8bd5'
+    if 'Connection closed' in msg or 'wait_for_timeout' in msg:
+        # 同步超时取消会以 Playwright 驱动断连的形式冒出，统一按超时提示。
+        return '\u6296\u5e97\u91c7\u96c6\u8d85\u65f6\uff0c\u8bf7\u5173\u95ed\u6296\u5e97\u6d4f\u89c8\u5668\u7a97\u53e3\u540e\u91cd\u8bd5'
     if 'Target page, context or browser has been closed' in msg or 'BrowserType.launch_persistent_context' in msg:
         return '\u6296\u5e97\u6d4f\u89c8\u5668\u542f\u52a8\u5931\u8d25\uff0c\u8bf7\u5173\u95ed\u6b8b\u7559\u6d4f\u89c8\u5668\u7a97\u53e3\u540e\u91cd\u8bd5'
     if '\u64cd\u4f5c\u73af\u5883\u5f02\u5e38' in msg or 'security_block' in msg:
@@ -855,24 +976,37 @@ def _friendly_doudian_error(error: Exception | str) -> str:
 
 
 def _cleanup_doudian_profile_processes(profile_id: str) -> None:
+    """抖店任务结束后的浏览器清理（P0 安全修复）。
+
+    旧实现用 PowerShell 扫描系统所有进程、按 CommandLine -like 匹配后 Stop-Process -Force，
+    会误杀命令行里恰好含该 profile 路径的用户软件（编辑器、终端、用户浏览器等）。
+
+    新实现：只关闭 process_registry 中登记过的、属于该抖店 profile 的进程；
+    五重校验（PID 存在 / 已登记 / create_time 一致 / 可执行文件一致 / 命令行含 profile）
+    全部通过才允许关闭，否则拒绝并记录 SKIP_UNMANAGED_PROCESS。
+    """
     profile_id = str(profile_id or '').strip()
     if not profile_id or not re.fullmatch(r'[A-Za-z0-9_-]{6,64}', profile_id):
         return
     try:
-        pattern = f'*browser-profiles\\doudian\\{profile_id}*'
-        command = (
-            "Get-CimInstance Win32_Process | "
-            f"Where-Object {{ $_.CommandLine -like '{pattern}' }} | "
-            "ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+        from doudian_store_collector import get_profile_path
+        from process_registry import terminate_for_profile
+
+        profile_path = get_profile_path(profile_id)
+        results = terminate_for_profile(
+            profile_path,
+            reason='doudian profile cleanup',
+            grace=2.0,
         )
-        creationflags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-        subprocess.run(
-            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', command],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            timeout=10,
-            creationflags=creationflags,
-        )
+        killed = sum(1 for r in results if r.get('action') == 'killed')
+        if killed:
+            print(f'[Doudian] cleaned {killed} registered process(es) for profile {profile_id}', flush=True)
+        else:
+            print(
+                f'[Doudian] 拒绝清理 profile {profile_id}：无已登记进程。'
+                '该账号浏览器仍在使用，请关闭对应窗口后重试。',
+                flush=True,
+            )
     except Exception as exc:
         print(f'[Doudian] cleanup profile browser processes failed: {exc}', flush=True)
 
@@ -925,6 +1059,10 @@ def _run_doudian_scheduled_collection():
                         break
                 _save_doudian_stores(current)
                 print(f'[Doudian] Scheduled sync failed: {local_id} {msg}')
+                # 网络类故障（代理中断/超时/DNS 等）5 分钟后快速补跑一轮，
+                # 避免等到下一个 30 分钟周期；业务类错误（绑定失效等）不加速。
+                if getattr(e, 'code', None) in _DOUDIAN_NETWORK_ERROR_CODES:
+                    state._doudian_fast_retry = True
             if index < len(stores) - 1:
                 time.sleep(30)
     finally:
@@ -958,8 +1096,10 @@ def _doudian_scheduler_loop():
             time.sleep(min(10, max(1, wait_seconds)))
             continue
         _run_doudian_scheduled_collection()
-        interval = _schedule_next_doudian_collection()
-        print(f'[Doudian] Next scheduled sync in {interval // 60} min')
+        fast_retry = bool(getattr(state, '_doudian_fast_retry', False))
+        state._doudian_fast_retry = False
+        interval = _schedule_next_doudian_collection(300 if fast_retry else None)
+        print(f'[Doudian] Next scheduled sync in {interval // 60} min{" (fast retry after failure)" if fast_retry else ""}')
 
 
 def _ensure_doudian_scheduler_started():
@@ -1532,7 +1672,7 @@ def local_accounts_list():
             state_json = profile / 'state.json'
             if state_json.exists():
                 try:
-                    state = json.loads(state_json.read_text('utf-8'))
+                    state = json.loads(read_text_file(state_json))
                     cookie_count = len(state.get('cookies', []))
                     cookie_names = {
                         item.get('name')
@@ -1744,6 +1884,18 @@ def update_status():
     return jsonify({'code': 0, 'current_version': APP_VERSION, 'status': _get_update_status()})
 
 
+@app.route('/api/update/available')
+def update_available():
+    """返回后台 30 分钟检查循环发现的待更新信息（无网络请求，供 UI 高频轮询）。"""
+    info = getattr(state, '_update_available_info', None)
+    return jsonify({
+        'code': 0,
+        'current_version': APP_VERSION,
+        'available': bool(info),
+        'latest': info or None,
+    })
+
+
 @app.route('/api/update/reminder')
 def update_reminder():
     try:
@@ -1783,12 +1935,12 @@ def snooze_update():
     try:
         payload = request.get_json(silent=True) or {}
         version = str(payload.get('version') or '').strip()
-        hours = int(payload.get('hours') or 24)
+        minutes = int(payload.get('minutes') or int(float(payload.get('hours') or 0) * 60) or 30)
         if not version:
             manifest = _fetch_update_manifest()
             version = str(manifest.get('version') or '').strip()
-        _snooze_update_prompt(version, hours)
-        return jsonify({'code': 0, 'version': version, 'hours': hours})
+        _snooze_update_prompt(version, minutes)
+        return jsonify({'code': 0, 'version': version, 'minutes': minutes})
     except Exception as exc:
         return jsonify({'code': 1, 'msg': str(exc)}), 500
 
@@ -1806,7 +1958,11 @@ def apply_update():
         if not force and not _is_newer_version(latest_version):
             return jsonify({'code': 409, 'msg': 'no newer version available', 'current_version': APP_VERSION}), 409
 
-        package_url = _resolve_update_url(manifest_url, manifest.get('url') or manifest.get('package_url') or '')
+        # 轻量包优先（不含内置浏览器，约 160MB）：本地已有内置浏览器目录时才可选，
+        # 否则回退全量包。轻量包可把更新下载量减半以上。
+        from companion_updater import choose_update_package
+
+        package_url, package_sha256, package_size = choose_update_package(manifest, manifest_url)
         if not package_url:
             return jsonify({'code': 400, 'msg': 'update package url is missing'}), 400
 
@@ -1823,23 +1979,38 @@ def apply_update():
             _begin_update_status(
                 latest_version,
                 package_url,
-                int(manifest.get('size') or manifest.get('package_size') or 0),
+                package_size,
             )
+
+            # 下载工作目录持久化：暂停后继续时复用，实现断点续传
+            update_work_dir = Path(tempfile.mkdtemp(prefix='pixingyun-update-download-'))
 
             def _update_job():
                 try:
-                    _set_update_status(phase='downloading')
-                    package_path = _download_update_package(
-                        package_url,
-                        str(manifest.get('sha256') or ''),
-                        progress_cb=_set_update_status,
-                        expected_size=int(manifest.get('size') or manifest.get('package_size') or 0),
-                    )
+                    from companion_updater import _DownloadPaused, is_download_paused
+
+                    while True:
+                        try:
+                            _set_update_status(phase='downloading')
+                            package_path = _download_update_package(
+                                package_url,
+                                package_sha256,
+                                progress_cb=_set_update_status,
+                                expected_size=package_size,
+                                work_dir=update_work_dir,
+                            )
+                            break
+                        except _DownloadPaused:
+                            _set_update_status(phase='paused')
+                            while is_download_paused():
+                                time.sleep(0.5)
+                            continue
                     _set_update_status(phase='starting', percent=100, package_path=str(package_path))
                     log_path = _start_update_process(package_path, latest_version)
                     _finish_update_status(log_path=str(log_path))
                 except Exception as job_exc:
-                    _fail_update_status(job_exc)
+                    # 停止更新并给出统一友好提示，不反复重试、不弹 WSH 窗口
+                    _fail_update_status(_friendly_update_failure(job_exc))
 
             threading.Thread(target=_update_job, daemon=True).start()
 
@@ -1851,7 +2022,36 @@ def apply_update():
             'status': _get_update_status(),
         })
     except Exception as exc:
-        _fail_update_status(exc)
+        message = _friendly_update_failure(exc)
+        _fail_update_status(message)
+        return jsonify({'code': 1, 'msg': message, 'current_version': APP_VERSION}), 500
+
+
+@app.route('/api/update/pause', methods=['POST'])
+def pause_update_download():
+    """暂停更新下载：分片/断点数据保留，点继续后接着下载。"""
+    try:
+        from companion_updater import pause_download
+
+        pause_download()
+        if _get_update_status().get('running'):
+            _set_update_status(phase='paused')
+        return jsonify({'code': 0, 'status': _get_update_status()})
+    except Exception as exc:
+        return jsonify({'code': 1, 'msg': str(exc), 'current_version': APP_VERSION}), 500
+
+
+@app.route('/api/update/resume', methods=['POST'])
+def resume_update_download():
+    """继续更新下载：从暂停处断点续传。"""
+    try:
+        from companion_updater import resume_download
+
+        resume_download()
+        if _get_update_status().get('running'):
+            _set_update_status(phase='downloading')
+        return jsonify({'code': 0, 'status': _get_update_status()})
+    except Exception as exc:
         return jsonify({'code': 1, 'msg': str(exc), 'current_version': APP_VERSION}), 500
 
 
@@ -2095,6 +2295,13 @@ def doudian_stores():
         return jsonify({'code': 0})
     if request.method == 'GET':
         stores = _get_doudian_stores()
+        # 兼容旧版本写入的原始报错文案：任何展示层都不应再出现
+        # "400 Client Error"、URL 或 traceback，统一转换成友好中文提示。
+        for item in stores:
+            raw_msg = str(item.get('login_message') or '')
+            if raw_msg and ('Client Error' in raw_msg or 'http://' in raw_msg.lower()
+                            or 'https://' in raw_msg.lower() or 'Traceback' in raw_msg):
+                item['login_message'] = _friendly_doudian_error(raw_msg)
         if str(request.args.get('probe') or '').lower() in ('1', 'true', 'yes'):
             if not state._doudian_sync_lock.acquire(blocking=False):
                 return jsonify({'code': 409, 'msg': '抖店正在同步或登录中，请稍后再检查状态'}), 409
@@ -2611,10 +2818,244 @@ def video_editor_raw_capcut():
     return jsonify({'code': 0 if result.get('ok') else 1, 'data': result})
 
 
+@app.route('/api/video-editor/v2/env')
+def video_editor_v2_env():
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    return jsonify({'code': 0, 'data': video_editor.get_environment()})
+
+
+@app.route('/api/video-editor/v2/basic', methods=['POST', 'OPTIONS'])
+def video_editor_v2_basic():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    body = request.get_json(silent=True) or {}
+    try:
+        result = video_editor.start_v2_basic_edit({
+            'source_path': body.get('source_path', ''),
+            'pace': body.get('pace', 'compact'),
+            'subtitle_template': body.get('subtitle_template', 'yellow'),
+            'material_density': body.get('material_density', 'normal'),
+            'material_library': body.get('material_library') or body.get('material_folder'),
+        })
+        return jsonify({'code': 0, 'data': result})
+    except ValueError as exc:
+        return jsonify({'code': 400, 'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'code': 500, 'error': str(exc)}), 500
+
+
+@app.route('/api/video-editor/v2/tasks')
+def video_editor_v2_tasks():
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    return jsonify({'code': 0, 'data': video_editor.list_v2_tasks()})
+
+
+@app.route('/api/video-editor/v2/tasks/<task_id>')
+def video_editor_v2_task(task_id):
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    task = video_editor.get_v2_task(task_id)
+    if not task:
+        return jsonify({'code': 404, 'error': 'TASK_NOT_FOUND'}), 404
+    return jsonify({'code': 0, 'data': task})
+
+
+@app.route('/api/video-editor/v2/tasks/<task_id>/cancel', methods=['POST', 'OPTIONS'])
+def video_editor_v2_cancel(task_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    return jsonify({'code': 0, 'data': video_editor.cancel_v2_task(task_id)})
+
+
+@app.route('/api/video-editor/v2/materials/scan', methods=['POST', 'OPTIONS'])
+def video_editor_v2_material_scan():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    body = request.get_json(silent=True) or {}
+    folder = body.get('folder') or body.get('material_library') or ''
+    return jsonify({'code': 0, 'data': video_editor.scan_v2_materials(folder)})
+
+
+@app.route('/api/video-editor/v2/materials')
+def video_editor_v2_materials():
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    folder = request.args.get('folder', '')
+    return jsonify({'code': 0, 'data': video_editor.scan_v2_materials(folder)})
+
+
+@app.route('/api/video-editor/v2/pick-video', methods=['POST', 'OPTIONS'])
+def video_editor_v2_pick_video():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    return jsonify({'code': 0, 'data': video_editor.pick_v2_video()})
+
+
+@app.route('/api/video-editor/v2/pick-material-folder', methods=['POST', 'OPTIONS'])
+def video_editor_v2_pick_material_folder():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    if not _video_editor_available:
+        return jsonify({'code': 500, 'error': 'AI 剪辑模块未加载'})
+    return jsonify({'code': 0, 'data': video_editor.pick_v2_material_folder()})
+
+
+@app.route('/api/video-editor/v2/probe', methods=['POST', 'OPTIONS'])
+def video_editor_v2_probe():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify({'code': 0, 'data': video_editor.probe_v2_video(body.get('path', ''))})
+    except Exception as exc:
+        return jsonify({'code': 400, 'error': str(exc)}), 400
+
+
+@app.route('/api/video-editor/v2/open-output', methods=['POST', 'OPTIONS'])
+def video_editor_v2_open_output():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    return jsonify({'code': 0, 'data': video_editor.open_v2_output(body.get('path', ''))})
+
+
+@app.route('/api/video-editor/v2/play', methods=['POST', 'OPTIONS'])
+def video_editor_v2_play():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    return jsonify({'code': 0, 'data': video_editor.play_v2_output(body.get('path', ''))})
+
+
+@app.route('/api/video-editor/v2/advanced/analyze', methods=['POST', 'OPTIONS'])
+def video_editor_v2_advanced_analyze():
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify({'code': 0, 'data': video_editor.start_v2_advanced_analyze(body)})
+    except Exception as exc:
+        return jsonify({'code': 400, 'error': str(exc)}), 400
+
+
+@app.route('/api/video-editor/v2/advanced/<task_id>/plan')
+def video_editor_v2_advanced_plan(task_id):
+    task = video_editor.get_v2_task(task_id)
+    if not task:
+        return jsonify({'code': 404, 'error': 'TASK_NOT_FOUND'}), 404
+    return jsonify({'code': 0, 'data': task.get('plan') or {}})
+
+
+@app.route('/api/video-editor/v2/advanced/<task_id>/plan', methods=['PATCH', 'OPTIONS'])
+def video_editor_v2_advanced_patch_plan(task_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    task = video_editor.patch_v2_advanced_plan(task_id, body)
+    if not task:
+        return jsonify({'code': 404, 'error': 'TASK_NOT_FOUND'}), 404
+    return jsonify({'code': 0, 'data': task.get('plan') or {}})
+
+
+@app.route('/api/video-editor/v2/advanced/<task_id>/render', methods=['POST', 'OPTIONS'])
+def video_editor_v2_advanced_render(task_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'code': 0})
+    body = request.get_json(silent=True) or {}
+    try:
+        return jsonify({'code': 0, 'data': video_editor.render_v2_advanced(task_id, body)})
+    except Exception as exc:
+        return jsonify({'code': 400, 'error': str(exc)}), 400
+
+
 # ══════════════════════════════════════════════════════════════════
 # Main
 # ══════════════════════════════════════════════════════════════════
+def _read_install_version(exe_dir: str) -> str:
+    """读取另一个安装的版本号（onedir 打包会带 _internal/companion_state.py 源码）。"""
+    try:
+        state_py = os.path.join(exe_dir, '_internal', 'companion_state.py')
+        if not os.path.isfile(state_py):
+            return ''
+        text = open(state_py, encoding='utf-8', errors='replace').read(8000)
+        m = re.search(r"APP_VERSION\\s*=\\s*['\"]([^'\"]+)['\"]", text)
+        return m.group(1).strip() if m else ''
+    except Exception:
+        return ''
+
+
+def _recycle_install_dir(dir_path: str) -> bool:
+    """把旧安装目录送入回收站（可恢复），返回是否成功。"""
+    try:
+        ps = (
+            "Add-Type -AssemblyName Microsoft.VisualBasic; "
+            "[Microsoft.VisualBasic.FileIO.FileSystem]::DeleteDirectory("
+            + repr(str(dir_path).replace(chr(39), chr(39) * 2))
+            + ", 'OnlyErrorDialogs', 'SendToRecycleBin')"
+        )
+        result = subprocess.run(
+            ['powershell', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', ps],
+            capture_output=True, timeout=120,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+        )
+        return result.returncode == 0
+    except Exception as exc:
+        print(f'[Main] 回收旧安装失败 {dir_path}: {exc}', flush=True)
+        return False
+
+
+def _find_other_companion_installs() -> list:
+    """扫描常见位置，返回本机上其他伴侣安装 [{exe, dir, version}]（不含当前实例）。"""
+    current = os.path.abspath(sys.argv[0]) if getattr(sys, 'frozen', False) else ''
+    candidates = [
+        r'D:\\Pixingyun',
+        r'C:\\Pixingyun',
+        r'D:\\Pixingyun Mate',
+        r'C:\\Pixingyun Mate',
+        os.path.join(os.environ.get('LOCALAPPDATA', ''), 'Programs', 'Pixingyun Mate'),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'Desktop', 'Pixingyun Mate'),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'Desktop', 'pixingyun-mate'),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'Downloads', 'Pixingyun Mate'),
+        os.path.join(os.environ.get('USERPROFILE', ''), 'Downloads', 'pixingyun-mate'),
+    ]
+    found = []
+    seen = set()
+    for d in candidates:
+        try:
+            exe = os.path.join(d, 'pixingyun-mate.exe')
+            if os.path.isfile(exe) and os.path.normcase(os.path.abspath(exe)) != os.path.normcase(current):
+                key = os.path.normcase(os.path.abspath(exe))
+                if key in seen:
+                    continue
+                seen.add(key)
+                found.append({
+                    'exe': os.path.abspath(exe),
+                    'dir': os.path.abspath(d),
+                    'version': _read_install_version(os.path.abspath(d)),
+                })
+        except Exception:
+            continue
+    return found
+
+
 if __name__ == '__main__':
+    # 尽早给所有出站请求装上版本号 + 设备标识请求头（供服务端日志区分设备）
+    try:
+        from companion_config import install_companion_request_headers
+        install_companion_request_headers()
+    except Exception as _hdr_err:
+        print(f'[WARN] companion request headers init failed: {_hdr_err}')
+
     startup_silent = any(arg in ('--startup', '--silent', '--tray') for arg in sys.argv[1:])
     if startup_silent:
         os.environ['PIXINGYUN_STARTUP_SILENT'] = '1'
@@ -2685,11 +3126,50 @@ if __name__ == '__main__':
             print(f'[Main] Cleaned {cleaned_runs} stale running collection run(s)', flush=True)
     except Exception as cleanup_err:
         print(f'[Main] Stale collection cleanup failed: {cleanup_err}', flush=True)
+    # ── 1b. 启动时清理上次会话遗留的伴侣浏览器进程（内存卫生，防止吃满内存后 Windows 关后台应用） ──
+    try:
+        from browser_manager import cleanup_stale_companion_browsers
+
+        swept = cleanup_stale_companion_browsers()
+        if swept:
+            print(f'[Main] Startup browser sweep: cleaned {swept} stale process(es)', flush=True)
+    except Exception as sweep_err:
+        print(f'[Main] Startup browser sweep failed: {sweep_err}', flush=True)
+
+    # ── 1c. 其他伴侣安装清理：默认关闭，只能显式配置后启用 ──
+    try:
+        cleanup_other_installs_on_start = _load_config().get('cleanup_other_installs_on_start') is True
+        def _cleanup_other_installs():
+            try:
+                found = _find_other_companion_installs()
+                for item in found:
+                    other_version = item.get('version') or 'unknown'
+                    if _recycle_install_dir(item['dir']):
+                        print(f"[Main] 已静默清理其他伴侣安装: {item['dir']} (v{other_version})", flush=True)
+                    else:
+                        print(f"[Main] 其他安装清理失败(下次启动重试): {item['dir']}", flush=True)
+            except Exception as _d:
+                print(f'[Main] 其他安装清理失败: {_d}', flush=True)
+
+        if cleanup_other_installs_on_start:
+            threading.Thread(target=_cleanup_other_installs, daemon=True, name='other-installs-cleanup').start()
+        else:
+            print('[Main] Other install cleanup disabled by default', flush=True)
+    except Exception as _d2:
+        print(f'[Main] 其他安装清理线程启动失败: {_d2}', flush=True)
+
     _ensure_doudian_scheduler_started()
 
     # ── 2. 主动 Token 刷新 ──
     print('[Main] 启动 Token 刷新守护线程...')
     _start_token_refresh_daemon()
+
+    # ── 2b. 伴侣监控中心心跳（仅上报自身进程/任务状态） ──
+    try:
+        from companion_heartbeat import start_heartbeat_thread
+        start_heartbeat_thread()
+    except Exception as _hb_err:
+        print(f'[WARN] heartbeat thread start failed: {_hb_err}')
 
     # ── 3. 启动定时采集 ──
     if _load_config().get('auto_collect_on_start') is True:
@@ -2714,6 +3194,12 @@ if __name__ == '__main__':
         state._collector_paused = True
         state._collector_next_run_at = None
         print('[Main] Background collector disabled')
+        threading.Thread(
+            target=_run_startup_collection_if_stale,
+            args=(20,),
+            daemon=True,
+            name='startup-stale-collector',
+        ).start()
 
     # ── 3b. 启动微信视频号会话保活守护线程 ──
     try:
@@ -2722,6 +3208,53 @@ if __name__ == '__main__':
         print('[Main] Session keep-alive daemon started')
     except Exception as _ka_err:
         print(f'[Main] Session keep-alive start failed: {_ka_err}')
+
+    # ── 3c. 启动运行日志上传守护线程（服务端按设备保存，供远程排查） ──
+    try:
+        from companion_telemetry import start_log_upload_daemon
+        start_log_upload_daemon()
+    except Exception as _tel_err:
+        print(f'[Main] Log upload daemon start failed: {_tel_err}')
+
+    # ── 3d. 更新检查守护线程：每 30 分钟自动检查，检测到新版本即触发强提醒 ──
+    try:
+        import urllib.parse as _up
+
+        state._update_available_info = None
+
+        def _update_check_loop():
+            time.sleep(15)
+            while True:
+                try:
+                    manifest = _fetch_update_manifest()
+                    latest_version = str(manifest.get('version') or '').strip()
+                    if latest_version and _is_newer_version(latest_version) and _should_prompt_update(latest_version):
+                        package_url = _resolve_update_url(
+                            _get_update_manifest_url(),
+                            manifest.get('url') or manifest.get('package_url') or '',
+                        )
+                        package_path = _up.urlparse(package_url).path if package_url else ''
+                        state._update_available_info = {
+                            'version': latest_version,
+                            'notes': manifest.get('notes') or '',
+                            'mandatory': bool(manifest.get('mandatory')),
+                            'published_at': manifest.get('published_at') or '',
+                            'size': int(manifest.get('size') or manifest.get('package_size') or 0),
+                            'filename': Path(package_path).name if package_path else '',
+                        }
+                        _mark_update_prompt_shown(latest_version)
+                        print(f'[Update] 检测到新版本 {latest_version}，触发强提醒')
+                        _flash_taskbar()
+                    else:
+                        state._update_available_info = None
+                except Exception as _ue:
+                    print(f'[Update] 自动更新检查失败: {_ue}')
+                time.sleep(1800)
+
+        threading.Thread(target=_update_check_loop, daemon=True, name='update-check-loop').start()
+        print('[Main] Update check loop started (every 30 min)')
+    except Exception as _ul_err:
+        print(f'[Main] Update check loop start failed: {_ul_err}')
 
     # ── 4. 启动系统托盘（后台线程）──
     win = None  # 提前定义，供 _on_exit 闭包引用

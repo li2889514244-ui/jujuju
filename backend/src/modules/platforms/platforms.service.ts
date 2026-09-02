@@ -10,7 +10,7 @@ import * as path from 'path'
 import { PrismaService } from '../../prisma/prisma.service'
 import { OAuthService } from './oauth/oauth.service'
 import { PLATFORM_CONFIGS } from './config/platform-config'
-import { ReportMetricsDto, ReportPostStatsDto, ReportSessionStatusDto } from './dto/platform.dto'
+import { ReportCollectStatusDto, ReportMetricsDto, ReportPostStatsDto, ReportSessionStatusDto } from './dto/platform.dto'
 import { IDataCollector } from './collectors/data-collector.interface'
 import { DouyinCollector } from './collectors/douyin.collector'
 import { KuaishouCollector } from './collectors/kuaishou.collector'
@@ -25,6 +25,7 @@ export class PlatformsService {
   private readonly collectors: Map<string, IDataCollector>
   private readonly beijingOffsetMs = 8 * 60 * 60 * 1000
   private readonly avatarCacheDir = path.join(process.cwd(), 'public', 'avatar-cache')
+  private readonly companionLogDir = path.join(process.cwd(), 'companion-logs')
 
   constructor(
     private prisma: PrismaService,
@@ -106,6 +107,48 @@ export class PlatformsService {
         '申请认证',
         '关注者',
         '昨日数据',
+        // 页面 UI 模块/导航标题，绝不能被当作昵称
+        '最近视频',
+        '最近作品',
+        '视频数据',
+        '数据概览',
+        '内容数据',
+        '作品数据',
+        '今日数据',
+        '数据趋势',
+        '热门视频',
+        '视频列表',
+        '作品列表',
+        '全部视频',
+        '全部作品',
+        '视频明细',
+        '粉丝数据',
+        '观众数据',
+        '直播数据',
+        '商品数据',
+        '订单数据',
+        '账号概览',
+        '内容洞察',
+        '互动管理',
+        '图文数据',
+        '视频动态',
+        '视频号动态',
+        '作品发布',
+        '发布作品',
+        '发布高清视频',
+        '发布全景视频',
+        '发布图文',
+        '发布文章',
+        '智能创作',
+        'AI分身',
+        'AI工坊',
+        '创作服务',
+        '创作中心',
+        '收入变现',
+        '活动中心',
+        '通知',
+        '查看全部',
+        '更多',
       ].includes(text)
     )
       return true
@@ -221,7 +264,7 @@ export class PlatformsService {
       const ext = this.getAvatarExt(contentType, avatarUrl)
       const hash = crypto.createHash('sha256').update(buffer).digest('hex').slice(0, 12)
       await fs.mkdir(this.avatarCacheDir, { recursive: true })
-      const existing = await fs.readdir(this.avatarCacheDir).catch(() => [])
+      const existing: string[] = await fs.readdir(this.avatarCacheDir).catch(() => [])
       await Promise.all(
         existing
           .filter((file) => file.startsWith(`${safeAccountId}-`))
@@ -439,6 +482,14 @@ export class PlatformsService {
       ? this.getBeijingDayStartFromDate(date)
       : this.getBeijingDayStart(hasReportedIncrement ? -1 : 0)
     const platform = account.platform as any
+    await this.prisma.account.update({
+      where: { id: accountId },
+      data: {
+        lastCollectAttemptAt: new Date(),
+        lastCollectStatus: 'COLLECTING',
+        lastCollectError: null,
+      },
+    })
 
     try {
       const pickNumber = (value: unknown) =>
@@ -589,7 +640,8 @@ export class PlatformsService {
           const current = statData[totalKey]
           const previous = previousStats[totalKey] ?? 0
           if (current === undefined || current === null) return
-          const delta = Math.max(0, current - previous)
+          // 粉丝允许负增量（掉粉真实反映为负数）；其余字段仍钳制为 0，避免累计口径回退造成污染
+          const delta = totalKey === 'followers' ? current - previous : Math.max(0, current - previous)
           const reportedIncrement = statData[incrementKey]
           const missingIncrement =
             reportedIncrement === undefined ||
@@ -747,7 +799,15 @@ export class PlatformsService {
       }
 
       // Update Account fields
-      const accountUpdates: any = { lastActiveAt: new Date(), status: 'ACTIVE' }
+      const collectedAt = new Date()
+      const accountUpdates: any = {
+        lastActiveAt: collectedAt,
+        status: 'ACTIVE',
+        lastSuccessfulCollectAt: collectedAt,
+        lastCollectAttemptAt: collectedAt,
+        lastCollectStatus: 'SUCCESS',
+        lastCollectError: null,
+      }
       if (metrics.followers && metrics.followers > 0) accountUpdates.followers = metrics.followers
       if (metrics.likes && metrics.likes > 0) accountUpdates.likes = metrics.likes
       if (metrics.following !== undefined) accountUpdates.following = metrics.following
@@ -825,7 +885,96 @@ export class PlatformsService {
       return { success: true }
     } catch (e: any) {
       this.logger.error(`reportMetrics error: ${e.message}`)
+      await this.prisma.account.update({
+        where: { id: accountId },
+        data: {
+          lastCollectAttemptAt: new Date(),
+          lastCollectStatus: 'FAILED',
+          lastCollectError: String(e.message || e).slice(0, 1000),
+        },
+      }).catch(() => undefined)
       return { success: false, error: e.message }
+    }
+  }
+
+  async reportCollectStatus(dto: ReportCollectStatusDto) {
+    const accountId = String(dto.accountId || '').trim()
+    const status = String(dto.status || '').trim().toUpperCase()
+    if (!accountId) {
+      return { success: false, error: 'accountId is required' }
+    }
+    if (!['SUCCESS', 'FAILED', 'COLLECTING'].includes(status)) {
+      return { success: false, error: 'invalid status' }
+    }
+    const account = await this.prisma.account.findUnique({ where: { id: accountId } })
+    if (!account) {
+      this.logger.warn(`reportCollectStatus: account ${accountId} not found`)
+      return { success: false, error: 'Account not found' }
+    }
+    const now = new Date()
+    await this.prisma.account.update({
+      where: { id: accountId },
+      data: {
+        lastCollectAttemptAt: now,
+        lastCollectStatus: status as any,
+        lastCollectError: status === 'FAILED' ? String(dto.message || '').slice(0, 1000) : null,
+        ...(status === 'SUCCESS' ? { lastSuccessfulCollectAt: now } : {}),
+      },
+    })
+    return { success: true, status }
+  }
+
+  /**
+   * 桌面伴侣日志上报：按设备维度保存最新日志，供运维远程排查。
+   * 只保留每台设备的最新日志（滚动覆盖），磁盘占用有界。
+   */
+  async reportCompanionLogs(userId: string, body: any) {
+    const deviceId = String(body?.deviceId || '').trim()
+    const version = String(body?.version || '').trim().slice(0, 32)
+    const installDir = String(body?.installDir || '').trim().slice(0, 300)
+    const logText = String(body?.log || '').slice(0, 600_000)
+    const diagText = String(body?.diag || '').slice(0, 200_000)
+
+    if (!/^[A-Za-z0-9_-]{4,64}$/.test(deviceId)) {
+      return { success: false, error: 'invalid deviceId' }
+    }
+
+    const baseDir = this.companionLogDir
+    const deviceDir = path.join(baseDir, deviceId)
+    const maxDeviceDirs = 60
+    try {
+      await fs.mkdir(deviceDir, { recursive: true })
+      await fs.writeFile(path.join(deviceDir, 'latest.log'), logText || '', 'utf-8')
+      if (diagText) {
+        await fs.writeFile(path.join(deviceDir, 'latest-diag.log'), diagText, 'utf-8')
+      }
+      const registryFile = path.join(baseDir, 'devices.json')
+      let registry: Record<string, any> = {}
+      try {
+        registry = JSON.parse(await fs.readFile(registryFile, 'utf-8'))
+      } catch {
+        registry = {}
+      }
+      registry[deviceId] = {
+        version,
+        userId,
+        installDir,
+        lastSeenAt: new Date().toISOString(),
+      }
+      const entries = Object.entries(registry)
+        .sort((a, b) => String(b[1]?.lastSeenAt || '').localeCompare(String(a[1]?.lastSeenAt || '')))
+      const trimmed: Record<string, any> = {}
+      for (const [key, value] of entries.slice(0, maxDeviceDirs)) {
+        trimmed[key] = value
+      }
+      await fs.writeFile(registryFile, JSON.stringify(trimmed, null, 2), 'utf-8')
+      this.logger.log(
+        `companion logs received: device=${deviceId} version=${version} user=${userId} logBytes=${logText.length}`,
+      )
+      return { success: true, deviceId }
+    } catch (error: any) {
+      this.logger.warn(`companion log save failed for ${deviceId}: ${error?.message || error}`)
+      return { success: false, error: String(error?.message || error).slice(0, 200) }
     }
   }
 
@@ -1130,7 +1279,12 @@ export class PlatformsService {
           likes: true,
           following: true,
           status: true,
+          metadata: true,
           lastActiveAt: true,
+          lastSuccessfulCollectAt: true,
+          lastCollectAttemptAt: true,
+          lastCollectStatus: true,
+          lastCollectError: true,
           createdAt: true,
           owner: { select: { id: true, name: true } },
           team: { select: { id: true, name: true } },
@@ -1142,7 +1296,17 @@ export class PlatformsService {
 
     // 标记Token状态
     const accountsWithTokenStatus = accounts.map((account: any) => {
-      const metadata = (account as any).metadata as Record<string, any>
+      let metadata: Record<string, any> = {}
+      try {
+        metadata =
+          typeof account.metadata === 'string'
+            ? JSON.parse(account.metadata)
+            : account.metadata && typeof account.metadata === 'object'
+              ? account.metadata
+              : {}
+      } catch {
+        metadata = {}
+      }
       const tokenExpiresAt = metadata?.tokenExpiresAt
       let tokenStatus = 'unknown'
 
@@ -1158,7 +1322,7 @@ export class PlatformsService {
       }
 
       return {
-        ...account,
+        ...Object.fromEntries(Object.entries(account).filter(([key]) => key !== 'metadata')),
         tokenStatus,
         hasOAuth: !!metadata?.oauthToken,
       }

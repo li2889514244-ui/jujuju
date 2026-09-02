@@ -10,6 +10,7 @@ import { TransformInterceptor } from './common/interceptors/transform.intercepto
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
 import { JsonLogger } from './common/logger/json-logger'
+import { SystemHealthService } from './modules/system-health/system-health.service'
 
 function parseCorsOrigins(originStr: string): string[] | boolean {
   if (originStr === '*') return true
@@ -59,7 +60,15 @@ async function bootstrap() {
     origin,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'X-API-Version'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'X-API-Version',
+      'X-Trace-Id',
+      'X-Request-Id',
+    ],
+    exposedHeaders: ['X-API-Version', 'X-Trace-Id', 'X-Request-Id'],
     maxAge: 86400, // 24h preflight cache
   })
 
@@ -79,6 +88,21 @@ async function bootstrap() {
   app.use(express.json({ limit: bodyLimit }))
   app.use(express.urlencoded({ extended: true, limit: bodyLimit }))
 
+  // Request ID middleware — keep frontend, backend logs, DB errors, and incidents on one trace.
+  app.use((req: any, res: any, next: any) => {
+    const incoming = req.headers['x-request-id'] || req.headers['x-trace-id']
+    const headerValue = Array.isArray(incoming) ? incoming[0] : incoming
+    const requestId =
+      typeof headerValue === 'string' && headerValue.length > 0 && headerValue.length <= 128
+        ? headerValue
+        : crypto.randomUUID()
+    req['requestId'] = requestId
+    req['traceId'] = requestId
+    res.setHeader('X-Request-Id', requestId)
+    res.setHeader('X-Trace-Id', requestId)
+    next()
+  })
+
   // 全局验证管道
   app.useGlobalPipes(
     new ValidationPipe({
@@ -91,22 +115,17 @@ async function bootstrap() {
     }),
   )
 
+  const systemHealthService = app.get(SystemHealthService, { strict: false })
+
   // 全局拦截器
-  app.useGlobalInterceptors(new LoggingInterceptor(), new TransformInterceptor())
+  app.useGlobalInterceptors(new LoggingInterceptor(systemHealthService), new TransformInterceptor())
 
   // 全局异常过滤器
-  app.useGlobalFilters(new HttpExceptionFilter())
+  app.useGlobalFilters(new HttpExceptionFilter(systemHealthService))
 
   // API 版本头
   app.use((_req: any, res: any, next: any) => {
     res.setHeader('X-API-Version', '1.0')
-    next()
-  })
-
-  // Trace ID middleware — injects X-Trace-Id header on every request
-  app.use((req: any, res: any, next: any) => {
-    req['traceId'] = req.headers['x-trace-id'] || crypto.randomUUID()
-    res.setHeader('X-Trace-Id', req['traceId'])
     next()
   })
 

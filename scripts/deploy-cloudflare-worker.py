@@ -49,17 +49,24 @@ def parse_env(path: Path) -> dict[str, str]:
 
 def cloudflare_env() -> dict[str, str]:
     env = os.environ.copy()
+    # 与 publish-companion-download.py 保持一致：优先 .env.local（本机可用、无 IP 限制的 token），
+    # 其次 secrets.env。secrets.env 里的 cfat_ token 带 IP 白名单，换 IP 后 wrangler 会报 9109。
+    local_env = parse_env(ROOT / ".env.local") if (ROOT / ".env.local").exists() else {}
     file_env = parse_env(ROOT / "secrets.env")
 
     token = (
         env.get("CLOUDFLARE_API_TOKEN")
         or env.get("CF_API_TOKEN")
+        or local_env.get("CLOUDFLARE_API_TOKEN")
+        or local_env.get("CF_API_TOKEN")
         or file_env.get("CLOUDFLARE_API_TOKEN")
         or file_env.get("CF_API_TOKEN")
     )
     account_id = (
         env.get("CLOUDFLARE_ACCOUNT_ID")
         or env.get("CF_ACCOUNT_ID")
+        or local_env.get("CLOUDFLARE_ACCOUNT_ID")
+        or local_env.get("CF_ACCOUNT_ID")
         or file_env.get("CLOUDFLARE_ACCOUNT_ID")
         or file_env.get("CF_ACCOUNT_ID")
     )
@@ -161,6 +168,12 @@ def main() -> int:
     parser.add_argument("--execute", action="store_true", help="Actually deploy the Worker and routes.")
     parser.add_argument("--skip-dry-run", action="store_true", help="Skip Wrangler dry-run before deploy.")
     parser.add_argument("--verify-only", action="store_true", help="Only check the public Worker marker header.")
+    parser.add_argument(
+        "--oauth",
+        action="store_true",
+        help="Use wrangler's cached OAuth login (~/.wrangler/config) instead of the API token; "
+        "useful when the API token is IP-allowlisted to a different network.",
+    )
     args = parser.parse_args()
 
     if args.verify_only:
@@ -168,13 +181,20 @@ def main() -> int:
         return 0
 
     env = cloudflare_env()
+    if args.oauth:
+        # OAuth 模式：不注入 API token，wrangler 会用 ~/.wrangler/config/default.toml
+        # 里的 OAuth 登录态（自动续期），只保留 ACCOUNT_ID。
+        env.pop("CLOUDFLARE_API_TOKEN", None)
+        env.pop("CF_API_TOKEN", None)
     if not args.skip_dry_run:
         run_wrangler(["deploy", "--dry-run", "--outdir", "dist-dry-run"], env=env)
 
     if args.execute:
-        if not env.get("CLOUDFLARE_API_TOKEN") or not env.get("CLOUDFLARE_ACCOUNT_ID"):
+        if not env.get("CLOUDFLARE_ACCOUNT_ID"):
+            raise SystemExit("Set CLOUDFLARE_ACCOUNT_ID before --execute.")
+        if not args.oauth and not env.get("CLOUDFLARE_API_TOKEN"):
             raise SystemExit(
-                "Set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID before --execute."
+                "Set CLOUDFLARE_API_TOKEN before --execute (or pass --oauth to use the cached OAuth login)."
             )
         require_safe_origin_config()
         run_wrangler(["deploy"], env=env)

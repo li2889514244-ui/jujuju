@@ -170,9 +170,16 @@ def deploy_archive(client, archive: Path, target: str, container: str) -> str:
         test -f "$TMP/dist/index.html"
 
         if [ -d "$TARGET" ]; then
-          cp -a "$TARGET/." "$BACKUP/" || true
+          # 备份排除大体积目录（downloads/companion-updates/uploads 由 preserve 单独保留），
+          # 避免每次部署把数百 MB 的安装包复制进 /tmp 撑爆磁盘。
+          for item in "$TARGET"/*; do
+            case "$(basename "$item")" in
+              downloads|companion-updates|uploads) ;;
+              *) cp -a "$item" "$BACKUP/" || true ;;
+            esac
+          done
           mkdir -p "$PRESERVE"
-          for path in downloads companion-updates; do
+          for path in downloads companion-updates uploads; do
             if [ -d "$TARGET/$path" ]; then
               cp -a "$TARGET/$path" "$PRESERVE/$path"
             fi
@@ -181,12 +188,13 @@ def deploy_archive(client, archive: Path, target: str, container: str) -> str:
         fi
 
         cp -a "$TMP/dist/." "$TARGET/"
-        for path in downloads companion-updates; do
+        for path in downloads companion-updates uploads; do
           if [ -d "$PRESERVE/$path" ]; then
             cp -a "$PRESERVE/$path" "$TARGET/$path"
           fi
         done
         chmod -R a+rX "$TARGET"
+        rm -rf "$TMP" "$PRESERVE"
 
         if docker ps --format '{{{{.Names}}}}' | grep -qx "$CONTAINER"; then
           docker exec "$CONTAINER" nginx -s reload >/tmp/nginx-reload-$STAMP.log 2>&1 || docker restart "$CONTAINER"
@@ -209,6 +217,29 @@ def deploy_archive(client, archive: Path, target: str, container: str) -> str:
     if not match:
         raise SystemExit("Remote deploy succeeded but remote_ref was not found")
     return match.group(1)
+
+
+def purge_site_html_cache() -> None:
+    """Cloudflare 对 SPA HTML 缓存 5 分钟；部署后主动 purge，避免用户读到旧入口引用。
+
+    复用 publish-companion-download.py 的 purge_cloudflare_cache（读取 secrets.env 里的
+    CLOUDFLARE_API_TOKEN / CLOUDFLARE_ZONE_ID）；无凭证时仅告警，不阻塞部署。
+    """
+    import importlib.util
+
+    publish_path = ROOT / "scripts" / "publish-companion-download.py"
+    try:
+        spec = importlib.util.spec_from_file_location("publish_companion_download", publish_path)
+        publish_mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(publish_mod)
+        publish_mod.purge_cloudflare_cache(
+            [
+                "https://ddddkiii.com/",
+                "https://ddddkiii.com/index.html",
+            ]
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f"WARN: site HTML cache purge skipped: {exc}")
 
 
 def main() -> None:
@@ -258,6 +289,8 @@ def main() -> None:
         print(f"public_ref={public_ref}")
         if public_ref != local_ref:
             raise SystemExit(f"Public ref mismatch: local={local_ref}, public={public_ref}")
+
+    purge_site_html_cache()
 
     print("DEPLOY SUCCESS")
 

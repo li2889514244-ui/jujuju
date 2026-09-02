@@ -71,6 +71,54 @@ SELECT 'orphan_doudian_orders=' || count(*)
   FROM "DoudianStoreOrder" o
   LEFT JOIN "DoudianStore" s ON s.id = o."storeId"
   WHERE s.id IS NULL;
+-- 订单/售后表唯一键漂移保护：出现重复行会直接让 总订单=有效+退款 失真
+SELECT 'doudian_duplicate_orders=' || count(*) FROM (
+  SELECT "storeId", "orderId" FROM "DoudianStoreOrder"
+  GROUP BY "storeId", "orderId" HAVING count(*) > 1
+) t;
+SELECT 'doudian_duplicate_aftersales=' || count(*) FROM (
+  SELECT "storeId", "afterSaleId" FROM "DoudianStoreAftersale"
+  GROUP BY "storeId", "afterSaleId" HAVING count(*) > 1
+) t;
+SELECT 'wechat_duplicate_orders=' || count(*) FROM (
+  SELECT "storeId", "orderId" FROM "WechatStoreOrder"
+  GROUP BY "storeId", "orderId" HAVING count(*) > 1
+) t;
+SELECT 'wechat_duplicate_aftersales=' || count(*) FROM (
+  SELECT "storeId", "afterSaleOrderId" FROM "WechatStoreAftersale"
+  GROUP BY "storeId", "afterSaleOrderId" HAVING count(*) > 1
+) t;
+-- 无主售后行：店铺不存在时按订单日归集退款会静默丢数
+SELECT 'orphan_doudian_aftersales=' || count(*)
+  FROM "DoudianStoreAftersale" a
+  LEFT JOIN "DoudianStore" s ON s.id = a."storeId"
+  WHERE s.id IS NULL;
+SELECT 'orphan_wechat_orders=' || count(*)
+  FROM "WechatStoreOrder" o
+  LEFT JOIN "WechatStore" s ON s.id = o."storeId"
+  WHERE s.id IS NULL;
+SELECT 'orphan_wechat_aftersales=' || count(*)
+  FROM "WechatStoreAftersale" a
+  LEFT JOIN "WechatStore" s ON s.id = a."storeId"
+  WHERE s.id IS NULL;
+-- 订单日为 0 的行无法按天归集（退款会归错天）
+SELECT 'doudian_orders_zero_create_time=' || count(*)
+  FROM "DoudianStoreOrder" WHERE "createTime" <= 0;
+SELECT 'wechat_orders_zero_create_time=' || count(*)
+  FROM "WechatStoreOrder" WHERE "createTime" <= 0;
+-- 负金额售后行
+SELECT 'negative_doudian_aftersale_rows=' || count(*)
+  FROM "DoudianStoreAftersale" WHERE "amount" < 0;
+SELECT 'negative_wechat_aftersale_rows=' || count(*)
+  FROM "WechatStoreAftersale" WHERE "amount" < 0;
+-- 信息性指标：跨日退款数量（退款发生日晚于订单日，口径应归订单日，非错误）
+SELECT 'cross_day_doudian_refunds=' || count(*)
+  FROM "DoudianStoreAftersale" a
+  JOIN "DoudianStoreOrder" o
+    ON o."storeId" = a."storeId" AND o."orderId" = a."orderId"
+  WHERE a.status IN (12, 27)
+    AND (to_timestamp(a."updateTime") AT TIME ZONE 'Asia/Shanghai')::date
+      > (to_timestamp(o."createTime") AT TIME ZONE 'Asia/Shanghai')::date;
 """
 
 
@@ -153,6 +201,38 @@ async function getJson(path) {
   if (Array.isArray(doudianStores) && doudianStores.some((store) => 'profilePath' in store)) {
     failures.push('doudianStores leaked profilePath');
   }
+
+  // 口径恒等式（总订单 = 有效订单 + 退款订单）：对每家抖店抽查最近 30 天汇总。
+  const nowSec = Math.floor(Date.now() / 1000);
+  const rangeStart = nowSec - 30 * 86400;
+  let doudianInvariantViolations = 0;
+  if (Array.isArray(doudianStores)) {
+    for (const store of doudianStores) {
+      if (!store || !store.id) continue;
+      try {
+        const summary = await getJson(
+          '/api/v1/doudian-browser/shop/summary?store_id=' + encodeURIComponent(store.id) +
+            '&start=' + rangeStart + '&end=' + nowSec + '&mode=month',
+        );
+        const total = summary?.totalOrderCount;
+        const valid = summary?.validOrderCount;
+        const refunded = summary?.refundedOrderCount;
+        if (typeof total === 'number' && typeof valid === 'number' && typeof refunded === 'number') {
+          if (total !== valid + refunded) {
+            doudianInvariantViolations += 1;
+            failures.push(
+              'doudian invariant: store=' + store.id + ' total=' + total + ' valid=' + valid + ' refunded=' + refunded,
+            );
+          }
+        } else {
+          failures.push('doudian summary missing counts for store=' + store.id);
+        }
+      } catch (error) {
+        failures.push('doudian summary check failed for store=' + store.id + ': ' + error.message);
+      }
+    }
+  }
+  console.log('doudian_invariant_violations=' + doudianInvariantViolations);
 
   if (failures.length) {
     console.error('API_CONSISTENCY_FAILED');
@@ -354,6 +434,17 @@ def evaluate_data_sanity(output: str) -> list[str]:
         "blank_account_nicknames",
         "negative_doudian_order_rows",
         "orphan_doudian_orders",
+        "doudian_duplicate_orders",
+        "doudian_duplicate_aftersales",
+        "wechat_duplicate_orders",
+        "wechat_duplicate_aftersales",
+        "orphan_doudian_aftersales",
+        "orphan_wechat_orders",
+        "orphan_wechat_aftersales",
+        "doudian_orders_zero_create_time",
+        "wechat_orders_zero_create_time",
+        "negative_doudian_aftersale_rows",
+        "negative_wechat_aftersale_rows",
     ]
 
     for key in zero_required:

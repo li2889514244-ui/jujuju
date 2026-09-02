@@ -172,6 +172,15 @@ async def collect_wechat_channels(cdp_url: str = "http://localhost:9222",
 
     async with async_playwright() as pw:
         print(f"[WeChat] 连接 CDP: {cdp_url}")
+        # P0 安全修复：连接前校验 CDP 端口上的浏览器是否属于披星云自己登记的进程。
+        # 用户的 Chrome/Edge 若开着远程调试端口（如 9222），绝不能 attach 后 Browser.close()。
+        from process_registry import verify_cdp_owner
+        cdp_owned, cdp_browser_pid, cdp_detail = verify_cdp_owner(cdp_url)
+        if not cdp_owned:
+            raise RuntimeError(
+                f"CDP 端口 {cdp_url} 上的浏览器不是披星云启动的（{cdp_detail}）。"
+                "为保护您的浏览器已拒绝连接，请通过伴侣界面发起采集。"
+            )
         browser = await pw.chromium.connect_over_cdp(cdp_url)
 
         # 注入反检测脚本到所有 context
@@ -250,7 +259,12 @@ async def collect_wechat_channels(cdp_url: str = "http://localhost:9222",
         except Exception as e:
             print(f"[WeChat] 更新采集时间失败: {e}")
 
-        await browser.close()
+        # P0 安全修复：connect_over_cdp 后绝不调用 browser.close()——
+        # Browser.close 会关闭整个浏览器实例（所有窗口/标签页），可能误关用户浏览器。
+        # 只允许通过注册表五重校验后关闭披星云自己启动的 CDP 浏览器。
+        if cdp_browser_pid:
+            from process_registry import terminate_managed
+            terminate_managed(cdp_browser_pid, reason='wechat collect finished', grace=2.0)
 
     return result
 
@@ -266,7 +280,8 @@ def register_wechat_routes(app):
     @app.route('/api/wechat-collect', methods=['POST'])
     def wechat_collect():
         data      = request.get_json(silent=True) or {}
-        cdp_url    = data.get('cdp_url', 'http://localhost:9222')
+        import companion_state as state
+        cdp_url    = data.get('cdp_url') or getattr(state, '_CDP_URL', None) or 'http://localhost:9222'
         account_id = data.get('account_id', 'wechat_default')
 
         def _run():

@@ -12,6 +12,7 @@ import { DoudianBrowserModule } from '../doudian-browser/doudian-browser.module'
 import { DoudianBrowserSyncScheduler } from './doudian-browser-sync.scheduler'
 import { OrderReportScheduler } from './order-report.scheduler'
 import { RefundAlertScheduler } from './refund-alert.scheduler'
+import { DailyReconciliationScheduler } from './daily-reconciliation.scheduler'
 import { SchedulerController } from './scheduler.controller'
 
 @Module({
@@ -32,6 +33,7 @@ import { SchedulerController } from './scheduler.controller'
     DoudianBrowserSyncScheduler,
     OrderReportScheduler,
     RefundAlertScheduler,
+    DailyReconciliationScheduler,
   ],
   exports: [
     PublishScheduler,
@@ -40,6 +42,7 @@ import { SchedulerController } from './scheduler.controller'
     DoudianBrowserSyncScheduler,
     OrderReportScheduler,
     RefundAlertScheduler,
+    DailyReconciliationScheduler,
   ],
 })
 export class SchedulerModule {}

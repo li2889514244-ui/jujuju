@@ -27,6 +27,10 @@ import { ScanBindModule } from './modules/scan-bind/scan-bind.module'
 import { WechatStoreModule } from './modules/wechat-store/wechat-store.module'
 import { DoudianBrowserModule } from './modules/doudian-browser/doudian-browser.module'
 import { AdminModule } from './modules/admin/admin.module'
+import { PerformanceLadderModule } from './modules/performance-ladder/performance-ladder.module'
+import { OrganizationSettingsModule } from './modules/organization-settings/organization-settings.module'
+import { CompanionMonitorModule } from './modules/companion-monitor/companion-monitor.module'
+import { SystemHealthModule } from './modules/system-health/system-health.module'
 import { JwtAuthGuard } from './modules/auth/guards/jwt-auth.guard'
 import { RolesGuard } from './modules/auth/guards/roles.guard'
 import { ServiceTokenGuard } from './modules/auth/guards/service-token.guard'
@@ -82,6 +86,10 @@ import { readIntegerEnv } from './config/env-number'
     WechatStoreModule,
     DoudianBrowserModule,
     AdminModule,
+    PerformanceLadderModule,
+    OrganizationSettingsModule,
+    CompanionMonitorModule,
+    SystemHealthModule,
   ],
   providers: [
     { provide: APP_INTERCEPTOR, useClass: TenantInterceptor },

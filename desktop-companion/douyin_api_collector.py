@@ -74,6 +74,91 @@ def _first_url_from_avatar_fields(source: Dict[str, Any]) -> str:
                 return url
     return ""
 
+
+async def extract_creator_home_identity(page) -> Dict[str, str]:
+    identity = {"nickname": "", "avatar_url": "", "sec_uid": ""}
+    try:
+        raw = await page.evaluate(
+            r'''() => {
+                const visible = (el) => {
+                    const rect = el.getBoundingClientRect();
+                    const style = getComputedStyle(el);
+                    return rect.width >= 24 && rect.height >= 24 &&
+                        style.visibility !== 'hidden' &&
+                        style.display !== 'none' &&
+                        Number(style.opacity || 1) > 0.05;
+                };
+                const textOf = (el) => {
+                    let text = '';
+                    let node = el;
+                    for (let i = 0; i < 5 && node; i += 1, node = node.parentElement) {
+                        text += ' ' + (node.innerText || '') + ' ' + (node.className || '') + ' ' +
+                            (node.getAttribute && (node.getAttribute('aria-label') || node.getAttribute('title') || '') || '');
+                    }
+                    return text;
+                };
+                const roots = [document];
+                for (const host of document.querySelectorAll('*')) {
+                    if (host.shadowRoot) roots.push(host.shadowRoot);
+                }
+                const bodyText = document.body ? document.body.innerText || '' : '';
+                const secMatch = bodyText.match(/MS4wLjAB[A-Za-z0-9._-]{20,}/);
+                const candidates = [];
+                for (const root of roots) {
+                    for (const img of Array.from(root.querySelectorAll('img'))) {
+                        const src = img.currentSrc || img.src || '';
+                        if (!/^https?:\/\//.test(src) || !visible(img)) continue;
+                        const rect = img.getBoundingClientRect();
+                        const width = img.naturalWidth || img.width || rect.width || 0;
+                        const height = img.naturalHeight || img.height || rect.height || 0;
+                        if (Math.max(width, height, rect.width, rect.height) < 36) continue;
+                        const nearbyText = textOf(img);
+                        const marker = `${src} ${nearbyText} ${img.alt || ''}`.toLowerCase();
+                        const ratio = Math.max(width, height) / Math.max(1, Math.min(width, height));
+                        let score = 0;
+                        if (/avatar|head|user|account|author|creator|profile/.test(marker)) score += 1200;
+                        if (/抖音号|粉丝|获赞|关注/.test(nearbyText)) score += 1800;
+                        if (rect.top >= 0 && rect.top <= 230 && rect.left >= 0 && rect.left <= 460) score += 1200;
+                        if (ratio <= 1.25) score += 600;
+                        if (/douyinpic|byteimg|pstatp|douyincdn/.test(src)) score += 200;
+                        if (/ai分身|ai工坊|发布|作品|通知|活动|任务|下载|视频|图文|日历/.test(nearbyText.toLowerCase())) score -= 2200;
+                        if (/cover|poster|banner|background|logo|icon/.test(marker)) score -= 700;
+                        if (ratio > 1.4) score -= 1800;
+                        candidates.push({ src, score, top: rect.top, left: rect.left, width, height, text: nearbyText.slice(0, 120) });
+                    }
+                }
+                candidates.sort((a, b) => b.score - a.score);
+                let nickname = '';
+                try {
+                    const lines = bodyText.split(/\n+/).map((x) => x.trim()).filter(Boolean);
+                    const idx = lines.findIndex((line) => line.includes('抖音号'));
+                    if (idx >= 0) {
+                        const sameLine = lines[idx].split(/抖音号/)[0].replace(/[|｜：:\s]+$/g, '').trim();
+                        if (sameLine && sameLine.length <= 80) nickname = sameLine;
+                    }
+                    if (!nickname && idx > 0) nickname = lines[idx - 1].replace(/\s+/g, ' ').slice(0, 80);
+                } catch (e) {}
+                return {
+                    nickname,
+                    sec_uid: secMatch ? secMatch[0] : '',
+                    avatar_url: candidates[0] && candidates[0].score > 0 ? candidates[0].src : '',
+                };
+            }'''
+        )
+        if isinstance(raw, dict):
+            for target_key, source_key in (
+                ("nickname", "nickname"),
+                ("avatar_url", "avatar_url"),
+                ("sec_uid", "sec_uid"),
+            ):
+                value = raw.get(source_key)
+                if isinstance(value, str) and value.strip():
+                    identity[target_key] = value.strip()
+    except Exception as exc:
+        logger.warning(f"[DouyinAPI] Creator home identity extraction warning: {str(exc)[:120]}")
+    return identity
+
+
 # ═══════════════════════════════════════════════════════════════
 # 抖音内部 API 端点（来自 Evil0ctal）
 # ═══════════════════════════════════════════════════════════════
@@ -310,9 +395,11 @@ async def get_sec_user_id(page) -> Optional[str]:
             return match ? decodeURIComponent(match[1]) : null;
         })()
         """)
-        if result:
+        if isinstance(result, str) and result.startswith("MS4wLjAB"):
             logger.info(f"[DouyinAPI] sec_user_id from cookie: {str(result)[:30]}...")
             return result
+        if result:
+            logger.info("[DouyinAPI] ignored non-sec_user_id cookie ss_uid")
     except Exception:
         pass
 
@@ -334,9 +421,11 @@ async def get_sec_user_id(page) -> Optional[str]:
             return null;
         })()
         """)
-        if result:
+        if isinstance(result, str) and result.startswith("MS4wLjAB"):
             logger.info(f"[DouyinAPI] sec_user_id from localStorage: {str(result)[:30]}...")
             return result
+        if result:
+            logger.info("[DouyinAPI] ignored non-sec_user_id localStorage uid")
     except Exception:
         pass
 

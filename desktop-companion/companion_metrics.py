@@ -9,12 +9,14 @@ import re, time, json, uuid, os
 from pathlib import Path
 
 import companion_state as state
+from companion_encoding import read_text_file
 from companion_browser import _launch_browser_opts
 
 try:
-    from douyin_api_collector import collect_douyin_data
+    from douyin_api_collector import collect_douyin_data, extract_creator_home_identity
 except Exception as _douyin_import_error:
     collect_douyin_data = None
+    extract_creator_home_identity = None
     _douyin_import_error = str(_douyin_import_error)
 else:
     _douyin_import_error = ''
@@ -234,6 +236,48 @@ def _is_safe_collected_nickname(value: str, platform: str = '') -> bool:
         '申请认证',
         '关注者',
         '昨日数据',
+        # 页面 UI 模块/导航标题，绝不能被当作昵称
+        '最近视频',
+        '最近作品',
+        '视频数据',
+        '数据概览',
+        '内容数据',
+        '作品数据',
+        '今日数据',
+        '数据趋势',
+        '热门视频',
+        '视频列表',
+        '作品列表',
+        '全部视频',
+        '全部作品',
+        '视频明细',
+        '粉丝数据',
+        '观众数据',
+        '直播数据',
+        '商品数据',
+        '订单数据',
+        '账号概览',
+        '内容洞察',
+        '互动管理',
+        '图文数据',
+        '视频动态',
+        '视频号动态',
+        '作品发布',
+        '发布作品',
+        '发布高清视频',
+        '发布全景视频',
+        '发布图文',
+        '发布文章',
+        '智能创作',
+        'AI分身',
+        'AI工坊',
+        '创作服务',
+        '创作中心',
+        '收入变现',
+        '活动中心',
+        '通知',
+        '查看全部',
+        '更多',
     }
     if text in noise_values:
         return False
@@ -1789,6 +1833,21 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
             const root = (w && w.shadowRoot) ? w.shadowRoot : document;
             const body = root.querySelector('body') || document.body;
             const text = body.innerText;
+            const noise = new Set([
+                '视频号', '视频号助手', '微信', '首页', '内容管理', '互动管理', '数据中心',
+                '视频数据', '关注者数据', '图文数据', '昨日数据',
+                '最近视频', '最近作品', '数据概览', '内容数据', '作品数据', '今日数据',
+                '数据趋势', '热门视频', '视频列表', '作品列表', '全部视频', '全部作品',
+                '视频明细', '粉丝数据', '观众数据', '直播数据', '商品数据', '订单数据',
+                '账号概览', '内容洞察', '视频动态', '视频号动态', '查看全部', '更多',
+                '抖音', '抖音创作者中心', '抖音创作服务平台', '快手', '快手创作者服务平台',
+                '小红书', '小红书创作服务平台', '创作者中心', '创作者服务平台', '视频管理',
+                '数据', '内容', '粉丝', '关注', '获赞', '账号', '平台', '扫码登录', '登录',
+                '申请认证', '关注者',
+                '作品发布', '发布作品', '发布高清视频', '发布全景视频', '发布图文', '发布文章',
+                '智能创作', 'AI分身', 'AI工坊', '创作服务', '创作中心', '收入变现', '活动中心', '通知',
+            ]);
+            const isNoise = (v) => noise.has(v);
             const lines = text.split('\\n').map(l => l.trim()).filter(l => l.length > 0);
 
             // Strategy 1: Find real display name (line before 抖音�?快手�?小红书号 label)
@@ -1797,7 +1856,7 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
                 if (line.match(/^(抖音号|快手号|小红书号|账号ID)/)) {
                     for (let j = i - 1; j >= Math.max(0, i - 5); j--) {
                         const candidate = lines[j];
-                        if (candidate.length >= 2 && candidate.length <= 30 &&
+                        if (candidate.length >= 2 && candidate.length <= 30 && !isNoise(candidate) &&
                             !/^\\d{5,}$/.test(candidate) &&
                             !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞)/.test(candidate)) {
                             result.nickname = candidate; break;
@@ -1816,7 +1875,7 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
                     'douyin', 'kuaishou', 'xiaohongshu', 'wechat', 'video account',
                 ];
                 const cleanLower = clean.toLowerCase();
-                if (clean.length >= 2 && clean.length <= 30 && !/^\\d+$/.test(clean) && !platformUINames.includes(cleanLower)) {
+                if (clean.length >= 2 && clean.length <= 30 && !isNoise(clean) && !/^\\d+$/.test(clean) && !platformUINames.includes(cleanLower)) {
                     result.nickname = clean;
                 }
             }
@@ -1831,7 +1890,7 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
                     const el = root.querySelector(sel);
                     if (el) {
                         const txt = el.innerText.trim();
-                        if (txt.length >= 2 && txt.length <= 30 && !/^\\d{5,}$/.test(txt)) {
+                        if (txt.length >= 2 && txt.length <= 30 && !isNoise(txt) && !/^\\d{5,}$/.test(txt)) {
                             result.nickname = txt; break;
                         }
                     }
@@ -1842,7 +1901,7 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
             if (!result.nickname) {
                 for (let i = 0; i < Math.min(lines.length, 15); i++) {
                     const candidate = lines[i];
-                    if (candidate.length >= 2 && candidate.length <= 20 &&
+                    if (candidate.length >= 2 && candidate.length <= 20 && !isNoise(candidate) &&
                         !/^\\d{5,}$/.test(candidate) &&
                         !/^(抖音|快手|小红书|创作者|首页|数据|内容|粉丝|关注|获赞|账号|平台)/.test(candidate) &&
                         !/[\u4e00-\u9fa5]{6,}/.test(candidate)) {
@@ -1864,13 +1923,13 @@ async def _scrape_dashboard(page, platform: str = '') -> dict:
             return result;
         }''')
         nick = _sanitize_text(info.get('nickname') or '')
-        if _is_safe_collected_nickname(nick, platform=platform):
+        if platform != 'DOUYIN' and _is_safe_collected_nickname(nick, platform=platform):
             metrics['_nickname'] = nick
         avatar = info.get('avatar')
-        if avatar and _is_safe_avatar_url(avatar):
+        if platform != 'DOUYIN' and avatar and _is_safe_avatar_url(avatar):
             metrics['_avatar'] = avatar
         elif avatar:
-            print(f'[DC] WECHAT_VIDEO: ignored suspicious avatar from DOM: {str(avatar)[:80]}')
+            print(f'[DC] {platform}: ignored dashboard DOM avatar: {str(avatar)[:80]}')
     except Exception as _e:
         print(f'[WARN] {type(_e).__name__}: {_e}')
 
@@ -3018,7 +3077,7 @@ async def _persist_context_state_with_cdp(context, state_path: Path, label: str,
                 'sameSite': c.get('sameSite', 'Lax'),
             })
 
-        state_data = json.loads(state_path.read_text('utf-8'))
+        state_data = json.loads(read_text_file(state_path))
         merged_by_key = {
             (c.get('name'), c.get('domain'), c.get('path')): c
             for c in state_data.get('cookies', [])
@@ -3035,7 +3094,7 @@ async def _persist_context_state_with_cdp(context, state_path: Path, label: str,
         print(f'{log_prefix} CDP cookie refresh warning for {label}: {str(e)[:120]}')
 
 
-async def _scrape_account_pages(context, platform: str, account_label: str = '', max_posts: int = 0, sleep_sec: float = 1.5, account_id: str = '') -> dict:
+async def _scrape_account_pages(context, platform: str, account_label: str = '', max_posts: int = 0, sleep_sec: float = 1.5, account_id: str = '', platform_uid: str = '') -> dict:
     """Scan pages in a single authenticated session."""
     entry = PLATFORM_DASHBOARDS.get(platform)
     if not entry:
@@ -3058,9 +3117,11 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
     douyin_api_attempted = False
     douyin_nav_count = 0
     douyin_nav_limit = 3
+    creator_home_avatar = ''
+    douyin_target_sec_uid = platform_uid if platform.upper() == 'DOUYIN' and str(platform_uid or '').startswith('MS4wLjAB') else ''
 
     async def _collect_douyin_api_once() -> bool:
-        nonlocal metrics, video_stats, douyin_api_attempted, douyin_nav_count
+        nonlocal metrics, video_stats, douyin_api_attempted, douyin_nav_count, creator_home_avatar
         if platform.upper() != 'DOUYIN' or douyin_api_attempted:
             return bool(video_stats)
         douyin_api_attempted = True
@@ -3079,19 +3140,33 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                 return False
             api_result = await collect_douyin_data(
                 page, max_posts=max_posts, sleep_sec=sleep_sec, fetch_comments=False,
-                account_label=account_label
+                account_label=account_label,
+                override_sec_user_id=douyin_target_sec_uid or None,
             )
             if not api_result.success:
                 print(f'[DouyinAPI] API collection FAILED: {api_result.error}')
                 return False
-            if api_result.detected_nickname:
-                ident_msg = f'[DouyinAPI] Detected: [{api_result.detected_nickname}]'
-                if account_label:
-                    match_status = 'MATCH' if api_result.detected_nickname == account_label else 'MISMATCH'
-                    ident_msg += f' (expected: [{account_label}], {match_status})'
-                print(ident_msg)
+            trusted_label = account_label if _is_safe_collected_nickname(account_label, platform=platform) else ''
+            if api_result.detected_nickname and trusted_label and not douyin_target_sec_uid:
+                if api_result.detected_nickname == account_label:
+                    print(f'[DouyinAPI] Identity confirmed: [{api_result.detected_nickname}]')
+                else:
+                    # 身份不匹配：页面登录账号与目标账号不一致（多账号会话串号），
+                    # 丢弃本次数据，避免把 A 账号的数据记到 B 名下。
+                    print(
+                        f'[DouyinAPI] IDENTITY MISMATCH — detected [{api_result.detected_nickname}] '
+                        f'expected [{account_label}]; DISCARDING data (cross-account guard)'
+                    )
+                    return False
+            elif api_result.detected_nickname and douyin_target_sec_uid:
+                print(f'[DouyinAPI] Identity by platform_uid: [{api_result.detected_nickname}]')
+            elif api_result.detected_nickname:
+                print(f'[DouyinAPI] Detected: [{api_result.detected_nickname}] (no target label to verify)')
             for k, v in api_result.metrics.items():
                 if v is not None and v != 0:
+                    if k == '_avatar' and creator_home_avatar and metrics.get('_avatar') == creator_home_avatar:
+                        print('[DouyinAPI] Keeping creator-center avatar; API avatar used only as fallback')
+                        continue
                     metrics[k] = v
             if api_result.video_stats:
                 old_count = len(video_stats)
@@ -3300,6 +3375,21 @@ async def _scrape_account_pages(context, platform: str, account_label: str = '',
                     print(f'[DC] WECHAT_VIDEO: DOM fallback error: {str(e)[:100]}')
 
         if platform == 'DOUYIN':
+            if extract_creator_home_identity:
+                try:
+                    home_identity = await extract_creator_home_identity(page)
+                    home_avatar = home_identity.get('avatar_url') if isinstance(home_identity, dict) else ''
+                    home_nickname = home_identity.get('nickname') if isinstance(home_identity, dict) else ''
+                    if home_avatar and _is_safe_avatar_url(home_avatar):
+                        metrics['_avatar'] = home_avatar
+                        creator_home_avatar = home_avatar
+                        print(f'[DC] DOUYIN: avatar(creator home): {home_avatar[:60]}...')
+                    elif home_avatar:
+                        print(f'[DC] DOUYIN: ignored suspicious creator-home avatar: {home_avatar[:80]}')
+                    if home_nickname and not metrics.get('_nickname') and _is_safe_collected_nickname(home_nickname, platform=platform):
+                        metrics['_nickname'] = home_nickname
+                except Exception as e:
+                    print(f'[DC] DOUYIN creator-home identity error: {str(e)[:160]}')
             state._collector_progress['phase'] = '抖音首页周期'
             try:
                 period_result = await _scrape_douyin_home_period_metrics(page)
@@ -3529,6 +3619,7 @@ async def _scrape_one_account(
     platform: str,
     profile_dir: Path,
     nickname: str = '',
+    platform_uid: str = '',
     max_posts: int = _DEFAULT_QUICK_MAX_POSTS,
 ) -> dict:
     """Scrape one account with its saved storage state."""
@@ -3542,12 +3633,11 @@ async def _scrape_one_account(
         return {'accountId': account_id, 'metrics': {}, 'videoStats': []}
 
     context = None
-    browser = None
     try:
         if platform == 'WECHAT_VIDEO':
             try:
                 import json as _json
-                saved_state = _json.loads(state_json.read_text('utf-8'))
+                saved_state = _json.loads(read_text_file(state_json))
                 saved_cookies = saved_state.get('cookies') or []
                 cookie_names = {
                     item.get('name')
@@ -3597,7 +3687,17 @@ async def _scrape_one_account(
         # WECHAT_VIDEO: override is safe (WeChat doesn't check UA version match)
         if fp and fp.get('user_agent') and not is_douyin:
             launch_kw['user_agent'] = fp['user_agent']
+        # P0 安全修复：launch 前拍摄浏览器进程快照，launch 后只登记「新出现」的进程，
+        # 使后续清理只能关闭披星云自己启动的实例，绝不波及用户浏览器/其他软件。
+        from process_registry import browser_snapshot, register_new_browser_tree
+        pre_launch_snapshot = browser_snapshot()
         context = await pw.chromium.launch_persistent_context(**launch_kw)
+        register_new_browser_tree(
+            profile_dir,
+            pre_launch_snapshot,
+            process_type='collector_browser',
+            account_id=account_id,
+        )
         print(f'[DC] {platform}: using persistent profile {profile_dir}')
         # 隐藏 headless=False 的浏览器窗口（仅隐藏屏幕外的窗口）
         if not headless_mode:
@@ -3630,7 +3730,7 @@ async def _scrape_one_account(
                 print('[DC] WECHAT_VIDEO: persistent profile loaded by browser; skip manual state replay')
                 raise RuntimeError('skip state replay for WECHAT_VIDEO')
             import json as _json
-            state = _json.loads(state_json.read_text('utf-8'))
+            state = _json.loads(read_text_file(state_json))
             saved_cookies = state.get('cookies') or []
             if saved_cookies:
                 # Use CDP to set cookies — add_cookies() drops session cookies (expires=-1)
@@ -3707,7 +3807,15 @@ async def _scrape_one_account(
                 print(f'[DC] First collection for {label}, full pagination sleep=4.0s')
         except Exception as e:
             print(f'[DC] Error checking first collection for {label}: {e}')
-        result = await _scrape_account_pages(context, platform, account_label=label, max_posts=post_limit, sleep_sec=douyin_sleep, account_id=account_id)
+        result = await _scrape_account_pages(
+            context,
+            platform,
+            account_label=label,
+            max_posts=post_limit,
+            sleep_sec=douyin_sleep,
+            account_id=account_id,
+            platform_uid=platform_uid,
+        )
         # 提取刷新后的 Cookie，供上层上传到服务器
         fresh_cookies = []
         try:
@@ -3792,7 +3900,7 @@ async def _scrape_one_account(
                     result = await _scrape_account_pages(
                         context, platform, account_label=label,
                         max_posts=post_limit, sleep_sec=douyin_sleep,
-                        account_id=account_id,
+                        account_id=account_id, platform_uid=platform_uid,
                     )
                     # Update fresh cookies after retry
                     try:
@@ -3876,13 +3984,6 @@ async def _scrape_one_account(
                     cleanup_browser_processes_for_profile(profile_dir)
                 except Exception:
                     pass
-        if browser:
-            try:
-                await asyncio.wait_for(browser.close(), timeout=8)
-            except asyncio.TimeoutError:
-                print(f'[DC] Browser close timed out for {platform}/{account_id}; continuing')
-            except Exception:
-                pass
 
 
 async def _scrape_all(accounts: list, max_posts: int = _DEFAULT_QUICK_MAX_POSTS, collection_mode: str = 'quick') -> list:
@@ -3920,6 +4021,7 @@ async def _scrape_all(accounts: list, max_posts: int = _DEFAULT_QUICK_MAX_POSTS,
                     _scrape_one_account(
                         pw, aid, platform, profile_dir,
                         nickname=acc.get('nickname', ''),
+                        platform_uid=acc.get('platform_uid', ''),
                         max_posts=max_posts,
                     ),
                     timeout=per_account_timeout,

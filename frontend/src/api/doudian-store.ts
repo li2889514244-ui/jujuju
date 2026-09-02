@@ -37,6 +37,9 @@ export interface DoudianSummary {
   count: number
   effectiveCount: number
   refundCount: number
+  totalOrderCount: number
+  validOrderCount: number
+  refundedOrderCount: number
   statusBreakdown: Array<{ label: string; count: number }>
   trend: Array<{ date: string; gmv: number; orders: number }>
   cached?: boolean

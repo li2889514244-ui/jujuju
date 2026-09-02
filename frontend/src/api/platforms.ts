@@ -23,6 +23,10 @@ export interface AuthorizedAccount {
   tokenStatus: 'valid' | 'expiring_soon' | 'expired' | 'unknown'
   hasOAuth: boolean
   lastActiveAt?: string
+  lastSuccessfulCollectAt?: string | null
+  lastCollectAttemptAt?: string | null
+  lastCollectStatus?: 'SUCCESS' | 'FAILED' | 'COLLECTING' | null
+  lastCollectError?: string | null
   createdAt: string
   owner: { id: string; name: string }
   team?: { id: string; name: string }

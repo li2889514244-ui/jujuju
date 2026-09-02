@@ -182,8 +182,8 @@ async def _execute_task(task: dict):
     _status["current_task"] = task_id
     update_task(task_id, status="processing")
 
-    browser = None
     context = None
+    profile_dir = None
 
     try:
         async with async_playwright() as pw:
@@ -196,10 +196,27 @@ async def _execute_task(task: dict):
             if browser_path:
                 launch_opts["executable_path"] = browser_path
 
-            browser = await pw.chromium.launch(**launch_opts)
-            context = await browser.new_context(
+            # P0 安全修复：登记披星云自己 launch 的浏览器进程，清理只能作用于这些 PID
+            from process_registry import browser_snapshot, register_new_browser_tree
+            safe_task_id = ''.join(ch if ch.isalnum() or ch in ('-', '_') else '_' for ch in str(task_id))[:80] or 'task'
+            profile_dir = (
+                Path(os.environ.get('LOCALAPPDATA', str(Path.home())))
+                / 'MatrixFlow'
+                / 'browser-profiles'
+                / 'pixing-worker'
+                / safe_task_id
+            )
+            profile_dir.mkdir(parents=True, exist_ok=True)
+            pre_snapshot = browser_snapshot()
+            context = await pw.chromium.launch_persistent_context(
+                user_data_dir=str(profile_dir),
                 viewport={"width": 1280, "height": 800},
                 locale="zh-CN",
+                **launch_opts,
+            )
+            register_new_browser_tree(
+                profile_dir, pre_snapshot,
+                process_type='pixing_worker_browser', task_id=task_id,
             )
             # 注入反检测脚本
             try:
@@ -207,7 +224,7 @@ async def _execute_task(task: dict):
                 await apply_stealth_to_context(context)
             except ImportError:
                 pass
-            page = await context.new_page()
+            page = context.pages[0] if context.pages else await context.new_page()
 
             # ── 第1步：打开披星教育 ──
             print(f"[PixingWorker] 打开 {PIXING_EDU_URL}")
@@ -396,9 +413,10 @@ async def _execute_task(task: dict):
                 await context.close()
             except Exception:
                 pass
-        if browser:
+        if profile_dir:
             try:
-                await browser.close()
+                from browser_manager import cleanup_browser_processes_for_profile
+                cleanup_browser_processes_for_profile(profile_dir)
             except Exception:
                 pass
         print(f"[PixingWorker] 浏览器已清理 (task={task_id})")

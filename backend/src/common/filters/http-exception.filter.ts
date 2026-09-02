@@ -14,6 +14,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
   private readonly logger = new Logger(HttpExceptionFilter.name)
   private readonly isProduction = process.env.NODE_ENV === 'production'
 
+  constructor(private readonly _systemHealth?: unknown) {}
+
   catch(exception: unknown, host: ArgumentsHost) {
     const ctx = host.switchToHttp()
     const response = ctx.getResponse<Response>()
@@ -23,6 +25,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let message = '服务器内部错误'
     let internalMessage = '' // 仅用于日志，不返回给客户端
     let errorName = 'UnknownError'
+    let businessErrorCode: string | undefined
 
     if (exception instanceof HttpException) {
       status = exception.getStatus()
@@ -33,6 +36,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
         typeof exceptionResponse === 'string'
           ? exceptionResponse
           : (exceptionResponse as any).message || exception.message
+      // 业务错误码透传：服务层通过 { code: 'STALE_COMPANION_BINDING' } 等结构化 code
+      // 抛出的异常，必须保留给客户端识别（伴侣自动 rebind 依赖它）。
+      const rawCode =
+        typeof exceptionResponse === 'object' && exceptionResponse !== null
+          ? (exceptionResponse as any).code
+          : undefined
+      if (typeof rawCode === 'string' && rawCode) {
+        businessErrorCode = rawCode
+      }
       internalMessage = exception.stack || ''
     } else if (exception instanceof Error) {
       errorName = exception.constructor.name
@@ -72,7 +84,7 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
 
     // 结构化错误日志
-    const traceId = (request as any)['traceId'] || 'no-trace'
+    const traceId = (request as any)['requestId'] || (request as any)['traceId'] || 'no-trace'
     const safeUrl = sanitizeUrl(request.url)
     const logMeta = {
       message: `${request.method} ${safeUrl} ${status}`,
@@ -99,10 +111,13 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     response.status(status).json({
       code: status,
+      ...(businessErrorCode ? { errorCode: businessErrorCode } : {}),
       message,
       data: null,
       timestamp: new Date().toISOString(),
       path: request.url,
+      requestId: traceId,
+      traceId,
     })
   }
 }

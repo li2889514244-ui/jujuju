@@ -1345,9 +1345,12 @@ export class AnalyticsService {
 
     // 查询全部历史 DailyStats（不再限制30天窗口）
     const tomorrow = this.getBeijingDayStart(1)
+    const today = this.getBeijingDayStart(0)
     const yesterday = this.getBeijingDayStart(-1)
     const sevenDaysAgo = this.getBeijingDayStart(-7)
     const thirtyDaysAgo = this.getBeijingDayStart(-30)
+    const weekStart = this.getBeijingDayStart(-7)
+    const monthStart = this.getBeijingDayStart(-30)
 
     const allStats = await this.prisma.dailyStats.findMany({
       where: {
@@ -1376,11 +1379,10 @@ export class AnalyticsService {
 
     // 计算每个账号的日/周/月聚合。日/周必须按自然时间窗口计算，
     // 这样采集断档或账号过期会在前端暴露为 null，便于运营排查。
-    const isWithinLast7 = (d: Date) => d >= sevenDaysAgo
-    const isWithinLast30 = (d: Date) => d >= thirtyDaysAgo
+    const isWithinLast7 = (d: Date) => d >= sevenDaysAgo && d <= yesterday
+    const isWithinLast30 = (d: Date) => d >= thirtyDaysAgo && d <= yesterday
     const isYesterday = (d: Date) => d.getTime() === yesterday.getTime()
-    const metricKeys = ['play', 'like', 'comment', 'share', 'new_fans'] as const
-    type MetricKey = (typeof metricKeys)[number]
+    type MetricKey = 'play' | 'like' | 'comment' | 'share' | 'new_fans'
     type MetricTotal = Record<MetricKey, number>
     const createMetricTotal = (): MetricTotal => ({
       play: 0,
@@ -1389,9 +1391,10 @@ export class AnalyticsService {
       share: 0,
       new_fans: 0,
     })
-    const numberOrNull = (value: unknown): number | null => {
+    const numberOrNull = (value: unknown, allowNegative = false): number | null => {
       const num = Number(value)
-      return Number.isFinite(num) ? Math.max(0, Math.round(num)) : null
+      if (!Number.isFinite(num)) return null
+      return allowNegative ? Math.round(num) : Math.max(0, Math.round(num))
     }
     const readJsonObject = (value: unknown): Record<string, any> => {
       if (!value) return {}
@@ -1404,12 +1407,72 @@ export class AnalyticsService {
         return {}
       }
     }
+    type PeriodState = 'complete' | 'partial' | 'historical' | 'empty'
+    type PeriodStatus = {
+      state: PeriodState
+      label: string
+      dataDate: string | null
+      coveredDays: number
+      expectedDays: number
+    }
+    const shortDate = (date: string | null) => (date ? date.slice(5) : '')
+    const parseMetricDate = (value: unknown): Date | null => {
+      if (typeof value !== 'string' || !value.trim()) return null
+      const normalized = value.includes('T') ? value : value.replace(' ', 'T')
+      const date = new Date(normalized)
+      return Number.isFinite(date.getTime()) ? date : null
+    }
+    const buildStatusLabel = (
+      periodKey: 'day_total' | 'week_total' | 'month_total',
+      state: PeriodState,
+      dataDate: string | null,
+      coveredDays: number,
+      expectedDays: number,
+    ) => {
+      const dateLabel = shortDate(dataDate)
+      if (state === 'empty') return '暂无数据'
+      if (periodKey === 'day_total') {
+        if (state === 'complete') return '昨日数据'
+        return dateLabel ? `历史数据 · ${dateLabel}` : '历史数据'
+      }
+      if (periodKey === 'week_total') {
+        if (state === 'complete') return '近7天数据'
+        if (state === 'partial') {
+          return dateLabel
+            ? `近7天数据不完整 · 更新至${dateLabel}`
+            : `近7天数据不完整 · 已覆盖${coveredDays}/${expectedDays}天`
+        }
+        return dateLabel ? `历史数据 · 截至${dateLabel}` : '历史数据'
+      }
+      if (state === 'complete') return '近30天数据'
+      if (state === 'partial') {
+        return dateLabel
+          ? `近30天数据不完整 · 更新至${dateLabel}`
+          : `近30天数据不完整 · 已覆盖${coveredDays}/${expectedDays}天`
+      }
+      return dateLabel ? `历史数据 · 截至${dateLabel}` : '历史数据'
+    }
+    const makePeriodStatus = (
+      periodKey: 'day_total' | 'week_total' | 'month_total',
+      state: PeriodState,
+      dataDate: string | null,
+      coveredDays: number,
+      expectedDays: number,
+    ): PeriodStatus => ({
+      state,
+      label: buildStatusLabel(periodKey, state, dataDate, coveredDays, expectedDays),
+      dataDate,
+      coveredDays,
+      expectedDays,
+    })
     const buildPeriodMetric = (
       metadata: unknown,
       periodKey: 'day_total' | 'week_total' | 'month_total',
       fallback: MetricTotal | null,
       currentFans: number,
-    ): MetricTotal | null => {
+      currentWindowStart: Date,
+      currentWindowEnd: Date,
+    ): { metric: MetricTotal | null; fromMetadata: boolean } => {
       const root = readJsonObject(metadata)
       const periodMetrics = readJsonObject(root.periodMetrics)
       const videoData = readJsonObject(periodMetrics.videoData)
@@ -1417,7 +1480,18 @@ export class AnalyticsService {
       const hasNewVideoPeriodSource = typeof videoData.source === 'string' && videoData.source.length > 0
       const hasNewFollowerPeriodSource =
         typeof followerData.source === 'string' && followerData.source.length > 0
-      if (!hasNewVideoPeriodSource && !hasNewFollowerPeriodSource) return fallback
+      if (!hasNewVideoPeriodSource && !hasNewFollowerPeriodSource) {
+        return { metric: fallback, fromMetadata: false }
+      }
+      const collectedDate =
+        parseMetricDate(videoData.collectedAt) || parseMetricDate(followerData.collectedAt)
+      if (
+        fallback &&
+        collectedDate &&
+        (collectedDate < currentWindowStart || collectedDate > currentWindowEnd)
+      ) {
+        return { metric: fallback, fromMetadata: false }
+      }
 
       const videoPeriod = readJsonObject(videoData[periodKey])
       const followerPeriod = readJsonObject(followerData[periodKey])
@@ -1432,10 +1506,11 @@ export class AnalyticsService {
         }
       }
 
+      // 净增粉丝允许负值（掉粉），不能被 Math.max(0) 清洗成 0
       const followerNet = hasNewFollowerPeriodSource
-        ? numberOrNull(followerPeriod.net_fans ?? followerPeriod.new_fans)
+        ? numberOrNull(followerPeriod.net_fans ?? followerPeriod.new_fans, true)
         : null
-      const videoNewFans = hasNewVideoPeriodSource ? numberOrNull(videoPeriod.new_fans) : null
+      const videoNewFans = hasNewVideoPeriodSource ? numberOrNull(videoPeriod.new_fans, true) : null
       const plausibleFollowerNet =
         followerNet !== null &&
         !(currentFans > 1000 && followerNet >= Math.floor(currentFans * 0.9))
@@ -1445,33 +1520,13 @@ export class AnalyticsService {
         hasAnyPeriodValue = true
       }
 
-      return hasAnyPeriodValue ? result : fallback
+      return hasAnyPeriodValue
+        ? { metric: result, fromMetadata: true }
+        : { metric: fallback, fromMetadata: false }
     }
 
     return accounts.map((acc) => {
       const stats = statsByAccount[acc.id] || []
-
-      // ── 异常增量过滤 ──
-      // 计算各增量字段的中位数，过滤掉超过中位数20倍的异常值（数据源口径污染）
-      const incrementFieldMap: Record<MetricKey, string> = {
-        play: 'viewsIncrement',
-        like: 'likesIncrement',
-        comment: 'commentsIncrement',
-        share: 'sharesIncrement',
-        new_fans: 'followersIncrement',
-      }
-      const medianThresholds: Partial<Record<MetricKey, number>> = {}
-      for (const mk of metricKeys) {
-        const field = incrementFieldMap[mk]
-        const vals = stats
-          .map((s: any) => (s[field] as number) || 0)
-          .filter((v) => v > 0)
-          .sort((a, b) => a - b)
-        if (vals.length >= 3) {
-          const median = vals[Math.floor(vals.length / 2)]
-          medianThresholds[mk] = median * 20
-        }
-      }
 
       // 用 null 表示"无数据"，区分"真实0"和"缺失"
       let monthTotal: MetricTotal | null = null
@@ -1479,23 +1534,21 @@ export class AnalyticsService {
       let dayTotal: MetricTotal | null = null
       let fallbackFans = 0
       let latestStatsDate: Date | null = null
+      let latestWeekDate: Date | null = null
+      let latestMonthDate: Date | null = null
+      const dayDates = new Set<string>()
+      const weekDates = new Set<string>()
+      const monthDates = new Set<string>()
 
       for (const s of stats) {
-        const rawIncrements = {
+        // 直接使用原始增量：真实爆款数据不能被"中位数倍数"规则静默清零。
+        // 数据源口径污染由摄入层（reportMetrics 的跳变保护）负责拦截。
+        const increments = {
           play: s.viewsIncrement || 0,
           like: s.likesIncrement || 0,
           comment: s.commentsIncrement || 0,
           share: s.sharesIncrement || 0,
           new_fans: s.followersIncrement || 0,
-        }
-
-        // 过滤异常增量值（超过中位数20倍）
-        const increments = { ...rawIncrements }
-        for (const mk of metricKeys) {
-          const threshold = medianThresholds[mk]
-          if (threshold && rawIncrements[mk] > threshold) {
-            increments[mk] = 0
-          }
         }
 
         // 月累计：自然最近30天，和前端“月/近30天”口径保持一致
@@ -1506,6 +1559,8 @@ export class AnalyticsService {
           monthTotal.comment += increments.comment
           monthTotal.share += increments.share
           monthTotal.new_fans += increments.new_fans
+          monthDates.add(this.formatBeijingDate(s.date))
+          if (!latestMonthDate || s.date > latestMonthDate) latestMonthDate = s.date
         }
 
         // 周累计：自然最近7天
@@ -1516,6 +1571,8 @@ export class AnalyticsService {
           weekTotal.comment += increments.comment
           weekTotal.share += increments.share
           weekTotal.new_fans += increments.new_fans
+          weekDates.add(this.formatBeijingDate(s.date))
+          if (!latestWeekDate || s.date > latestWeekDate) latestWeekDate = s.date
         }
 
         // 日：自然昨天
@@ -1526,6 +1583,7 @@ export class AnalyticsService {
           dayTotal.comment += increments.comment
           dayTotal.share += increments.share
           dayTotal.new_fans += increments.new_fans
+          dayDates.add(this.formatBeijingDate(s.date))
         }
 
         // Account.followers 是伴侣最新上报的当前粉丝快照；DailyStats 只作为缺省兜底。
@@ -1543,6 +1601,92 @@ export class AnalyticsService {
         week_total: weekTotal,
         month_total: monthTotal,
       }
+      const metadataRoot = readJsonObject(acc.metadata)
+      const metadataPeriodMetrics = readJsonObject(metadataRoot.periodMetrics)
+      const metadataVideoData = readJsonObject(metadataPeriodMetrics.videoData)
+      const metadataFollowerData = readJsonObject(metadataPeriodMetrics.followerData)
+      const metadataCollectedDate =
+        parseMetricDate(metadataVideoData.collectedAt) || parseMetricDate(metadataFollowerData.collectedAt)
+      const metadataDataDate = metadataCollectedDate ? this.formatBeijingDate(metadataCollectedDate) : dataDate
+      const metadataIsToday =
+        Boolean(metadataCollectedDate) && metadataCollectedDate! >= today && metadataCollectedDate! < tomorrow
+      const metadataInWeek =
+        Boolean(metadataCollectedDate) && metadataCollectedDate! >= weekStart && metadataCollectedDate! < tomorrow
+      const metadataInMonth =
+        Boolean(metadataCollectedDate) && metadataCollectedDate! >= monthStart && metadataCollectedDate! < tomorrow
+      const dayResult = buildPeriodMetric(
+        acc.metadata,
+        'day_total',
+        periodFallback?.day_total ?? null,
+        acc.followers || fallbackFans,
+        yesterday,
+        yesterday,
+      )
+      const weekResult = buildPeriodMetric(
+        acc.metadata,
+        'week_total',
+        periodFallback?.week_total ?? null,
+        acc.followers || fallbackFans,
+        weekStart,
+        yesterday,
+      )
+      const monthResult = buildPeriodMetric(
+        acc.metadata,
+        'month_total',
+        periodFallback?.month_total ?? null,
+        acc.followers || fallbackFans,
+        monthStart,
+        yesterday,
+      )
+      const dayMetric = dayResult.metric
+      const weekMetric = weekResult.metric
+      const monthMetric = monthResult.metric
+      const dayDataDate = dayDates.size ? this.formatBeijingDate(yesterday) : metadataDataDate
+      const weekDataDate = latestWeekDate ? this.formatBeijingDate(latestWeekDate) : metadataDataDate
+      const monthDataDate = latestMonthDate ? this.formatBeijingDate(latestMonthDate) : metadataDataDate
+      // 状态判断：DailyStats 覆盖天数达标 或 periodMetrics 本身代表平台完整周期值时，都算 complete。
+      // periodMetrics（companion 上报的平台原生周/月周期值）不应因为 DailyStats 行数少而被误标 partial。
+      // periodMetrics 只有"最近2天内采集"才代表当前完整周期值（平台数据中心滚动值每日更新）；
+      // 更早采集的元数据仍在窗口内 → partial（数据不完整·更新至xx）；窗口外 → historical。
+      const metadataRecent = Boolean(metadataCollectedDate) && metadataCollectedDate! >= this.getBeijingDayStart(-2)
+      const dayComplete = dayDates.size > 0 || (dayResult.fromMetadata && metadataIsToday)
+      const weekComplete = weekDates.size >= 7 || (weekResult.fromMetadata && metadataRecent)
+      const monthComplete = monthDates.size >= 30 || (monthResult.fromMetadata && metadataRecent)
+      const dayStatus = dayMetric
+        ? makePeriodStatus(
+            'day_total',
+            dayComplete ? 'complete' : 'historical',
+            dayDataDate,
+            dayComplete ? 1 : 0,
+            1,
+          )
+        : makePeriodStatus('day_total', 'empty', null, 0, 1)
+      const weekStatus = weekMetric
+        ? makePeriodStatus(
+            'week_total',
+            weekComplete
+              ? 'complete'
+              : weekDates.size > 0 || metadataInWeek
+                ? 'partial'
+                : 'historical',
+            weekDataDate,
+            weekComplete ? 7 : weekDates.size || (metadataInWeek ? 1 : 0),
+            7,
+          )
+        : makePeriodStatus('week_total', 'empty', null, 0, 7)
+      const monthStatus = monthMetric
+        ? makePeriodStatus(
+            'month_total',
+            monthComplete
+              ? 'complete'
+              : monthDates.size > 0 || metadataInMonth
+                ? 'partial'
+                : 'historical',
+            monthDataDate,
+            monthComplete ? 30 : monthDates.size || (metadataInMonth ? 1 : 0),
+            30,
+          )
+        : makePeriodStatus('month_total', 'empty', null, 0, 30)
 
       return {
         id: acc.id,
@@ -1551,24 +1695,14 @@ export class AnalyticsService {
         platform: acc.platform,
         fans: acc.followers || fallbackFans,
         info: {
-          day_total: buildPeriodMetric(
-            acc.metadata,
-            'day_total',
-            periodFallback?.day_total ?? null,
-            acc.followers || fallbackFans,
-          ),
-          week_total: buildPeriodMetric(
-            acc.metadata,
-            'week_total',
-            periodFallback?.week_total ?? null,
-            acc.followers || fallbackFans,
-          ),
-          month_total: buildPeriodMetric(
-            acc.metadata,
-            'month_total',
-            periodFallback?.month_total ?? null,
-            acc.followers || fallbackFans,
-          ),
+          day_total: dayMetric,
+          week_total: weekMetric,
+          month_total: monthMetric,
+        },
+        periodStatus: {
+          day_total: dayStatus,
+          week_total: weekStatus,
+          month_total: monthStatus,
         },
         dataDate,
       }

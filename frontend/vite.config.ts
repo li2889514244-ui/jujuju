@@ -7,7 +7,14 @@ import { ElementPlusResolver } from 'unplugin-vue-components/resolvers'
 import { resolve } from 'path'
 import viteCompression from 'vite-plugin-compression'
 
+// 前端版本号：优先显式传入 VITE_APP_VERSION，其次 npm 包版本。
+// 每个错误事件都会带上该版本，用于版本回归分析。
+const appVersion = process.env.VITE_APP_VERSION || process.env.npm_package_version || '1.0.0'
+
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   plugins: [
     vue(),
     AutoImport({
@@ -77,5 +84,12 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     include: ['src/**/*.test.ts'],
+    // 组件测试需要处理 element-plus 的 CSS 导入
+    css: true,
+    server: {
+      deps: {
+        inline: ['element-plus'],
+      },
+    },
   },
 })

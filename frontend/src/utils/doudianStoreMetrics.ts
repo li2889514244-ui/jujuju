@@ -101,6 +101,20 @@ export function getDoudianSuccessfulRefundOrderIds(aftersales: DoudianAftersaleM
   )
 }
 
+export function getDoudianRefundedOrderCount(aftersales: DoudianAftersaleMetric[]) {
+  const orderIds = new Set<string>()
+  const fallbackIds = new Set<string>()
+  aftersales.forEach((item) => {
+    if (!isDoudianSuccessfulRefund(item)) return
+    if (item.order_id) {
+      orderIds.add(String(item.order_id))
+      return
+    }
+    if (item.id) fallbackIds.add(String(item.id))
+  })
+  return orderIds.size + fallbackIds.size
+}
+
 export function isDoudianRevenueOrder(
   order: DoudianOrderMetric,
   successfulRefundOrderIds: Set<string>,
@@ -118,19 +132,15 @@ export function getDoudianRevenueOrders(
 
 export function filterDoudianRefunds(
   aftersales: DoudianAftersaleMetric[],
-  range: DoudianRange,
-  mode: DoudianViewMode,
+  _range: DoudianRange,
+  _mode: DoudianViewMode,
   revenueOrderIds: Set<string>,
 ) {
+  // 退款统一按订单归属日归集：只统计所选时间范围内出单的退款，
+  // 不再按退款发生时间过滤（跨日退款会正确归到订单当天）。
   return aftersales.filter((item) => {
-    const refundTime = Number(item.update_time || item.create_time || 0)
-    if (!isDoudianSuccessfulRefund(item) || refundTime < range.start || refundTime > range.end) {
-      return false
-    }
-    if (!['today', 'yesterday'].includes(mode)) {
-      return revenueOrderIds.has(String(item.order_id || ''))
-    }
-    return true
+    if (!isDoudianSuccessfulRefund(item)) return false
+    return revenueOrderIds.has(String(item.order_id || ''))
   })
 }
 

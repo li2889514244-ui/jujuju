@@ -17,6 +17,8 @@ import threading
 import time
 from typing import Optional
 
+from companion_encoding import run_cmd
+
 try:
     from loguru import logger
 except Exception:
@@ -173,20 +175,16 @@ def _check_capcut_available() -> dict:
     """检查 capcut-cli 是否可用"""
     try:
         cmd = _get_capcut_binary()
-        result = subprocess.run(
-            cmd + ["doctor"],
-            capture_output=True, text=True, timeout=30,
-            encoding="utf-8", errors="replace"
-        )
+        result = run_cmd(cmd + ["doctor"], timeout=30)
         if result.returncode == 0:
             # npx 输出可能有多行，取最后一行 JSON
-            for line in result.stdout.strip().split("\n")[::-1]:
+            for line in result.stdout_text.strip().split("\n")[::-1]:
                 line = line.strip()
                 if line.startswith("{"):
                     data = json.loads(line)
                     return {"available": True, "info": data}
             return {"available": True, "info": {}}
-        return {"available": False, "error": result.stderr[:300]}
+        return {"available": False, "error": result.stderr_text[:300]}
     except FileNotFoundError:
         return {"available": False, "error": "capcut-cli 未安装，请运行 npm install -g capcut-cli"}
     except Exception as e:
@@ -213,13 +211,9 @@ def _run_capcut(args: list, timeout: int = 120) -> dict:
     cmd = _get_capcut_binary() + args
     logger.info(f"[VideoEditor] 执行: {' '.join(cmd)}")
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace"
-        )
-        stdout = result.stdout.strip()
-        stderr = result.stderr.strip()
+        result = run_cmd(cmd, timeout=timeout)
+        stdout = result.stdout_text.strip()
+        stderr = result.stderr_text.strip()
 
         # 尝试解析 JSON 输出
         parsed = None
@@ -255,14 +249,11 @@ def _run_ffmpeg(args: list, timeout: int = 300) -> dict:
     cmd = [ffmpeg] + args
     logger.info(f"[VideoEditor] FFmpeg: {' '.join(cmd[:6])}...")
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout,
-            encoding="utf-8", errors="replace"
-        )
+        result = run_cmd(cmd, timeout=timeout)
         return {
             "ok": result.returncode == 0,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
+            "stdout": result.stdout_text,
+            "stderr": result.stderr_text,
         }
     except subprocess.TimeoutExpired:
         return {"ok": False, "error": f"FFmpeg 超时（{timeout}s）"}
@@ -1008,3 +999,150 @@ def get_environment() -> dict:
         "deepseek_models": get_deepseek_models(),
         "deepseek_default_model": _DEEPSEEK_DEFAULT_MODEL,
     }
+
+
+_legacy_get_environment = get_environment
+
+
+def get_environment() -> dict:
+    """Return video editor environment, including the V2 local ASR model state."""
+    data = _legacy_get_environment()
+    fw_model_dir = os.environ.get(
+        "MODEL_DIR",
+        os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "MatrixFlow", "models", "faster-whisper-small"),
+    )
+    try:
+        import faster_whisper  # noqa: F401
+        fw_installed = True
+    except Exception:
+        fw_installed = False
+    data["faster_whisper"] = {"installed": fw_installed, "model_dir": fw_model_dir, "model_ready": os.path.isdir(fw_model_dir)}
+    whisper_cache = os.environ.get("WHISPER_CACHE_DIR") or os.path.join(os.path.expanduser("~"), ".cache", "whisper")
+    cached_whisper_model = ""
+    for name in [os.environ.get("WHISPER_MODEL", ""), "small", "base", "tiny"]:
+        if name and os.path.isfile(os.path.join(whisper_cache, f"{name}.pt")):
+            cached_whisper_model = name
+            break
+    data.setdefault("whisper", {})
+    data["whisper"]["cached_model"] = cached_whisper_model
+    data["speech_to_text_ready"] = bool(os.path.isdir(fw_model_dir) or cached_whisper_model)
+    data["default_material_library"] = os.path.join(os.path.expanduser("~"), "Videos", "PixingyunAssets")
+    return data
+
+
+def start_v2_basic_edit(payload: dict) -> dict:
+    """Start the timeline based MP4-producing basic editor."""
+    from video_editor.task_manager import start_basic_task
+
+    source_path = str((payload or {}).get("source_path") or "").strip()
+    if not source_path:
+        raise ValueError("SOURCE_REQUIRED")
+    if not os.path.isfile(source_path):
+        raise ValueError("SOURCE_NOT_FOUND")
+    return start_basic_task(payload or {})
+
+
+def list_v2_tasks() -> list:
+    from video_editor.task_manager import list_tasks
+
+    return list_tasks()
+
+
+def get_v2_task(task_id: str) -> dict:
+    from video_editor.task_manager import get_task
+
+    return get_task(task_id)
+
+
+def cancel_v2_task(task_id: str) -> dict:
+    from video_editor.task_manager import cancel_task
+
+    return cancel_task(task_id)
+
+
+def scan_v2_materials(folder: str) -> dict:
+    from video_editor.material_library import scan_materials
+
+    return {"materials": scan_materials(folder), "folder": folder}
+
+
+def pick_v2_video() -> dict:
+    import tkinter as tk
+    from tkinter import filedialog
+    from video_editor.probe import probe_video
+
+    root = tk.Tk()
+    root.withdraw()
+    path = filedialog.askopenfilename(
+        title="选择视频",
+        filetypes=[("Video files", "*.mp4 *.mov *.mkv *.avi *.webm"), ("All files", "*.*")],
+    )
+    root.destroy()
+    if not path:
+        return {"cancelled": True}
+    info = probe_video(path).to_dict()
+    return {"cancelled": False, "path": path, "info": info}
+
+
+def pick_v2_material_folder() -> dict:
+    import tkinter as tk
+    from tkinter import filedialog
+    from video_editor.material_library import scan_materials
+
+    root = tk.Tk()
+    root.withdraw()
+    path = filedialog.askdirectory(title="选择素材库")
+    root.destroy()
+    if not path:
+        return {"cancelled": True}
+    return {"cancelled": False, "folder": path, "material_count": len(scan_materials(path))}
+
+
+def probe_v2_video(path: str) -> dict:
+    from video_editor.probe import probe_video
+
+    return probe_video(path).to_dict()
+
+
+def open_v2_output(path: str = "") -> dict:
+    try:
+        if path and os.path.isfile(path):
+            subprocess.run(["explorer", "/select,", path], check=False)
+            return {"ok": True}
+        folder = os.path.join(os.path.expanduser("~"), "Videos", "Pixingyun", "Exports")
+        os.makedirs(folder, exist_ok=True)
+        os.startfile(folder)
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def play_v2_output(path: str) -> dict:
+    if not path or not os.path.isfile(path):
+        return {"ok": False, "error": "OUTPUT_NOT_FOUND"}
+    try:
+        os.startfile(path)
+        return {"ok": True}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
+def start_v2_advanced_analyze(payload: dict) -> dict:
+    from video_editor.task_manager import start_advanced_analyze_task
+
+    source_path = str((payload or {}).get("source_path") or "").strip()
+    if not source_path or not os.path.isfile(source_path):
+        raise ValueError("SOURCE_NOT_FOUND")
+    return start_advanced_analyze_task(payload or {})
+
+
+def patch_v2_advanced_plan(task_id: str, patch: dict) -> dict:
+    from video_editor.task_manager import patch_advanced_plan
+
+    return patch_advanced_plan(task_id, patch or {})
+
+
+def render_v2_advanced(task_id: str, options: dict) -> dict:
+    from video_editor.task_manager import start_advanced_render_task
+
+    return start_advanced_render_task(task_id, options or {})

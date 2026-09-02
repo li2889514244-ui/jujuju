@@ -13,7 +13,7 @@
         <path d="M9 20V8l10 6-10 6z" fill="#ffffff" opacity="0.96" />
       </svg>
     </div>
-    <div v-if="!collapsed" class="sidebar-inner__brand">
+    <div class="sidebar-inner__brand" :class="{ 'sidebar-inner__brand--hidden': collapsed }">
       <span class="sidebar-inner__logo-text">披星云</span>
       <span class="sidebar-inner__logo-subtitle">Matrix Ops</span>
     </div>
@@ -22,7 +22,7 @@
   <!-- Menu -->
   <nav class="sidebar-inner__menu">
     <div v-for="section in menuSections" :key="section.name" class="sidebar-inner__section">
-      <div v-if="!collapsed" class="sidebar-inner__section-label">{{ section.name }}</div>
+      <div class="sidebar-inner__section-label" :class="{ 'sidebar-inner__section-label--hidden': collapsed }">{{ section.name }}</div>
       <router-link
         v-for="r in section.routes"
         :key="r.path"
@@ -35,7 +35,7 @@
         <el-icon :size="18" class="sidebar-inner__item-icon">
           <component :is="getIcon(r.meta?.icon)" />
         </el-icon>
-        <span v-if="!collapsed" class="sidebar-inner__item-label">{{ r.meta?.title }}</span>
+        <span class="sidebar-inner__item-label" :class="{ 'sidebar-inner__item-label--hidden': collapsed }">{{ r.meta?.title }}</span>
       </router-link>
     </div>
   </nav>
@@ -44,7 +44,7 @@
   <div class="sidebar-inner__bottom">
     <div class="sidebar-inner__status" :class="{ 'sidebar-inner__status--ok': backendOk }">
       <span class="sidebar-inner__status-dot"></span>
-      <span v-if="!collapsed" class="sidebar-inner__status-text">{{ backendVersion }}</span>
+      <span class="sidebar-inner__status-text" :class="{ 'sidebar-inner__status-text--hidden': collapsed }">{{ backendVersion }}</span>
       <el-icon
         v-if="!collapsed && !backendOk"
         :size="13"
@@ -221,6 +221,14 @@ function getIcon(name: unknown): Component {
     flex-direction: column;
     gap: 1px;
     min-width: 0;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+
+    &--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
   &__logo {
@@ -256,6 +264,14 @@ function getIcon(name: unknown): Component {
     font-weight: 600;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+    white-space: nowrap;
+    opacity: 1;
+    transition: opacity var(--motion-fast) var(--ease-standard);
+
+    &--hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
   &__item {
@@ -311,6 +327,13 @@ function getIcon(name: unknown): Component {
     &-label {
       overflow: hidden;
       text-overflow: ellipsis;
+      opacity: 1;
+      transition: opacity var(--motion-fast) var(--ease-standard);
+
+      &--hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
     }
   }
 
@@ -354,6 +377,14 @@ function getIcon(name: unknown): Component {
       color: $text-secondary;
       font-family: $font-mono;
       font-weight: 500;
+      white-space: nowrap;
+      opacity: 1;
+      transition: opacity var(--motion-fast) var(--ease-standard);
+
+      &--hidden {
+        opacity: 0;
+        pointer-events: none;
+      }
     }
 
     &-retry {

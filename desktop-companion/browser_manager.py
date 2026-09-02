@@ -14,6 +14,8 @@ import sys
 import time
 from pathlib import Path
 
+from companion_encoding import run_cmd
+
 
 def _import_playwright() -> bool:
     try:
@@ -204,16 +206,14 @@ def ensure_playwright_chromium(timeout: int = 120) -> str | None:
 
     print("[BrowserMgr] Playwright Chromium is missing; downloading...")
     try:
-        result = subprocess.run(
+        result = run_cmd(
             [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
             timeout=timeout,
-            text=True,
         )
         if result.returncode == 0:
             print("[BrowserMgr] Chromium download completed")
             return find_playwright_chromium()
-        print(f"[BrowserMgr] Chromium download failed: {result.stderr[:200]}")
+        print(f"[BrowserMgr] Chromium download failed: {result.stderr_text[:200]}")
     except subprocess.TimeoutExpired:
         print("[BrowserMgr] Chromium download timed out")
     except Exception as exc:
@@ -270,72 +270,45 @@ def _norm_for_cmdline(path: str | Path) -> str:
 
 
 def cleanup_browser_processes_for_profile(profile_dir: str | Path, timeout: float = 2.0) -> int:
-    """Terminate only browser processes using the given companion profile.
+    """Terminate only browser processes that Pixingyun Mate itself started AND
+    registered in the managed-process registry for this profile.
 
-    This deliberately does not kill arbitrary Chrome/Edge processes. Playwright
-    persistent contexts include the profile path in the process command line, so
-    matching on that path keeps cleanup scoped to Pixingyun Mate-owned browser
-    windows and avoids touching a coworker's normal browser session.
+    P0 安全修复：不再扫描系统所有进程、按命令行路径猜测归属。
+    - 只有登记进 managed_processes 且通过五重校验（PID 存在 / 已登记 /
+      create_time 一致 / 可执行文件一致 / 命令行含该 profile）的进程才允许关闭。
+    - 未登记或校验不过 → 不杀，并提示用户关闭对应窗口后重试。
     """
+    from process_registry import terminate_for_profile
+
     profile_marker = _norm_for_cmdline(profile_dir)
     if not profile_marker:
         return 0
 
-    try:
-        import psutil
-    except Exception as exc:
-        print(f"[BrowserMgr] psutil unavailable; skip browser cleanup: {exc}")
-        return 0
+    results = terminate_for_profile(
+        profile_dir, reason="profile cleanup", grace=max(0.1, timeout)
+    )
+    killed = sum(1 for r in results if r.get("action") == "killed")
+    if killed:
+        print(f"[BrowserMgr] cleaned {killed} registered browser process(es) for profile {profile_dir}")
+    else:
+        print(
+            f"[BrowserMgr] 拒绝清理 profile {profile_dir}："
+            "无已登记进程或校验未通过。该账号浏览器仍在使用，请关闭对应窗口后重试。"
+        )
+    return killed
 
-    current_pid = os.getpid()
-    matched = []
-    browser_names = {
-        "chrome.exe",
-        "chromium.exe",
-        "msedge.exe",
-        "chrome",
-        "chromium",
-        "msedge",
-    }
-    for proc in psutil.process_iter(["pid", "name", "cmdline"]):
-        try:
-            if proc.info.get("pid") == current_pid:
-                continue
-            name = str(proc.info.get("name") or "").lower()
-            if name not in browser_names:
-                continue
-            cmdline = " ".join(str(part) for part in (proc.info.get("cmdline") or []))
-            cmdline_norm = _norm_for_cmdline(cmdline)
-            if profile_marker in cmdline_norm:
-                matched.append(proc)
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            continue
-        except Exception:
-            continue
+def cleanup_stale_companion_browsers(timeout: float = 2.0) -> int:
+    """启动清扫：只清理「上次会话登记过（managed_processes.json）且五重校验通过」的遗留进程。
 
-    if not matched:
-        return 0
+    P0 安全修复：不再按 %LOCALAPPDATA%/MatrixFlow/browser-profiles 等路径全系统扫描猜测。
+    未登记 / create_time 不一致（PID 被复用）→ 拒绝关闭并记录 SKIP_UNMANAGED_PROCESS。
+    """
+    from process_registry import terminate_stale_records
 
-    for proc in matched:
-        try:
-            proc.terminate()
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-        except Exception as exc:
-            print(f"[BrowserMgr] browser terminate warning pid={getattr(proc, 'pid', '?')}: {exc}")
-
-    gone, alive = psutil.wait_procs(matched, timeout=max(0.1, timeout))
-    for proc in alive:
-        try:
-            proc.kill()
-        except (psutil.NoSuchProcess, psutil.AccessDenied):
-            pass
-        except Exception as exc:
-            print(f"[BrowserMgr] browser kill warning pid={getattr(proc, 'pid', '?')}: {exc}")
-
-    # Give Chrome/Edge a short moment to release the profile lock files.
-    if alive:
-        time.sleep(0.2)
-    killed = len(gone) + len(alive)
-    print(f"[BrowserMgr] cleaned {killed} browser process(es) for profile {profile_dir}")
+    results = terminate_stale_records(
+        reason="stale companion cleanup", grace=max(0.1, timeout)
+    )
+    killed = sum(1 for r in results if r.get("action") == "killed")
+    if killed:
+        print(f"[BrowserMgr] cleaned {killed} stale registered companion browser process(es) on startup")
     return killed

@@ -10,6 +10,84 @@
     <el-skeleton v-if="loading && !userInfo" :rows="8" animated />
 
     <template v-else>
+      <section class="settings-panel loading-image-panel">
+        <div class="settings-panel__main">
+          <div class="section-title">
+            <el-icon><Picture /></el-icon>
+            <span>刷新动画图片</span>
+          </div>
+          <p class="form-hint loading-image-panel__hint">
+            上传多张图片组成图片库，全站数据刷新时随机选择一张作为圆形旋转动画；支持 PNG / JPG /
+            JPEG / WEBP（单张 ≤3MB）。未上传时使用披星云默认 Logo。
+          </p>
+
+          <div class="loading-image-toolbar">
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+              multiple
+              class="loading-image-input"
+              @change="onFileChange"
+            />
+            <el-button type="primary" plain size="small" :loading="uploading" @click="chooseFile">
+              <el-icon><Upload /></el-icon>上传图片
+            </el-button>
+            <el-button size="small" :disabled="!config.images.length" @click="resetImages">
+              <el-icon><Delete /></el-icon>清空全部
+            </el-button>
+            <div class="loading-image-switch">
+              <span>随机播放</span>
+              <el-switch
+                :model-value="config.randomEnabled"
+                :disabled="!config.images.length"
+                @change="toggleRandom"
+              />
+            </div>
+          </div>
+
+          <div v-if="config.images.length" class="loading-image-gallery">
+            <div
+              v-for="item in config.images"
+              :key="item.fileName"
+              class="loading-image-cell"
+              :class="{ 'loading-image-cell--default': !config.randomEnabled && item.url === config.defaultImageUrl }"
+              :title="!config.randomEnabled ? '点击设为默认刷新图' : ''"
+              @click="!config.randomEnabled && setDefaultImage(item)"
+            >
+              <el-image
+                :src="item.url"
+                :preview-src-list="config.images.map((i) => i.url)"
+                :initial-index="config.images.indexOf(item)"
+                preview-teleported
+                fit="cover"
+                class="loading-image-thumb"
+              >
+                <template #error>
+                  <div class="loading-image-thumb-error">加载失败</div>
+                </template>
+              </el-image>
+              <span v-if="!config.randomEnabled && item.url === config.defaultImageUrl" class="loading-image-badge">
+                默认
+              </span>
+              <el-button
+                class="loading-image-delete"
+                circle
+                size="small"
+                :icon="Close"
+                title="删除"
+                @click.stop="removeImage(item)"
+              />
+            </div>
+          </div>
+          <div v-else class="loading-image-empty">
+            <span>当前图片库为空，刷新时使用披星云默认 Logo</span>
+          </div>
+
+          <div class="form-hint">{{ statusText }}</div>
+        </div>
+      </section>
+
       <section class="settings-panel">
         <div class="settings-panel__main">
           <div class="section-title">
@@ -83,17 +161,186 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue'
-import { ElMessage } from 'element-plus'
-import { User, Upload, Check, InfoFilled } from '@element-plus/icons-vue'
+import { ref, onMounted, reactive, computed } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { User, Upload, Check, InfoFilled, Picture, Delete, Close } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
+import { useLoadingStore } from '@/store/loading'
 import { authApi } from '@/api/auth'
+import {
+  organizationSettingsApi,
+  type LoadingImageConfig,
+  type LoadingImageItem,
+} from '@/api/organization-settings'
 import type { UserInfo } from '@/types'
 
 const userStore = useUserStore()
+const loadingStore = useLoadingStore()
 const loading = ref(false)
 const saving = ref(false)
 const userInfo = ref<UserInfo | null>(null)
+
+// ── 刷新动画图片库（组织级配置） ──
+const config = reactive<LoadingImageConfig>({
+  images: [],
+  randomEnabled: true,
+  defaultImageUrl: '',
+  hasCustom: false,
+})
+const uploading = ref(false)
+const fileInputRef = ref<HTMLInputElement | null>(null)
+const statusText = computed(() => {
+  if (!config.images.length) return '当前使用：披星云默认 Logo'
+  if (config.randomEnabled) return `当前图片库：${config.images.length} 张 · 随机播放`
+  return `当前图片库：${config.images.length} 张 · 固定显示默认图`
+})
+
+function syncStore(configData?: LoadingImageConfig | null) {
+  if (configData) loadingStore.setLoadingConfig(configData)
+}
+
+async function loadLoadingImageConfig() {
+  try {
+    const res = await organizationSettingsApi.getLoadingImage()
+    if (res.data) {
+      config.images = res.data.images || []
+      config.randomEnabled = res.data.randomEnabled !== false
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      config.hasCustom = Boolean(res.data.hasCustom)
+      syncStore(res.data)
+    }
+  } catch {
+    /* 配置加载失败保持默认 */
+  }
+}
+
+function chooseFile() {
+  fileInputRef.value?.click()
+}
+
+async function onFileChange(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files || [])
+  input.value = ''
+  if (files.length === 0) return
+  const invalid = files.find(
+    (file) => !['image/png', 'image/jpeg', 'image/webp'].includes(file.type),
+  )
+  if (invalid) {
+    ElMessage.error('仅支持 PNG / JPG / JPEG / WEBP 图片')
+    return
+  }
+  const oversized = files.find((file) => file.size > 3 * 1024 * 1024)
+  if (oversized) {
+    ElMessage.error('单张图片不能超过 3MB')
+    return
+  }
+  uploading.value = true
+  try {
+    const res = await organizationSettingsApi.uploadLoadingImages(files)
+    if (res.data) {
+      config.images = res.data.images || []
+      config.randomEnabled = res.data.randomEnabled !== false
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      config.hasCustom = Boolean(res.data.hasCustom)
+      syncStore(res.data)
+    }
+    ElMessage.success(`已上传 ${files.length} 张图片`)
+  } catch (error: any) {
+    console.error('[刷新动画图片] 上传失败', error)
+    ElMessage.error('图片上传失败，请稍后重试')
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function removeImage(item: LoadingImageItem) {
+  try {
+    await ElMessageBox.confirm('确定删除这张刷新图片吗？', '删除图片', {
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  try {
+    const res = await organizationSettingsApi.deleteLoadingImage(item.fileName)
+    if (res.data) {
+      config.images = res.data.images || []
+      config.randomEnabled = res.data.randomEnabled !== false
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      config.hasCustom = Boolean(res.data.hasCustom)
+      syncStore(res.data)
+    }
+    ElMessage.success('图片已删除')
+  } catch (error: any) {
+    console.error('[刷新动画图片] 删除失败', error)
+    ElMessage.error('图片删除失败，请稍后重试')
+  }
+}
+
+async function resetImages() {
+  try {
+    await ElMessageBox.confirm('确定清空整个图片库并恢复默认 Logo 吗？', '清空图片库', {
+      type: 'warning',
+      confirmButtonText: '清空',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
+  uploading.value = true
+  try {
+    const res = await organizationSettingsApi.resetLoadingImages()
+    if (res.data) {
+      config.images = res.data.images || []
+      config.randomEnabled = res.data.randomEnabled !== false
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      config.hasCustom = Boolean(res.data.hasCustom)
+      syncStore(res.data)
+    }
+    ElMessage.success('已清空图片库，恢复默认 Logo')
+  } catch (error: any) {
+    console.error('[刷新动画图片] 清空失败', error)
+    ElMessage.error('操作失败，请稍后重试')
+  } finally {
+    uploading.value = false
+  }
+}
+
+async function toggleRandom(value: string | number | boolean) {
+  const enabled = Boolean(value)
+  try {
+    const res = await organizationSettingsApi.updateLoadingPrefs({ randomEnabled: enabled })
+    if (res.data) {
+      config.randomEnabled = res.data.randomEnabled !== false
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      syncStore(res.data)
+    }
+    ElMessage.success(enabled ? '已开启随机播放' : '已关闭随机播放，将固定显示默认图')
+  } catch (error: any) {
+    config.randomEnabled = !enabled
+    console.error('[刷新动画图片] 设置失败', error)
+    ElMessage.error('设置失败，请稍后重试')
+  }
+}
+
+async function setDefaultImage(item: LoadingImageItem) {
+  try {
+    const res = await organizationSettingsApi.updateLoadingPrefs({
+      defaultFileName: item.fileName,
+    })
+    if (res.data) {
+      config.defaultImageUrl = res.data.defaultImageUrl || ''
+      syncStore(res.data)
+    }
+    ElMessage.success('已设为默认刷新图')
+  } catch (error: any) {
+    console.error('[刷新动画图片] 设置默认失败', error)
+    ElMessage.error('设置失败，请稍后重试')
+  }
+}
 
 const form = reactive({
   name: '',
@@ -104,6 +351,7 @@ const form = reactive({
 
 onMounted(() => {
   loadUserInfo()
+  loadLoadingImageConfig()
 })
 
 async function loadUserInfo() {
@@ -166,6 +414,8 @@ function getRoleLabel(role?: string) {
       return '所有者'
     case 'ADMIN':
       return '管理员'
+    case 'GROUP_LEADER':
+      return '组长'
     default:
       return '成员'
   }
@@ -286,6 +536,114 @@ function formatTime(time?: string) {
     font-size: 13px;
     font-weight: 500;
   }
+}
+
+// ── 刷新动画图片库 ──
+.loading-image-panel {
+  margin-bottom: 20px;
+
+  &__hint {
+    margin: -6px 0 16px;
+  }
+}
+
+.loading-image-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.loading-image-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: $text-secondary;
+  font-size: 13px;
+}
+
+.loading-image-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.loading-image-cell {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  cursor: pointer;
+
+  &--default {
+    outline: 2px solid $accent-500;
+    outline-offset: 3px;
+  }
+
+  &:hover .loading-image-delete {
+    opacity: 1;
+  }
+}
+
+.loading-image-thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid rgba($accent-400, 0.45);
+  background: rgba($bg-hover, 0.5);
+
+  :deep(.el-image__inner) {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+  }
+}
+
+.loading-image-thumb-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: $text-tertiary;
+  font-size: 11px;
+}
+
+.loading-image-badge {
+  position: absolute;
+  left: 50%;
+  bottom: -18px;
+  transform: translateX(-50%);
+  padding: 1px 8px;
+  border-radius: $radius-full;
+  background: $accent-500;
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  pointer-events: none;
+}
+
+.loading-image-delete {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  opacity: 0;
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.loading-image-empty {
+  padding: 14px 16px;
+  border: 1px dashed $border-base;
+  border-radius: $radius-md;
+  color: $text-tertiary;
+  font-size: 13px;
+}
+
+.loading-image-input {
+  display: none;
 }
 
 @media (max-width: 860px) {

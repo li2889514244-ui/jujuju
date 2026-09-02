@@ -96,20 +96,24 @@
     <div class="monetization__kpi monetization__kpi--primary">
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeAmountLabel }}</div>
-        <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.gross) }}</div>
+        <div class="kpi-card__value">
+          &yen;<AnimatedNumber :value="orderStats.gross" :format="centToYuan" :duration="280" />
+        </div>
         <div class="kpi-card__sub">{{ orderStatsSub }}</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-card__label">{{ rangeOrderLabel }}</div>
-        <div class="kpi-card__value">{{ orderStats.transactionCount }}</div>
+        <div class="kpi-card__label">总订单</div>
+        <div class="kpi-card__value">
+          <AnimatedNumber :value="orderStats.totalOrderCount" :duration="280" />
+        </div>
         <div class="kpi-card__sub">{{ effectiveOrderSub }}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeRefundLabel }}</div>
         <div class="kpi-card__value kpi-card__value--danger">
-          &yen;{{ centToYuan(orderStats.refund) }}
+          &yen;<AnimatedNumber :value="orderStats.refund" :format="centToYuan" :duration="280" />
         </div>
-        <div class="kpi-card__sub">{{ orderStats.refundCount }} 笔退款</div>
+        <div class="kpi-card__sub">{{ orderStats.refundedOrderCount }} 笔退款订单</div>
       </div>
     </div>
 
@@ -188,12 +192,10 @@
             </div>
           </div>
           <div class="source-row__stats">
-            <strong>{{ source.orders }}</strong>
+            <strong>{{ source.validOrderCount }}</strong>
             <span>单</span>
             <em>&yen;{{ centToYuan(source.gmv) }}</em>
-            <small v-if="source.refundCount > 0">
-              退款 {{ source.refundCount }} 单 / &yen;{{ centToYuan(source.refundAmount) }}
-            </small>
+            <small>总订单 {{ source.totalOrderCount }} · 退款 {{ source.refundedOrderCount }}</small>
           </div>
         </div>
       </div>
@@ -305,12 +307,14 @@ import {
   type WechatStore,
 } from '@/api/wechat-store'
 import dayjs from 'dayjs'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import {
   buildDailySales,
   buildStatusBreakdown,
   calculateNetSales,
   normalizeAftersales,
 } from '@/utils/wechatStoreMetrics'
+import { useLoadingStore } from '@/store/loading'
 
 const loading = ref(false)
 const router = useRouter()
@@ -342,9 +346,13 @@ interface SourceSummary {
   name: string
   accountType: string
   saleChannel: string
-  orders: number
+  /** 总订单 = 有效订单 + 退款订单 */
+  totalOrderCount: number
+  /** 有效订单 / 去退款单数（主数字） */
+  validOrderCount: number
+  /** 退款订单数 */
+  refundedOrderCount: number
   gmv: number
-  refundCount: number
   refundAmount: number
 }
 
@@ -367,18 +375,6 @@ const rangeAmountLabel = computed(() => {
     month: '近30天成交金额',
     current_month: '当月成交金额',
     custom: '自定义时段成交金额',
-  }
-  return labels[viewMode.value]
-})
-
-const rangeOrderLabel = computed(() => {
-  const labels = {
-    today: '今天成交订单',
-    yesterday: '昨天成交订单',
-    week: '近7天成交订单',
-    month: '近30天成交订单',
-    current_month: '当月成交订单',
-    custom: '自定义时段成交订单',
   }
   return labels[viewMode.value]
 })
@@ -453,21 +449,18 @@ const displayRangeLabel = computed(() => {
   return labels[viewMode.value]
 })
 const orderStatsSub = computed(() => {
-  const { gross, refund, transactionCount, effectiveCount } = orderStats.value
+  const { gross, refund, totalOrderCount, validOrderCount, refundedOrderCount } = orderStats.value
   const net = gross - refund
-  if (transactionCount === 0) return '0 笔订单'
+  if (totalOrderCount === 0) return '0 笔订单'
   const netText = refund > 0 ? `净额 ¥${centToYuan(net)}` : ''
-  const countText =
-    effectiveCount === transactionCount
-      ? `${transactionCount} 笔`
-      : `${effectiveCount} 有效 / ${transactionCount} 总`
+  const countText = `${totalOrderCount} 笔总订单 / 有效 ${validOrderCount} / 退款 ${refundedOrderCount}`
   return netText ? `${countText}，${netText}` : countText
 })
 
 const effectiveOrderSub = computed(() => {
-  const { transactionCount, effectiveCount } = orderStats.value
-  if (transactionCount === 0) return '暂无订单'
-  return effectiveCount === transactionCount ? '全部有效' : `${effectiveCount} 笔有效`
+  const { totalOrderCount, validOrderCount, refundedOrderCount } = orderStats.value
+  if (totalOrderCount === 0) return '暂无订单'
+  return `有效订单 ${validOrderCount} / 退款订单 ${refundedOrderCount}`
 })
 
 const sortedProducts = computed(() => [...products.value].sort((a, b) => b.sales - a.sales))
@@ -490,22 +483,30 @@ const sourceRanking = computed<SourceSummary[]>(() => {
       name: source.account_nickname || source.account_id || '未知来源',
       accountType: source.account_type,
       saleChannel: source.sale_channel,
-      orders: 0,
+      totalOrderCount: 0,
+      validOrderCount: 0,
+      refundedOrderCount: 0,
       gmv: 0,
-      refundCount: 0,
       refundAmount: 0,
     }
-    existing.orders += 1
+    // 统一口径（与业绩天梯一致）：总订单 = 有效 + 退款，主数字展示去退款单数
+    existing.totalOrderCount += 1
     existing.gmv += Number(order.product_price || order.pay_amount || 0)
     if (refund) {
-      existing.refundCount += 1
+      existing.refundedOrderCount += 1
       existing.refundAmount += refund.amount
     }
     map.set(key, existing)
   }
-  return Array.from(map.values()).sort(
-    (a, b) => b.orders - a.orders || b.refundCount - a.refundCount || b.gmv - a.gmv,
-  )
+  return Array.from(map.values())
+    .map((source) => ({
+      ...source,
+      validOrderCount: source.totalOrderCount - source.refundedOrderCount,
+    }))
+    .sort(
+      (a, b) =>
+        b.validOrderCount - a.validOrderCount || b.gmv - a.gmv || a.name.localeCompare(b.name),
+    )
 })
 
 const sourceAttributionOrders = computed(() => {
@@ -693,6 +694,8 @@ function isSuccessfulAftersale(a: WechatAftersale) {
 
 async function loadStores() {
   storesLoading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     const res = await wechatStoreApi.getStores()
     const list = Array.isArray(res.data) ? res.data : Array.isArray(res) ? res : []
@@ -705,6 +708,7 @@ async function loadStores() {
   } finally {
     storesLoaded.value = true
     storesLoading.value = false
+    loadingStore.stop()
   }
 }
 
@@ -714,6 +718,8 @@ async function loadStoreData() {
     return
   }
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     const { start, end } = displayRange.value
     const sourceRefundEnd = Math.max(end, Math.floor(Date.now() / 1000))
@@ -772,6 +778,7 @@ async function loadStoreData() {
     ElMessage.error(error?.message || '微信小店数据同步失败')
   } finally {
     loading.value = false
+    loadingStore.stop()
   }
 }
 

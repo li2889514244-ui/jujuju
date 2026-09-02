@@ -8,8 +8,9 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import type { ApiResponse } from '@/types'
 import { isJwtExpiringWithin } from '@/utils/jwt'
+import { createRequestId, reportApiFailure } from '@/utils/frontend-monitor'
 
-type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean }
+type RetriableRequestConfig = InternalAxiosRequestConfig & { _retry?: boolean; _requestStartedAt?: number; _requestId?: string }
 
 const SESSION_EXPIRED_MESSAGE = '登录已过期，请重新登录'
 const REQUEST_FAILED_MESSAGE = '请求失败，请检查输入后重试'
@@ -99,6 +100,13 @@ async function handleTokenRefresh(config?: RetriableRequestConfig): Promise<Axio
 
 service.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
+    const tracedConfig = config as RetriableRequestConfig
+    const requestId = createRequestId()
+    tracedConfig._requestStartedAt = Date.now()
+    tracedConfig._requestId = requestId
+    config.headers['X-Request-Id'] = requestId
+    config.headers['X-Trace-Id'] = requestId
+
     const userStore = useUserStore()
     if (
       userStore.token &&
@@ -130,6 +138,16 @@ service.interceptors.response.use(
         return handleTokenRefresh(response.config as RetriableRequestConfig)
       }
 
+      const tracedConfig = response.config as RetriableRequestConfig
+      reportApiFailure({
+        url: response.config.url,
+        statusCode: response.status,
+        businessCode: res.code,
+        durationMs: tracedConfig._requestStartedAt ? Date.now() - tracedConfig._requestStartedAt : undefined,
+        requestId: response.headers?.['x-request-id'] || tracedConfig._requestId,
+        message: readableMessage(res.message, REQUEST_FAILED_MESSAGE),
+      })
+
       const message = readableMessage(res.message, REQUEST_FAILED_MESSAGE)
       if (!response.config.url?.includes('/notifications')) {
         ElMessage.error(message)
@@ -143,8 +161,18 @@ service.interceptors.response.use(
       return handleTokenRefresh(error.config as RetriableRequestConfig | undefined)
     }
     const isNotif = error.config?.url?.includes('/notifications')
+    // silent 标记：调用方自行处理错误提示（技术细节只进日志，不暴露给用户）
+    const isSilent = (error.config as any)?.silent === true
     const message = readableMessage(error.response?.data?.message || error.message, NETWORK_ERROR_MESSAGE)
-    if (!isNotif) {
+    const tracedConfig = error.config as RetriableRequestConfig | undefined
+    reportApiFailure({
+      url: tracedConfig?.url,
+      statusCode: error.response?.status,
+      durationMs: tracedConfig?._requestStartedAt ? Date.now() - tracedConfig._requestStartedAt : undefined,
+      requestId: error.response?.headers?.['x-request-id'] || tracedConfig?._requestId,
+      message,
+    })
+    if (!isNotif && !isSilent) {
       ElMessage.error(message)
     }
     if (error instanceof Error) {
@@ -177,6 +205,14 @@ export function put<T = unknown>(
   config?: AxiosRequestConfig,
 ): Promise<ApiResponse<T>> {
   return service.put<ApiResponse<T>>(url, data, config).then((res) => res.data)
+}
+
+export function patch<T = unknown>(
+  url: string,
+  data?: unknown,
+  config?: AxiosRequestConfig,
+): Promise<ApiResponse<T>> {
+  return service.patch<ApiResponse<T>>(url, data, config).then((res) => res.data)
 }
 
 export function del<T = unknown>(

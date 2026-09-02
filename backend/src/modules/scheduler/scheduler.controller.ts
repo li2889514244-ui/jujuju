@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger'
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'
 import { OrderReportScheduler } from './order-report.scheduler'
 import { RefundAlertScheduler } from './refund-alert.scheduler'
+import { DailyReconciliationScheduler } from './daily-reconciliation.scheduler'
 
 @ApiTags('scheduler')
 @ApiBearerAuth('access-token')
@@ -12,6 +13,7 @@ export class SchedulerController {
   constructor(
     private orderReportScheduler: OrderReportScheduler,
     private refundAlertScheduler: RefundAlertScheduler,
+    private dailyReconciliationScheduler: DailyReconciliationScheduler,
   ) {}
 
   @Post('trigger/order-report')
@@ -27,5 +29,12 @@ export class SchedulerController {
   async triggerRefundCheck() {
     await this.refundAlertScheduler.checkNewRefunds()
     return { triggered: true }
+  }
+
+  @Post('trigger/reconciliation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Manually trigger daily doudian reconciliation' })
+  async triggerReconciliation() {
+    return this.dailyReconciliationScheduler.triggerManually()
   }
 }

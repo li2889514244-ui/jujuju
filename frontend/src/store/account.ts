@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { accountsApi } from '@/api/accounts'
+import { useLoadingStore } from '@/store/loading'
 import type { Account, AccountFilter, AccountGroup, PaginatedResponse } from '@/types'
 
 /** Extract items from PaginatedResponse with backward compat for legacy field names. */
@@ -26,6 +27,8 @@ export const useAccountStore = defineStore('account', () => {
 
   async function fetchAccounts() {
     loading.value = true
+    const loadingStore = useLoadingStore()
+    loadingStore.start()
     try {
       const res = await accountsApi.getList(filter.value)
       const data = res.data
@@ -33,6 +36,7 @@ export const useAccountStore = defineStore('account', () => {
       total.value = data.total || 0
     } finally {
       loading.value = false
+      loadingStore.stop()
     }
   }
 
@@ -47,8 +51,14 @@ export const useAccountStore = defineStore('account', () => {
   }
 
   async function fetchGroups() {
-    const res = await accountsApi.getGroups()
-    groups.value = res.data
+    const loadingStore = useLoadingStore()
+    loadingStore.start()
+    try {
+      const res = await accountsApi.getGroups()
+      groups.value = res.data
+    } finally {
+      loadingStore.stop()
+    }
   }
 
   async function updateAccount(id: string, data: Partial<Account>) {

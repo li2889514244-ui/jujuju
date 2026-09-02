@@ -3,46 +3,97 @@
     <section class="hero-card">
       <div class="hero-card__header">
         <div>
-          <div class="hero-card__eyebrow">{{ currentMonthLabel }} · 全店铺有效订单</div>
+          <div class="hero-card__eyebrow">
+            <MonthSwitcher
+              v-model="selectedMonth"
+              :current-month="todayMonth"
+              @change="handleMonthChange"
+            />
+            <span class="hero-card__eyebrow-divider">·</span>
+            <span class="hero-card__eyebrow-text">全店铺有效订单</span>
+            <span v-if="snapshotNote" class="hero-card__snapshot-note" :title="snapshotNote">
+              {{ snapshotNote }}
+            </span>
+          </div>
           <h2 class="hero-card__title">业绩天梯</h2>
           <p class="hero-card__subtitle">
-            按老师归因看当月冲刺进度，默认隐藏未匹配来源，避免鱼龙混杂的数据干扰判断。
+            按老师归因看所选月份的订单完成情况，默认隐藏未匹配来源，避免鱼龙混杂的数据干扰判断。
           </p>
         </div>
         <div class="hero-card__actions">
+          <span class="hero-card__rule-updated">{{ ladderRuleUpdatedText }}</span>
           <el-button text size="small" @click="showRules = true">调整归因规则</el-button>
-          <el-button :icon="Refresh" circle size="small" :loading="loading" @click="loadData" />
+          <el-button :icon="Refresh" circle size="small" :loading="loading" @click="loadMonthData" />
         </div>
       </div>
 
-      <div class="hero-card__body">
+      <div v-loading="loading" class="hero-card__body">
         <div class="hero-card__progress-panel">
-          <div class="hero-card__score">
-            <strong>{{ totalCurrentOrders }}</strong>
-            <span>/ {{ totalTargetOrders }} 单</span>
-          </div>
-          <el-progress
-            :percentage="totalProgress"
-            :stroke-width="16"
-            :show-text="false"
-            class="hero-card__progress"
-          />
-          <div class="hero-card__progress-meta">
-            <span>已完成 {{ totalProgress }}%</span>
-            <span>还差 {{ totalRemainingOrders }} 单</span>
-          </div>
+          <!-- 当前月：冲刺进度（已完成/还差/剩余日均/剩余天数） -->
+          <template v-if="!isHistoricalMonth">
+            <div class="hero-card__score">
+              <strong><AnimatedNumber :value="totalCurrentOrders" :duration="280" /></strong>
+              <span>/ {{ totalTargetOrders }} 单</span>
+            </div>
+            <el-progress
+              :percentage="totalProgress"
+              :stroke-width="16"
+              :show-text="false"
+              class="hero-card__progress"
+            />
+            <div class="hero-card__progress-meta">
+              <span>已完成 {{ totalProgress }}%</span>
+              <span>还差 {{ totalRemainingOrders }} 单</span>
+            </div>
+          </template>
+
+          <!-- 历史月：月度结果（最终完成/目标/完成率/是否达标），不再计算剩余天数与剩余日均 -->
+          <template v-else>
+            <div class="hero-card__score">
+              <strong><AnimatedNumber :value="totalCurrentOrders" :duration="280" /></strong>
+              <span>/ {{ totalTargetOrders }} 单</span>
+              <el-tag
+                size="small"
+                effect="dark"
+                class="hero-card__goal-tag"
+                :type="isMonthGoalReached ? 'success' : 'danger'"
+              >
+                {{ isMonthGoalReached ? '已达标' : '未达标' }}
+              </el-tag>
+            </div>
+            <el-progress
+              :percentage="Math.min(100, finalCompletionRate)"
+              :stroke-width="16"
+              :show-text="false"
+              class="hero-card__progress"
+            />
+            <div class="hero-card__progress-meta">
+              <span>最终完成 {{ totalCurrentOrders }} 单</span>
+              <span>完成率 {{ finalCompletionRate }}%</span>
+            </div>
+          </template>
         </div>
 
         <div class="hero-card__metrics">
           <div class="metric-tile">
+            <span>总订单</span>
+            <strong><AnimatedNumber :value="totalOrderCount" :duration="280" /></strong>
+            <em>有效 {{ totalCurrentOrders }} + 退款 {{ totalRefundedOrders }}</em>
+          </div>
+          <div v-if="!isHistoricalMonth" class="metric-tile">
             <span>剩余日均</span>
-            <strong>{{ dailyRequiredOrders }}</strong>
-            <em>单/天</em>
+            <strong><AnimatedNumber :value="dailyRequiredOrders" :duration="280" /></strong>
+            <em>剩余 {{ daysRemaining }} 天</em>
+          </div>
+          <div v-else class="metric-tile">
+            <span>完成率</span>
+            <strong>{{ finalCompletionRate }}%</strong>
+            <em>{{ isMonthGoalReached ? '已达标' : '未达标' }}</em>
           </div>
           <div class="metric-tile">
-            <span>去退款</span>
-            <strong>{{ totalRefundedOrders }}</strong>
-            <em>单已排除</em>
+            <span>有效订单</span>
+            <strong>{{ totalCurrentOrders }}</strong>
+            <em>去退款</em>
           </div>
           <div class="metric-tile">
             <span>覆盖店铺</span>
@@ -52,11 +103,20 @@
         </div>
       </div>
 
+      <el-alert
+        v-if="monthError"
+        :title="monthError"
+        type="error"
+        :closable="false"
+        show-icon
+        class="hero-card__month-error"
+      />
+
       <div class="filter-bar">
         <el-select v-model="selectedTeacher" size="small" class="filter-bar__select">
           <el-option label="全部老师" value="all" />
           <el-option
-            v-for="teacher in teachers"
+            v-for="teacher in effectiveTeachers"
             :key="teacher.id"
             :label="teacher.name"
             :value="teacher.name"
@@ -68,16 +128,16 @@
           <el-option label="抖店" value="抖店" />
         </el-select>
         <el-button
-          :type="excludeRefunded ? 'primary' : 'default'"
+          type="primary"
           size="small"
-          @click="toggleRefunds"
+          disabled
         >
-          {{ excludeRefunded ? '已去退款' : '去退款' }}
+          按有效订单
         </el-button>
         <el-button
           :type="showUnmatched ? 'warning' : 'default'"
           size="small"
-          @click="showUnmatched = !showUnmatched"
+          @click="toggleUnmatched"
         >
           {{ showUnmatched ? '显示未匹配' : '隐藏未匹配' }}
         </el-button>
@@ -106,17 +166,33 @@
               <div class="teacher-card__status">{{ teacherStatusText(teacher) }}</div>
             </div>
             <el-tag size="small" :type="teacherTagType(teacher)" effect="dark">
-              {{ teacher.progress }}%
+              {{ isHistoricalMonth ? teacher.completionRate : teacher.progress }}%
             </el-tag>
           </div>
           <div class="teacher-card__numbers">
-            <strong>{{ teacher.orders }}</strong>
+            <strong>{{ teacher.validOrderCount }}</strong>
             <span>/ {{ teacher.target }} 单</span>
           </div>
-          <el-progress :percentage="teacher.progress" :stroke-width="10" :show-text="false" />
-          <div class="teacher-card__foot">
+          <el-progress
+            :percentage="Math.min(100, teacher.progress)"
+            :stroke-width="10"
+            :show-text="false"
+          />
+          <!-- 历史月：最终完成/完成率/是否达标，不再显示“还差 X 单” -->
+          <div v-if="isHistoricalMonth" class="teacher-card__foot">
+            <span>完成率 {{ teacher.completionRate }}%</span>
+            <span
+              :class="teacher.completionRate >= 100 ? 'teacher-card__reached' : 'teacher-card__missed'"
+            >
+              {{ teacher.completionRate >= 100 ? '已达标' : '未达标' }}
+            </span>
+            <span>总订单 {{ teacher.totalOrderCount }} 单</span>
+            <span v-if="teacher.refundedOrderCount > 0">退款 {{ teacher.refundedOrderCount }} 单</span>
+          </div>
+          <div v-else class="teacher-card__foot">
             <span>还差 {{ teacher.remaining }} 单</span>
-            <span v-if="teacher.refunded > 0">去退款 {{ teacher.refunded }} 单</span>
+            <span>总订单 {{ teacher.totalOrderCount }} 单</span>
+            <span v-if="teacher.refundedOrderCount > 0">退款 {{ teacher.refundedOrderCount }} 单</span>
           </div>
         </div>
         <div v-if="teacherRows.length === 0" class="empty-hint">
@@ -159,16 +235,27 @@
               <el-tag size="small" :type="rankTagType(index)" effect="dark">
                 {{ rankLabel(index) }}
               </el-tag>
-              <h3>{{ source.name }}</h3>
-              <p>{{ source.teacherName }} · {{ source.platformLabel }} · {{ source.storeLabel }}</p>
-              <p class="podium-card__operator">
-                {{ source.operator ? `运营者：${source.operator}` : '未设置运营者' }}
+              <h3 :title="source.name">{{ source.name }}</h3>
+              <p :title="source.teacherName + ' · ' + source.platformLabel + ' · ' + source.storeLabel">
+                {{ source.teacherName }} · {{ source.platformLabel }} · {{ source.storeLabel }}
+              </p>
+              <p
+                class="podium-card__operator"
+                :title="source.operator || (source.accountId ? '账号已匹配 · 未设置主负责人' : '未匹配账号')"
+              >
+                <template v-if="source.operator">
+                  运营者：{{ source.operator }}
+                  <em v-if="source.operatorSource === 'account'" class="operator-origin">主负责人</em>
+                  <em v-else-if="source.operatorSource === 'legacy'" class="operator-origin">历史配置</em>
+                </template>
+                <template v-else-if="source.accountId">账号已匹配 · 未设置主负责人</template>
+                <template v-else>未匹配账号</template>
               </p>
             </div>
             <div class="podium-card__orders">
-              <strong>{{ source.orders }}</strong>
+              <strong>{{ source.validOrderCount }}</strong>
               <span>单</span>
-              <em v-if="source.refunded > 0">去退款 {{ source.refunded }} 单</em>
+              <em>总订单 {{ source.totalOrderCount }} · 退款 {{ source.refundedOrderCount }}</em>
             </div>
           </div>
         </div>
@@ -187,24 +274,30 @@
             <div class="source-row__rank">{{ index + 4 }}</div>
             <div class="source-row__main">
               <div class="source-row__title">
-                <div class="source-row__name">{{ source.name }}</div>
+                <div class="source-row__name" :title="source.name">{{ source.name }}</div>
               </div>
               <div class="source-row__meta">
-                <span>{{ source.teacherName }}</span>
-                <span>{{ source.platformLabel }}</span>
-                <span>{{ source.storeLabel }}</span>
-                <span>{{ source.operator ? `运营者：${source.operator}` : '未设置运营者' }}</span>
+                <span :title="source.teacherName">{{ source.teacherName }}</span>
+                <span :title="source.platformLabel">{{ source.platformLabel }}</span>
+                <span :title="source.storeLabel">{{ source.storeLabel }}</span>
+                <span
+                  :title="source.operator || (source.accountId ? '未设置主负责人' : '未匹配账号')"
+                >
+                  <template v-if="source.operator">运营者：{{ source.operator }}</template>
+                  <template v-else-if="source.accountId">未设置主负责人</template>
+                  <template v-else>未匹配账号</template>
+                </span>
               </div>
             </div>
             <div class="source-row__stats">
-              <strong>{{ source.orders }}</strong>
+              <strong>{{ source.validOrderCount }}</strong>
               <span>单</span>
-              <small v-if="source.refunded > 0">去退款 {{ source.refunded }} 单</small>
+              <small>总订单 {{ source.totalOrderCount }} · 退款 {{ source.refundedOrderCount }}</small>
             </div>
           </div>
         </div>
         <div v-if="sourceRanking.length === 0" class="empty-hint">
-          {{ loading ? '正在读取出单来源…' : '暂无当月出单来源' }}
+          {{ loading ? '正在读取出单来源…' : '暂无该月出单来源' }}
         </div>
       </div>
     </div>
@@ -221,18 +314,26 @@
             <span>{{ store.platform }}</span>
           </div>
           <div class="store-card__stats">
-            <span>{{ store.orders }} 单</span>
-            <em v-if="store.refunded > 0">去退款 {{ store.refunded }} 单</em>
+            <span>去退款 {{ store.validOrderCount }} 单</span>
+            <em>总订单 {{ store.totalOrderCount }} · 退款 {{ store.refundedOrderCount }}</em>
           </div>
         </div>
         <div v-if="storeSummaries.length === 0" class="empty-hint">
-          {{ loading ? '正在读取店铺订单…' : '暂无当月店铺订单' }}
+          {{ loading ? '正在读取店铺订单…' : '暂无该月店铺订单' }}
         </div>
       </div>
     </div>
 
     <el-drawer v-model="showRules" title="归因规则与目标" size="520px">
       <div class="rules-panel">
+        <el-alert
+          v-if="isHistoricalMonth"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="rules-panel__month-hint"
+          :title="`正在查看历史月 ${monthLabelText} 的冻结快照，此处修改只会保存到当前月（${todayMonthLabel}）配置。`"
+        />
         <p class="rules-panel__hint">
           只有命中老师名称或关键词的来源才会进入默认榜单。关键词建议放账号名、品牌名、课程名。
         </p>
@@ -282,34 +383,55 @@
             <h3>{{ selectedSource.name }}</h3>
             <p>{{ selectedSource.teacherName }} · {{ selectedSource.platformLabel }} · {{ selectedSource.storeLabel }}</p>
           </div>
-          <strong>{{ selectedSource.orders }} 单</strong>
+          <strong>{{ selectedSource.validOrderCount }} 单</strong>
         </div>
 
         <div class="source-detail__operator">
           <span>运营者</span>
-          <div>
-            <el-input
-              v-model="sourceOperatorDraft"
-              placeholder="填写这个出单账号对应的运营者"
-              clearable
-              @keyup.enter="saveSourceOperator"
-            />
-            <el-button type="primary" @click="saveSourceOperator">保存</el-button>
+          <div class="source-detail__operator-value">
+            <template v-if="selectedSource.operator">
+              <strong>{{ selectedSource.operator }}</strong>
+              <el-tag
+                v-if="selectedSource.operatorSource === 'account'"
+                size="small"
+                type="success"
+              >
+                来自账号主负责人
+              </el-tag>
+              <el-tag v-else-if="selectedSource.operatorSource === 'legacy'" size="small" type="info">
+                历史配置
+              </el-tag>
+              <p v-if="selectedSource.operatorSource === 'account'" class="source-detail__operator-hint">
+                已自动同步「账号接入」中该账号的主负责人，无需重复设置。
+              </p>
+            </template>
+            <template v-else-if="selectedSource.accountId">
+              <strong>未设置主负责人</strong>
+              <p class="source-detail__operator-hint">
+                该来源已对应到「账号接入」中的账号，但该账号尚未设置主负责人。请到「账号接入」设置后，这里会自动同步。
+              </p>
+            </template>
+            <template v-else>
+              <strong>未匹配账号</strong>
+              <p class="source-detail__operator-hint">
+                该来源尚未对应到「账号接入」中的账号。请先接入对应账号并设置主负责人，这里会自动同步。
+              </p>
+            </template>
           </div>
         </div>
 
         <div class="source-detail__stats">
           <div>
-            <span>覆盖平台</span>
-            <strong>{{ selectedSource.platforms.length }}</strong>
+            <span>总订单</span>
+            <strong>{{ selectedSource.totalOrderCount }}</strong>
           </div>
           <div>
-            <span>覆盖店铺</span>
-            <strong>{{ selectedSource.storeNames.length }}</strong>
+            <span>有效订单</span>
+            <strong>{{ selectedSource.validOrderCount }}</strong>
           </div>
           <div>
-            <span>去退款</span>
-            <strong>{{ selectedSource.refunded }}</strong>
+            <span>退款订单</span>
+            <strong>{{ selectedSource.refundedOrderCount }}</strong>
           </div>
         </div>
 
@@ -353,7 +475,14 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router'
 import { doudianStoreApi, type DoudianStore } from '@/api/doudian-store'
+import {
+  performanceLadderApi,
+  type PerformanceLadderConfigResponse,
+  type PerformanceLadderMonthSnapshotResponse,
+  type PerformanceLadderTeacherDto,
+} from '@/api/performance-ladder'
 import {
   wechatStoreApi,
   type WechatAftersale,
@@ -370,6 +499,20 @@ import {
   type DoudianOrderMetric,
 } from '@/utils/doudianStoreMetrics'
 import { normalizeAftersales } from '@/utils/wechatStoreMetrics'
+import { accountsApi } from '@/api/accounts'
+import { useLoadingStore } from '@/store/loading'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
+import MonthSwitcher from '@/components/common/MonthSwitcher.vue'
+import {
+  currentMonth,
+  daysRemainingForMonth,
+  isCurrentMonth,
+  monthLabel,
+  monthRange,
+  normalizeMonthParam,
+} from '@/utils/monthRange'
+import { createLatestRequestGuard } from '@/utils/requestGuard'
+import type { Account } from '@/types'
 
 interface TeacherConfig {
   id: string
@@ -379,10 +522,13 @@ interface TeacherConfig {
 }
 
 interface TeacherRow extends TeacherConfig {
-  orders: number
-  refunded: number
+  totalOrderCount: number
+  validOrderCount: number
+  refundedOrderCount: number
   remaining: number
   progress: number
+  /** 不封顶的最终完成率（历史月展示真实结果用） */
+  completionRate: number
   locked?: boolean
 }
 
@@ -390,8 +536,9 @@ interface StoreSummary {
   key: string
   platform: string
   name: string
-  orders: number
-  refunded: number
+  totalOrderCount: number
+  validOrderCount: number
+  refundedOrderCount: number
 }
 
 interface SourceSummary {
@@ -406,15 +553,19 @@ interface SourceSummary {
   storeLabel: string
   storeNames: string[]
   operator: string
+  operatorSource: 'account' | 'legacy' | null
+  accountId: string
   orderIds: string[]
-  orders: number
-  refunded: number
+  totalOrderCount: number
+  validOrderCount: number
+  refundedOrderCount: number
 }
 
 interface SourceSummaryAccumulator extends SourceSummary {
   teacherNames: Set<string>
   platformNames: Set<string>
   sourceStoreNames: Set<string>
+  sourceAccountIds: Set<string>
 }
 
 interface LadderOrder {
@@ -425,6 +576,7 @@ interface LadderOrder {
   storeName: string
   sourceName: string
   sourceKey: string
+  sourceAccountId: string
   sourceLabel: string
   teacherText: string
   productTitle: string
@@ -454,7 +606,7 @@ const DEFAULT_TEACHERS: TeacherConfig[] = [
 ]
 
 const loading = ref(false)
-const excludeRefunded = ref(false)
+const excludeRefunded = ref(true)
 const showUnmatched = ref(false)
 const showRules = ref(false)
 const showSourceDetail = ref(false)
@@ -462,29 +614,105 @@ const selectedTeacher = ref('all')
 const selectedPlatform = ref('all')
 const selectedSourceKey = ref('')
 const sourceSearch = ref('')
-const sourceOperatorDraft = ref('')
 const sourceOperators = ref<Record<string, string>>({})
+const sourceAccounts = ref<Account[]>([])
 const teachers = ref<TeacherConfig[]>([])
 const orders = ref<LadderOrder[]>([])
+const ladderConfigInitialized = ref(false)
+const ladderRuleUpdatedAt = ref<string | null>(null)
+const ladderRuleUpdatedBy = ref('')
 
-const currentMonthLabel = computed(() => dayjs().format('YYYY年MM月'))
-function getCurrentMonthRange() {
-  const now = dayjs()
-  return { start: now.startOf('month').unix(), end: now.endOf('day').unix() }
-}
+// ── 月份作为页面统一参数（YYYY-MM）──────────────────────────────
+const route = useRoute()
+const router = useRouter()
+const todayMonth = ref(currentMonth())
+// URL ?month=YYYY-MM 优先；非法/未来月份回落当前自然月
+const selectedMonth = ref(normalizeMonthParam(route.query.month) ?? todayMonth.value)
+const monthError = ref('')
+const monthSnapshot = ref<PerformanceLadderMonthSnapshotResponse | null>(null)
+const snapshotFallback = ref(false)
+// 防串月：快速连续切月时，只有最新一次请求允许写页面数据
+const orderLoadGuard = createLatestRequestGuard()
+
 const teacherStorageKey = computed(() => `performance-ladder-teachers:${dayjs().format('YYYY-MM')}`)
 const sourceOperatorStorageKey = 'performance-ladder-source-operators'
-const visibleOrders = computed(() =>
-  orders.value.filter(
-    (order) => order.isTransaction && (!excludeRefunded.value || !order.isRefunded),
-  ),
+
+// 账号接入数据索引：用于把出单来源统一关联到账号的「主负责人」
+const sourceAccountIdIndex = computed(() => {
+  const map = new Map<string, Account[]>()
+  for (const account of sourceAccounts.value) {
+    const key = normalizeText(account.platformUserId || '')
+    if (!key) continue
+    const list = map.get(key) || []
+    list.push(account)
+    map.set(key, list)
+  }
+  return map
+})
+
+const sourceAccountNameIndex = computed(() => {
+  const map = new Map<string, Account[]>()
+  for (const account of sourceAccounts.value) {
+    const key = normalizeText(account.nickname || '')
+    if (!key) continue
+    const list = map.get(key) || []
+    list.push(account)
+    map.set(key, list)
+  }
+  return map
+})
+
+// ── 当前月 vs 历史月 ────────────────────────────────────────────
+const isHistoricalMonth = computed(() => !isCurrentMonth(selectedMonth.value))
+const monthLabelText = computed(() => monthLabel(selectedMonth.value))
+const todayMonthLabel = computed(() => monthLabel(todayMonth.value))
+
+/**
+ * 老师目标：当前月用实时配置；历史月用当月快照（“当月当时的目标”），
+ * 快照接口不可用（后端未部署）时兜底用当前配置并在页面提示。
+ */
+const effectiveTeachers = computed<TeacherConfig[]>(() => {
+  if (!isHistoricalMonth.value || !monthSnapshot.value) return teachers.value
+  return monthSnapshot.value.targets.map((item) => ({
+    id: item.id,
+    name: item.name,
+    target: Number(item.monthlyTarget || 0),
+    keywordsText: (item.aliases || []).join(','),
+  }))
+})
+
+/** 出单来源运营者映射：历史月使用快照值，避免后续修改影响历史归因 */
+const effectiveSourceOperators = computed(() => {
+  if (!isHistoricalMonth.value || !monthSnapshot.value) return sourceOperators.value
+  return monthSnapshot.value.sourceOperators || {}
+})
+
+const snapshotNote = computed(() => {
+  if (snapshotFallback.value && isHistoricalMonth.value) {
+    return '目标快照不可用 · 暂按当前配置显示'
+  }
+  if (!isHistoricalMonth.value || !monthSnapshot.value) return ''
+  const time = monthSnapshot.value.capturedAt
+    ? dayjs(monthSnapshot.value.capturedAt).format('YYYY-MM-DD HH:mm')
+    : ''
+  if (monthSnapshot.value.snapshotCreated) {
+    return `目标快照首次生成于 ${time}（此前未保存该月配置）`
+  }
+  return time ? `目标快照：${time}` : ''
+})
+
+const validOrders = computed(() =>
+  orders.value.filter((order) => order.isTransaction && !order.isRefunded),
 )
-const totalCurrentOrders = computed(() => visibleOrders.value.length)
+const refundedOrders = computed(() => orders.value.filter((order) => order.isRefunded))
+const totalOrderCount = computed(() => validOrders.value.length + refundedOrders.value.length)
+const visibleOrders = validOrders
+const totalCurrentOrders = computed(() => validOrders.value.length)
 const totalRefundedOrders = computed(
-  () => orders.value.filter((order) => order.isRefunded).length,
+  () => refundedOrders.value.length,
 )
 const totalTargetOrders = computed(() =>
-  teachers.value.reduce((sum, teacher) => sum + Number(teacher.target || 0), 0),
+  effectiveTeachers.value.reduce((sum, teacher) => sum + Number(teacher.target || 0), 0),
 )
 const totalRemainingOrders = computed(() =>
   Math.max(0, totalTargetOrders.value - totalCurrentOrders.value),
@@ -493,13 +721,30 @@ const totalProgress = computed(() => {
   if (totalTargetOrders.value <= 0) return 0
   return Math.min(100, Math.round((totalCurrentOrders.value / totalTargetOrders.value) * 100))
 })
-const daysRemaining = computed(() => Math.max(1, dayjs().endOf('month').diff(dayjs(), 'day') + 1))
-const dailyRequiredOrders = computed(() =>
-  Math.ceil(totalRemainingOrders.value / daysRemaining.value),
+/** 历史月最终完成率：不封顶，展示真实结果 */
+const finalCompletionRate = computed(() => {
+  if (totalTargetOrders.value <= 0) return 0
+  return Math.round((totalCurrentOrders.value / totalTargetOrders.value) * 100)
+})
+const isMonthGoalReached = computed(
+  () => totalTargetOrders.value > 0 && totalCurrentOrders.value >= totalTargetOrders.value,
 )
+/** 当前月：从今天到月底的剩余天数；历史月：null（已结束，不再计算剩余日均） */
+const daysRemaining = computed(() => daysRemainingForMonth(selectedMonth.value))
+const dailyRequiredOrders = computed(() => {
+  const days = daysRemaining.value
+  if (days === null || days <= 0) return 0
+  return Math.ceil(totalRemainingOrders.value / days)
+})
+const ladderRuleUpdatedText = computed(() => {
+  if (!ladderConfigInitialized.value) return '规则尚未初始化到服务器'
+  if (!ladderRuleUpdatedAt.value) return '规则尚未保存到服务器'
+  const time = dayjs(ladderRuleUpdatedAt.value).format('YYYY-MM-DD HH:mm')
+  return ladderRuleUpdatedBy.value ? `规则更新：${time} · ${ladderRuleUpdatedBy.value}` : `规则更新：${time}`
+})
 const activeChips = computed(() => {
   const chips = [
-    excludeRefunded.value ? '口径：已去退款' : '口径：含退款',
+    '口径：按有效订单',
     '微信：有效订单',
     '抖店：有效订单',
   ]
@@ -509,23 +754,27 @@ const activeChips = computed(() => {
   return chips
 })
 const teacherRows = computed<TeacherRow[]>(() => {
-  const rows = teachers.value.map<TeacherRow>((teacher) => {
-    const matched = visibleOrders.value.filter((order) => matchTeacher(order, teacher.name))
-    const refunded = orders.value.filter(
+  const rows = effectiveTeachers.value.map<TeacherRow>((teacher) => {
+    const validOrderCount = validOrders.value.filter((order) => matchTeacher(order, teacher.name)).length
+    const refundedOrderCount = orders.value.filter(
       (order) => order.isRefunded && matchTeacher(order, teacher.name),
     ).length
+    const totalOrderCount = validOrderCount + refundedOrderCount
     const target = Number(teacher.target || 0)
+    const completionRate = target > 0 ? Math.round((validOrderCount / target) * 100) : 0
     return {
       ...teacher,
-      orders: matched.length,
-      refunded,
-      remaining: Math.max(0, target - matched.length),
-      progress: target > 0 ? Math.min(100, Math.round((matched.length / target) * 100)) : 0,
+      totalOrderCount,
+      validOrderCount,
+      refundedOrderCount,
+      remaining: Math.max(0, target - validOrderCount),
+      progress: Math.min(100, completionRate),
+      completionRate,
     }
   })
 
   const matchedIds = new Set<string>()
-  for (const teacher of teachers.value) {
+  for (const teacher of effectiveTeachers.value) {
     for (const order of visibleOrders.value) {
       if (matchTeacher(order, teacher.name)) matchedIds.add(order.id)
     }
@@ -536,10 +785,12 @@ const teacherRows = computed<TeacherRow[]>(() => {
       id: 'teacher-unmatched',
       name: '未匹配老师',
       target: 0,
-      orders: unmatched.length,
-      refunded: 0,
+      totalOrderCount: unmatched.length,
+      validOrderCount: unmatched.length,
+      refundedOrderCount: 0,
       remaining: 0,
       progress: 0,
+      completionRate: 0,
       locked: true,
     })
   }
@@ -554,15 +805,17 @@ const storeSummaries = computed<StoreSummary[]>(() => {
       key,
       platform: order.platform,
       name: order.storeName,
-      orders: 0,
-      refunded: 0,
+      totalOrderCount: 0,
+      validOrderCount: 0,
+      refundedOrderCount: 0,
     }
-    if (order.isTransaction && (!excludeRefunded.value || !order.isRefunded)) existing.orders += 1
-    if (order.isRefunded) existing.refunded += 1
+    if (order.isTransaction && !order.isRefunded) existing.validOrderCount += 1
+    if (order.isRefunded) existing.refundedOrderCount += 1
+    existing.totalOrderCount = existing.validOrderCount + existing.refundedOrderCount
     map.set(key, existing)
   }
   return Array.from(map.values()).sort(
-    (a, b) => b.orders - a.orders || a.name.localeCompare(b.name),
+    (a, b) => b.validOrderCount - a.validOrderCount || a.name.localeCompare(b.name),
   )
 })
 const sourceRanking = computed<SourceSummary[]>(() => {
@@ -588,17 +841,23 @@ const sourceRanking = computed<SourceSummary[]>(() => {
       storeLabel: order.storeName,
       storeNames: [],
       sourceStoreNames: new Set<string>(),
-      operator: sourceOperators.value[key] || '',
+      operator: '',
+      operatorSource: null,
+      accountId: '',
       orderIds: [],
-      orders: 0,
-      refunded: 0,
+      sourceAccountIds: new Set<string>(),
+      totalOrderCount: 0,
+      validOrderCount: 0,
+      refundedOrderCount: 0,
     }
     existing.teacherNames.add(teacherName)
     existing.platformNames.add(order.platform)
     existing.sourceStoreNames.add(order.storeName)
-    if (order.isTransaction && (!excludeRefunded.value || !order.isRefunded)) existing.orders += 1
+    if (order.sourceAccountId) existing.sourceAccountIds.add(order.sourceAccountId)
+    if (order.isTransaction && !order.isRefunded) existing.validOrderCount += 1
     existing.orderIds.push(order.id)
-    if (order.isRefunded) existing.refunded += 1
+    if (order.isRefunded) existing.refundedOrderCount += 1
+    existing.totalOrderCount = existing.validOrderCount + existing.refundedOrderCount
     map.set(key, existing)
   }
   const keyword = normalizeText(sourceSearch.value)
@@ -607,8 +866,18 @@ const sourceRanking = computed<SourceSummary[]>(() => {
       const teacherNames = Array.from(source.teacherNames)
       const platforms = Array.from(source.platformNames)
       const storeNames = Array.from(source.sourceStoreNames)
+      const sourceAccountId = Array.from(source.sourceAccountIds).find(Boolean) || ''
+      const resolved = resolveSourceOperator({
+        sourceName: source.name,
+        sourceKey: source.accountKey,
+        sourceAccountId,
+        platform: source.platform,
+      })
       return {
         ...source,
+        operator: resolved.operator,
+        operatorSource: resolved.operatorSource,
+        accountId: resolved.accountId,
         teacherName: compactLabel(teacherNames, '老师'),
         platform: platforms[0] || source.platform,
         platformLabel: compactLabel(platforms, '平台'),
@@ -618,7 +887,7 @@ const sourceRanking = computed<SourceSummary[]>(() => {
         storeNames,
       }
     })
-    .filter((source) => source.orders > 0 || source.refunded > 0)
+    .filter((source) => source.totalOrderCount > 0)
     .filter((source) => {
       if (!keyword) return true
       return normalizeText(
@@ -631,7 +900,7 @@ const sourceRanking = computed<SourceSummary[]>(() => {
         ].join(' '),
       ).includes(keyword)
     })
-    .sort((a, b) => b.orders - a.orders || a.teacherName.localeCompare(b.teacherName))
+    .sort((a, b) => b.validOrderCount - a.validOrderCount || a.teacherName.localeCompare(b.teacherName))
 })
 const topSources = computed(() => sourceRanking.value.slice(0, 3))
 const listSources = computed(() => sourceRanking.value.slice(3))
@@ -646,14 +915,14 @@ const selectedSourceOrders = computed(() => {
 })
 
 function matchTeacher(order: LadderOrder, teacherName: string) {
-  const teacher = teachers.value.find((item) => item.name === teacherName)
+  const teacher = effectiveTeachers.value.find((item) => item.name === teacherName)
   if (!teacher) return false
   const haystack = normalizeText(order.teacherText)
   return teacherKeywords(teacher).some((keyword) => haystack.includes(keyword))
 }
 
 function teacherNameForOrder(order: LadderOrder) {
-  return teachers.value.find((teacher) => matchTeacher(order, teacher.name))?.name || '未匹配老师'
+  return effectiveTeachers.value.find((teacher) => matchTeacher(order, teacher.name))?.name || '未匹配老师'
 }
 
 function normalizeText(value: string) {
@@ -661,6 +930,56 @@ function normalizeText(value: string) {
     .toLowerCase()
     .replace(/\s+/g, '')
     .replace(/[·・_\-—｜|/\\()[\]（）【】,，.。:：;；]/g, '')
+}
+
+/**
+ * 统一解析出单来源的运营者：
+ * 1) 优先用订单/来源数据里的稳定账号 ID（微信 account_id / 抖店 author_id）精确关联「账号接入」；
+ * 2) 匹配不到时，才用规范化昵称精确匹配（且要求唯一账号）；
+ * 3) 历史手工 sourceOperators 仅作兜底，不再作为主要运营者数据源。
+ */
+function resolveSourceOperator(order: {
+  sourceName: string
+  sourceKey: string
+  sourceAccountId: string
+  platform: string
+}): { operator: string; operatorSource: 'account' | 'legacy' | null; accountId: string } {
+  const idKey = normalizeText(order.sourceAccountId)
+  if (idKey) {
+    const candidates = sourceAccountIdIndex.value.get(idKey) || []
+    const preferredPlatform = order.platform === '微信小店' ? 'WECHAT_VIDEO' : 'DOUYIN'
+    const account =
+      candidates.find((item) => String(item.platform).toUpperCase() === preferredPlatform) ||
+      candidates[0]
+    if (account) {
+      return {
+        operator: account.primaryOperator?.user?.name || '',
+        operatorSource: 'account',
+        accountId: account.id,
+      }
+    }
+  }
+
+  const nameKey = normalizeText(order.sourceName)
+  if (nameKey) {
+    const byName = sourceAccountNameIndex.value.get(nameKey) || []
+    const uniqueIds = new Set(byName.map((item) => item.id))
+    if (uniqueIds.size === 1 && byName[0]) {
+      return {
+        operator: byName[0].primaryOperator?.user?.name || '',
+        operatorSource: 'account',
+        accountId: byName[0].id,
+      }
+    }
+  }
+
+  const legacyKey = nameKey || normalizeText(order.sourceKey) || order.sourceKey
+  const legacyOperator = effectiveSourceOperators.value[legacyKey]
+  if (legacyOperator) {
+    return { operator: legacyOperator, operatorSource: 'legacy', accountId: '' }
+  }
+
+  return { operator: '', operatorSource: null, accountId: '' }
 }
 
 function sourceAccountKey(order: LadderOrder) {
@@ -679,92 +998,229 @@ function teacherKeywords(teacher: TeacherConfig) {
     .filter(Boolean)
 }
 
-function loadSourceOperators() {
+function readLegacySourceOperators() {
   try {
     const saved = window.localStorage.getItem(sourceOperatorStorageKey)
     const parsed = saved ? (JSON.parse(saved) as unknown) : null
-    sourceOperators.value =
-      parsed && typeof parsed === 'object' && !Array.isArray(parsed)
-        ? (parsed as Record<string, string>)
-        : {}
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, string>)
+      : {}
   } catch {
-    sourceOperators.value = {}
+    return {}
   }
-}
-
-function persistSourceOperators(next: Record<string, string>) {
-  sourceOperators.value = next
-  window.localStorage.setItem(sourceOperatorStorageKey, JSON.stringify(next))
 }
 
 function openSourceDetail(source: SourceSummary) {
   selectedSourceKey.value = source.key
-  sourceOperatorDraft.value = source.operator || ''
   showSourceDetail.value = true
 }
 
-function saveSourceOperator() {
-  const source = selectedSource.value
-  if (!source) return
-  const next = { ...sourceOperators.value }
-  const operator = sourceOperatorDraft.value.trim()
-  if (operator) next[source.accountKey] = operator
-  else delete next[source.accountKey]
-  persistSourceOperators(next)
-  ElMessage.success(operator ? '运营者已保存' : '已清空运营者')
+function parseTeacherAliases(text?: string) {
+  return String(text || '')
+    .split(/[,，\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
 }
 
-function loadTeachers() {
+function teacherFromDto(teacher: PerformanceLadderTeacherDto): TeacherConfig {
+  return {
+    id: teacher.id,
+    name: teacher.name,
+    target: Number(teacher.monthlyTarget || 0),
+    keywordsText: (teacher.aliases || []).join(','),
+  }
+}
+
+function readLegacyTeachers() {
   try {
     const saved = window.localStorage.getItem(teacherStorageKey.value)
     const parsed = saved ? (JSON.parse(saved) as unknown) : null
     const savedTeachers = Array.isArray(parsed) ? (parsed as TeacherConfig[]) : []
-    teachers.value =
-      savedTeachers.length > 0
-        ? savedTeachers.map((teacher) => ({
-            ...teacher,
-            target: Number(teacher.target || 0),
-            keywordsText:
-              teacher.keywordsText ||
-              DEFAULT_TEACHERS.find(
-                (defaultTeacher) =>
-                  defaultTeacher.id === teacher.id || defaultTeacher.name === teacher.name,
-              )?.keywordsText ||
-              '',
-          }))
-        : DEFAULT_TEACHERS.map((teacher) => ({ ...teacher }))
+    return savedTeachers
+      .filter((teacher) => teacher.name?.trim())
+      .map((teacher) => ({
+        ...teacher,
+        target: Number(teacher.target || 0),
+        keywordsText:
+          teacher.keywordsText ||
+          DEFAULT_TEACHERS.find(
+            (defaultTeacher) =>
+              defaultTeacher.id === teacher.id || defaultTeacher.name === teacher.name,
+          )?.keywordsText ||
+          '',
+      }))
   } catch {
-    teachers.value = DEFAULT_TEACHERS.map((teacher) => ({ ...teacher }))
+    return []
   }
 }
 
-function saveTeachers() {
-  window.localStorage.setItem(
-    teacherStorageKey.value,
-    JSON.stringify(
-      teachers.value
-        .filter((teacher) => teacher.name.trim())
-        .map((teacher) => ({ ...teacher, target: Number(teacher.target || 0) })),
-    ),
-  )
+function applyLadderConfig(data: PerformanceLadderConfigResponse) {
+  ladderConfigInitialized.value = data.initialized
+  excludeRefunded.value = true
+  // 历史月视图的“显示未匹配”由该月快照决定，保存实时配置时不要重置它
+  if (!isHistoricalMonth.value) showUnmatched.value = !data.config.hideUnmatched
+  sourceOperators.value = data.config.sourceOperators || {}
+  ladderRuleUpdatedAt.value = data.config.updatedAt || null
+  ladderRuleUpdatedBy.value = data.config.updatedBy?.name || ''
+  teachers.value = data.teachers.length
+    ? data.teachers.filter((teacher) => teacher.enabled).map(teacherFromDto)
+    : DEFAULT_TEACHERS.map((teacher) => ({ ...teacher }))
 }
 
-function addTeacher() {
-  teachers.value.push({ id: `teacher-${Date.now()}`, name: '', target: 1600, keywordsText: '' })
-  saveTeachers()
+async function saveLadderConfig(payload: {
+  monthlyTarget?: number
+  refundMode?: string
+  sourceIgnoreMode?: string
+  hideUnmatched?: boolean
+  sourceOperators?: Record<string, string>
+  sourceIgnoreList?: string[]
+}) {
+  const res = await performanceLadderApi.updateConfig(payload)
+  if (res.data) applyLadderConfig(res.data)
 }
 
-function removeTeacher(id: string) {
+async function initializeServerConfigFromLegacyOrDefaults() {
+  const legacyTeachers = readLegacyTeachers()
+  const initialTeachers = legacyTeachers.length ? legacyTeachers : DEFAULT_TEACHERS
+  const legacyOperators = readLegacySourceOperators()
+  const res = await performanceLadderApi.initializeConfig({
+    monthlyTarget: initialTeachers.reduce((sum, teacher) => sum + Number(teacher.target || 0), 0),
+    refundMode: 'exclude',
+    hideUnmatched: !showUnmatched.value,
+    sourceOperators: legacyOperators,
+    teachers: initialTeachers.map((teacher, index) => ({
+      name: teacher.name,
+      aliases: parseTeacherAliases(teacher.keywordsText),
+      monthlyTarget: Number(teacher.target || 0),
+      enabled: true,
+      sortOrder: index,
+    })),
+  })
+  window.localStorage.setItem(`performance-ladder-migrated:${dayjs().format('YYYY-MM')}`, '1')
+  if (res.data) applyLadderConfig(res.data)
+}
+
+async function loadLadderConfig() {
+  try {
+    const res = await performanceLadderApi.getConfig()
+    if (!res.data) return false
+    if (!res.data.initialized) {
+      await initializeServerConfigFromLegacyOrDefaults()
+      return true
+    }
+    applyLadderConfig(res.data)
+    return true
+  } catch (error: any) {
+    teachers.value = []
+    sourceOperators.value = {}
+    ElMessage.error(error?.message || '\u4e1a\u7ee9\u89c4\u5219\u52a0\u8f7d\u5931\u8d25\uff0c\u8bf7\u5237\u65b0\u9875\u9762\u6216\u8054\u7cfb\u7ba1\u7406\u5458')
+    return false
+  }
+}
+
+async function saveTeachers() {
+  const rows = teachers.value.filter((teacher) => teacher.name.trim())
+  try {
+    for (let index = 0; index < rows.length; index++) {
+      const teacher = rows[index]
+      const payload = {
+        name: teacher.name.trim(),
+        aliases: parseTeacherAliases(teacher.keywordsText),
+        monthlyTarget: Number(teacher.target || 0),
+        enabled: true,
+        sortOrder: index,
+      }
+      const replaceLocal = (dto: PerformanceLadderTeacherDto | undefined) => {
+        if (!dto) return
+        const idx = teachers.value.findIndex((item) => item.id === teacher.id)
+        if (idx >= 0) teachers.value[idx] = teacherFromDto(dto)
+      }
+      // 本地默认/历史 id 不是服务器 id：直接新建，避免向服务器提交失效引用
+      if (!String(teacher.id || '').startsWith('pltea_')) {
+        const created = await performanceLadderApi.createTeacher(payload)
+        replaceLocal(created.data?.teacher)
+        continue
+      }
+      try {
+        const updated = await performanceLadderApi.updateTeacher(teacher.id, payload)
+        replaceLocal(updated.data?.teacher)
+      } catch (error: any) {
+        if (isTeacherMissingError(error)) {
+          // 老师在服务器上已被删除（失效引用）：按当前配置重建，并换用新服务器 id
+          const created = await performanceLadderApi.createTeacher(payload)
+          replaceLocal(created.data?.teacher)
+        } else {
+          throw error
+        }
+      }
+    }
+    const fresh = await performanceLadderApi.getConfig()
+    if (fresh.data) applyLadderConfig(fresh.data)
+    ElMessage.success('老师配置已保存')
+  } catch (error: any) {
+    ElMessage.error('老师配置保存失败，请稍后重试')
+  }
+}
+
+let addingTeacher = false
+
+async function addTeacher() {
+  if (addingTeacher) return
+  addingTeacher = true
+  try {
+    const res = await performanceLadderApi.createTeacher({
+      name: '新老师',
+      aliases: [],
+      monthlyTarget: 1600,
+      enabled: true,
+      sortOrder: teachers.value.length,
+    })
+    if (res.data?.teacher) teachers.value.push(teacherFromDto(res.data.teacher))
+  } catch (error: any) {
+    ElMessage.error(error?.message || '老师添加失败，请稍后重试')
+  } finally {
+    addingTeacher = false
+  }
+}
+
+function isTeacherMissingError(error: any) {
+  return error?.response?.status === 404
+}
+
+async function removeTeacher(id: string) {
+  const index = teachers.value.findIndex((teacher) => teacher.id === id)
+  if (index < 0) return
+  const removed = teachers.value[index]
+  // 先本地移除，防止重复点击/多标签页对同一个 id 重复提交删除请求
   teachers.value = teachers.value.filter((teacher) => teacher.id !== id)
-  saveTeachers()
+  try {
+    await performanceLadderApi.deleteTeacher(id)
+  } catch (error: any) {
+    if (isTeacherMissingError(error)) {
+      // 服务器上已不存在（已被删除的失效引用）：本地同步移除即可，不再报错
+      return
+    }
+    teachers.value.splice(index, 0, removed)
+    ElMessage.error('老师删除失败，请稍后重试')
+  }
 }
 
-function toggleRefunds() {
-  excludeRefunded.value = !excludeRefunded.value
+async function toggleUnmatched() {
+  showUnmatched.value = !showUnmatched.value
+  // 历史月只切换本地显示，不写服务器配置（避免污染当前月规则）
+  if (isHistoricalMonth.value) return
+  try {
+    await saveLadderConfig({ hideUnmatched: !showUnmatched.value })
+  } catch {
+    showUnmatched.value = !showUnmatched.value
+  }
 }
 
 function teacherStatusText(teacher: TeacherRow) {
   if (teacher.locked) return '待整理归因'
+  if (isHistoricalMonth.value) {
+    return teacher.completionRate >= 100 ? '当月已达标' : '当月未达标'
+  }
   if (teacher.progress >= 100) return '目标已完成'
   if (teacher.progress >= 70) return '冲刺状态良好'
   if (teacher.progress >= 35) return '稳步推进中'
@@ -772,6 +1228,9 @@ function teacherStatusText(teacher: TeacherRow) {
 }
 
 function teacherTagType(teacher: TeacherRow) {
+  if (isHistoricalMonth.value) {
+    return teacher.completionRate >= 100 ? 'success' : 'danger'
+  }
   if (teacher.progress >= 100) return 'success'
   if (teacher.progress >= 70) return 'primary'
   if (teacher.progress >= 35) return 'warning'
@@ -829,6 +1288,10 @@ function wechatSourceName(order: WechatOrder, storeName: string) {
 function wechatSourceKey(order: WechatOrder, storeName: string) {
   const source = primaryWechatSource(order)
   return source?.account_id || source?.account_nickname || `store:${storeName}`
+}
+
+function wechatSourceAccountId(order: WechatOrder) {
+  return primaryWechatSource(order)?.account_id || ''
 }
 
 function wechatSourceLabel(order: WechatOrder, storeName: string) {
@@ -910,9 +1373,10 @@ function hideImg(event: Event) {
 async function loadWechatStoreOrders(store: WechatStore, start: number, end: number) {
   const [orderRes, aftersaleRes] = await Promise.all([
     wechatStoreApi.getOrders(store.id, { page_size: 5000, start_time: start, end_time: end }),
+    // 售后只设 begin（该月首至今）：跨月退款（8月订单9月才退）也必须识别，
+    // 否则历史月有效订单会高估。多余售后记录无害（只按本月订单 id 匹配）
     wechatStoreApi.getAftersaleCount?.(store.id, {
       begin_create_time: start,
-      end_create_time: end,
     }) || Promise.resolve(null),
   ])
   const storeOrders =
@@ -935,6 +1399,7 @@ async function loadWechatStoreOrders(store: WechatStore, start: number, end: num
     storeName: store.name,
     sourceName: wechatSourceName(order, store.name),
     sourceKey: wechatSourceKey(order, store.name),
+    sourceAccountId: wechatSourceAccountId(order),
     sourceLabel: wechatSourceLabel(order, store.name),
     teacherText: wechatTeacherText(order, store.name),
     productTitle: order.product_title,
@@ -952,9 +1417,9 @@ async function loadWechatStoreOrders(store: WechatStore, start: number, end: num
 async function loadDoudianStoreOrders(store: DoudianStore, start: number, end: number) {
   const [orderRes, aftersaleRes] = await Promise.all([
     doudianStoreApi.getOrders(store.id, { start_time: start, end_time: end }),
+    // 同微信：只设 begin，覆盖跨月退款；多余售后记录无害
     doudianStoreApi.getAftersales(store.id, {
       begin_create_time: start,
-      end_create_time: end,
     }),
   ])
   const storeOrders = (orderRes.data?.order_list || []) as DoudianOrderMetric[]
@@ -978,6 +1443,7 @@ async function loadDoudianStoreOrders(store: DoudianStore, start: number, end: n
     storeName: store.name,
     sourceName: doudianSourceName(order, store.name),
     sourceKey: doudianSourceKey(order, store.name),
+    sourceAccountId: order.author_id || '',
     sourceLabel: doudianSourceLabel(order, store.name),
     teacherText: doudianTeacherText(order, store.name),
     productTitle: order.product_title || '未知商品',
@@ -992,36 +1458,145 @@ async function loadDoudianStoreOrders(store: DoudianStore, start: number, end: n
   }))
 }
 
-async function loadData() {
-  loading.value = true
+async function loadSourceAccounts() {
   try {
-    const { start, end } = getCurrentMonthRange()
+    const all: Account[] = []
+    const pageSize = 100
+    const first = await accountsApi.getList({
+      platform: '',
+      group: '',
+      keyword: '',
+      page: 1,
+      pageSize,
+    })
+    const firstList = first.data as any
+    const firstAccounts = Array.isArray(firstList?.accounts)
+      ? firstList.accounts
+      : Array.isArray(firstList?.items)
+        ? firstList.items
+        : []
+    const total = Number(firstList?.total) || firstAccounts.length
+    all.push(...firstAccounts)
+    let page = 2
+    while (all.length < total && page <= 50) {
+      const res = await accountsApi.getList({
+        platform: '',
+        group: '',
+        keyword: '',
+        page,
+        pageSize,
+      })
+      const pageData = res.data as any
+      const list = Array.isArray(pageData?.accounts)
+        ? pageData.accounts
+        : Array.isArray(pageData?.items)
+          ? pageData.items
+          : []
+      if (!list.length) break
+      all.push(...list)
+      page += 1
+    }
+    sourceAccounts.value = all
+  } catch {
+    sourceAccounts.value = []
+  }
+}
+
+/** 拉取历史月的目标/规则快照（不直接写状态，由调用方在守卫校验后应用） */
+async function fetchMonthSnapshot(month: string) {
+  try {
+    const res = await performanceLadderApi.getMonthSnapshot(month)
+    if (!res.data) throw new Error('snapshot empty')
+    return { data: res.data, fallback: false }
+  } catch {
+    // 后端尚未部署快照接口（404 等）时兜底：沿用当前配置，页面有明确提示
+    return { data: null, fallback: true }
+  }
+}
+
+async function loadMonthData() {
+  const month = selectedMonth.value
+  const seq = orderLoadGuard.begin()
+  loading.value = true
+  monthError.value = ''
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
+  try {
+    // 历史月：读取该月当时生效的目标/规则；当前月：直接用实时配置
+    if (!isCurrentMonth(month)) {
+      const { data: snapshot, fallback } = await fetchMonthSnapshot(month)
+      if (!orderLoadGuard.isLatest(seq)) return
+      monthSnapshot.value = snapshot
+      snapshotFallback.value = fallback
+      if (snapshot && !snapshot.isCurrentMonth) {
+        showUnmatched.value = !snapshot.hideUnmatched
+      }
+      if (fallback) {
+        ElMessage.warning(`${monthLabel(month)}目标快照不可用，暂时按当前目标计算`)
+      }
+    } else {
+      monthSnapshot.value = null
+      snapshotFallback.value = false
+    }
+
+    const { start, end } = monthRange(month)
     const [wechatStoresRes, doudianStoresRes] = await Promise.all([
       wechatStoreApi.getStores(),
       doudianStoreApi.getStores(),
+      loadSourceAccounts(),
     ])
+    if (!orderLoadGuard.isLatest(seq)) return
     const wechatStores = Array.isArray(wechatStoresRes.data) ? wechatStoresRes.data : []
     const doudianStores = Array.isArray(doudianStoresRes.data) ? doudianStoresRes.data : []
     const results = await Promise.allSettled([
       ...wechatStores.map((store) => loadWechatStoreOrders(store, start, end)),
       ...doudianStores.map((store) => loadDoudianStoreOrders(store, start, end)),
     ])
+    // 防串月：期间用户又切换了月份，丢弃本次过期结果
+    if (!orderLoadGuard.isLatest(seq)) return
     orders.value = results.flatMap((result) => (result.status === 'fulfilled' ? result.value : []))
     const failed = results.filter((result) => result.status === 'rejected').length
     if (failed > 0) ElMessage.warning(`${failed} 家店铺订单读取失败，其余店铺已汇总`)
   } catch (error: any) {
-    orders.value = []
-    ElMessage.error(error?.message || '业绩天梯数据加载失败')
+    if (!orderLoadGuard.isLatest(seq)) return
+    // 加载失败：保留旧数据、给出明确错误提示，绝不显示 0
+    monthError.value = `${monthLabel(month)}数据加载失败`
+    ElMessage.error(error?.message || monthError.value)
   } finally {
-    loading.value = false
+    // loadingStore 是引用计数，每次 start 必须配对一次 stop；
+    // 被守卫丢弃的旧请求也要归还计数，否则快速切月会泄漏计数导致全局刷新动画卡住
+    loadingStore.stop()
+    if (orderLoadGuard.isLatest(seq)) loading.value = false
   }
 }
 
-watch(teacherStorageKey, loadTeachers, { immediate: true })
+/** 把当前月份同步到 URL：?month=YYYY-MM，当前自然月时不带参数 */
+function syncMonthToUrl() {
+  const query: LocationQueryRaw = { ...route.query }
+  if (selectedMonth.value === todayMonth.value) delete query.month
+  else query.month = selectedMonth.value
+  const before = typeof route.query.month === 'string' ? route.query.month : undefined
+  const after = typeof query.month === 'string' ? query.month : undefined
+  if (before !== after) void router.replace({ query })
+}
 
-onMounted(() => {
-  loadSourceOperators()
-  void loadData()
+function handleMonthChange(next: string) {
+  if (next === selectedMonth.value) return
+  // 双保险：任何入口都不能切到未来月份
+  selectedMonth.value = next > todayMonth.value ? todayMonth.value : next
+}
+
+watch(selectedMonth, () => {
+  syncMonthToUrl()
+  void loadMonthData()
+})
+
+onMounted(async () => {
+  const configReady = await loadLadderConfig()
+  if (configReady) {
+    syncMonthToUrl()
+    void loadMonthData()
+  }
 })
 </script>
 
@@ -1066,11 +1641,49 @@ onMounted(() => {
   }
 
   &__eyebrow {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: $space-2;
+    min-width: 0;
+
+    // 小屏：月份切换器 + 快照提示自动换行，不挤压标题与操作按钮
+    @media (max-width: 640px) {
+      gap: $space-1;
+    }
+  }
+
+  &__eyebrow-divider {
+    color: $accent-300;
+    font-weight: 700;
+  }
+
+  &__eyebrow-text {
     color: $accent-300;
     font-size: $text-xs;
     font-weight: 700;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+
+  &__snapshot-note {
+    max-width: 100%;
+    overflow: hidden;
+    color: $text-tertiary;
+    font-size: $text-micro;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &__month-error {
+    position: relative;
+    z-index: 1;
+    margin-top: $space-4;
+  }
+
+  &__goal-tag {
+    align-self: center;
+    margin-left: $space-2;
   }
 
   &__title {
@@ -1087,6 +1700,12 @@ onMounted(() => {
     color: $text-secondary;
     font-size: $text-sm;
     line-height: 1.7;
+  }
+
+  &__rule-updated {
+    color: $text-secondary;
+    font-size: $text-xs;
+    white-space: nowrap;
   }
 
   &__actions {
@@ -1309,6 +1928,16 @@ onMounted(() => {
     color: $text-tertiary;
     font-size: $text-xs;
   }
+
+  &__reached {
+    color: $color-success !important;
+    font-weight: 700;
+  }
+
+  &__missed {
+    color: $color-danger !important;
+    font-weight: 700;
+  }
 }
 
 .section-card {
@@ -1342,7 +1971,10 @@ onMounted(() => {
   }
 }
 
+// 响应式基准是主内容区域的实际可用宽度（container query），
+// 而不是 viewport：左侧导航会占用空间，viewport 断点会失准。
 .source-board {
+  container-type: inline-size;
   padding: $space-5;
   min-height: 240px;
 }
@@ -1353,13 +1985,23 @@ onMounted(() => {
   gap: $space-4;
   margin-bottom: $space-4;
 
-  @media (max-width: 980px) {
+  // 中：Top3 两列
+  @container (max-width: 940px) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  // 窄：Top3 单列
+  @container (max-width: 560px) {
     grid-template-columns: 1fr;
   }
 }
 
 .podium-card {
   position: relative;
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
   min-height: 170px;
   padding: $space-5;
   border: 1px solid rgba($accent-400, 0.38);
@@ -1419,9 +2061,13 @@ onMounted(() => {
   }
 
   p {
+    max-width: 100%;
     margin: 0;
+    overflow: hidden;
     color: $text-tertiary;
     font-size: $text-xs;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   &__operator {
@@ -1429,18 +2075,19 @@ onMounted(() => {
     color: $accent-200 !important;
   }
 
+  // 数字块不再绝对定位：改为 flex 流内布局，宽屏靠右对齐、
+  // 窄卡片自动堆到信息下方，绝不与运营者/总订单/退款文字重叠。
   &__orders {
-    position: absolute;
-    right: $space-5;
-    bottom: $space-5;
     display: grid;
     justify-items: end;
     gap: 2px;
+    margin-top: auto;
+    padding-top: $space-3;
     font-family: $font-mono;
 
     strong {
       color: $text-primary;
-      font-size: 38px;
+      font-size: clamp(26px, 5.5cqw, 38px);
       line-height: 1;
     }
 
@@ -1449,10 +2096,18 @@ onMounted(() => {
       color: $text-tertiary;
       font-size: $text-micro;
       font-style: normal;
+      white-space: nowrap;
     }
 
     em {
       color: $color-danger;
+    }
+  }
+
+  // 卡片内部响应式：空间不足时数字与标签改为上下结构、左对齐
+  @container (max-width: 330px) {
+    &__orders {
+      justify-items: start;
     }
   }
 }
@@ -1462,7 +2117,8 @@ onMounted(() => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: $space-3;
 
-  @media (max-width: 900px) {
+  // 窄：普通排行单列
+  @container (max-width: 940px) {
     grid-template-columns: 1fr;
   }
 }
@@ -1472,6 +2128,7 @@ onMounted(() => {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: $space-3;
+  min-width: 0;
   padding: $space-4;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: $radius-md;
@@ -1523,6 +2180,13 @@ onMounted(() => {
     margin-top: 4px;
     color: $text-tertiary;
     font-size: $text-micro;
+
+    span {
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
   }
 
   &__stats {
@@ -1534,7 +2198,7 @@ onMounted(() => {
 
     strong {
       color: $text-primary;
-      font-size: 22px;
+      font-size: clamp(18px, 3cqw, 22px);
       line-height: 1;
     }
 
@@ -1601,6 +2265,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: $space-4;
+
+  &__month-hint {
+    margin: 0;
+  }
 
   &__hint {
     margin: 0;
@@ -1694,6 +2362,22 @@ onMounted(() => {
       display: grid;
       grid-template-columns: minmax(0, 1fr) auto;
       gap: $space-2;
+      align-items: center;
+    }
+
+    .source-detail__operator-value {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: $space-2;
+    }
+
+    .source-detail__operator-hint {
+      flex-basis: 100%;
+      margin: 0;
+      color: $text-tertiary;
+      font-size: $text-xs;
+      line-height: 1.6;
     }
   }
 
@@ -1846,5 +2530,17 @@ onMounted(() => {
   color: $text-tertiary;
   text-align: center;
   grid-column: 1 / -1;
+}
+
+.operator-origin {
+  margin-left: $space-1;
+  padding: 0 5px;
+  border: 1px solid rgba($accent-400, 0.45);
+  border-radius: 4px;
+  color: $accent-200;
+  font-size: 11px;
+  font-style: normal;
+  line-height: 1.6;
+  vertical-align: 1px;
 }
 </style>

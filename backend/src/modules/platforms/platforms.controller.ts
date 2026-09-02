@@ -29,6 +29,7 @@ import {
   PlatformFilterDto,
   ReportMetricsDto,
   ReportPostStatsDto,
+  ReportCollectStatusDto,
   ReportSessionStatusDto,
 } from './dto/platform.dto'
 
@@ -143,6 +144,20 @@ export class PlatformsController {
   @HttpCode(HttpStatus.OK)
   async reportSessionStatus(@Body() dto: ReportSessionStatusDto) {
     return this.platformsService.reportSessionStatus(dto)
+  }
+
+  @Post('report-collect-status')
+  @ApiOperation({ summary: '桌面伴侣上报账号采集状态' })
+  @HttpCode(HttpStatus.OK)
+  async reportCollectStatus(@Body() dto: ReportCollectStatusDto) {
+    return this.platformsService.reportCollectStatus(dto)
+  }
+
+  @Post('report-logs')
+  @ApiOperation({ summary: '桌面伴侣上报运行日志（按设备保存最新日志，供远程排查）' })
+  @HttpCode(HttpStatus.OK)
+  async reportLogs(@Body() body: any, @CurrentUser('id') userId: string) {
+    return this.platformsService.reportCompanionLogs(userId, body)
   }
 
   // ==================== Token管理 ====================

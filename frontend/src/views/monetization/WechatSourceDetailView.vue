@@ -21,9 +21,9 @@
 
     <div class="source-page__kpi">
       <div class="kpi-card">
-        <div class="kpi-card__label">{{ rangeLabel }}出单</div>
-        <div class="kpi-card__value">{{ sourceOrders.length }}</div>
-        <div class="kpi-card__sub">已发货订单</div>
+        <div class="kpi-card__label">{{ rangeLabel }}有效订单</div>
+        <div class="kpi-card__value">{{ sourceValidOrderCount }}</div>
+        <div class="kpi-card__sub">总订单 {{ sourceTotalOrderCount }} · 退款 {{ sourceRefundedOrderCount }}</div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeLabel }}销售额</div>
@@ -33,7 +33,7 @@
       <div class="kpi-card">
         <div class="kpi-card__label">退款</div>
         <div class="kpi-card__value kpi-card__value--danger">¥{{ centToYuan(sourceRefundAmount) }}</div>
-        <div class="kpi-card__sub">{{ sourceRefundCount }} 笔成功退款</div>
+        <div class="kpi-card__sub">退款 {{ sourceRefundedOrderCount }} 单</div>
       </div>
     </div>
 
@@ -93,6 +93,7 @@ import {
   type WechatOrderSourceInfo,
 } from '@/api/wechat-store'
 import { buildDailySales, normalizeAftersales } from '@/utils/wechatStoreMetrics'
+import { useLoadingStore } from '@/store/loading'
 
 const route = useRoute()
 const router = useRouter()
@@ -146,7 +147,14 @@ const sourceGmv = computed(() => {
 const sourceRefundAmount = computed(() => {
   return sourceRefunds.value.reduce((sum, item) => sum + Number(item.amount || 0), 0)
 })
-const sourceRefundCount = computed(() => sourceRefunds.value.length)
+// 统一口径：总订单 = 有效 + 退款，主数字为去退款单数
+const sourceTotalOrderCount = computed(() => sourceOrders.value.length)
+const sourceRefundedOrderCount = computed(
+  () => new Set(sourceRefunds.value.map((item) => String(item.order_id))).size,
+)
+const sourceValidOrderCount = computed(
+  () => sourceTotalOrderCount.value - sourceRefundedOrderCount.value,
+)
 
 const trendEntries = computed(() => {
   const entries = buildDailySales(sourceOrders.value, sourceRefunds.value)
@@ -272,6 +280,8 @@ async function loadData() {
   }
 
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   try {
     const { start, end } = detailRange.value
     const [ordRes, afterRes] = await Promise.all([
@@ -294,6 +304,7 @@ async function loadData() {
     ElMessage.error(error?.message || '来源详情加载失败')
   } finally {
     loading.value = false
+    loadingStore.stop()
   }
 }
 

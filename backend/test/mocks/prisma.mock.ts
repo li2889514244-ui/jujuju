@@ -61,6 +61,15 @@ export const mockPrismaService: any = {
     findFirst: jest.fn(),
   },
 
+  accountOperator: {
+    findMany: jest.fn().mockResolvedValue([]),
+    findUnique: jest.fn(),
+    upsert: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    count: jest.fn(),
+  },
+
   // 内容相关
   post: {
     findUnique: jest.fn(),
@@ -101,7 +110,71 @@ export const mockPrismaService: any = {
     findMany: jest.fn(),
   },
 
+  // 伴侣监控中心
+  companionDevice: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    upsert: jest.fn(),
+    update: jest.fn(),
+  },
+
+  companionHeartbeat: {
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+
+  companionAlert: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+
+  // 伴侣监控中心 Phase 2: 事件与故障聚合
+  companionEvent: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+
+  companionIncident: {
+    findUnique: jest.fn(),
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    deleteMany: jest.fn(),
+    count: jest.fn(),
+  },
+
+  // 统一系统健康中心
+  systemEvent: {
+    findMany: jest.fn(),
+    create: jest.fn(),
+    count: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+
+  systemIncident: {
+    findFirst: jest.fn(),
+    findMany: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    updateMany: jest.fn(),
+    count: jest.fn(),
+    deleteMany: jest.fn(),
+  },
+
   // Prisma 事务和连接
+  $queryRaw: jest.fn(),
+  $executeRaw: jest.fn(),
   $connect: jest.fn(),
   $disconnect: jest.fn(),
   $transaction: jest.fn((operation: Function | any[]) =>

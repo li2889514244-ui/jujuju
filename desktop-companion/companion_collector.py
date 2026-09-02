@@ -15,6 +15,7 @@ from companion_metrics import (
 
 _DEFAULT_QUICK_MAX_POSTS = state._DEFAULT_QUICK_MAX_POSTS
 _POST_STATS_BATCH_SIZE = 80
+_STALE_STARTUP_COLLECT_SECONDS = 15 * 60
 
 
 def _is_local_or_missing_uid(value) -> bool:
@@ -29,6 +30,14 @@ def _is_unsafe_nickname_fallback(platform, value) -> bool:
     if text in {
         '视频号', '视频号助手', '微信', '抖音', '快手', '小红书',
         '创作者中心', '创作者服务平台', '内容管理', '数据中心', '首页',
+        # 页面 UI 模块/导航标题
+        '最近视频', '最近作品', '视频数据', '数据概览', '内容数据', '作品数据',
+        '今日数据', '数据趋势', '热门视频', '视频列表', '作品列表', '全部视频',
+        '全部作品', '视频明细', '粉丝数据', '观众数据', '直播数据', '商品数据',
+        '订单数据', '账号概览', '内容洞察', '互动管理', '图文数据', '视频动态',
+        '视频号动态', '作品发布', '发布作品', '发布高清视频', '发布全景视频',
+        '发布图文', '发布文章', '智能创作', 'AI分身', 'AI工坊', '创作服务',
+        '创作中心', '收入变现', '活动中心', '通知', '查看全部', '更多',
     }:
         return True
     return platform == 'WECHAT_VIDEO' and text.startswith('sph') and len(text) >= 12
@@ -131,6 +140,22 @@ def report_post_stats_in_batches(
             result['failed'] += len(batch)
             result['errors'].append(f'{start + 1}-{end} {type(e).__name__}: {str(e)[:180]}')
 
+    # Phase 2: 同步打点——只有真正发起了上传才记录成功/失败，
+    # 没有内容可传（sent=0 且 failed=0）不记录（保持 lastSync 为 null 语义）。
+    if result['sent'] > 0 or result['failed'] > 0:
+        try:
+            from companion_heartbeat import record_sync
+            record_sync(
+                success=(result['failed'] == 0),
+                upload_count=result['sent'],
+                error_code='' if result['failed'] == 0 else (str(result['errors'][0])[:80] if result['errors'] else 'UPLOAD_FAIL'),
+                kind='post_stats',
+                store_id='',
+                store_name='',
+            )
+        except Exception:
+            pass
+
     return result
 
 
@@ -179,6 +204,43 @@ def _schedule_next_collection(delay_seconds: int | None = None) -> int:
     state._collector_schedule_interval = interval
     state._collector_next_run_at = time.time() + interval
     return interval
+
+
+def _has_stale_collectable_accounts(threshold_seconds: int = _STALE_STARTUP_COLLECT_SECONDS) -> bool:
+    try:
+        from datetime import datetime, timezone
+        from local_db import get_all_accounts
+
+        now = time.time()
+        accounts = get_all_accounts(include_expired=True)
+        for account in accounts:
+            status = str(account.get('status') or '').strip().lower()
+            if status and status not in {'active', 'online'}:
+                continue
+            collected_at = str(account.get('last_collected_at') or '').strip()
+            if not collected_at:
+                return True
+            try:
+                parsed = datetime.strptime(collected_at, '%Y-%m-%d %H:%M:%S').replace(tzinfo=timezone.utc)
+                if now - parsed.timestamp() > threshold_seconds:
+                    return True
+            except Exception:
+                return True
+    except Exception as exc:
+        print(f'[DC] Startup stale check failed: {str(exc)[:120]}')
+    return False
+
+
+def _run_startup_collection_if_stale(delay_seconds: int = 20):
+    time.sleep(max(0, int(delay_seconds)))
+    if state._collector_running:
+        print('[DC] Startup stale collection skipped: collection already running')
+        return
+    if not _has_stale_collectable_accounts():
+        print('[DC] Startup stale collection skipped: recent successful collection exists')
+        return
+    print('[DC] Startup stale collection triggered')
+    _run_collection_once(0, 'full', 'startup_stale')
 
 
 def _run_collection_once(
@@ -242,6 +304,48 @@ def _run_collection_once(
             '\u5173\u6ce8\u8005',
             '\u6628\u65e5\u6570\u636e',
             '\u7533\u8bf7\u8ba4\u8bc1',
+            # 页面 UI 模块/导航标题，绝不能被当作昵称
+            '\u6700\u8fd1\u89c6\u9891',
+            '\u6700\u8fd1\u4f5c\u54c1',
+            '\u89c6\u9891\u6570\u636e',
+            '\u6570\u636e\u6982\u89c8',
+            '\u5185\u5bb9\u6570\u636e',
+            '\u4f5c\u54c1\u6570\u636e',
+            '\u4eca\u65e5\u6570\u636e',
+            '\u6570\u636e\u8d8b\u52bf',
+            '\u70ed\u95e8\u89c6\u9891',
+            '\u89c6\u9891\u5217\u8868',
+            '\u4f5c\u54c1\u5217\u8868',
+            '\u5168\u90e8\u89c6\u9891',
+            '\u5168\u90e8\u4f5c\u54c1',
+            '\u89c6\u9891\u660e\u7ec6',
+            '\u7c89\u4e1d\u6570\u636e',
+            '\u89c2\u4f17\u6570\u636e',
+            '\u76f4\u64ad\u6570\u636e',
+            '\u5546\u54c1\u6570\u636e',
+            '\u8ba2\u5355\u6570\u636e',
+            '\u8d26\u53f7\u6982\u89c8',
+            '\u5185\u5bb9\u6d1e\u5bdf',
+            '\u4e92\u52a8\u7ba1\u7406',
+            '\u56fe\u6587\u6570\u636e',
+            '\u89c6\u9891\u52a8\u6001',
+            '\u89c6\u9891\u53f7\u52a8\u6001',
+            '\u4f5c\u54c1\u53d1\u5e03',
+            '\u53d1\u5e03\u4f5c\u54c1',
+            '\u53d1\u5e03\u9ad8\u6e05\u89c6\u9891',
+            '\u53d1\u5e03\u5168\u666f\u89c6\u9891',
+            '\u53d1\u5e03\u56fe\u6587',
+            '\u53d1\u5e03\u6587\u7ae0',
+            '\u667a\u80fd\u521b\u4f5c',
+            'AI\u5206\u8eab',
+            'AI\u5de5\u574a',
+            '\u521b\u4f5c\u670d\u52a1',
+            '\u521b\u4f5c\u4e2d\u5fc3',
+            '\u6536\u5165\u53d8\u73b0',
+            '\u6d3b\u52a8\u4e2d\u5fc3',
+            '\u901a\u77e5',
+            '\u67e5\u770b\u5168\u90e8',
+            '\u66f4\u591a',
         }
         if text in noise_values:
             return True
@@ -314,6 +418,10 @@ def _run_collection_once(
             update_nickname,
         )
         import requests
+        # 出站 HTTP 全部直连：requests 默认会读取 Windows 系统代理
+        # （Clash/VPN 等），代理节点故障时上传会被 TCP RST 打断。
+        _http = requests.Session()
+        _http.trust_env = False
 
         def refresh_backend_token(reason: str = '') -> str:
             nonlocal token, cfg
@@ -339,10 +447,10 @@ def _run_collection_once(
                     req_headers = dict(headers or {})
                     if token and 'Authorization' not in req_headers:
                         req_headers['Authorization'] = f'Bearer {token}'
-                    resp = requests.post(url, json=payload, headers=req_headers, timeout=timeout)
+                    resp = _http.post(url, json=payload, headers=req_headers, timeout=timeout)
                     if resp.status_code == 401 and refresh_backend_token('HTTP 401'):
                         req_headers['Authorization'] = f'Bearer {token}'
-                        resp = requests.post(url, json=payload, headers=req_headers, timeout=timeout)
+                        resp = _http.post(url, json=payload, headers=req_headers, timeout=timeout)
                     return resp
                 except Exception as e:
                     last_error = e
@@ -400,7 +508,7 @@ def _run_collection_once(
                 last_resp = None
                 seen_ids = set()
                 for url in endpoints:
-                    resp = requests.get(url, headers=headers, timeout=15)
+                    resp = _http.get(url, headers=headers, timeout=15)
                     last_resp = resp
                     if resp.status_code >= 400:
                         print(f'[DC] Remote accounts HTTP {resp.status_code} for {url}')
@@ -577,6 +685,26 @@ def _run_collection_once(
             except Exception as e:
                 print(f'[DC] Session status report error for {backend_account_id}: {e}')
 
+        def report_collect_status(local_account_id: str, backend_account_id: str, status: str, message: str = ''):
+            if not can_report_to_backend(local_account_id, backend_account_id):
+                return
+            try:
+                r = post_json_with_retry(
+                    f'{api_url}/platforms/report-collect-status',
+                    {
+                        'accountId': backend_account_id,
+                        'status': status,
+                        'message': message[:500],
+                    },
+                    headers={'Authorization': f'Bearer {token}'},
+                    timeout=15,
+                    attempts=2,
+                )
+                if r.status_code >= 400:
+                    print(f'[DC] Collect status report HTTP {r.status_code} for {backend_account_id}: {r.text[:160]}')
+            except Exception as e:
+                print(f'[DC] Collect status report error for {backend_account_id}: {e}')
+
         for item in scraped:
             local_account_id = item['accountId']
             backend_account_id = backend_account_ids.get(local_account_id, local_account_id)
@@ -586,10 +714,13 @@ def _run_collection_once(
             history = metrics.pop('_history', []) if isinstance(metrics, dict) else []
 
             if item.get('captcha'):
+                report_collect_status(local_account_id, backend_account_id, 'FAILED', '采集遇到验证码阻断')
                 report_session_status(local_account_id, backend_account_id, 'blocked', '伴侣采集时遇到验证码阻断')
             elif item.get('expired'):
+                report_collect_status(local_account_id, backend_account_id, 'FAILED', '采集时检测到登录态失效')
                 report_session_status(local_account_id, backend_account_id, 'offline', '伴侣采集时检测到登录态失效')
             elif has_payload:
+                report_collect_status(local_account_id, backend_account_id, 'COLLECTING', '伴侣已采集到数据，正在上报')
                 report_session_status(local_account_id, backend_account_id, 'online', '伴侣采集到有效数据')
 
             if has_payload:
@@ -620,6 +751,7 @@ def _run_collection_once(
                 except Exception as e:
                     print(f'[DC] Local save error {local_account_id}: {e}')
             else:
+                report_collect_status(local_account_id, backend_account_id, 'FAILED', '本次采集没有拿到有效数据')
                 print(f'[DC] No valid payload for {local_account_id}; collection time not updated')
 
             nickname = metrics.pop('_nickname', None) if isinstance(metrics, dict) else None
@@ -666,11 +798,13 @@ def _run_collection_once(
                         update_collection_time(local_account_id)
                     else:
                         report_failures += 1
+                        report_collect_status(local_account_id, backend_account_id, 'FAILED', f'指标上报失败 HTTP {r.status_code}')
                         print(
                             f'[DC] Report HTTP {r.status_code} for '
                             f'{local_account_id}->{backend_account_id}: {r.text[:200]}')
                 except Exception as e:
                     report_failures += 1
+                    report_collect_status(local_account_id, backend_account_id, 'FAILED', f'指标上报异常: {e}')
                     print(f'[DC] Report error {local_account_id}->{backend_account_id}: {e}')
 
             if can_report and history:
@@ -750,7 +884,7 @@ def _run_collection_once(
                 avatar = None
             if can_report and avatar:
                 try:
-                    r = requests.put(
+                    r = _http.put(
                         f'{api_url}/accounts/{backend_account_id}',
                         json={'avatar': avatar},
                         headers={'Authorization': f'Bearer {token}'},
@@ -829,6 +963,16 @@ def _run_collection_once(
             run_status = 'error'
             run_error = 'No scraped account data was reported to backend'
         state._collector_last_error = run_error or None
+        try:
+            from companion_heartbeat import record_collection
+            record_collection(
+                success=(run_status == 'success'),
+                account_count=scraped_payloads,
+                error_code=('UPLOAD_FAIL' if report_failures else ('NO_PAYLOAD' if run_status == 'error' else '')),
+                message=run_error or '',
+            )
+        except Exception:
+            pass
         finish_collection_run(run_id, run_status, accounts_total, reported, video_reported, run_error)
         platform_map = {'DOUYIN':'douyin','XIAOHONGSHU':'xiaohongshu','KUAISHOU':'kuaishou','WECHAT_VIDEO':'tencent'}
         success_account_ids = set()
@@ -845,6 +989,16 @@ def _run_collection_once(
     except Exception as e:
         state._collector_last_error = str(e)
         print(f'[DC] Fatal: {e}')
+        try:
+            from companion_heartbeat import record_collection
+            record_collection(
+                success=False,
+                account_count=reported,
+                error_code='FATAL',
+                message=str(e),
+            )
+        except Exception:
+            pass
         try:
             from local_db import finish_collection_run
             finish_collection_run(run_id, 'error', accounts_total, reported, video_reported, str(e))

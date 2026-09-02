@@ -289,6 +289,7 @@
         <el-form-item label="角色">
           <el-select v-model="newUser.role" style="width: 100%">
             <el-option label="成员" value="MEMBER" />
+            <el-option label="组长" value="GROUP_LEADER" />
             <el-option label="管理者" value="MANAGER" />
             <el-option label="管理员" value="ADMIN" />
             <el-option label="所有者" value="OWNER" />
@@ -313,6 +314,7 @@
         <el-form-item label="角色">
           <el-select v-model="editUser.role" style="width: 100%">
             <el-option label="成员" value="MEMBER" />
+            <el-option label="组长" value="GROUP_LEADER" />
             <el-option label="管理者" value="MANAGER" />
             <el-option label="管理员" value="ADMIN" />
             <el-option label="所有者" value="OWNER" />
@@ -429,6 +431,7 @@ function roleLabel(role: string) {
     OWNER: '所有者',
     ADMIN: '管理员',
     MANAGER: '管理者',
+    GROUP_LEADER: '组长',
     MEMBER: '成员',
     VIEWER: '访客',
   }
@@ -441,6 +444,7 @@ function roleTagType(role: string): 'success' | 'primary' | 'warning' | 'info' |
     OWNER: 'warning',
     ADMIN: 'primary',
     MANAGER: 'success',
+    GROUP_LEADER: 'success',
     MEMBER: 'info',
     VIEWER: 'info',
   }

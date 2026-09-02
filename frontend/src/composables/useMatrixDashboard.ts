@@ -1,8 +1,9 @@
 import { ref, computed } from 'vue'
-import { analyticsApi, type AccountDetailItem, type DailyMetrics } from '@/api/analytics'
+import { analyticsApi, type AccountDetailItem, type DailyMetrics, type PeriodDataStatus } from '@/api/analytics'
 import { accountsApi } from '@/api/accounts'
 import { formatLargeNum } from '@/utils/format'
 import { toBackend } from '@/utils/platform'
+import { useLoadingStore } from '@/store/loading'
 import type { AnalyticsOverview, PlatformStats, TrendData, Account } from '@/types'
 
 export interface KpiCard {
@@ -52,22 +53,79 @@ export function useMatrixDashboard() {
     { id: 5, type: 'share', text: '新增分享' },
   ]
 
+  const periodKeyMap = {
+    day: 'day_total',
+    week: 'week_total',
+    month: 'month_total',
+  } as const
+
+  type PeriodKey = (typeof periodKeyMap)[keyof typeof periodKeyMap]
+
+  function getPeriodSource(acc: AccountDetailItem, period = dateType.value) {
+    const key = periodKeyMap[period]
+    const source = acc.info[key]
+    const status = acc.periodStatus?.[key] || buildFallbackPeriodStatus(key, source, acc.dataDate)
+    return { key, source, status }
+  }
+
+  function canUseInCurrentSummary(status?: PeriodDataStatus) {
+    return status?.state === 'complete' || status?.state === 'partial'
+  }
+
+  function buildFallbackPeriodStatus(
+    key: PeriodKey,
+    source: DailyMetrics | null,
+    dataDate: string | null,
+  ): PeriodDataStatus {
+    const expectedDays = key === 'day_total' ? 1 : key === 'week_total' ? 7 : 30
+    return {
+      state: source ? 'historical' : 'empty',
+      label: source && dataDate ? `历史数据 · 截至${dataDate.slice(5)}` : source ? '历史数据' : '暂无数据',
+      dataDate,
+      coveredDays: source ? 0 : 0,
+      expectedDays,
+    }
+  }
+
   const aggregatedStats = computed<UserStat[]>(() => {
     const list = accountDetailList.value
     return userStatDefs.map((def) => {
       let total = 0
-      const period = dateType.value
       for (const acc of list) {
-        const source =
-          period === 'day'
-            ? acc.info.day_total
-            : period === 'week'
-              ? acc.info.week_total
-              : acc.info.month_total
-        total += source?.[def.type] || 0
+        const { source, status } = getPeriodSource(acc)
+        if (canUseInCurrentSummary(status)) total += source?.[def.type] || 0
       }
       return { ...def, value: total }
     })
+  })
+
+  const periodCompleteness = computed(() => {
+    const total = accountDetailList.value.length
+    let complete = 0
+    let partial = 0
+    let historical = 0
+    let empty = 0
+    for (const acc of accountDetailList.value) {
+      const { status } = getPeriodSource(acc)
+      if (status.state === 'complete') complete += 1
+      else if (status.state === 'partial') partial += 1
+      else if (status.state === 'historical') historical += 1
+      else empty += 1
+    }
+    return { total, complete, partial, historical, empty }
+  })
+
+  const periodCompletenessLabel = computed(() => {
+    const s = periodCompleteness.value
+    if (s.total === 0) return ''
+    if (s.partial === 0 && s.historical === 0 && s.empty === 0) {
+      return `${s.total}个账号数据完整`
+    }
+    const parts = [`${s.total}个账号中`, `${s.complete}个完整`]
+    if (s.partial) parts.push(`${s.partial}个不完整`)
+    if (s.historical) parts.push(`${s.historical}个历史参考`)
+    if (s.empty) parts.push(`${s.empty}个暂无数据`)
+    return parts.join('，')
   })
 
   // ─── KPI Cards (保留原有的4张，新增日/周/月聚合卡) ───
@@ -155,6 +213,10 @@ export function useMatrixDashboard() {
     tokenStatus?: string
     hasCookies?: boolean
     status?: string
+    lastSuccessfulCollectAt?: string | null
+    lastCollectAttemptAt?: string | null
+    lastCollectStatus?: 'SUCCESS' | 'FAILED' | 'COLLECTING' | null
+    lastCollectError?: string | null
     fans: number
     play: number | null
     issue?: number
@@ -171,16 +233,27 @@ export function useMatrixDashboard() {
     shareFormatted: string
     /** 该行数据是否为 null（无采集数据） */
     isStale: boolean
+    /** 当前周期数据状态：complete/partial/historical/empty */
+    periodState: 'complete' | 'partial' | 'historical' | 'empty'
     /** 最近采集日期 */
     dataDate: string | null
     /** 无数据标签 */
     staleLabel: string
+    dataStatusLabel: string
+    dataStatusType: 'success' | 'warning' | 'danger' | 'info'
+    dataStatusTitle: string
     /** 最新采集状态标签 */
     collectLabel: string
     /** 最新采集标签类型 */
     collectType: 'success' | 'warning' | 'danger' | 'info'
     /** 最新采集说明 */
     collectTitle: string
+    /** 当前同步状态标签 */
+    syncLabel: string
+    /** 当前同步状态标签类型 */
+    syncType: 'success' | 'warning' | 'danger' | 'info'
+    /** 当前同步状态说明 */
+    syncTitle: string
   }
 
   const sortKey = ref<string>('')
@@ -241,6 +314,55 @@ export function useMatrixDashboard() {
     }
   }
 
+  function formatDateTime(value?: string | null) {
+    if (!value) return ''
+    const date = new Date(value)
+    if (!Number.isFinite(date.getTime())) return ''
+    const pad = (num: number) => String(num).padStart(2, '0')
+    return `${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`
+  }
+
+  function buildSyncStatus(account?: {
+    lastSuccessfulCollectAt?: string | null
+    lastCollectAttemptAt?: string | null
+    lastCollectStatus?: 'SUCCESS' | 'FAILED' | 'COLLECTING' | null
+    lastCollectError?: string | null
+  }): {
+    label: string
+    type: 'success' | 'warning' | 'danger' | 'info'
+    title: string
+  } {
+    const status = account?.lastCollectStatus
+    const successTime = formatDateTime(account?.lastSuccessfulCollectAt)
+    const attemptTime = formatDateTime(account?.lastCollectAttemptAt)
+    if (status === 'COLLECTING') {
+      return {
+        label: '正在同步',
+        type: 'warning',
+        title: attemptTime ? `开始同步：${attemptTime}` : '正在同步数据',
+      }
+    }
+    if (status === 'FAILED') {
+      return {
+        label: '同步失败',
+        type: 'danger',
+        title: account?.lastCollectError || (attemptTime ? `上次尝试：${attemptTime}` : '上次同步失败'),
+      }
+    }
+    if (account?.lastSuccessfulCollectAt) {
+      return {
+        label: successTime ? `更新 ${successTime}` : '已更新',
+        type: 'success',
+        title: successTime ? `最近成功同步：${successTime}` : '最近成功同步时间可用',
+      }
+    }
+    return {
+      label: '未同步',
+      type: 'info',
+      title: '还没有成功同步记录',
+    }
+  }
+
   const accountTableData = computed<AccountTableRow[]>(() => {
     const list = accountDetailList.value
     const period = dateType.value
@@ -255,30 +377,35 @@ export function useMatrixDashboard() {
             onlineReason?: string
             hasCookies?: boolean
             status?: string
+            lastSuccessfulCollectAt?: string | null
+            lastCollectAttemptAt?: string | null
+            lastCollectStatus?: 'SUCCESS' | 'FAILED' | 'COLLECTING' | null
+            lastCollectError?: string | null
           })
         | undefined
-      const source =
-        period === 'day'
-          ? acc.info.day_total
-          : period === 'week'
-            ? acc.info.week_total
-            : acc.info.month_total
+      const { source, status: periodStatus } = getPeriodSource(acc, period)
+
+      // 只有"历史回退"行需要视觉弱化；partial 行数值正常显示（仅标签提示不完整）。
+      const isStale = periodStatus.state === 'historical'
+      const periodState = periodStatus.state as 'complete' | 'partial' | 'historical' | 'empty'
 
       // source 为 null 表示该周期无采集数据
-      const isStale = !source
       const play = source?.play ?? null
       const new_fans = source?.new_fans ?? null
       const like = source?.like ?? null
       const comment = source?.comment ?? null
       const share = source?.share ?? null
       const dataDate = (acc as any).dataDate ?? null
-      const missingPeriodLabel =
-        period === 'day'
-          ? '昨日无日增'
-          : period === 'week'
-            ? '近7天无数据'
-            : '近30天无数据'
       const collectFreshness = buildCollectFreshness(dataDate)
+      const syncStatus = buildSyncStatus(accountMeta)
+      const dataStatusType =
+        periodStatus.state === 'complete'
+          ? 'success'
+          : periodStatus.state === 'partial'
+            ? 'warning'
+            : periodStatus.state === 'historical'
+              ? 'info'
+              : 'danger'
 
       return {
         id: acc.id,
@@ -292,6 +419,10 @@ export function useMatrixDashboard() {
         tokenStatus: accountMeta?.tokenStatus,
         hasCookies: accountMeta?.hasCookies,
         status: accountMeta?.status,
+        lastSuccessfulCollectAt: accountMeta?.lastSuccessfulCollectAt,
+        lastCollectAttemptAt: accountMeta?.lastCollectAttemptAt,
+        lastCollectStatus: accountMeta?.lastCollectStatus,
+        lastCollectError: accountMeta?.lastCollectError,
         fans: acc.fans || 0,
         play,
         new_fans,
@@ -305,11 +436,21 @@ export function useMatrixDashboard() {
         commentFormatted: comment === null ? '—' : formatLargeNum(comment),
         shareFormatted: share === null ? '—' : formatLargeNum(share),
         isStale,
+        periodState,
         dataDate,
-        staleLabel: dataDate ? missingPeriodLabel : '从未采集',
+        staleLabel: periodStatus.label,
+        dataStatusLabel: periodStatus.label,
+        dataStatusType,
+        dataStatusTitle:
+          periodStatus.state === 'empty'
+            ? '当前周期没有可用采集数据'
+            : `覆盖 ${periodStatus.coveredDays}/${periodStatus.expectedDays} 天，数据截止 ${periodStatus.dataDate || dataDate || '--'}`,
         collectLabel: collectFreshness.label,
         collectType: collectFreshness.type,
         collectTitle: collectFreshness.title,
+        syncLabel: syncStatus.label,
+        syncType: syncStatus.type,
+        syncTitle: syncStatus.title,
       }
     })
 
@@ -494,13 +635,8 @@ export function useMatrixDashboard() {
     for (const detail of detailList) {
       const groupInfo = accountGroupMap.get(detail.id) || { groupId: '', groupName: '未分组' }
       const key = groupInfo.groupId || '__none__'
-      const period = dateType.value
-      const source =
-        period === 'day'
-          ? detail.info.day_total
-          : period === 'week'
-            ? detail.info.week_total
-            : detail.info.month_total
+      const { source, status } = getPeriodSource(detail)
+      const usableSource = canUseInCurrentSummary(status) ? source : null
 
       if (!groupMap.has(key)) {
         groupMap.set(key, {
@@ -516,10 +652,10 @@ export function useMatrixDashboard() {
       const g = groupMap.get(key)!
       g.accountCount += 1
       g.followers += detail.fans || 0
-      g.play += source?.play || 0
-      g.like += source?.like || 0
-      g.comment += source?.comment || 0
-      g.share += source?.share || 0
+      g.play += usableSource?.play || 0
+      g.like += usableSource?.like || 0
+      g.comment += usableSource?.comment || 0
+      g.share += usableSource?.share || 0
     }
 
     return Array.from(groupMap.entries())
@@ -553,6 +689,8 @@ export function useMatrixDashboard() {
   async function refreshAll() {
     loading.value = true
     error.value = null
+    const loadingStore = useLoadingStore()
+    loadingStore.start()
     try {
       const gid = groupId.value || undefined
       const bp = platform.value ? toBackend(platform.value) : undefined
@@ -608,6 +746,7 @@ export function useMatrixDashboard() {
       error.value = e.message || '数据加载失败'
     } finally {
       loading.value = false
+      loadingStore.stop()
     }
   }
 
@@ -622,6 +761,8 @@ export function useMatrixDashboard() {
     overview,
     kpiCards,
     aggregatedStats,
+    periodCompleteness,
+    periodCompletenessLabel,
     aggregatedTrends,
     platformStats,
     platformTableData,

@@ -17,6 +17,7 @@ enum UserRole {
   VIEWER
   OWNER
   MANAGER
+  GROUP_LEADER
   SUPER_ADMIN
 }
 
@@ -53,6 +54,12 @@ enum AccountOperatorRole {
   COLLABORATOR
 }
 
+enum AccountCollectStatus {
+  SUCCESS
+  FAILED
+  COLLECTING
+}
+
 // ==================== 用户与组织 ====================
 
 enum EventType {
@@ -79,13 +86,15 @@ model User {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  organization     Organization?     @relation(fields: [organizationId], references: [id])
-  organizationId   String?
-  accounts         Account[]
-  accountOperators AccountOperator[]
-  auditLogs        AuditLog[]
-  members          TeamMember[]
-  events           CalendarEvent[]
+  organization                    Organization?              @relation(fields: [organizationId], references: [id])
+  organizationId                  String?
+  accounts                        Account[]
+  accountOperators                AccountOperator[]
+  performanceLadderConfigUpdates  PerformanceLadderConfig[]  @relation("PerformanceLadderConfigUpdatedBy")
+  performanceLadderTeacherUpdates PerformanceLadderTeacher[] @relation("PerformanceLadderTeacherUpdatedBy")
+  auditLogs                       AuditLog[]
+  members                         TeamMember[]
+  events                          CalendarEvent[]
 
   @@index([organizationId])
   @@index([email])
@@ -103,29 +112,46 @@ model Organization {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  users                  User[]
-  teams                  Team[]
-  accounts               Account[]
-  posts                  Post[]
-  postStats              PostStats[]
-  dailyStats             DailyStats[]
-  competitors            Competitor[]
-  competitorSnapshots    CompetitorSnapshot[]
-  accountGroups          AccountGroup[]
-  assets                 Asset[]
-  notifications          Notification[]
-  wechatStores           WechatStore[]
-  wechatStoreOrders      WechatStoreOrder[]
-  wechatStoreProducts    WechatStoreProduct[]
-  wechatStoreAftersales  WechatStoreAftersale[]
-  doudianStores          DoudianStore[]
-  doudianStoreOrders     DoudianStoreOrder[]
-  doudianStoreProducts   DoudianStoreProduct[]
-  doudianStoreAftersales DoudianStoreAftersale[]
-  pixingVideoTasks       PixingVideoTask[]
-  calendarEvents         CalendarEvent[]
+  users                     User[]
+  teams                     Team[]
+  accounts                  Account[]
+  posts                     Post[]
+  postStats                 PostStats[]
+  dailyStats                DailyStats[]
+  competitors               Competitor[]
+  competitorSnapshots       CompetitorSnapshot[]
+  accountGroups             AccountGroup[]
+  assets                    Asset[]
+  notifications             Notification[]
+  wechatStores              WechatStore[]
+  wechatStoreOrders         WechatStoreOrder[]
+  wechatStoreProducts       WechatStoreProduct[]
+  wechatStoreAftersales     WechatStoreAftersale[]
+  doudianStores             DoudianStore[]
+  doudianStoreOrders        DoudianStoreOrder[]
+  doudianStoreProducts      DoudianStoreProduct[]
+  doudianStoreAftersales    DoudianStoreAftersale[]
+  pixingVideoTasks          PixingVideoTask[]
+  calendarEvents            CalendarEvent[]
+  performanceLadderConfig          PerformanceLadderConfig?
+  performanceLadderTeachers        PerformanceLadderTeacher[]
+  performanceLadderMonthSnapshots  PerformanceLadderMonthSnapshot[]
+  organizationSettings             OrganizationSetting[]
 
   @@index([status])
+}
+
+model OrganizationSetting {
+  id             String       @id @default(cuid())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId String
+  key            String
+  value          String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
 }
 
 model Team {
@@ -146,27 +172,31 @@ model Team {
 // ==================== 平台账号 ====================
 
 model Account {
-  id             String        @id @default(cuid())
-  platform       PlatformEnum
-  platformUserId String
-  nickname       String
-  avatar         String?
-  bio            String?
-  followers      Int           @default(0)
-  likes          Int           @default(0)
-  following      Int           @default(0)
-  status         AccountStatus @default(ACTIVE)
-  cookies        String?
-  cookieSavedAt  DateTime? // Cookie 上次保存时间，用于凭据健康监控
-  proxyConfig    String? // JSON 字符串
-  metadata       String? // JSON 字符串
-  lastActiveAt   DateTime?
-  storeScore     Float?
-  storeDiagnosis String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  organizationId String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                      String                @id @default(cuid())
+  platform                PlatformEnum
+  platformUserId          String
+  nickname                String
+  avatar                  String?
+  bio                     String?
+  followers               Int                   @default(0)
+  likes                   Int                   @default(0)
+  following               Int                   @default(0)
+  status                  AccountStatus         @default(ACTIVE)
+  cookies                 String?
+  cookieSavedAt           DateTime? // Cookie 上次保存时间，用于凭据健康监控
+  proxyConfig             String? // JSON 字符串
+  metadata                String? // JSON 字符串
+  lastActiveAt            DateTime?
+  lastSuccessfulCollectAt DateTime?
+  lastCollectAttemptAt    DateTime?
+  lastCollectStatus       AccountCollectStatus?
+  lastCollectError        String?
+  storeScore              Float?
+  storeDiagnosis          String?
+  organization            Organization?         @relation(fields: [organizationId], references: [id])
+  organizationId          String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
 
   owner      User              @relation(fields: [userId], references: [id])
   userId     String
@@ -184,6 +214,67 @@ model Account {
   @@index([groupId])
   @@index([platform])
   @@index([organizationId])
+  @@index([lastCollectStatus])
+  @@index([lastSuccessfulCollectAt])
+}
+
+model PerformanceLadderConfig {
+  id               String       @id @default(cuid())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId   String       @unique
+  monthlyTarget    Int          @default(0)
+  refundMode       String       @default("include")
+  sourceIgnoreMode String       @default("exclude")
+  hideUnmatched    Boolean      @default(true)
+  sourceOperators  String       @default("{}") // JSON: source account key -> operator name
+  sourceIgnoreList String       @default("[]") // JSON array
+  updatedByUser    User?        @relation("PerformanceLadderConfigUpdatedBy", fields: [updatedByUserId], references: [id])
+  updatedByUserId  String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  @@index([organizationId])
+  @@index([updatedByUserId])
+}
+
+model PerformanceLadderTeacher {
+  id              String       @id @default(cuid())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String
+  name            String
+  aliases         String       @default("[]") // JSON array
+  monthlyTarget   Int          @default(0)
+  enabled         Boolean      @default(true)
+  sortOrder       Int          @default(0)
+  updatedByUser   User?        @relation("PerformanceLadderTeacherUpdatedBy", fields: [updatedByUserId], references: [id])
+  updatedByUserId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@index([organizationId, enabled, sortOrder])
+  @@index([updatedByUserId])
+}
+
+// 业绩天梯月度快照：冻结每个自然月当时生效的目标/归因规则。
+// 老师目标与归因规则主表只保存当前值；查看历史月份时读取该月快照，
+// 避免后续修改当前配置导致历史月份成绩被重新计算。
+model PerformanceLadderMonthSnapshot {
+  id              String       @id @default(cuid())
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organizationId  String
+  yearMonth       String // "YYYY-MM"
+  targets         String       @default("[]") // JSON: [{ id, name, aliases, monthlyTarget }]
+  sourceOperators String       @default("{}") // JSON: source account key -> operator name
+  hideUnmatched   Boolean      @default(true)
+  capturedAt      DateTime     @default(now())
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([organizationId, yearMonth])
+  @@index([organizationId])
+  @@index([yearMonth])
 }
 
 // ==================== 内容发布 ====================
@@ -735,4 +826,209 @@ model CalendarEvent {
   @@index([teamId])
   @@index([startTime])
   @@index([organizationId])
+}
+
+// ==================== 伴侣监控中心 ====================
+
+model CompanionDevice {
+  id                         String               @id @default(cuid())
+  deviceId                   String               @unique
+  deviceName                 String               @default("")
+  ownerUserId                String?
+  ownerName                  String?
+  organizationId             String?
+  companionVersion           String               @default("")
+  startedAt                  DateTime?
+  firstSeenAt                DateTime             @default(now())
+  lastSeenAt                 DateTime?
+  lastHeartbeatAt            DateTime?
+  healthStatus               String               @default("unknown") // online / unstable / offline / unknown
+  currentTask                String? // idle/collecting/syncing/uploading/queued/updating/error
+  currentTaskDetail          Json?
+  taskStartedAt              DateTime?
+  platformSummary            Json?
+  lastCollectionAt           DateTime?
+  lastCollectionSuccess      Boolean?
+  lastCollectionAccountCount Int?
+  lastSyncAt                 DateTime?
+  lastSyncSuccess            Boolean?
+  lastSyncUploadCount        Int?
+  lastSyncErrorCode          String?
+  lastErrorCode              String?
+  lastErrorMessage           String?
+  lastErrorAt                DateTime?
+  updateStatus               Json?
+  cpuPercent                 Float?
+  memoryMb                   Float?
+  processUptimeSeconds       Int?
+  consecutiveSyncFailures    Int                  @default(0)
+  recentHttpErrors           Json?
+  // Phase 2: 运行周期 / 崩溃检测 / UI 模式 / 进度时间戳
+  bootId                     String?
+  bootSeq                    Int                  @default(0)
+  bootCount                  Int                  @default(0)
+  exitState                  String? // clean 表示上次运行正常退出（优雅退出信标）
+  uiMode                     String               @default("") // webview / browser / unknown
+  startupDiagnostic          Json?
+  lastProgressAt             DateTime?
+  createdAt                  DateTime             @default(now())
+  updatedAt                  DateTime             @updatedAt
+  CompanionHeartbeat         CompanionHeartbeat[]
+
+  @@index([organizationId])
+  @@index([healthStatus])
+  @@index([lastHeartbeatAt])
+  @@index([bootId])
+}
+
+model CompanionHeartbeat {
+  id                   String   @id @default(cuid())
+  deviceId             String
+  receivedAt           DateTime @default(now())
+  companionVersion     String   @default("")
+  taskStatus           String?
+  taskDetail           Json?
+  platformSummary      Json?
+  lastCollection       Json?
+  lastSync             Json?
+  lastError            Json?
+  update               Json?
+  cpuPercent           Float?
+  memoryMb             Float?
+  processUptimeSeconds Int?
+  ownerName            String?
+  bootId               String?
+  seq                  Int?
+
+  device CompanionDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
+
+  @@index([deviceId, receivedAt])
+  @@index([receivedAt])
+}
+
+model CompanionAlert {
+  id             String   @id @default(cuid())
+  deviceId       String?
+  type           String // SYNC_FAIL_3X / OFFLINE_24H / HEARTBEAT_STALE / TASK_TIMEOUT / UPDATE_FAILED / VERSION_OUTDATED / HTTP_ERROR_SPIKE / LOGIN_EXPIRED_MASS
+  message        String
+  status         String   @default("open") // open / acknowledged
+  organizationId String?
+  acknowledgedAt DateTime?
+  acknowledgedBy String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([deviceId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([organizationId])
+}
+
+// Phase 2: 事件原始记录 + 故障聚合（Incident 生命周期 open -> recovering -> resolved）
+model CompanionEvent {
+  id             String   @id @default(cuid())
+  deviceId       String?
+  type           String // BOOT_STARTED / CRASH_SUSPECTED / TASK_STUCK / 各告警类型
+  message        String
+  organizationId String?
+  createdAt      DateTime @default(now())
+
+  @@index([deviceId, createdAt])
+  @@index([type, createdAt])
+  @@index([organizationId])
+}
+
+model CompanionIncident {
+  id              String    @id @default(cuid())
+  deviceId        String? // 组织级故障为 null（如大量登录态失效）
+  type            String
+  message         String
+  status          String    @default("open") // open / recovering / resolved
+  occurrences     Int       @default(1)
+  firstOccurredAt DateTime  @default(now())
+  lastOccurredAt  DateTime  @default(now())
+  recoveringSince DateTime?
+  recoveredAt     DateTime?
+  resolvedAt      DateTime?
+  durationSeconds Int?
+  organizationId  String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([deviceId, type, status])
+  @@index([status])
+  @@index([organizationId])
+}
+
+// ==================== 统一系统健康中心 ====================
+
+model SystemEvent {
+  id               String   @id @default(cuid())
+  sourceType       String
+  sourceId         String?
+  organizationId   String?
+  userId           String?
+  deviceId         String?
+  bootId           String?
+  requestId        String?
+  taskId           String?
+  accountId        String?
+  storeId          String?
+  platform         String?
+  frontendVersion  String?
+  backendVersion   String?
+  companionVersion String?
+  eventType        String
+  severity         String   @default("INFO")
+  errorCode        String?
+  message          String
+  occurredAt       DateTime @default(now())
+  metadata         Json?
+  createdAt        DateTime @default(now())
+
+  @@index([sourceType, occurredAt])
+  @@index([eventType, occurredAt])
+  @@index([severity, occurredAt])
+  @@index([errorCode, occurredAt])
+  @@index([organizationId, occurredAt])
+  @@index([requestId])
+  @@index([deviceId, occurredAt])
+  @@index([accountId, occurredAt])
+  @@index([storeId, occurredAt])
+}
+
+model SystemIncident {
+  id                String    @id @default(cuid())
+  sourceType        String
+  scope             String    @default("global")
+  organizationId    String?
+  errorCode         String?
+  severity          String    @default("ERROR")
+  status            String    @default("OPEN")
+  firstOccurredAt   DateTime  @default(now())
+  lastOccurredAt    DateTime  @default(now())
+  recoveryStartedAt DateTime?
+  resolvedAt        DateTime?
+  occurrenceCount   Int       @default(1)
+  affectedUsers     Int       @default(0)
+  affectedDevices   Int       @default(0)
+  affectedAccounts  Int       @default(0)
+  affectedStores    Int       @default(0)
+  affectedVersions  Json?
+  title             String
+  summary           String
+  rootCause         String?
+  resolution        String?
+  acknowledgedAt    DateTime?
+  acknowledgedBy    String?
+  dedupeKey         String
+  metadata          Json?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @default(now()) @updatedAt
+
+  @@index([sourceType, status])
+  @@index([status, severity])
+  @@index([dedupeKey, status])
+  @@index([organizationId, status])
+  @@index([lastOccurredAt])
 }

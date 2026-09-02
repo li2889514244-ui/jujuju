@@ -10,13 +10,42 @@
           </transition>
         </router-view>
       </main>
+      <GlobalLoadingOverlay />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
+import GlobalLoadingOverlay from '@/components/common/GlobalLoadingOverlay.vue'
+import { useLoadingStore } from '@/store/loading'
+import { useUserStore } from '@/store/user'
+import { organizationSettingsApi } from '@/api/organization-settings'
+
+const loadingStore = useLoadingStore()
+const userStore = useUserStore()
+
+onMounted(async () => {
+  // 应用启动时加载一次组织级刷新动画配置（若已有则跳过）
+  if (!loadingStore.configLoaded) {
+    try {
+      const res = await organizationSettingsApi.getLoadingImage()
+      if (res.data) loadingStore.setLoadingConfig(res.data)
+    } catch {
+      // 配置加载失败时使用默认 Logo，不打扰用户
+    } finally {
+      loadingStore.setConfigLoaded(true)
+    }
+  }
+  // 启动时同步一次最新用户信息：角色可能刚被管理员修改，本地持久化的角色可能已过期
+  try {
+    await userStore.fetchUserInfo()
+  } catch {
+    // 刷新失败沿用本地缓存的用户信息，不打扰用户
+  }
+})
 
 function onPageEnter() {
   requestAnimationFrame(() => {

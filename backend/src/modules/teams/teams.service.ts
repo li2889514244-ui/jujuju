@@ -296,6 +296,7 @@ export class TeamsService {
       OWNER: 5,
       ADMIN: 4,
       MANAGER: 3,
+      GROUP_LEADER: 2.5,
       MEMBER: 2,
       VIEWER: 1,
     }

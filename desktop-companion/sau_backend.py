@@ -18,6 +18,8 @@ MatrixFlow Local Scan-Bind Server
 import asyncio
 import json
 import os
+
+from companion_encoding import read_text_file
 import sqlite3
 import sys
 import threading
@@ -85,8 +87,7 @@ LOGIN_FN = {
 def read_cookie_file(path: str) -> dict:
     """从 Playwright storage_state JSON 中提取 cookies 字符串"""
     try:
-        with open(path) as f:
-            data = json.load(f)
+        data = json.loads(read_text_file(path))
         cookies = data.get('cookies', [])
         cookie_str = '; '.join(f"{c['name']}={c['value']}" for c in cookies)
         return {'cookies': cookie_str, 'count': len(cookies)}

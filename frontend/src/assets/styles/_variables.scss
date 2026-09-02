@@ -1,4 +1,4 @@
-﻿// MatrixFlow v6 - Deep Space Quiet design tokens
+// MatrixFlow v6 - Deep Space Quiet design tokens
 // 注意：本文件仅暴露 SCSS 变量与 mixin，由 vite additionalData 自动注入。
 // 任何 CSS 输出（:root、html、body 等）请放在 global.scss / _element-overrides.scss。
 
@@ -126,6 +126,15 @@ $ease-out:    cubic-bezier(0.16, 1, 0.3, 1);
 $ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
 $ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 $ease-in-out: cubic-bezier(0.45, 0, 0.15, 1);
+
+// ============================================================
+// 9b. 动效（全站统一节奏）
+// ============================================================
+$motion-fast:   150ms;
+$motion-normal: 220ms;
+$motion-slow:   320ms;
+// 全站标准缓动（cubic-bezier(0.4, 0, 0.2, 1)），个别强调场景用 $ease-out
+$motion-standard-ease: $ease-smooth;
 
 // ============================================================
 // 10. 布局

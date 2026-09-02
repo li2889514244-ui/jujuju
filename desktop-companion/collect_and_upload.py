@@ -128,6 +128,14 @@ async def intercept_auth_data(page):
 
 async def collect_all():
     async with async_playwright() as pw:
+        # P0 安全修复：连接前校验 CDP 端口归属，防止误关用户的 Chrome/Edge。
+        from process_registry import verify_cdp_owner
+        owned, browser_pid, detail = verify_cdp_owner(CDP_URL)
+        if not owned:
+            raise RuntimeError(
+                f"CDP 端口 {CDP_URL} 上的浏览器不是披星云启动的（{detail}）。"
+                "为保护您的浏览器已拒绝连接。此脚本已废弃，请通过伴侣 UI 采集。"
+            )
         browser = await pw.chromium.connect_over_cdp(CDP_URL)
         page = None
         for ctx in browser.contexts:
@@ -274,7 +282,10 @@ async def collect_all():
 
         print(f"  关注者总数: {result.get('follower_total')}, 净增: {result.get('net_followers')}")
 
-        await browser.close()
+        # P0 安全修复：不调用 Browser.close()，改为经注册表五重校验后关闭披星云自己的 CDP 浏览器
+        if browser_pid:
+            from process_registry import terminate_managed
+            terminate_managed(browser_pid, reason='collect_and_upload finished', grace=2.0)
         return result
 
 

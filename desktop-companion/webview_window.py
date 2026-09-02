@@ -26,6 +26,11 @@ except Exception:
     webview = None
     _HAS_WEBVIEW = False
 
+try:
+    import companion_state as state
+except Exception:
+    state = None
+
 APP_URL = "http://127.0.0.1:5409"
 APPDATA_DIR = Path(os.environ.get('LOCALAPPDATA', str(Path.home()))) / 'MatrixFlow'
 WEBVIEW2_DATA_DIR = APPDATA_DIR / 'webview2'
@@ -57,6 +62,42 @@ def _write_diagnostic(event, **detail):
         }
         with WEBVIEW2_DIAG_LOG.open('a', encoding='utf-8') as fh:
             fh.write(json.dumps(payload, ensure_ascii=False) + '\n')
+    except Exception:
+        pass
+
+
+def _read_webview2_runtime_version():
+    """读取系统 WebView2 Runtime 版本（注册表）；没有安装则返回 None。
+
+    用于监控中心解释“为什么这台电脑以浏览器形式打开”。
+    """
+    try:
+        import winreg
+        candidates = [
+            (winreg.HKEY_LOCAL_MACHINE, r'SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'),
+            (winreg.HKEY_CURRENT_USER, r'Software\Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}'),
+        ]
+        for hive, path in candidates:
+            try:
+                with winreg.OpenKey(hive, path) as key:
+                    value, _ = winreg.QueryValueEx(key, 'pv')
+                    return str(value)
+            except OSError:
+                continue
+    except Exception:
+        pass
+    return None
+
+
+def _mark_ui_mode(mode: str, fallback_reason: str = None):
+    """把 UI 模式写入共享状态，供心跳上报（监控中心 Phase 2）。"""
+    if state is None:
+        return
+    try:
+        state._ui_mode = mode
+        if mode == 'browser':
+            state._ui_fallback_reason = fallback_reason or ''
+            state._ui_fallback_at = time.strftime('%Y-%m-%dT%H:%M:%S')
     except Exception:
         pass
 
@@ -139,7 +180,7 @@ def _open_ui_browser_fallback(url=APP_URL, reason='unknown'):
 
     try:
         if browser_path:
-            subprocess.Popen([
+            launched = subprocess.Popen([
                 browser_path,
                 f'--app={url}',
                 f'--user-data-dir={profile_dir}',
@@ -148,6 +189,16 @@ def _open_ui_browser_fallback(url=APP_URL, reason='unknown'):
                 '--disable-extensions',
                 '--window-size=1100,700',
             ], close_fds=True)
+            try:
+                from process_registry import register_process
+                register_process(
+                    launched.pid,
+                    process_type='webview_fallback_browser',
+                    profile_path=str(profile_dir),
+                    executable=browser_path,
+                )
+            except Exception:
+                pass
             _write_diagnostic(
                 'ui-browser-fallback-open',
                 reason=reason,
@@ -155,10 +206,12 @@ def _open_ui_browser_fallback(url=APP_URL, reason='unknown'):
                 label=browser_label,
                 profile=str(profile_dir),
             )
+            _mark_ui_mode('browser', reason)
             return True
 
         webbrowser.open(url)
         _write_diagnostic('ui-browser-fallback-open', reason=reason, label=browser_label)
+        _mark_ui_mode('browser', reason)
         return True
     except Exception as exc:
         _write_diagnostic('ui-browser-fallback-failed', reason=reason, error=str(exc))
@@ -284,6 +337,11 @@ class WebViewWindow:
 
         _apply_webview2_compat_env()
         WEBVIEW2_DATA_DIR.mkdir(parents=True, exist_ok=True)
+        if state is not None:
+            try:
+                state._webview2_runtime_version = _read_webview2_runtime_version()
+            except Exception:
+                pass
 
         # pywebview 设置
         webview.settings['ALLOW_DOWNLOADS'] = False
@@ -388,6 +446,7 @@ class WebViewWindow:
 
         self._started = True
         print(f"[WebView] 原生窗口已启动: {self.url}")
+        _mark_ui_mode('webview')
         _check_render_after(12, 'load watchdog timeout')
 
         # start() 阻塞主线程，直到窗口关闭

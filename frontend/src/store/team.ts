@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { teamsApi } from '@/api/teams'
+import { useLoadingStore } from '@/store/loading'
 import type { Team, TeamMember, InviteForm } from '@/types'
 
 export const useTeamStore = defineStore('team', () => {
@@ -27,8 +28,14 @@ export const useTeamStore = defineStore('team', () => {
   async function fetchMembers(teamId?: string) {
     const id = teamId || currentTeamId.value
     if (!id) return
-    const res = await teamsApi.getMembers(id)
-    members.value = res.data
+    const loadingStore = useLoadingStore()
+    loadingStore.start()
+    try {
+      const res = await teamsApi.getMembers(id)
+      members.value = res.data
+    } finally {
+      loadingStore.stop()
+    }
   }
 
   async function inviteMember(form: InviteForm) {

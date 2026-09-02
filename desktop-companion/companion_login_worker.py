@@ -6,6 +6,7 @@ from pathlib import Path
 from queue import Empty
 
 import companion_state as state
+from companion_encoding import read_text_file, write_text_file
 from companion_browser import _launch_browser_opts
 from companion_collector import (
     _is_local_or_missing_uid,
@@ -139,10 +140,16 @@ def _build_scan_browser_launches(scan_profile_dir, browser_opts: dict, login_fp:
 async def _launch_scan_browser_context(pw, scan_profile_dir, browser_opts: dict, login_fp: dict | None, platform_key: str):
     launch_errors: list[str] = []
     launches = _build_scan_browser_launches(scan_profile_dir, browser_opts, login_fp, platform_key)
+    # P0 安全修复：launch 前快照，成功后只登记新出现的浏览器进程
+    from process_registry import browser_snapshot, register_new_browser_tree
+    pre_snapshot = browser_snapshot()
     for launch_kw in launches:
         label = _browser_launch_label(launch_kw)
         try:
             context = await pw.chromium.launch_persistent_context(**launch_kw)
+            register_new_browser_tree(
+                scan_profile_dir, pre_snapshot, process_type='scan_login_browser'
+            )
             print(f'[Worker] Scan browser launch succeeded via {label}', flush=True)
             return context, launch_kw
         except Exception as exc:
@@ -193,6 +200,34 @@ def _looks_like_wechat_noise(value) -> bool:
         '数据中心',
         '关注者',
         '昨日数据',
+        # 页面 UI 模块/导航标题，绝不能被当作昵称
+        '最近视频',
+        '最近作品',
+        '视频数据',
+        '数据概览',
+        '内容数据',
+        '作品数据',
+        '今日数据',
+        '数据趋势',
+        '热门视频',
+        '视频列表',
+        '作品列表',
+        '全部视频',
+        '全部作品',
+        '视频明细',
+        '粉丝数据',
+        '观众数据',
+        '直播数据',
+        '商品数据',
+        '订单数据',
+        '账号概览',
+        '内容洞察',
+        '互动管理',
+        '图文数据',
+        '视频动态',
+        '视频号动态',
+        '查看全部',
+        '更多',
     }
     if value in noise_values:
         return True
@@ -271,6 +306,32 @@ async def _extract_wechat_video_identity(page) -> dict:
                     '\u5173\u6ce8\u8005\u6570\u636e',
                     '\u56fe\u6587\u6570\u636e',
                     '\u6628\u65e5\u6570\u636e',
+                    '\u6700\u8fd1\u89c6\u9891',
+                    '\u6700\u8fd1\u4f5c\u54c1',
+                    '\u6570\u636e\u6982\u89c8',
+                    '\u5185\u5bb9\u6570\u636e',
+                    '\u4f5c\u54c1\u6570\u636e',
+                    '\u4eca\u65e5\u6570\u636e',
+                    '\u6570\u636e\u8d8b\u52bf',
+                    '\u70ed\u95e8\u89c6\u9891',
+                    '\u89c6\u9891\u5217\u8868',
+                    '\u4f5c\u54c1\u5217\u8868',
+                    '\u5168\u90e8\u89c6\u9891',
+                    '\u5168\u90e8\u4f5c\u54c1',
+                    '\u89c6\u9891\u660e\u7ec6',
+                    '\u7c89\u4e1d\u6570\u636e',
+                    '\u89c2\u4f17\u6570\u636e',
+                    '\u76f4\u64ad\u6570\u636e',
+                    '\u5546\u54c1\u6570\u636e',
+                    '\u8ba2\u5355\u6570\u636e',
+                    '\u8d26\u53f7\u6982\u89c8',
+                    '\u5185\u5bb9\u6d1e\u5bdf',
+                    '\u4e92\u52a8\u7ba1\u7406',
+                    '\u56fe\u6587\u6570\u636e',
+                    '\u89c6\u9891\u52a8\u6001',
+                    '\u89c6\u9891\u53f7\u52a8\u6001',
+                    '\u67e5\u770b\u5168\u90e8',
+                    '\u66f4\u591a',
                 ]);
                 const isUid = (value) => /^sph[A-Za-z0-9_-]{8,}$/.test(value || '');
                 const clean = (value) => String(value || '').replace(/\u200b/g, '').replace(/\s+/g, ' ').trim();
@@ -458,23 +519,28 @@ async def _extract_douyin_identity(page) -> dict:
                 try { visit(window.__STORE__ || window.__INITIAL_STATE__ || window.__NUXT__ || {}, 0); } catch (e) {}
                 try {
                     const bodyText = document.body ? document.body.innerText || '' : '';
-                    const m = bodyText.match(/抖音号[:：\s]*([A-Za-z0-9._-]{4,})/);
-                    if (m) setText('platform_uid', m[1]);
+                    const m = bodyText.match(/MS4wLjAB[A-Za-z0-9._-]{20,}/);
+                    if (m) setText('platform_uid', m[0]);
                 } catch (e) {}
                 try {
                     const candidates = [...document.images]
                         .map((img) => ({
                             src: img.currentSrc || img.src || '',
-                            size: Math.max(img.naturalWidth || img.width || 0, img.naturalHeight || img.height || 0),
+                            w: img.naturalWidth || img.width || 0,
+                            h: img.naturalHeight || img.height || 0,
                             text: `${img.className || ''} ${img.alt || ''} ${img.getAttribute('aria-label') || ''}`.toLowerCase(),
                         }))
-                        .filter((item) => /^https?:\/\//.test(item.src) && item.size >= 40)
-                        .sort((a, b) => {
-                            const as = (/(avatar|head|user)/.test(a.text) ? 1000 : 0) + a.size;
-                            const bs = (/(avatar|head|user)/.test(b.text) ? 1000 : 0) + b.size;
-                            return bs - as;
-                        });
-                    if (candidates[0]) setText('avatar', candidates[0].src);
+                        .filter((item) => /^https?:\/\//.test(item.src) && Math.max(item.w, item.h) >= 40)
+                        .map((item) => {
+                            // 竖版大图（视频封面/剧照）严重降权：头像几乎是方图，视频封面是 9:16 竖图
+                            const portrait = item.h > item.w * 1.35;
+                            const squareBias = item.w >= item.h ? 1 : (item.h <= item.w * 1.35 ? 0.7 : 0.2);
+                            const sizeScore = Math.max(item.w, item.h) * (portrait ? 0.2 : 1) * squareBias;
+                            const textScore = (/(avatar|head|user)/.test(item.text) ? 1000 : 0);
+                            return { ...item, score: textScore + sizeScore };
+                        })
+                        .sort((a, b) => b.score - a.score);
+                    if (candidates[0] && candidates[0].score > 0) setText('avatar', candidates[0].src);
                 } catch (e) {}
                 return out;
             }'''
@@ -487,6 +553,21 @@ async def _extract_douyin_identity(page) -> dict:
     except Exception as exc:
         print(f'[Worker] DOUYIN browser identity extraction warning: {str(exc)[:120]}')
 
+    try:
+        from douyin_api_collector import extract_creator_home_identity
+        home_identity = await extract_creator_home_identity(page)
+        home_nickname = _sanitize_text(home_identity.get('nickname') if isinstance(home_identity, dict) else '')
+        home_avatar = _sanitize_text(home_identity.get('avatar_url') if isinstance(home_identity, dict) else '')
+        home_sec_uid = _sanitize_text(home_identity.get('sec_uid') if isinstance(home_identity, dict) else '')
+        if home_nickname and not _is_unsafe_nickname_fallback('DOUYIN', home_nickname):
+            identity['nickname'] = home_nickname
+        if home_avatar:
+            identity['avatar'] = home_avatar
+        if home_sec_uid.startswith('MS4wLjAB'):
+            identity['platform_uid'] = home_sec_uid
+    except Exception as exc:
+        print(f'[Worker] DOUYIN creator-home identity warning: {str(exc)[:120]}')
+
     # If we already have a sec_uid from DOM, try to enrich with API profile.
     if identity.get('platform_uid'):
         try:
@@ -494,7 +575,7 @@ async def _extract_douyin_identity(page) -> dict:
             profile = await get_user_profile(page, identity['platform_uid'])
             if profile:
                 identity['nickname'] = _sanitize_text(profile.get('nickname')) or identity.get('nickname', '')
-                identity['avatar'] = _sanitize_text(profile.get('avatar_url')) or identity.get('avatar', '')
+                identity['avatar'] = identity.get('avatar', '') or _sanitize_text(profile.get('avatar_url'))
                 identity['bio'] = _sanitize_text(profile.get('bio')) or identity.get('bio', '')
         except Exception as exc:
             print(f'[Worker] DOUYIN API profile enrichment warning: {str(exc)[:120]}')
@@ -572,7 +653,7 @@ async def _extract_douyin_identity(page) -> dict:
             profile = await get_user_profile(page, identity['platform_uid'])
             if profile:
                 identity['nickname'] = _sanitize_text(profile.get('nickname')) or identity.get('nickname', '')
-                identity['avatar'] = _sanitize_text(profile.get('avatar_url')) or identity.get('avatar', '')
+                identity['avatar'] = identity.get('avatar', '') or _sanitize_text(profile.get('avatar_url'))
                 identity['bio'] = _sanitize_text(profile.get('bio')) or identity.get('bio', '')
         except Exception as exc:
             print(f'[Worker] DOUYIN API profile enrichment warning: {str(exc)[:120]}')
@@ -588,7 +669,7 @@ def _build_session_auth_summary(profile_dir: Path, cookies: list | None = None, 
         if cookies is None:
             state_path = profile_dir / 'state.json'
             if state_path.exists():
-                state_data = json.loads(state_path.read_text('utf-8'))
+                state_data = json.loads(read_text_file(state_path))
                 cookies = state_data.get('cookies') or []
                 for origin in state_data.get('origins') or []:
                     for item in origin.get('localStorage') or []:
@@ -654,7 +735,7 @@ async def _persist_runtime_storage(context, page, state_path: Path, wait_ms: int
     await context.storage_state(path=str(state_path))
 
     try:
-        state_data = json.loads(state_path.read_text('utf-8'))
+        state_data = json.loads(read_text_file(state_path))
         origin = runtime.get('origin') or 'https://channels.weixin.qq.com'
         items = runtime.get('items') or {}
         if items:
@@ -778,7 +859,10 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     except Exception:
                         print('[Worker] clear_cookies failed, creating new context')
                         await _safe_close_context(context, scan_profile_dir, f'{platform_key}/clear_cookies')
+                        from process_registry import browser_snapshot as _bs, register_new_browser_tree as _rbnt
+                        _pre2 = _bs()
                         context = await pw.chromium.launch_persistent_context(**launch_kw)
+                        _rbnt(scan_profile_dir, _pre2, process_type='scan_login_browser')
 
                     page = context.pages[0] if context.pages else await context.new_page()
                     # Don't auto-close popups for Douyin — its login flow may open
@@ -1134,7 +1218,10 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         if douyin_identity.get('platform_uid'):
                             real_id = douyin_identity['platform_uid']
                         if douyin_identity.get('nickname') and (
-                            not nickname or nickname == real_id or nickname == _sanitize_text(info['name'])
+                            not nickname
+                            or nickname == real_id
+                            or nickname == _sanitize_text(info['name'])
+                            or _is_unsafe_nickname_fallback(platform_key, nickname)
                         ):
                             nickname = douyin_identity['nickname']
                         avatar = douyin_identity.get('avatar') or ''
@@ -1191,6 +1278,10 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
 
                     # 后端注册和上报必须可观测：本地可以先保存，但网站同步失败不能冒充成功。
                     import requests as req
+                    # 出站 HTTP 全部直连：requests 默认读取 Windows 系统代理
+                    # （Clash/VPN 等），代理节点故障时会被 TCP RST 打断。
+                    req_session = req.Session()
+                    req_session.trust_env = False
                     sync_errors = []
 
                     def _record_sync_error(label, detail):
@@ -1221,11 +1312,11 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                         headers = dict(kwargs.pop('headers', {}) or {})
                         if token and 'Authorization' not in headers:
                             headers['Authorization'] = f'Bearer {token}'
-                        resp = req.request(method, url, headers=headers, **kwargs)
+                        resp = req_session.request(method, url, headers=headers, **kwargs)
                         if resp.status_code == 401 and _refresh_backend_token('HTTP 401'):
                             abort_if_cancelled(f'{method} {url} retry')
                             headers['Authorization'] = f'Bearer {token}'
-                            resp = req.request(method, url, headers=headers, **kwargs)
+                            resp = req_session.request(method, url, headers=headers, **kwargs)
                         return resp
 
                     def _response_ok(resp) -> bool:
@@ -1254,6 +1345,25 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     nickname = _account_text(nickname, platform_uid or info.get('name') or '未命名账号')
                     avatar = _account_text(avatar, '')
                     bio = _account_text(bio, '')
+
+                    # 身份可靠性守卫：只有 finder 内部 uid（非 sph 视频号ID）且昵称不可靠时，
+                    # 不允许创建/更新云端账号 —— 避免把"最近视频"等页面标题误存为昵称。
+                    _finder_only_uid = bool(
+                        re.match(r'^v2_[A-Za-z0-9_@.\-]{8,}@finder$', platform_uid or '')
+                    )
+                    _unreliable_nickname = (
+                        not nickname
+                        or _looks_like_wechat_uid(nickname)
+                        or _looks_like_wechat_noise(nickname)
+                        or _looks_like_legal_entity_name(nickname)
+                    )
+                    if platform_key == 'WECHAT_VIDEO' and _finder_only_uid and _unreliable_nickname:
+                        local_only_identity = True
+                        platform_uid = f"local:{platform_key}:{uuid.uuid4().hex[:12]}"
+                        _record_sync_error(
+                            '昵称采集失败',
+                            '未从页面可靠识别到视频号昵称，本次仅本地保存，未创建/更新云端账号。请停留在视频号主页后重新扫码绑定。',
+                        )
 
                     existing_id = None
                     data = {'code': -1, 'message': 'Backend unavailable'}  # default: backend failed
@@ -1299,6 +1409,13 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                         if _is_local_or_missing_uid((acc.get('platformUserId') or '').strip())
                                         and _is_local_or_missing_uid(platform_uid)
                                     ]
+                                    # 只有 finder 内部 uid 时，若昵称可靠且云端有唯一同名账号，
+                                    # 复用该账号（不覆盖其 platformUserId），避免产生重复账号。
+                                    finder_reuse_allowed = (
+                                        platform_key == 'WECHAT_VIDEO'
+                                        and _finder_only_uid
+                                        and not _unreliable_nickname
+                                    )
                                     if (
                                         len(legacy_candidates) == 1
                                         and not _is_unsafe_nickname_fallback(platform_key, nickname)
@@ -1307,6 +1424,12 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                         print(
                                             f'[Worker] Legacy nickname account reuse allowed for '
                                             f'{platform_key} {nickname}: {existing_id}'
+                                        )
+                                    elif finder_reuse_allowed and len(nickname_candidates) == 1:
+                                        existing_id = nickname_candidates[0].get('id')
+                                        print(
+                                            f'[Worker] WECHAT_VIDEO finder-uid scan reused same-name account '
+                                            f'{existing_id} (platformUserId untouched)'
                                         )
                                     elif nickname_candidates:
                                         print(
@@ -1449,7 +1572,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                     # We already have them in the `cookies` variable from CDP extraction above
                     try:
                         import json as _json2
-                        state_data = _json2.loads(state_path.read_text('utf-8'))
+                        state_data = _json2.loads(read_text_file(state_path))
                         existing_keys = {(c.get('name'), c.get('domain'), c.get('path')) for c in state_data.get('cookies', [])}
                         merged = list(state_data.get('cookies', []))
                         added = 0
@@ -1485,7 +1608,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                             'cookie_age_seconds': 0,
                         }
                         cookie_info_path = Path(target_profile) / 'cookie_info.json'
-                        cookie_info_path.write_text(json.dumps(cookie_info, ensure_ascii=False))
+                        write_text_file(cookie_info_path, json.dumps(cookie_info, ensure_ascii=False))
                     except Exception as e:
                         print(f'[Worker] Cookie info save warning: {e}')
 
@@ -1722,7 +1845,7 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                         except Exception:
                                             pass
 
-                                    state_data = json.loads(source_state.read_text('utf-8'))
+                                    state_data = json.loads(read_text_file(source_state))
                                     existing_names = {(c.get('name'), c.get('domain'), c.get('path')) for c in state_data.get('cookies', [])}
                                     merged = list(state_data.get('cookies', []))
                                     for c in extra_cookies:
@@ -1739,11 +1862,11 @@ def _make_login_worker(platform, info, queue, ctrl_queue, api_url, token, use_ss
                                     print(f'[Worker] WECHAT_VIDEO: cookie merge warning: {ce}')
 
                                 source_cookie_info = source_profile / 'cookie_info.json'
-                                source_cookie_info.write_text(json.dumps({
+                                write_text_file(source_cookie_info, json.dumps({
                                     'last_cookie_refresh': time.strftime('%Y-%m-%d %H:%M:%S'),
                                     'cookie_age_seconds': 0,
                                     'profile_persisted': True,
-                                }, ensure_ascii=False), encoding='utf-8')
+                                }, ensure_ascii=False))
                                 if page:
                                     try: await page.close()
                                     except Exception: pass

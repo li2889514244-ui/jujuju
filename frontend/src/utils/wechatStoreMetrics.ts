@@ -23,6 +23,9 @@ export interface SalesStats {
   effectiveCount: number
   transactionCount: number
   refundCount: number
+  totalOrderCount: number
+  validOrderCount: number
+  refundedOrderCount: number
   avg: number
   gross: number
   refund: number
@@ -66,6 +69,20 @@ function orderDate(order: WechatOrderMetric) {
 
 function aftersaleDate(item: WechatAftersaleMetric) {
   return item.create_time ? dayjs.unix(item.create_time).format('MM-DD') : ''
+}
+
+function countRefundedOrders(aftersales: WechatAftersaleMetric[]) {
+  const orderIds = new Set<string>()
+  const fallbackIds = new Set<string>()
+  aftersales.forEach((item) => {
+    if (!isSuccessfulRefund(item)) return
+    if (item.order_id) {
+      orderIds.add(String(item.order_id))
+      return
+    }
+    if (item.id) fallbackIds.add(String(item.id))
+  })
+  return orderIds.size + fallbackIds.size
 }
 
 export function normalizeAftersales<T extends WechatAftersaleMetric>(items: T[]) {
@@ -112,6 +129,9 @@ export function calculateNetSales(
     return !orderId || orderIdsInScope.has(orderId)
   })
   const refund = successfulRefunds.reduce((sum, item) => sum + safeAmount(item.amount), 0)
+  const refundedOrderCount = countRefundedOrders(successfulRefunds)
+  const validOrderCount = effectiveCount
+  const totalOrderCount = validOrderCount + refundedOrderCount
 
   const gmv = gross - refund
   const count = orders.length
@@ -121,7 +141,10 @@ export function calculateNetSales(
     count,
     effectiveCount,
     transactionCount,
-    refundCount: successfulRefunds.length,
+    refundCount: refundedOrderCount,
+    totalOrderCount,
+    validOrderCount,
+    refundedOrderCount,
     avg: effectiveCount > 0 ? gmv / effectiveCount : 0,
     gross,
     refund,

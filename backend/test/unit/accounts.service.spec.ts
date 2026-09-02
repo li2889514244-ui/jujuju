@@ -10,6 +10,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { AccountsService } from '../../src/modules/accounts/accounts.service';
+import { PermissionService } from '../../src/modules/teams/permission.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import { mockPrismaService, resetPrismaMocks } from '../mocks/prisma.mock';
 import { mockAccounts, mockUsers } from '../fixtures';
@@ -32,6 +33,10 @@ describe('AccountsService', () => {
       providers: [
         AccountsService,
         { provide: PrismaService, useValue: mockPrismaService },
+        {
+          provide: PermissionService,
+          useValue: { assertUserPermission: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 
@@ -129,6 +134,24 @@ describe('AccountsService', () => {
 
       expect(result).not.toHaveProperty('cookies');
       expect(result).toHaveProperty('hasCookies', true);
+    });
+
+    it('页面标题类噪声昵称不得写入（最近视频等防回归）', async () => {
+      mockPrismaService.account.findUnique.mockResolvedValue(null);
+      mockPrismaService.account.create.mockResolvedValue({
+        ...mockAccounts.douyin,
+        nickname: '',
+      });
+
+      for (const noise of ['最近视频', '最近作品', '视频数据', '数据概览', '内容数据', '作品数据']) {
+        mockPrismaService.account.create.mockClear();
+        await service.create(
+          { platform: Platform.WECHAT_VIDEO, platformUserId: 'sphTest123456', nickname: noise, cookies: '' },
+          'user-001',
+        );
+        const createCall = mockPrismaService.account.create.mock.calls[0][0];
+        expect(createCall.data.nickname).not.toBe(noise);
+      }
     });
   });
 

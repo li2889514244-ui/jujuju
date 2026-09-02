@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="account-list">
     <div class="account-list__header">
       <div>
@@ -94,6 +94,7 @@
         :key="acc.id"
         class="account-card"
         :class="{ 'account-card--selected': selectedIds.includes(acc.id) }"
+        :data-account-id="acc.id"
         @click="toggleSelect(acc.id)"
       >
         <div class="account-card__check">
@@ -119,7 +120,9 @@
           </span>
         </div>
         <div class="account-card__stats">
-          <span class="account-card__stat-value">{{ formatCompactNum(acc.followers || 0) }}</span>
+          <span class="account-card__stat-value">
+            <AnimatedNumber :value="acc.followers || 0" :format="formatCompactNum" :duration="280" />
+          </span>
           <span class="account-card__stat-label">粉丝</span>
         </div>
         <span v-if="acc.groupName" class="account-card__group">{{ acc.groupName }}</span>
@@ -388,6 +391,7 @@ import GlassCard from '@/components/common/GlassCard.vue'
 import PlatformBadge from '@/components/common/PlatformBadge.vue'
 import ManualAddDialog from '@/components/account/ManualAddDialog.vue'
 import { accountOnlineLabel, accountOnlineState, formatCompactNum, tokenStatusLabel } from '@/utils/format'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 import { readJsonOr } from '@/utils/http'
 import { getPlatformColor } from '@/composables/usePlatform'
 import { useCompanionUrl } from '@/composables/useCompanionUrl'
@@ -604,6 +608,13 @@ async function handleDelete(id: string) {
     '删除账号',
     { type: 'warning', confirmButtonText: '永久删除', cancelButtonText: '取消' },
   )
+  // 删除动效：卡片先淡出并收起高度，再刷新列表，避免下方内容突然跳上来
+  const cardEl = document.querySelector<HTMLElement>(`[data-account-id="${id}"]`)
+  if (cardEl) {
+    cardEl.style.maxHeight = `${cardEl.offsetHeight}px`
+    requestAnimationFrame(() => cardEl.classList.add('removing-item'))
+    await new Promise((resolve) => setTimeout(resolve, 240))
+  }
   await accountStore.deleteAccount(id)
   ElMessage.success('删除成功')
 }
@@ -622,6 +633,11 @@ async function handleBatchDelete() {
   } else {
     ElMessage.warning(`删除完成：成功 ${successCount} 个，失败 ${failCount} 个`)
   }
+  // 清掉已删除账号的选中态，避免浮动栏残留"已选 N 个账号"（这些账号已不存在）
+  const successfulIds = new Set(
+    selectedIds.value.filter((_, index) => results[index]?.status === 'fulfilled'),
+  )
+  selectedIds.value = selectedIds.value.filter((id) => !successfulIds.has(id))
   accountStore.fetchAccounts()
 }
 

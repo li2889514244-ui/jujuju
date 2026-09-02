@@ -172,7 +172,11 @@ describe('PlatformsService reportMetrics', () => {
         }),
       }),
     )
-    const updateArg = prisma.account.update.mock.calls[0][0]
+    // reportMetrics 会先写一条 lastCollectAttemptAt 更新，再写业务更新；
+    // 取第一条带 metadata 的更新。
+    const updateArg = prisma.account.update.mock.calls
+      .map((call: any[]) => call[0])
+      .find((arg: any) => arg?.data?.metadata)
     const metadata = JSON.parse(updateArg.data.metadata)
     expect(metadata.periodMetrics.videoData.day_total.play).toBe(10)
     expect(metadata.periodMetrics.followerData.day_total.net_fans).toBe(2)

@@ -61,7 +61,7 @@ services:
     container_name: matrixflow-tunnel
     restart: always
     network_mode: host
-    command: tunnel --region us --edge-ip-version 4 --protocol quic run --dns-resolver-addrs 100.100.2.136:53 --dns-resolver-addrs 100.100.2.138:53 --token ${CF_TUNNEL_TOKEN}
+    command: tunnel --region us --edge-ip-version 4 --protocol http2 run --token ${CF_TUNNEL_TOKEN}
     mem_limit: 64m
     security_opt:
       - no-new-privileges:true

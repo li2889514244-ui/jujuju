@@ -173,6 +173,21 @@ export class ReportPostStatsDto {
   posts!: ReportPostStatItem[]
 }
 
+export class ReportCollectStatusDto {
+  @ApiProperty({ description: '账号ID' })
+  @IsString()
+  accountId!: string
+
+  @ApiProperty({ description: '采集状态', enum: ['SUCCESS', 'FAILED', 'COLLECTING'] })
+  @IsString()
+  status!: 'SUCCESS' | 'FAILED' | 'COLLECTING'
+
+  @ApiPropertyOptional({ description: '状态说明或失败原因' })
+  @IsOptional()
+  @IsString()
+  message?: string
+}
+
 export class PlatformFilterDto {
   @ApiPropertyOptional({ description: '平台筛选' })
   @IsOptional()

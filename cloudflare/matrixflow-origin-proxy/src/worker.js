@@ -14,6 +14,19 @@ const STATIC_ASSET_TTL_SECONDS = 30 * 24 * 60 * 60
 const DOWNLOAD_PREFIX = '/downloads/'
 const COMPANION_UPDATE_PREFIX = '/companion-updates/'
 const DOWNLOAD_TTL_SECONDS = 24 * 60 * 60
+const UPLOADS_PREFIX = '/uploads/'
+const UPLOADS_TTL_SECONDS = 24 * 60 * 60
+// SPA 页面（index.html 及所有前端路由）：边缘缓存 5 分钟，卸载源站压力；
+// 每次前端部署后 publish 脚本会主动 purge，确保用户尽快看到新版本。
+const HTML_TTL_SECONDS = 5 * 60
+const EXCLUDED_FROM_HTML_CACHE = [
+  STATIC_ASSET_PREFIX,
+  DOWNLOAD_PREFIX,
+  COMPANION_UPDATE_PREFIX,
+  UPLOADS_PREFIX,
+  '/api/',
+  '/ws/',
+]
 
 function isStaticAssetRequest(request) {
   const url = new URL(request.url)
@@ -55,6 +68,25 @@ function isCompanionUpdateRequest(request) {
 function isApiRequest(request) {
   const url = new URL(request.url)
   return url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws/')
+}
+
+function isUploadsRequest(request) {
+  const url = new URL(request.url)
+  return (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    url.pathname.startsWith(UPLOADS_PREFIX)
+  )
+}
+
+function isHtmlPageRequest(request) {
+  if (request.method !== 'GET' && request.method !== 'HEAD') {
+    return false
+  }
+  if (request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
+    return false
+  }
+  const url = new URL(request.url)
+  return !EXCLUDED_FROM_HTML_CACHE.some((prefix) => url.pathname.startsWith(prefix))
 }
 
 function buildOriginRequest(request, env, options = {}) {
@@ -102,6 +134,30 @@ function buildCfOptions(request, env, originRequest) {
     cf.cacheTtlByStatus = {
       '200-299': STATIC_ASSET_TTL_SECONDS,
       404: 60,
+      '500-599': 0,
+    }
+    cf.cacheKey = originRequest.url
+    return cf
+  }
+
+  if (isUploadsRequest(request)) {
+    cf.cacheEverything = true
+    cf.cacheTtl = UPLOADS_TTL_SECONDS
+    cf.cacheTtlByStatus = {
+      '200-299': UPLOADS_TTL_SECONDS,
+      404: 60,
+      '500-599': 0,
+    }
+    cf.cacheKey = originRequest.url
+    return cf
+  }
+
+  if (isHtmlPageRequest(request)) {
+    cf.cacheEverything = true
+    cf.cacheTtl = HTML_TTL_SECONDS
+    cf.cacheTtlByStatus = {
+      '200-299': HTML_TTL_SECONDS,
+      404: 0,
       '500-599': 0,
     }
     cf.cacheKey = originRequest.url
@@ -164,12 +220,14 @@ function rewriteLocation(response, publicUrl) {
 export default {
   async fetch(request, env) {
     const staticAsset = isStaticAssetRequest(request)
+    const uploadsAsset = isUploadsRequest(request)
+    const htmlPage = isHtmlPageRequest(request)
     const downloadAsset = isDownloadRequest(request)
     const mutableDownloadAsset = isMutableDownloadRequest(request)
     const companionUpdateAsset = isCompanionUpdateRequest(request)
     const apiRequest = isApiRequest(request)
     const originRequest = buildOriginRequest(request, env, {
-      publicStaticAsset: staticAsset || downloadAsset,
+      publicStaticAsset: staticAsset || uploadsAsset || htmlPage || downloadAsset,
       bustCache: mutableDownloadAsset || companionUpdateAsset,
     })
     const cf = buildCfOptions(request, env, originRequest)

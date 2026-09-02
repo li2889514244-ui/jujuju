@@ -1,4 +1,12 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, OnModuleInit } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common'
 import { AccountStatus, UserRole } from '@prisma/client'
 import * as fs from 'fs'
 import * as path from 'path'
@@ -67,6 +75,10 @@ function textValue(value: any) {
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   if (typeof value === 'string') return value.trim()
   return ''
+}
+
+function normalizeStoreName(value: any) {
+  return String(value || '').trim().replace(/\s+/g, '').toLowerCase()
 }
 
 function findNestedText(obj: any, keyTokens: string[], valueHints: string[] = []): string {
@@ -158,7 +170,14 @@ export class DoudianBrowserService implements OnModuleInit {
       where: { id: storeId },
       select: { organizationId: true },
     })
-    if (!store) throw new BadRequestException('Doudian store not found')
+    if (!store) {
+      // 结构化 404：伴侣本地保存的 cloud_store_id 已失效（云端店铺被重建）时，
+      // 伴侣可识别 DOUDIAN_STORE_NOT_FOUND 并按店名自动找回、重绑，而不是死循环报错。
+      throw new NotFoundException({
+        code: 'DOUDIAN_STORE_NOT_FOUND',
+        message: '云端抖店店铺不存在，请重新绑定后同步。',
+      })
+    }
     if (user?.role === UserRole.SUPER_ADMIN) return
     if (store.organizationId && user?.organizationId === store.organizationId) return
     if (!store.organizationId && !user?.organizationId) return
@@ -237,6 +256,66 @@ export class DoudianBrowserService implements OnModuleInit {
       data: { name: trimmed },
     })
     return { updated: true, name: trimmed }
+  }
+
+  async rebindCompanionStore(
+    id: string,
+    body: { localProfileId?: string; storeName?: string },
+    user?: { role?: UserRole; organizationId?: string | null },
+  ) {
+    await this.assertStoreAccess(id, user)
+    const localProfileId = String(body.localProfileId || '').trim()
+    if (!/^[A-Za-z0-9_-]{3,128}$/.test(localProfileId)) {
+      throw new BadRequestException({
+        code: 'INVALID_LOCAL_PROFILE_ID',
+        message: '披星云伴侣本地店铺标识无效，请刷新伴侣后重试。',
+      })
+    }
+
+    const store = await (this.prisma as any).doudianStore.findUnique({
+      where: { id },
+      select: { id: true, name: true, profilePath: true, organizationId: true },
+    })
+    if (!store) throw new BadRequestException('Doudian store not found')
+    if (!String(store.profilePath || '').startsWith('companion:')) {
+      throw new BadRequestException({
+        code: 'NOT_COMPANION_MANAGED_STORE',
+        message: '当前抖店不是披星云伴侣管理的店铺，不能自动重绑。',
+      })
+    }
+
+    const incomingName = String(body.storeName || '').trim()
+    if (incomingName && store.name && normalizeStoreName(incomingName) !== normalizeStoreName(store.name)) {
+      throw new ConflictException({
+        code: 'DOUDIAN_STORE_NAME_MISMATCH',
+        message: '当前登录的抖店名称与网站店铺不一致，为避免绑错店，本次同步已停止。',
+      })
+    }
+
+    const profilePath = `companion:${localProfileId}`
+    const existing = await (this.prisma as any).doudianStore.findUnique({
+      where: { profilePath },
+      select: { id: true, organizationId: true },
+    })
+    if (existing && existing.id !== id) {
+      throw new ConflictException({
+        code: 'DOUDIAN_PROFILE_ALREADY_BOUND',
+        message: '当前披星云伴侣本地店铺已经绑定到另一家抖店，请检查店铺后再同步。',
+      })
+    }
+
+    const updated = await (this.prisma as any).doudianStore.update({
+      where: { id },
+      data: {
+        profilePath,
+        ...(incomingName ? { name: incomingName } : {}),
+        syncStatus: 'pending',
+        syncError: null,
+        sessionStatus: 'managed_by_companion',
+      },
+      select: safeStoreSelect,
+    })
+    return { success: true, code: 'REBIND_OK', store: updated }
   }
 
   async syncAllStores() {
@@ -345,10 +424,28 @@ export class DoudianBrowserService implements OnModuleInit {
     },
   ) {
     const store = await (this.prisma as any).doudianStore.findUnique({ where: { id: storeId } })
-    if (!store) throw new Error(`Doudian store not found: ${storeId}`)
+    if (!store) {
+      throw new NotFoundException({
+        code: 'DOUDIAN_STORE_NOT_FOUND',
+        message: '云端抖店店铺不存在，请重新绑定后同步。',
+      })
+    }
     const expectedProfilePath = `companion:${payload.localProfileId || ''}`
     if (!payload.localProfileId || store.profilePath !== expectedProfilePath) {
-      throw new BadRequestException('Invalid companion upload store binding')
+      this.logger.warn(
+        `Doudian companion binding stale storeId=${storeId} expected=${store.profilePath} received=${expectedProfilePath}`,
+      )
+      await (this.prisma as any).doudianStore.update({
+        where: { id: storeId },
+        data: {
+          syncStatus: 'failed',
+          syncError: '当前店铺与披星云伴侣的绑定信息已失效，请重新绑定后同步。',
+        },
+      })
+      throw new ConflictException({
+        code: 'STALE_COMPANION_BINDING',
+        message: '当前店铺与披星云伴侣的绑定信息已失效，请重新绑定后同步。',
+      })
     }
     // Store name matching removed: account isolation is enforced by
     // profilePath (localProfileId) binding above, not by name comparison.

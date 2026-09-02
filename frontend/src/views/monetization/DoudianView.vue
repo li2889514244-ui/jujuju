@@ -37,7 +37,6 @@
           placeholder="选择店铺"
           size="small"
           class="doudian__store-select"
-          @change="loadData"
         >
           <el-option
             v-for="store in localStores"
@@ -52,7 +51,6 @@
           placeholder="选择店铺"
           size="small"
           class="doudian__store-select"
-          @change="loadData"
         >
           <el-option
             v-for="store in stores"
@@ -125,15 +123,26 @@
     <div class="doudian__kpi doudian__kpi--primary">
       <div class="kpi-card">
         <div class="kpi-card__label">{{ rangeSalesLabel }}</div>
-        <div class="kpi-card__value">&yen;{{ centToYuan(orderStats.net) }}</div>
+        <div class="kpi-card__value">
+          &yen;<AnimatedNumber :value="orderStats.net" :format="centToYuan" :duration="280" />
+        </div>
         <div class="kpi-card__sub">{{ orderStatsSub }}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-card__label">总订单</div>
+        <div class="kpi-card__value">
+          <AnimatedNumber :value="orderStats.totalOrderCount" :duration="280" />
+        </div>
+        <div class="kpi-card__sub">
+          有效订单 {{ orderStats.validOrderCount }} / 退款订单 {{ orderStats.refundedOrderCount }}
+        </div>
       </div>
       <div class="kpi-card">
         <div class="kpi-card__label">售后退款</div>
         <div class="kpi-card__value kpi-card__value--danger">
-          &yen;{{ centToYuan(rangeAftersaleAmount) }}
+          &yen;<AnimatedNumber :value="rangeAftersaleAmount" :format="centToYuan" :duration="280" />
         </div>
-        <div class="kpi-card__sub">{{ displayRefundAftersales.length }} 条退款记录</div>
+        <div class="kpi-card__sub">{{ orderStats.refundedOrderCount }} 笔退款订单</div>
       </div>
     </div>
 
@@ -213,12 +222,10 @@
             </div>
           </div>
           <div class="source-row__stats">
-            <strong>{{ source.orders }}</strong>
+            <strong>{{ source.validOrderCount }}</strong>
             <span>单</span>
             <em>&yen;{{ centToYuan(source.gmv) }}</em>
-            <small v-if="source.refundCount > 0">
-              退款 {{ source.refundCount }} 单 / &yen;{{ centToYuan(source.refundAmount) }}
-            </small>
+            <small>总订单 {{ source.totalOrderCount }} · 退款 {{ source.refundedOrderCount }}</small>
           </div>
         </div>
       </div>
@@ -336,11 +343,14 @@ import {
   doudianOrderStatus,
   filterDoudianRefunds,
   getDoudianRevenueOrders,
+  getDoudianRefundedOrderCount,
   getDoudianSuccessfulRefundOrderIds,
   type DoudianAftersaleMetric,
   type DoudianOrderMetric,
 } from '@/utils/doudianStoreMetrics'
 import { readJsonOr } from '@/utils/http'
+import { useLoadingStore } from '@/store/loading'
+import AnimatedNumber from '@/components/common/AnimatedNumber.vue'
 
 const stores = ref<DoudianStore[]>([])
 const router = useRouter()
@@ -376,9 +386,13 @@ interface DoudianSourceSummary {
   authorId: string
   authorSource: string
   isSelf: boolean
-  orders: number
+  /** 总订单 = 有效订单 + 退款订单 */
+  totalOrderCount: number
+  /** 有效订单 / 去退款单数（主数字） */
+  validOrderCount: number
+  /** 退款订单数 */
+  refundedOrderCount: number
   gmv: number
-  refundCount: number
   refundAmount: number
 }
 
@@ -416,11 +430,11 @@ const hasCachedData = computed(
   () => orders.value.length > 0 || products.value.length > 0 || aftersales.value.length > 0,
 )
 const storeAlertTitle = computed(() => {
-  if (lastLoadError.value && !hasCachedData.value) return lastLoadError.value
+  if (lastLoadError.value) return lastLoadError.value
   const message = activeStore.value?.syncError || activeLocalStore.value?.last_error || ''
   if (!message) return ''
-  if (hasCachedData.value) return ''
-  return message
+  // 同步失败即使存在旧缓存也必须提示，避免用户把过期数据当最新数据
+  return hasCachedData.value ? message + '（当前展示历史缓存数据）' : message
 })
 const displayRange = computed(() => {
   const now = dayjs()
@@ -481,6 +495,7 @@ const displayRefundAftersales = computed(() => {
 const rangeAftersaleAmount = computed(() =>
   displayRefundAftersales.value.reduce((sum, item) => sum + Number(item.amount || 0), 0),
 )
+const refundedOrderCount = computed(() => getDoudianRefundedOrderCount(displayRefundAftersales.value))
 const refundedOrderMap = computed(() => {
   const map = new Map<string, { count: number; amount: number }>()
   for (const item of displayRefundAftersales.value) {
@@ -525,24 +540,37 @@ const orderStats = computed(() => {
       net: current.net,
       count: current.count,
       effectiveCount: current.effectiveCount,
+      totalOrderCount: current.totalOrderCount ?? current.effectiveCount + current.refundCount,
+      validOrderCount: current.validOrderCount ?? current.effectiveCount,
+      refundedOrderCount: current.refundedOrderCount ?? current.refundCount,
     }
   }
   const gross = revenueOrders.value.reduce((sum, order) => sum + Number(order.pay_amount || 0), 0)
   const refund = rangeAftersaleAmount.value
+  // 有效订单 = 营收订单 - 退款订单；总订单 = 有效 + 退款（与后端 buildDoudianSummary 同口径）
+  const refundedIds = new Set(
+    displayRefundAftersales.value
+      .filter((item) => item.order_id)
+      .map((item) => String(item.order_id)),
+  )
+  const validOrderCount = revenueOrders.value.filter(
+    (order) => !refundedIds.has(String(order.order_id || '')),
+  ).length
   return {
     gross,
     refund,
-    net: Math.max(0, gross - refund),
+    net: gross - refund,
     count: displayOrders.value.length,
-    effectiveCount: revenueOrders.value.length,
+    effectiveCount: validOrderCount,
+    totalOrderCount: validOrderCount + refundedOrderCount.value,
+    validOrderCount,
+    refundedOrderCount: refundedOrderCount.value,
   }
 })
 const orderStatsSub = computed(() => {
-  const { count, effectiveCount } = orderStats.value
-  if (count === 0) return '0 笔订单'
-  const countText =
-    effectiveCount === count ? `${count} 笔订单` : `${effectiveCount} 笔有效 / ${count} 笔总单`
-  return countText
+  const { totalOrderCount, validOrderCount, refundedOrderCount } = orderStats.value
+  if (totalOrderCount === 0) return '0 笔订单'
+  return `${totalOrderCount} 笔总订单 / 有效 ${validOrderCount} / 退款 ${refundedOrderCount}（退款按订单日归集）`
 })
 const syncText = computed(() => {
   if (usingCloudFallback.value && activeStore.value?.lastSyncedAt) {
@@ -566,7 +594,7 @@ const sortedProducts = computed(() =>
 )
 const statusBreakdown = computed(() => {
   if (backendSummary.value) return backendSummary.value.statusBreakdown
-  return buildDoudianStatusBreakdown(displayOrders.value, displayRefundAftersales.value.length)
+  return buildDoudianStatusBreakdown(displayOrders.value, refundedOrderCount.value)
 })
 const sourceRanking = computed<DoudianSourceSummary[]>(() => {
   const map = new Map<string, DoudianSourceSummary>()
@@ -586,27 +614,35 @@ const sourceRanking = computed<DoudianSourceSummary[]>(() => {
       authorId,
       authorSource: isSelf ? '小店自卖' : String(order.author_source || '').trim(),
       isSelf,
-      orders: 0,
+      totalOrderCount: 0,
+      validOrderCount: 0,
+      refundedOrderCount: 0,
       gmv: 0,
-      refundCount: 0,
       refundAmount: 0,
     }
+    // 统一口径（与业绩天梯一致）：总订单 = 有效 + 退款，主数字展示去退款单数
     if (shouldCountOrder) {
-      existing.orders += 1
+      existing.totalOrderCount += 1
       existing.gmv += Number(order.pay_amount || 0)
     }
     if (!existing.authorSource && order.author_source) {
       existing.authorSource = String(order.author_source).trim()
     }
     if (refund) {
-      existing.refundCount += refund.count
+      existing.refundedOrderCount += 1
       existing.refundAmount += refund.amount
     }
     map.set(key, existing)
   }
-  return Array.from(map.values()).sort(
-    (a, b) => b.gmv - a.gmv || b.orders - a.orders || b.refundCount - a.refundCount,
-  )
+  return Array.from(map.values())
+    .map((source) => ({
+      ...source,
+      validOrderCount: source.totalOrderCount - source.refundedOrderCount,
+    }))
+    .sort(
+      (a, b) =>
+        b.validOrderCount - a.validOrderCount || b.gmv - a.gmv || a.name.localeCompare(b.name),
+    )
 })
 const trendOption = computed(() => {
   const entries =
@@ -715,6 +751,23 @@ function resolveApiUrl() {
   return `${window.location.origin}${raw}`
 }
 
+function friendlyDoudianSyncError(error: any) {
+  const message = String(error?.message || error || '')
+  if (message.includes('STALE_COMPANION_BINDING') || message.includes('Invalid companion upload store binding')) {
+    return '当前抖店绑定已失效，请在披星云伴侣里重新绑定后同步'
+  }
+  if (message.includes('400 Client Error') || message.includes('/doudian-browser/stores/')) {
+    return '抖店同步被服务器拒绝，请重新登录或重新绑定该店铺后再同步'
+  }
+  if (message.includes('401') || message.toLowerCase().includes('unauthorized')) {
+    return '抖店登录已失效，请在披星云伴侣重新登录后再同步'
+  }
+  if (message.includes('502') || message.includes('503') || message.includes('504')) {
+    return '同步服务暂时异常，请稍后重试'
+  }
+  return message || '抖店同步失败'
+}
+
 async function getRequiredCompanionUrl() {
   const companionUrl = await getCompanionUrl()
   if (!companionUrl) throw new Error('桌面伴侣未启动')
@@ -761,51 +814,65 @@ function clearDoudianData() {
   summary.value = null
 }
 
+// 请求时序守卫：只有最新一次 loadData 的结果允许写入页面状态，
+// 防止快速切换店铺/时间范围时旧请求后返回覆盖新数据（串店）。
+let latestRequestId = 0
+
 async function loadData() {
+  const requestId = ++latestRequestId
   lastLoadError.value = ''
   if (!activeStoreId.value) {
     clearDoudianData()
     return
   }
+  // 固定本次请求的店铺 id 与时间范围，避免请求期间切换导致 summary 与列表错位
+  const storeId = activeStoreId.value
+  const range = displayRange.value
+  const mode = viewMode.value
   loading.value = true
+  const loadingStore = useLoadingStore()
+  loadingStore.start()
   clearDoudianData()
   try {
-    const range = displayRange.value
     const [orderRes, recentOrderRes, productRes, aftersaleRes] = await Promise.all([
-      doudianStoreApi.getOrders(activeStoreId.value, {
+      doudianStoreApi.getOrders(storeId, {
         start_time: range.start,
         end_time: range.end,
       }),
-      doudianStoreApi.getOrders(activeStoreId.value),
-      doudianStoreApi.getProducts(activeStoreId.value),
-      doudianStoreApi.getAftersales(activeStoreId.value, {
-        begin_create_time: range.start,
-        end_create_time: range.end,
-      }),
+      doudianStoreApi.getOrders(storeId),
+      doudianStoreApi.getProducts(storeId),
+      // 拉取全量售后（不再按退款时间过滤）：退款统一按订单归属日归集
+      doudianStoreApi.getAftersales(storeId),
     ])
+    if (requestId !== latestRequestId) return
     orders.value = orderRes.data?.order_list || []
     recentOrders.value = recentOrderRes.data?.order_list || orders.value
     products.value = productRes.data?.products || []
     aftersales.value = aftersaleRes.data?.list || []
     try {
-      if (['today', 'yesterday', 'week', 'month'].includes(viewMode.value)) {
-        const summaryRes = await doudianStoreApi.getSummary(activeStoreId.value, {
+      if (['today', 'yesterday', 'week', 'month'].includes(mode)) {
+        const summaryRes = await doudianStoreApi.getSummary(storeId, {
           start: range.start,
           end: range.end,
-          mode: viewMode.value as DoudianSummary['mode'],
+          mode: mode as DoudianSummary['mode'],
         })
+        if (requestId !== latestRequestId) return
         summary.value = summaryRes.data || null
       }
     } catch {
       summary.value = null
     }
   } catch (error: any) {
+    if (requestId !== latestRequestId) return
     clearDoudianData()
     console.error('[Doudian] load data failed', error)
     lastLoadError.value = error?.message || '抖店数据加载失败'
     ElMessage.error(lastLoadError.value)
   } finally {
-    loading.value = false
+    loadingStore.stop()
+    if (requestId === latestRequestId) {
+      loading.value = false
+    }
   }
 }
 
@@ -944,7 +1011,7 @@ async function syncActive() {
     await loadStores()
     await loadData()
   } catch (error: any) {
-    const message = error?.message || '同步失败'
+    const message = friendlyDoudianSyncError(error)
     if (message.includes('取消')) ElMessage.info(message)
     else ElMessage.error(message)
   } finally {

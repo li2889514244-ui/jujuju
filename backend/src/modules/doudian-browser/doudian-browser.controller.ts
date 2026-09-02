@@ -77,6 +77,15 @@ export class DoudianBrowserController {
     return { success: true, ...result }
   }
 
+  @Post('stores/:id/rebind')
+  async rebindCompanionStore(
+    @Param('id') id: string,
+    @Body() body: { localProfileId?: string; storeName?: string },
+    @CurrentUser() user: any,
+  ) {
+    return this.doudianBrowserService.rebindCompanionStore(id, body, user)
+  }
+
   @Post('sync')
   syncAllStores() {
     return this.doudianBrowserService.syncAllStores()

@@ -128,6 +128,13 @@ desktop-companion/*
 !desktop-companion/*.py
 !desktop-companion/*.bat
 !desktop-companion/companion_config.json.example
+!desktop-companion/video_editor/
+!desktop-companion/video_editor/*.py
+!desktop-companion/tests/
+!desktop-companion/tests/*
+!desktop-companion/pixingyun-mate-onedir.spec
+!desktop-companion/pixingyun-mate.spec
+!desktop-companion/æŠ«æ˜Ÿäº‘ä¼´ä¾£.spec
 
 # å¤–éƒ¨çˆ¬è™«å·¥å…·
 bazhuayu_style_scraper.py_debug_archive/
@@ -224,3 +231,6 @@ backend/prisma/data/
 backups/matrixflow_*
 github_payload.json
 proc_info.txt
+
+# ±¾µØ ffmpeg ÏÂÔØ²úÎï£¨ÔËÐÐÊ±°´Ðè»ñÈ¡£©
+ffmpeg-tmp/

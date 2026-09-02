@@ -20,6 +20,7 @@ import sqlite3
 from pathlib import Path
 
 import companion_state as state
+from companion_encoding import read_text_file
 from companion_config import _load_config
 from companion_auth import _login_with_saved_credentials, _check_and_refresh_token
 
@@ -71,7 +72,7 @@ def _load_state_data(profile_dir: Path) -> dict:
     if not state_path.exists():
         return {}
     try:
-        return json.loads(state_path.read_text('utf-8'))
+        return json.loads(read_text_file(state_path))
     except Exception:
         return {}
 

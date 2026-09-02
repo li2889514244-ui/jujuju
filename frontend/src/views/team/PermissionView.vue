@@ -86,13 +86,13 @@ const ADMIN_DEFAULTS: PermEntry[] = [
 
 const MEMBER_DEFAULTS: PermEntry[] = [
   { id: 'view_accounts', name: '查看账号', description: '查看团队内所有账号信息', enabled: true, alwaysEnabled: true },
-  { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: false },
+  { id: 'manage_accounts', name: '管理账号', description: '添加、编辑、删除账号', enabled: true },
   { id: 'view_content', name: '查看内容', description: '查看团队内所有内容', enabled: true, alwaysEnabled: true },
   { id: 'create_content', name: '创建内容', description: '创建和编辑内容', enabled: true },
   { id: 'publish_content', name: '发布内容', description: '发布内容到各平台', enabled: false },
   { id: 'view_analytics', name: '查看数据', description: '查看数据分析报告', enabled: true },
   { id: 'export_data', name: '导出数据', description: '导出分析报告和数据', enabled: false },
-  { id: 'manage_browser', name: '管理浏览器', description: '管理内置浏览器会话', enabled: false },
+  { id: 'manage_browser', name: '管理浏览器', description: '管理内置浏览器会话', enabled: true },
   { id: 'manage_team', name: '管理团队', description: '邀请、移除成员、修改角色', enabled: false },
   { id: 'manage_permissions', name: '管理权限', description: '修改团队权限设置', enabled: false },
 ]

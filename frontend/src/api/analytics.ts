@@ -22,8 +22,21 @@ export interface AccountDetailItem {
     week_total: DailyMetrics | null
     month_total: DailyMetrics | null
   }
+  periodStatus?: {
+    day_total?: PeriodDataStatus
+    week_total?: PeriodDataStatus
+    month_total?: PeriodDataStatus
+  }
   /** 数据来源日期（最近一次采集日期），null 表示从未采集 */
   dataDate: string | null
+}
+
+export interface PeriodDataStatus {
+  state: 'complete' | 'partial' | 'historical' | 'empty'
+  label: string
+  dataDate: string | null
+  coveredDays: number
+  expectedDays: number
 }
 
 export const analyticsApi = {

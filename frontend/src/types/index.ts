@@ -61,6 +61,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
 export interface Account {
   id: string
   platform: Platform
+  platformUserId?: string
   nickname: string
   avatar: string
   accountId: string
@@ -74,6 +75,10 @@ export interface Account {
   onlineReason?: string
   hasCookies?: boolean
   status?: string
+  lastSuccessfulCollectAt?: string | null
+  lastCollectAttemptAt?: string | null
+  lastCollectStatus?: 'SUCCESS' | 'FAILED' | 'COLLECTING' | null
+  lastCollectError?: string | null
   lastActiveAt: string
   followers: number
   following: number

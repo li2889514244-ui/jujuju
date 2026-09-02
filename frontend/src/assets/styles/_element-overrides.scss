@@ -110,10 +110,16 @@
   border-radius: $radius-md;
   font-weight: 500;
   letter-spacing: -0.01em;
-  transition: all 0.18s $ease-out;
+  transition: all var(--motion-fast) var(--ease-standard);
 
   &:focus-visible {
     @include focus-ring;
+  }
+
+  // 点击按压反馈：轻微缩小，松开自然恢复（不做夸张弹跳）
+  &:not(.is-disabled):active {
+    transform: scale(0.97);
+    transition-duration: 60ms;
   }
 }
 
@@ -395,7 +401,7 @@
   border-color: $border-base;
   color: $text-secondary;
   font-weight: 500;
-  transition: all 0.18s $ease-out;
+  transition: all var(--motion-fast) var(--ease-standard);
 }
 
 .el-radio-button.is-active .el-radio-button__inner {
@@ -790,6 +796,181 @@
   }
 }
 
+
+// ════════════════════════════════════════════════════════════
+// 全站动效：Dialog / MessageBox / Popover / Dropdown / Message / Notification
+// 统一使用 --motion-* 与 --ease-standard，克制、快速、无弹跳。
+// ════════════════════════════════════════════════════════════
+
+// ── Dialog（dialog-fade 挂在 overlay 上，弹窗本体加 scale） ──
+.dialog-fade-enter-active {
+  transition: opacity var(--motion-normal) var(--ease-standard);
+}
+
+.dialog-fade-leave-active {
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.dialog-fade-enter-from,
+.dialog-fade-leave-to {
+  opacity: 0;
+}
+
+.el-dialog {
+  transition:
+    transform var(--motion-normal) var(--ease-standard),
+    opacity var(--motion-normal) var(--ease-standard);
+}
+
+.dialog-fade-enter-from .el-dialog {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.dialog-fade-leave-to .el-dialog {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+// ── MessageBox（确认框随 overlay 一起淡入 + 轻微 scale） ──
+.el-fade-in-linear-enter-active {
+  transition: opacity var(--motion-normal) var(--ease-standard);
+}
+
+.el-fade-in-linear-leave-active {
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.el-fade-in-linear-enter-from .el-message-box {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.el-fade-in-linear-leave-to .el-message-box {
+  opacity: 0;
+  transform: scale(0.97);
+}
+
+.el-message-box {
+  transition:
+    transform var(--motion-normal) var(--ease-standard),
+    opacity var(--motion-normal) var(--ease-standard);
+}
+
+// ── Popover / Select / Dropdown（el-zoom-in-top → 快速淡入 + 轻微下移） ──
+.el-zoom-in-top-enter-active,
+.el-zoom-in-top-leave-active {
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.el-zoom-in-top-enter-from {
+  opacity: 0;
+  transform: translateY(-4px) scaleY(0.98);
+  transform-origin: center top;
+}
+
+.el-zoom-in-top-leave-to {
+  opacity: 0;
+  transform: translateY(-2px) scaleY(0.98);
+  transform-origin: center top;
+}
+
+// ── Message（轻微滑入 + 淡入） ──
+.el-message-fade-enter-active {
+  transition:
+    opacity var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.el-message-fade-leave-active {
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.el-message-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.el-message-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-2px);
+}
+
+// ── Notification（右上角轻微滑入） ──
+.el-notification-fade-enter-active {
+  transition:
+    opacity var(--motion-normal) var(--ease-standard),
+    transform var(--motion-normal) var(--ease-standard);
+}
+
+.el-notification-fade-leave-active {
+  transition: opacity var(--motion-fast) var(--ease-standard);
+}
+
+.el-notification-fade-enter-from {
+  opacity: 0;
+  transform: translateX(10px);
+}
+
+.el-notification-fade-leave-to {
+  opacity: 0;
+  transform: translateX(6px);
+}
+
+// ── 卡片：统一 hover 规范（上浮 1-2px + 阴影 + 边框，不放大） ──
+.el-card.is-hover-shadow {
+  transition:
+    transform var(--motion-normal) var(--ease-standard),
+    border-color var(--motion-normal) var(--ease-standard),
+    box-shadow var(--motion-normal) var(--ease-standard);
+}
+
+.el-card.is-hover-shadow:hover {
+  transform: translateY(-1px);
+  border-color: $border-strong;
+}
+
+// ── 表格 / 分页：切换与加载时的轻量过渡 ──
+.el-table {
+  transition: opacity var(--motion-normal) var(--ease-standard);
+}
+
+.el-pager li,
+.el-pagination .btn-prev,
+.el-pagination .btn-next {
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard),
+    transform var(--motion-fast) var(--ease-standard);
+}
+
+.el-pagination .btn-prev:active:not(:disabled),
+.el-pagination .btn-next:active:not(:disabled),
+.el-pager li:active:not(.is-active) {
+  transform: scale(0.94);
+}
+
+// ── Tabs：选中态/下划线平滑（下划线由 EP transform 动画，此处统一时长） ──
+.el-tabs__active-bar {
+  transition: transform var(--motion-normal) var(--ease-standard);
+}
+
+.el-tabs__item {
+  transition: color var(--motion-fast) var(--ease-standard);
+}
+
+// ── Segmented（若使用）：选中块平滑 ──
+.el-segmented {
+  transition: background-color var(--motion-fast) var(--ease-standard);
+}
+
+.el-segmented__item {
+  transition:
+    color var(--motion-fast) var(--ease-standard),
+    background-color var(--motion-fast) var(--ease-standard);
+}
 @media (max-width: 480px) {
   // 超小屏下进一步缩小
   .el-table {

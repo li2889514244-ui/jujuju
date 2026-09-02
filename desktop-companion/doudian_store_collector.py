@@ -71,8 +71,10 @@ DOUDIAN_PAGES = [
     },
 ]
 MAX_PAGINATION_PAGES = 60
-PAGE_SETTLE_MS = 1_500
-NETWORK_SETTLE_TIMEOUT_MS = 2_000
+# 大店铺 60+60 页全量翻页曾贴近 8 分钟同步超时（480s）导致浏览器被超时取消，
+# 表现为 Page.wait_for_timeout: Connection closed。这里压缩每页等待预算。
+PAGE_SETTLE_MS = 900
+NETWORK_SETTLE_TIMEOUT_MS = 1_200
 UPLOAD_CHUNK_ITEMS = 100
 UPLOAD_RETRY_DELAYS_SECONDS = (1, 2, 4, 8, 16)
 UPLOAD_RETRY_STATUS_CODES = {429, 502, 503, 504}
@@ -86,6 +88,16 @@ UPLOAD_RETRY_EXCEPTIONS = (
 
 class DoudianUploadError(RuntimeError):
     """Friendly upload error for the UI; raw details are printed to logs."""
+
+    def __init__(self, message: str, *, code: str | None = None, detail: Any = None):
+        super().__init__(message)
+        self.code = code
+        self.detail = detail
+
+
+def _normalize_store_name(value: Any) -> str:
+    """与后端 normalizeStoreName 保持一致的店名规范化：去空格、转小写。"""
+    return re.sub(r"\s+", "", str(value or "")).lower()
 
 
 def _resolve_doudian_browser(
@@ -174,8 +186,12 @@ def get_profile_path(local_profile_id: str) -> Path:
 
 
 async def _launch_doudian_context(pw, profile_path: Path, kwargs: dict, label: str):
+    from process_registry import browser_snapshot, register_new_browser_tree
+    pre_snapshot = browser_snapshot()
     try:
-        return await pw.chromium.launch_persistent_context(str(profile_path), **kwargs)
+        context = await pw.chromium.launch_persistent_context(str(profile_path), **kwargs)
+        register_new_browser_tree(profile_path, pre_snapshot, process_type='doudian_browser', store_id=label)
+        return context
     except Exception as exc:
         message = str(exc)
         should_retry = any(
@@ -196,7 +212,10 @@ async def _launch_doudian_context(pw, profile_path: Path, kwargs: dict, label: s
             cleanup_browser_processes_for_profile(profile_path)
         except Exception as cleanup_err:
             print(f"[Doudian] launch cleanup warning: {str(cleanup_err)[:120]}", flush=True)
-        return await pw.chromium.launch_persistent_context(str(profile_path), **kwargs)
+        pre_snapshot = browser_snapshot()
+        context = await pw.chromium.launch_persistent_context(str(profile_path), **kwargs)
+        register_new_browser_tree(profile_path, pre_snapshot, process_type='doudian_browser', store_id=label)
+        return context
 
 
 async def _safe_close_context(context, timeout_ms: int = 8_000) -> None:
@@ -594,9 +613,9 @@ def _extract_order_authors_from_page_text(text: str) -> dict[str, dict]:
 
 async def _capture_order_page_authors(page, captured: dict) -> None:
     text = ""
-    for _ in range(6):
+    for _ in range(3):
         try:
-            text = await page.locator("body").inner_text(timeout=5_000)
+            text = await page.locator("body").inner_text(timeout=4_000)
         except Exception:
             text = ""
         debug = captured.setdefault("orderSourceDebug", {"pages": 0, "textLength": 0, "hasOrderNo": False, "hasAuthor": False})
@@ -607,7 +626,7 @@ async def _capture_order_page_authors(page, captured: dict) -> None:
             debug["hasAuthor"] = bool(debug.get("hasAuthor")) or "带货达人" in text
         if "订单编号" in text and ("带货达人" in text or "小店自卖" in text or "精选联盟" in text):
             break
-        await page.wait_for_timeout(1_000)
+        await page.wait_for_timeout(600)
     page_authors = _extract_order_authors_from_page_text(text)
     if not page_authors:
         return
@@ -955,17 +974,95 @@ def _payload_chunks(compact: dict, payload: dict) -> list[dict]:
     return chunks
 
 
-def _new_upload_session() -> requests.Session:
+def _new_http_session() -> requests.Session:
+    """创建出站 HTTP 会话，显式禁用系统代理。
+
+    requests 默认 trust_env=True，会读取 Windows 注册表里的系统代理
+    （例如 Clash/VPN 的 127.0.0.1:xxxx）。代理节点故障时，所有到
+    披星云服务器的上传都会被 TCP RST（10054）打断，且重试无效。
+    披星云 API 必须直连。
+    """
     session = requests.Session()
+    session.trust_env = False
     adapter = requests.adapters.HTTPAdapter(pool_connections=4, pool_maxsize=4)
     session.mount("https://", adapter)
     session.mount("http://", adapter)
     return session
 
 
+def _new_upload_session() -> requests.Session:
+    return _new_http_session()
+
+
+# 网络类错误码：用于 UI 精确提示与调度快速重试
+_NETWORK_ERROR_CODES = (
+    "CONNECTION_RESET",
+    "CONNECTION_REFUSED",
+    "DNS_FAILURE",
+    "TLS_ERROR",
+    "TIMEOUT",
+    "NETWORK_ERROR",
+)
+
+
+def _classify_network_error(raw_error: Any) -> tuple[str, str]:
+    """把 requests 网络异常归类为稳定的 (错误码, 友好提示)。
+
+    错误码用于 UI 映射精确文案；raw 异常细节仍会打印进日志。
+    """
+    text = str(raw_error)
+    cause: Any = raw_error
+    for _ in range(6):
+        inner = (
+            getattr(cause, "reason", None)
+            or getattr(cause, "__cause__", None)
+        )
+        if inner is None and getattr(cause, "args", None):
+            for arg in cause.args or ():
+                if isinstance(arg, BaseException):
+                    inner = arg
+                    break
+        if inner is None:
+            break
+        cause = inner
+
+    if isinstance(cause, ConnectionResetError) or "10054" in text or "reset by peer" in text.lower():
+        return (
+            "CONNECTION_RESET",
+            "抖店数据上传被本地网络中断（连接被重置）。若电脑开启了代理/VPN（如 Clash），请把披星云服务器设为直连后重试",
+        )
+    if isinstance(cause, ConnectionRefusedError) or "10061" in text:
+        return (
+            "CONNECTION_REFUSED",
+            "披星云服务器拒绝连接，请稍后重试",
+        )
+    if isinstance(cause, OSError) and ("getaddrinfo" in text or "nodename" in text or "name resolution" in text.lower()):
+        return (
+            "DNS_FAILURE",
+            "无法解析披星云服务器域名，请检查网络与 DNS 设置",
+        )
+    if isinstance(cause, requests.exceptions.SSLError) or "SSLError" in text or "CERTIFICATE_VERIFY" in text:
+        return (
+            "TLS_ERROR",
+            "与披星云服务器的安全连接失败（证书校验异常），请检查系统时间与网络",
+        )
+    if isinstance(cause, (requests.exceptions.ReadTimeout, requests.exceptions.Timeout)) or "timed out" in text.lower():
+        return (
+            "TIMEOUT",
+            "披星云服务器响应超时，请稍后重试",
+        )
+    if isinstance(cause, (requests.exceptions.ConnectionError, ConnectionError, OSError)):
+        return (
+            "NETWORK_ERROR",
+            "上传披星云服务器失败，请检查网络后重试",
+        )
+    return ("NETWORK_ERROR", "上传披星云服务器失败，请检查网络后重试")
+
+
 def _raise_upload_network_error(raw_error: Any) -> None:
-    print(f"[DoudianUpload] final upload failure raw={raw_error!r}", flush=True)
-    raise DoudianUploadError("上传披星云服务器失败，请检查网络后重试") from None
+    code, message = _classify_network_error(raw_error)
+    print(f"[DoudianUpload] final upload failure code={code} raw={raw_error!r}", flush=True)
+    raise DoudianUploadError(message, code=code) from None
 
 
 def _raise_upload_http_error(response: requests.Response) -> None:
@@ -979,17 +1076,113 @@ def _raise_upload_http_error(response: requests.Response) -> None:
         f"[DoudianUpload] upload rejected status={status} url={getattr(response, 'url', '')} body={body!r}",
         flush=True,
     )
+    parsed_body: Any = None
+    try:
+        parsed_body = response.json()
+    except Exception:
+        parsed_body = None
+    error_code = str(
+        (parsed_body or {}).get("errorCode") or (parsed_body or {}).get("code") or ""
+    )
+    server_message = str((parsed_body or {}).get("message") or (parsed_body or {}).get("msg") or "")
+
+    if status == 409 and error_code == "STALE_COMPANION_BINDING":
+        raise DoudianUploadError(
+            "\u5f53\u524d\u6296\u5e97\u7ed1\u5b9a\u5df2\u5931\u6548\uff0c\u6b63\u5728\u5c1d\u8bd5\u91cd\u65b0\u7ed1\u5b9a\u540e\u540c\u6b65",
+            code="STALE_COMPANION_BINDING",
+            detail=parsed_body,
+        ) from None
     if status == 400:
-        message = "抖店上传被服务器拒绝，请重新登录或重新绑定该店铺后再同步"
+        message = "\u6296\u5e97\u4e0a\u4f20\u88ab\u670d\u52a1\u5668\u62d2\u7edd\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u6216\u91cd\u65b0\u7ed1\u5b9a\u8be5\u5e97\u94fa\u540e\u518d\u540c\u6b65"
     elif status == 403:
-        message = "当前账号没有权限同步这个抖店，请确认网站登录账号和店铺归属"
+        message = "\u5f53\u524d\u8d26\u53f7\u6ca1\u6709\u6743\u9650\u540c\u6b65\u8fd9\u4e2a\u6296\u5e97\uff0c\u8bf7\u786e\u8ba4\u7f51\u7ad9\u767b\u5f55\u8d26\u53f7\u548c\u5e97\u94fa\u5f52\u5c5e"
     elif status == 404:
-        message = "云端抖店记录不存在，请刷新店铺列表后重新绑定"
+        message = "\u4e91\u7aef\u6296\u5e97\u5e97\u94fa\u4e0d\u5b58\u5728\uff0c\u6b63\u5728\u5c1d\u8bd5\u6309\u5e97\u540d\u91cd\u65b0\u7ed1\u5b9a\u540e\u540c\u6b65"
+    elif status == 409:
+        message = server_message or "\u5f53\u524d\u6296\u5e97\u540c\u6b65\u51b2\u7a81\uff0c\u8bf7\u5237\u65b0\u5e97\u94fa\u540e\u91cd\u8bd5"
     elif status >= 500:
-        message = "披星云服务器暂时处理失败，请稍后重试"
+        message = "\u62ab\u661f\u4e91\u670d\u52a1\u5668\u6682\u65f6\u5904\u7406\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u8bd5"
     else:
-        message = "抖店上传失败，请检查登录状态后重试"
-    raise DoudianUploadError(message) from None
+        message = "\u6296\u5e97\u4e0a\u4f20\u5931\u8d25\uff0c\u8bf7\u68c0\u67e5\u767b\u5f55\u72b6\u6001\u540e\u91cd\u8bd5"
+    raise DoudianUploadError(message, code=error_code or None, detail=parsed_body or body) from None
+
+
+def rebind_companion_store(
+    api_url: str,
+    token: str,
+    store_id: str,
+    local_profile_id: str,
+    store_name: str | None = None,
+) -> dict:
+    url = f"{api_url.rstrip('/')}/doudian-browser/stores/{store_id}/rebind"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    payload = {"localProfileId": local_profile_id, "storeName": store_name}
+    try:
+        with _new_http_session() as session:
+            response = session.post(url, json=payload, headers=headers, timeout=(20, 60))
+    except UPLOAD_RETRY_EXCEPTIONS as exc:
+        code, message = _classify_network_error(exc)
+        print(f"[DoudianUpload] rebind network failure code={code} raw={exc!r}", flush=True)
+        raise DoudianUploadError("抖店重新绑定失败：" + message, code=code) from None
+    if response.status_code >= 400:
+        _raise_upload_http_error(response)
+    try:
+        return response.json()
+    except Exception:
+        return {"success": True}
+
+
+def relink_companion_store(api_url: str, token: str, store_name: str) -> str:
+    """本地保存的 cloud_store_id 已失效（云端店铺被重建）时，按店名在云端找回店铺。
+
+    只在云端存在且仅存在一家同名店铺时返回其 id；否则抛友好错误，绝不乱绑。
+    """
+    url = f"{api_url.rstrip('/')}/doudian-browser/stores"
+    headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    try:
+        with _new_http_session() as session:
+            response = session.get(url, headers=headers, timeout=(20, 60))
+    except UPLOAD_RETRY_EXCEPTIONS as exc:
+        code, message = _classify_network_error(exc)
+        print(f"[DoudianUpload] relink store list network failure code={code} raw={exc!r}", flush=True)
+        raise DoudianUploadError("抖店重新绑定失败（无法获取云端店铺列表）：" + message, code=code) from None
+    if response.status_code == 401:
+        raise DoudianUploadError(
+            "\u6296\u5e97\u91cd\u65b0\u7ed1\u5b9a\u5931\u8d25\uff1a\u7f51\u7ad9\u767b\u5f55\u5df2\u8fc7\u671f\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u7f51\u7ad9\u540e\u518d\u540c\u6b65",
+            code="UNAUTHORIZED",
+        )
+    if response.status_code >= 400:
+        _raise_upload_http_error(response)
+    stores: list[Any] = []
+    try:
+        payload = response.json()
+        # 后端响应统一包装为 {code, message, data} 信封（TransformInterceptor），
+        # 也可能直接返回裸数组。兼容两种结构，避免把信封当空列表导致找不到同名店铺。
+        if isinstance(payload, list):
+            stores = payload
+        elif isinstance(payload, dict):
+            data = payload.get("data")
+            if isinstance(data, list):
+                stores = data
+            elif isinstance(data, dict):
+                inner = data.get("stores") or data.get("list") or data.get("items") or []
+                if isinstance(inner, list):
+                    stores = inner
+    except Exception:
+        stores = []
+    norm_target = _normalize_store_name(store_name)
+    matches = [s for s in stores if _normalize_store_name((s or {}).get("name")) == norm_target]
+    if len(matches) == 0:
+        raise DoudianUploadError(
+            "\u4e91\u7aef\u627e\u4e0d\u5230\u540c\u540d\u6296\u5e97\u5e97\u94fa\uff0c\u8bf7\u91cd\u65b0\u767b\u5f55\u6216\u91cd\u65b0\u7ed1\u5b9a\u8be5\u5e97\u94fa\u540e\u518d\u540c\u6b65",
+            code="DOUDIAN_STORE_NOT_FOUND",
+        )
+    if len(matches) > 1:
+        raise DoudianUploadError(
+            "\u4e91\u7aef\u5b58\u5728\u591a\u5bb6\u540c\u540d\u6296\u5e97\u5e97\u94fa\uff0c\u65e0\u6cd5\u81ea\u52a8\u786e\u5b9a\u7ed1\u5b9a\u76ee\u6807\uff0c\u8bf7\u5728\u7f51\u7ad9\u91cd\u65b0\u7ed1\u5b9a\u540e\u518d\u540c\u6b65",
+            code="DOUDIAN_STORE_AMBIGUOUS",
+        )
+    return str((matches[0] or {}).get("id") or "")
 
 
 def _post_upload_chunk(
@@ -999,7 +1192,8 @@ def _post_upload_chunk(
     *,
     session: requests.Session | None = None,
 ) -> dict:
-    client = session or requests
+    # 无会话时也绝不使用模块级 requests（它会读取系统代理）
+    client = session if session is not None else _new_http_session()
     last_error: Any = None
     max_retries = len(UPLOAD_RETRY_DELAYS_SECONDS)
 

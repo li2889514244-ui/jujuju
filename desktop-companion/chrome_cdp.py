@@ -28,6 +28,8 @@ import sys
 import time
 import urllib.request
 import json
+
+from companion_encoding import decode_bytes
 from pathlib import Path
 
 DEFAULT_PORT = 9222
@@ -42,6 +44,22 @@ DEFAULT_CHROME_PATHS = [
 
 # Chrome 149+ 可能绑定到 IPv6 [::1]，所以同时探测两个地址
 _CDP_HOSTS = ['127.0.0.1', '[::1]']
+
+
+def _register_launched_browser(cdp) -> None:
+    """把 CDP 启动的浏览器主进程登记进托管注册表（唯一允许被关闭的依据）。"""
+    try:
+        from process_registry import register_process
+        if getattr(cdp, "_process", None) is not None and cdp._process.poll() is None:
+            register_process(
+                cdp._process.pid,
+                process_type="cdp_browser",
+                profile_path=str(cdp._user_data_dir),
+                executable=cdp._chrome_exe,
+                parent_pid=os.getpid(),
+            )
+    except Exception as exc:
+        print(f"[CDP] register launched browser failed: {exc}")
 
 
 class ChromeCDP:
@@ -69,25 +87,41 @@ class ChromeCDP:
             return True
         return _check_port(self.port)
 
+    def _choose_free_port(self) -> bool:
+        """在默认端口起向后最多试 10 个端口。
+
+        只清理确认属于伴侣自己的残留 Chrome（命令行包含本伴侣 profile 路径），
+        外部程序占用的端口一律跳过、顺延，保证不误杀他人进程。
+        """
+        for _ in range(10):
+            if not _probe_cdp(self.port):
+                return True
+            if _kill_chrome(self.port, require_profile=self._user_data_dir):
+                deadline = time.time() + 15
+                released = False
+                while time.time() < deadline:
+                    if not _probe_cdp(self.port):
+                        released = True
+                        break
+                    time.sleep(0.5)
+                if released:
+                    return True
+                print(f'[CDP] 端口 {self.port} 清理后仍未释放，顺延到 {self.port + 1}')
+            else:
+                print(f'[CDP] 端口 {self.port} 被其他程序占用，改用端口 {self.port + 1}')
+            self.port += 1
+        return False
+
     def start(self, open_url=None, app_mode=False):
         """Start Chrome. Kill stale instances first, with retry logic."""
-        # --- Clean up stale Chrome instances ---
-        # 只清理有 CDP 响应的 stale 实例（避免误杀用户的常规 Chrome）
-        cleanup_attempts = 0
-        while cleanup_attempts < 3:
-            stale_url = _probe_cdp(self.port)
-            if not stale_url:
-                break
-            cleanup_attempts += 1
-            old_pid = _get_cdp_pid(self.port)
-            print(f'[CDP] Stale Chrome detected (PID={old_pid}) at {stale_url}, attempt {cleanup_attempts}/3...')
-            _kill_chrome(self.port)
-            # Wait for port release
-            deadline = time.time() + 15
-            while time.time() < deadline:
-                if not _probe_cdp(self.port):
-                    break
-                time.sleep(0.5)
+        # --- 选择可用端口（安全策略） ---
+        # 端口被占用时：只有确认是伴侣自己的残留 Chrome 才清理；
+        # 是其他程序占用则顺延端口，绝不误杀用户的浏览器/软件。
+        if not self._choose_free_port():
+            raise RuntimeError(
+                f'CDP 调试端口 {self.port}~{self.port + 9} 均被其他程序占用，'
+                '请关闭相关程序后重试'
+            )
 
         # --- Clean profile lock files from previous crashed session ---
         _clean_profile_locks(self._user_data_dir)
@@ -140,6 +174,7 @@ class ChromeCDP:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
+        _register_launched_browser(self)
 
         # Wait for CDP port with health check — probe both IPv4 and IPv6
         deadline = time.time() + 90
@@ -169,6 +204,7 @@ class ChromeCDP:
             (self._user_data_dir / 'Local State').write_text('{}', encoding='utf-8')
             _clean_profile_locks(self._user_data_dir)
             self._process = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            _register_launched_browser(self)
             deadline = time.time() + 90
             while time.time() < deadline:
                 working_url = _probe_cdp(self.port)
@@ -187,21 +223,31 @@ class ChromeCDP:
         raise RuntimeError(f'Chrome 启动超时，端口 {self.port} 未就绪。请关闭所有 Chrome 窗口后重试')
 
     def stop(self):
-        """关闭 Chrome 进程"""
+        """关闭 Chrome 进程（只允许关闭披星云自己启动并登记的进程）"""
         # 优先用子进程句柄
         if self._process and self._process.poll() is None:
             print('[CDP] 关闭 Chrome...')
-            self._process.terminate()
+            closed = False
             try:
-                self._process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self._process.kill()
+                from process_registry import terminate_managed
+                result = terminate_managed(self._process.pid, reason='cdp stop')
+                closed = result.get('action') in ('killed', 'already_gone')
+            except Exception as exc:
+                print(f'[CDP] registry terminate failed: {exc}')
+            if not closed:
+                # 句柄是本会话自己 Popen 的（披星云启动的进程），允许兜底关闭
+                self._process.terminate()
+                try:
+                    self._process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._process.kill()
             print('[CDP] Chrome 已关闭')
             return
-        # 兜底：用 CDP API 关闭
+        # 兜底：用 CDP API 关闭（仅限伴侣自己的浏览器，外部进程保留不动）
         if _check_port(self.port):
             print('[CDP] 通过 CDP 关闭 Chrome...')
-            _kill_chrome(self.port)
+            if not _kill_chrome(self.port, require_profile=self._user_data_dir):
+                print('[CDP] 端口由非伴侣进程占用，保留不动')
 
     def get_url(self):
         return self.url
@@ -272,27 +318,69 @@ def _get_cdp_pid(port):
     return 'unknown'
 
 
-def _kill_chrome(port):
-    """终止占用指定 CDP 端口的 Chrome 进程（尝试 IPv4 和 IPv6）"""
-    # 先通过 CDP API 获取 PID（两个地址都试）
-    killed_pids = set()
+def _pid_cmdline(pid) -> str:
+    """读取指定 PID 的完整命令行（优先 psutil，兜底 PowerShell）。"""
+    try:
+        import psutil
+        try:
+            return " ".join(str(part) for part in (psutil.Process(int(pid)).cmdline() or []))
+        except Exception:
+            pass
+    except ImportError:
+        pass
+    try:
+        result = subprocess.run(
+            [
+                "powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command",
+                f"(Get-CimInstance Win32_Process -Filter 'ProcessId={int(pid)}').CommandLine",
+            ],
+            capture_output=True, timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return decode_bytes(result.stdout).strip()
+    except Exception:
+        return ""
+
+
+def _cmdline_matches_profile(cmdline: str, profile_dir) -> bool:
+    """命令行是否包含伴侣自己的浏览器 profile 路径（进程归属校验）。"""
+    if not cmdline or not profile_dir:
+        return False
+    try:
+        marker = os.path.normcase(os.path.abspath(os.path.expandvars(str(profile_dir)))).replace("/", "\\")
+    except Exception:
+        marker = str(profile_dir).replace("/", "\\").lower()
+    return marker in cmdline.replace("/", "\\").lower()
+
+
+def _kill_chrome(port, require_profile=None) -> bool:
+    """终止占用指定 CDP 端口的浏览器进程（尝试 IPv4 和 IPv6）。
+
+    v3.2.88 安全修复：仅当进程命令行包含伴侣自己的 profile 路径时才允许终止；
+    否则返回 False，由调用方改用其他端口——绝不再误杀用户的浏览器/其他软件。
+    """
     for host in _CDP_HOSTS:
         try:
             resp = urllib.request.urlopen(f'http://{host}:{port}/json/version', timeout=2)
             data = json.loads(resp.read())
             pid = data.get('Browser-Pid') or data.get('pid')
-            if pid:
-                pid = int(pid)
-                if pid not in killed_pids:
-                    subprocess.run(['taskkill', '/F', '/PID', str(pid)],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                   timeout=10)
-                    killed_pids.add(pid)
-                    print(f'[CDP] 已终止 Chrome (PID={pid})')
         except Exception:
-            pass
-    if killed_pids:
-        return
+            continue
+        if not pid:
+            continue
+        pid = int(pid)
+        cmdline = _pid_cmdline(pid)
+        if require_profile and not _cmdline_matches_profile(cmdline, require_profile):
+            print(f'[CDP] 端口 {port} 被非伴侣浏览器占用 (PID={pid})，保留不动')
+            return False
+        # P0 安全修复：taskkill 前必须通过托管注册表五重校验
+        from process_registry import terminate_managed
+        result = terminate_managed(pid, reason='cdp port cleanup')
+        if result.get('action') in ('killed', 'already_gone'):
+            print(f'[CDP] 已终止 Chrome (PID={pid})')
+            return True
+        print(f"[CDP] 拒绝终止 PID={pid}：{result.get('detail')}（保留不动）")
+        return False
 
     # 兜底：查端口占用进程（netstat 会同时列出 IPv4 和 IPv6）
     try:
@@ -300,23 +388,30 @@ def _kill_chrome(port):
             ['netstat', '-ano'],
             capture_output=True, timeout=10
         )
-        stdout_text = result.stdout.decode('gbk', errors='ignore') if result.stdout else ''
+        stdout_text = decode_bytes(result.stdout)
         if not stdout_text:
-            return
+            return False
         for line in stdout_text.splitlines():
             if f':{port}' in line and 'LISTENING' in line:
                 parts = line.strip().split()
                 pid_str = parts[-1]
                 if pid_str == '0':
                     continue
-                if pid_str not in killed_pids:
-                    subprocess.run(['taskkill', '/F', '/PID', pid_str],
-                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                   timeout=10)
-                    killed_pids.add(pid_str)
+                cmdline = _pid_cmdline(pid_str)
+                if require_profile and not _cmdline_matches_profile(cmdline, require_profile):
+                    print(f'[CDP] 端口 {port} 被非伴侣进程占用 (PID={pid_str})，保留不动')
+                    return False
+                # P0 安全修复：taskkill 前必须通过托管注册表五重校验
+                from process_registry import terminate_managed
+                result = terminate_managed(int(pid_str), reason='cdp port cleanup')
+                if result.get('action') in ('killed', 'already_gone'):
                     print(f'[CDP] 已终止端口 {port} 占用进程 (PID={pid_str})')
+                    return True
+                print(f"[CDP] 拒绝终止 PID={pid_str}：{result.get('detail')}（保留不动）")
+                return False
     except Exception as e:
         print(f'[CDP] 端口占用清理失败: {e}')
+    return False
 
 
 def _find_chrome(preferred=None):

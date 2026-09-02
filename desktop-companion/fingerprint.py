@@ -10,6 +10,8 @@ import json
 import random
 from pathlib import Path
 
+from companion_encoding import read_text_file
+
 # ── 真实 GPU 配置池（vendor, renderer）──
 _GPU_PROFILES = [
     ('Google Inc. (Intel)', 'ANGLE (Intel, Intel(R) UHD Graphics 630 Direct3D11 vs_5_0 ps_5_0, D3D11)'),
@@ -90,7 +92,7 @@ def load_fingerprint(profile_dir: Path, account_id: str = '') -> dict:
     fp_path = Path(profile_dir) / 'fingerprint.json'
     if fp_path.exists():
         try:
-            return json.loads(fp_path.read_text('utf-8'))
+            return json.loads(read_text_file(fp_path))
         except Exception:
             pass
     # Fallback: 从 account_id 生成

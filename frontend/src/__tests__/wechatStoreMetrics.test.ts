@@ -41,6 +41,28 @@ describe('wechatStoreMetrics', () => {
     expect(result.transactionCount).toBe(3)
     expect(result.refundCount).toBe(1)
     expect(result.effectiveCount).toBe(2)
+    expect(result.validOrderCount).toBe(2)
+    expect(result.refundedOrderCount).toBe(1)
+    expect(result.totalOrderCount).toBe(3)
+  })
+
+  it('counts total orders as valid plus deduplicated refunded orders', () => {
+    const result = calculateNetSales(
+      [
+        { order_id: 'valid-1', status: 30, pay_amount: 29900, create_time: 1 },
+        { order_id: 'valid-2', status: 100, pay_amount: 29900, create_time: 1 },
+        { order_id: 'refund-1', status: 200, pay_amount: 29900, create_time: 1 },
+      ],
+      [
+        { id: 'after-1', order_id: 'refund-1', status: 'MERCHANT_REFUND_SUCCESS', amount: 10000 },
+        { id: 'after-2', order_id: 'refund-1', status: 'MERCHANT_REFUND_SUCCESS', amount: 19900 },
+      ],
+    )
+
+    expect(result.validOrderCount).toBe(2)
+    expect(result.refundedOrderCount).toBe(1)
+    expect(result.refundCount).toBe(1)
+    expect(result.totalOrderCount).toBe(3)
   })
 
   it('uses product_price for gross when available (matches official platform)', () => {

@@ -14,7 +14,7 @@ const props = withDefaults(
     delay?: number
   }>(),
   {
-    duration: 800,
+    duration: 280,
     delay: 0,
   },
 )

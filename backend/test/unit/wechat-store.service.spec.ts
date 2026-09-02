@@ -1,4 +1,4 @@
-﻿import { Test, TestingModule } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { WechatStoreService } from '../../src/modules/wechat-store/wechat-store.service';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
@@ -93,6 +93,7 @@ describe('WechatStoreService', () => {
   });
 
   it('normalizes malformed order numbers before writing synced orders', async () => {
+    prisma.wechatStore.findUnique.mockResolvedValue({ id: 'store-1', organizationId: null });
     jest.spyOn(service as any, 'collectOrderIds').mockResolvedValue(['order-1']);
     jest.spyOn(service as any, 'getOrderDetailRemote').mockResolvedValue({
       errcode: 0,
@@ -131,6 +132,7 @@ describe('WechatStoreService', () => {
   });
 
   it('returns WeChat order source infos from cached raw detail', async () => {
+    prisma.wechatStore.findUnique.mockResolvedValue({ id: 'store-1', organizationId: null });
     prisma.wechatStoreOrder.findMany.mockResolvedValue([
       {
         orderId: 'order-1',

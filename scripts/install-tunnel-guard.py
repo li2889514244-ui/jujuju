@@ -25,9 +25,7 @@ REMOTE_STATE = "/opt/matrixflow/runtime/tunnel-health-failures"
 REMOTE_LOG = "/opt/matrixflow/logs/tunnel-health.log"
 CRON_FILE = "/etc/cron.d/matrixflow-tunnel-guard"
 TUNNEL_COMMAND = (
-    "tunnel --region us --edge-ip-version 4 --protocol quic run "
-    "--dns-resolver-addrs 100.100.2.136:53 "
-    "--dns-resolver-addrs 100.100.2.138:53 "
+    "tunnel --region us --edge-ip-version 4 --protocol http2 run "
     "--token ${CF_TUNNEL_TOKEN}"
 )
 

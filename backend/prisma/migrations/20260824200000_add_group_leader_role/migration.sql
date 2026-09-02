@@ -1,0 +1,2 @@
+-- Add GROUP_LEADER (组长) to UserRole enum
+ALTER TYPE "UserRole" ADD VALUE IF NOT EXISTS 'GROUP_LEADER';

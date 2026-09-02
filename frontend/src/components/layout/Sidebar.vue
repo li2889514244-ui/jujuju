@@ -89,11 +89,12 @@ onUnmounted(() => {
   border-right: 1px solid $border-subtle;
   display: flex;
   flex-direction: column;
-  transition: width 0.25s $ease-out;
+  transition: width var(--motion-normal) var(--ease-standard);
   flex-shrink: 0;
   z-index: 10;
   user-select: none;
   position: relative;
+  overflow: hidden; // 收起时裁掉正在淡出的文字，避免闪烁/跳动
 
   // 顶部极轻 indigo glow（不抢戏）
   &::before {

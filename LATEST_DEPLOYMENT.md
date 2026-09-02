@@ -1,6 +1,84 @@
 # Latest Deployment Marker
 
-Last verified: 2026-08-21 10:42 Asia/Shanghai
+Current verified: 2026-09-01 12:00 Asia/Shanghai (系统健康中心 Phase 1 收尾上线：backend ×2 + frontend，无新迁移，恢复巡检/计数修复/并发去重修复已生效，production 实测通过)
+
+## 系统健康中心 Phase 1 收尾 (2026-09-01 11:47~12:00)
+
+- 后端首次部署 `deploy-backend-safe.py --execute --migrate`（backup `/opt/matrixflow/releases/backend/20260901114712`，21 migrations up to date，health 200）：上线恢复巡检 sweepIncidentRecovery（每分钟，COMPANION 排除）、严重度只升不降、overview 真实计数、总体状态基于当前未恢复故障、前端时间戳钳制、慢接口阈值对齐。
+- 部署后实测发现并发竞态 bug（前端刷新时 overview+incidents 并行触发 syncCompanionIncidents → 重复 SystemIncident 行）；修复：进程内串行化 syncChain + 新增并发单测；第二次部署（backup `/opt/matrixflow/releases/backend/20260901115533`，health 200）后清理生产存量重复（7 组合并、删 8 行），75 秒观察 duplicate_keys=0。
+- 前端 `deploy-frontend-fast.py --allow-dirty-source` 成功：public entry `assets/js/index-BepOSBOX.js`（三处 ref 一致；hash 未变系 __APP_VERSION__ 常量折叠等价）、健康中心 chunk `SystemHealthCenterView-CGAjyRPo.js` 公网 200、Cloudflare 已 purge。
+- 生产实测（服务器端短时 super-admin JWT）：/system-health/overview 200（INCIDENT，p0=0，p1=3，六层卡片齐全）、incidents/events 200（真实事件带 requestId 已入库）、companion-monitor/overview 200（3 设备 1 在线、心跳重启后持续 201）、SystemEvent=11/SystemIncident=8、一条 FRONTEND 故障已被巡检置 RECOVERING（cron 生产生效）。
+
+## 业绩天梯月份切换 (2026-09-01 11:35)
+
+- 后端：`deploy-backend-safe.py --execute --skip-build --migrate` 成功（backup `/opt/matrixflow/releases/backend/20260901113533`，health 200，PM2 online）。应用了两个迁移：`202608310001_system_health_center`（修复 UTF-8 BOM 导致的一直失败问题）与 `202609010001_performance_ladder_month_snapshot`（新增月度目标/规则快照表）。`21 migrations` 与数据库完全一致（Database schema is up to date）。
+- 前端：`deploy-frontend-fast.py --skip-typecheck --allow-dirty-source` 成功，public entry `assets/js/index-BepOSBOX.js`、ladder chunk `PerformanceLadderView-BDiJGTPX.js`（remote/origin/public ref 三处一致），Cloudflare HTML cache 已 purge，remote backup `/tmp/matrixflow-frontend-dist-backup-20260901113655`。
+- 新端点 `GET /api/v1/performance-ladder/month-snapshot/:month` 生产实测（短时 admin JWT）：历史月首次读取创建快照（snapshotCreated=true）、二次读取复用（false）、当前月实时（isCurrentMonth=true）、未来月 400「不能查看未来月份」、非法格式 400。生产快照数据：卢慧 2026-08 目标 1260 已冻结。
+- 部署中发现并修复的两个既有问题：(1) 迁移 `202608310001_system_health_center/migration.sql` 带 UTF-8 BOM，PostgreSQL 报 syntax error，该迁移从未成功应用（已在本次随修复一起应用）；(2) 生产数据库已应用但本地缺失的迁移目录 `20260707000000_add_authing_integration`（git 提交 423f57ef 时被误删）已从 git 历史（0ad9706e）恢复。
+- 验证：后端 Jest 35 套 343 项、前端 vitest 71/71、`diagnose-production.py --remote` DIAGNOSE OK（21 migrations up to date、data sanity 全 0、api_consistency ok）。
+
+## Pixingyun Mate 3.2.107 AI editor test release (2026-08-31 10:37)
+
+- Public manifest: `https://ddddkiii.com/companion-updates/latest.json` -> version `3.2.107`.
+- In-app update default package: lite ZIP (`157266112` bytes). Full ZIP metadata remains available as `full_url`/`full_sha256`/`full_size` for fallback-compatible clients.
+- Portable ZIP: `https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.107.zip` (`348241979` bytes, SHA256 `6101e9ca28672de00e715224c0750318f6153097024e695c11a9186c0ecd5047`).
+- Lite ZIP: `https://ddddkiii.com/downloads/pixingyun-mate-lite-3.2.107.zip` (`157266112` bytes, SHA256 `08a208fdfaeaf22ce7ae3b7014ed5825e279ecbecc3a201cbffe2e109697acca`).
+- Installer: `https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.107.exe` and stable `https://ddddkiii.com/downloads/pixingyun-mate-setup.exe` (`452050302` bytes, SHA256 `259c37ada4dc19a53460c9ed16573a5b29cbc112087c8d3b6637ffc6d36480b7`).
+- Fix scope: AI editor only. Packaged the V2 `video_editor` module, fixed FFmpeg pipe hangs, lowered the small-video disk-space floor, added cached Whisper CLI fallback, allowed MP4 export without ASR model, and clarified AI editor readiness/error UI. No account/store/collection/website business logic changed.
+- Verification: Python compile passed; core video-editor tests passed; real MP4 export smoke passed with cached Whisper and with no ASR model; ZIP/EXE magic bytes pass (`ZIP=504B0304`, `EXE=4D5A5000`); public `/api/v1/health` returned `200`.
+
+## Pixingyun Mate 3.2.106 process-safety release (2026-08-27 12:04)
+
+- Public manifest: `https://ddddkiii.com/companion-updates/latest.json` -> version `3.2.106`.
+- Portable ZIP: `https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.106.zip` (`348168878` bytes, SHA256 `179680e9e369a7dedc36e960353bbd183bf53edf334315d733d29758d2f0e732`).
+- Lite ZIP: `https://ddddkiii.com/downloads/pixingyun-mate-lite-3.2.106.zip` (`155921509` bytes, SHA256 `ccd283bad404c7b3ac42b9d51f2a4b065bc965be6c2893973a304a87963effe1`).
+- Installer: `https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.106.exe` and stable `https://ddddkiii.com/downloads/pixingyun-mate-setup.exe` (`451976876` bytes, SHA256 `80c13085e0234a82be389ec532d07ffbe00b3a08e2a4a7c76b53a944e30536a4`).
+- Fix scope: no broad process killing; browser records require Pixingyun-owned `profile_path`; legacy no-profile records are pruned without killing; updater rollback uses `$Started.Kill()` instead of `Stop-Process -Id`; collection cleanup closes owned persistent contexts and never calls `browser.close()` directly.
+- Infrastructure fix during verification: `/opt/matrixflow/docker-compose.yml` cloudflared command is now `tunnel --region us --edge-ip-version 4 --protocol http2 run --token ${CF_TUNNEL_TOKEN}` to avoid intermittent `localhost` DNS resolution failures.
+
+Last verified: 2026-08-25 18:25 Asia/Shanghai (companion log upload live: backend stores per-device logs + devices.json registry; companion 3.2.92 published — logs uploaded every 30 min with tokens redacted; also deployed: 组长 GROUP_LEADER role + 商业转化 pages gated to 组长及以上, plus AppLayout boot-time role re-sync — current public entry `assets/js/index-D7VcOktl.js`; production `UserRole` enum includes GROUP_LEADER; earlier notes below still stand)
+
+## 组长角色 + 商业转化查看权限 (2026-08-25 17:33)
+
+New `GROUP_LEADER` (组长) user role (migration `20260824200000_add_group_leader_role`). 微信小店/抖店/业绩天梯 (plus their hidden source-detail sub-routes) now require `SUPER_ADMIN/OWNER/ADMIN/MANAGER/GROUP_LEADER` — sidebar hides them and the router guard redirects MEMBER/VIEWER to 仪表盘; no other section or permission changed. Public frontend entry is now `assets/js/index-CcKAkRK8.js` (ladder chunk `PerformanceLadderView-B1KEMAPN.js`); backend backup `/opt/matrixflow/releases/backend/20260825173232`. Details in `docs/deployment-log.md` 17:33 entry.
+
+## 刷新中 overlay 200px resize (2026-08-24 19:06)
+
+`GlobalLoadingOverlay.vue`: the spinning image is now `min(200px, 35vw)` square (50% radius, object-fit cover), 2.4s per rotation, 20px gap to the 刷新中... text; no refresh-logic changes. Public frontend entry is now `assets/js/index-BPo7jbfN.js` with overlay styles in `assets/css/AppLayout-BNdCrgcO.css`; Cloudflare cache purged. Details in `docs/deployment-log.md` 19:06 entry.
+
+## 业绩天梯 triple fix (2026-08-24 15:07)
+
+Fixed the double 'Teacher not found' toast (stale deleted-teacher reference + double toast from interceptor/component), the 有效订单 tile bound to the refund count, and the literal `?? + ??` placeholder under 总订单. Teacher error messages are now Chinese, teacher API calls are silent, deletes are optimistic, and stale teacher ids self-heal. Public frontend entry is now `assets/js/index-DwNm7xmO.js` with ladder chunk `assets/js/PerformanceLadderView-s1uXaUtr.js`; backend redeployed at `/opt/matrixflow/releases/backend/20260824150509`. Details in `docs/deployment-log.md` 15:07 entry.
+
+## Companion 3.2.87 release (2026-08-24 16:05) — supersedes 3.2.86
+
+Fixed the Doudian sync timeout that repeatedly showed "Page.wait_for_timeout: Connection closed while reading from the driver" on 唐商披星. Root cause: full order+aftersale pagination takes ~7.5-8 min, right at the 480s collect timeout, which cancels the browser mid-wait and surfaces as a driver disconnect. Fixes: per-page waits tightened (settle 1500→900ms, networkidle 2000→1200ms, source-capture retries 6→3 with 600ms backoff), collect timeout raised 480→660s, disconnect errors now map to the friendly 抖店采集超时 prompt. Also shipped the Doudian data reset (backup → wipe orders → re-collect → restore pre-window band from 08-20 dump): final state identical to pre-wipe.
+
+- Public manifest: https://ddddkiii.com/companion-updates/latest.json -> version 3.2.87
+- Update ZIP: https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.87.zip (348,082,956 bytes)
+- Installer: https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.87.exe (451,906,532 bytes)
+- Local D:\Pixingyun runs 3.2.87 (backup D:\Pixingyun.bak-3287); both stores re-synced successfully after the wipe (唐商 465s, 披星教育 ~3.5min).
+
+## Companion 3.2.86 release (2026-08-24 12:53) — supersedes 3.2.85
+
+Re-published as 3.2.86 because 3.2.85 (and 3.2.84) shipped a broken zip self-update apply path: companion_updater._start_zip_update_process wrote the apply script with Path.write_text(..., bom=True) which raises TypeError, so in-app updates failed after download. Fixed by using companion_encoding.write_text_file for all three script writers (vbs, exe-ps1, zip-ps1). IMPORTANT: companions on 3.2.84/3.2.85 cannot self-update (their updater is broken) — they must manually download the 3.2.86 ZIP (unzip over install dir) or run the 3.2.86 installer once; from 3.2.86 onward in-app updates work again.
+
+- Public manifest: https://ddddkiii.com/companion-updates/latest.json -> version 3.2.86
+- Update ZIP: https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.86.zip (261,843,481 bytes, SHA256 bb50cd45a1835a6488476b3bb73b06c225f25e251d50bc2cba597c7fdaca9bde)
+- Installer: https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.86.exe (396,556,744 bytes, SHA256 1b7670df648ba03ba648ad0d2e5308802894a9bc7b7921da0806a9446735bdaf)
+- Local D:\Pixingyun now runs 3.2.86 (/health 3.2.86, update check available=false); backups: D:\Pixingyun.bak-proxyfix-20260824-115803, D:\Pixingyun.bak-3285-*, D:\Pixingyun.bak-3286-*
+- Local self-update end-to-end verification of 3.2.84 failed at apply stage with Path.write_text bom TypeError — that is how the 3.2.84/3.2.85 updater bug was discovered. The fix is source-verified (0 Path.write_text calls left in companion_updater.py; 3 write_text_file calls; BOM output verified) and shipped in 3.2.86.
+
+## Companion 3.2.85 release (2026-08-24)
+
+Published Pixingyun Mate 3.2.85 to fix the Doudian upload chain outage. Root cause: companion outbound HTTP read the Windows system proxy (Clash Verge 127.0.0.1:7897), so all Doudian uploads were routed through proxy nodes; a node outage on 2026-08-24 ~10:49-11:14 caused TCP RST (10054) on every chunk, failing both stores. Server was healthy and received zero requests in that window. Fix: all companion outbound HTTP (doudian upload/rebind/relink, auth login/refresh, collector uploads, login worker uploads) now uses no-proxy sessions (trust_env=False); network errors are classified (CONNECTION_RESET/TIMEOUT/DNS_FAILURE/TLS_ERROR/NETWORK_ERROR) with friendly per-code UI messages; Doudian scheduler fast-retries 5 minutes after a network-class failure instead of waiting 30 minutes. Verification: upload chunk latency dropped from ~6.5s (proxy) to ~0.6s (direct); manual sync of both stores succeeded (201 on server).
+
+- Public manifest: https://ddddkiii.com/companion-updates/latest.json -> version 3.2.85
+- Update ZIP: https://ddddkiii.com/downloads/pixingyun-mate-portable-3.2.85.zip (261,843,957 bytes, SHA256 1030a8534db701f166dbde7930cf96e4fd290a77692ec3130c27c856d4934c48)
+- Installer: https://ddddkiii.com/downloads/pixingyun-mate-setup-3.2.85.exe (396,588,862 bytes, SHA256 90d720fcc23db57c80b109f05f1c5f2592764ab7773cd707366fb8fe202ade92)
+- Local D:Pixingyun deployed with the same build; previous install backed up to D:Pixingyun.bak-proxyfix-20260824-115803
+- Known follow-up: companion update package download still uses urllib with system proxy (slow ~200KB/s on this machine) — consider no-proxy downloader in a future release; Clash Verge rule enhancement for ddddkkiii.com added locally (profiles/r8aEXnh0nVOj.yaml prepend DOMAIN-SUFFIX DIRECT), takes effect after Clash reloads.
+- Server stability findings: ECS is 2 vCPU / 1.6GB RAM; matrixflow Node heap at ~95% usage; PG had "not properly shut down / recovery" events on 2026-08-14 (disk-full event) and 2026-08-21; recommend upgrading ECS memory and adding PG/disk/memory alerting.
 
 This file is the source of truth for the current usable MatrixFlow / Pixingyun deployment. If another AI agent works in this repo later, read this file before choosing which build, bundle, backend dist, or companion package is current.
 
@@ -17,18 +95,25 @@ For deployment history, failure patterns, safe deployment rules, and AI handoff 
 ## Production Frontend
 
 - Production URL: https://ddddkiii.com
-- Current deployed entry bundle: `assets/js/index-Bh3_d0rd.js`
-- Current dashboard page chunk: `assets/js/MatrixDashboard-CBg4-QvC.js`
-- Current Doudian page chunk: `assets/js/DoudianView-D77maavl.js`
-- Current Doudian source-detail page chunk: `assets/js/DoudianSourceDetailView-DArwBQp8.js`
-- Current WeChat store page chunk: `assets/js/MonetizationView-bsaYOSXC.js`
-- Current WeChat source-detail page chunk: `assets/js/WechatSourceDetailView-IY-5-Rbi.js`
-- Current performance ladder page chunk: `assets/js/PerformanceLadderView-C3oXgGHm.js`
-- Current permission page chunk: `assets/js/PermissionView-D9V1C4m5.js`
-- Current login page chunk: `assets/js/LoginView-CD6Xuz-H.js`
-- Current MCP page chunk: `assets/js/MCPConnectionView-W59MLoKJ.js`
-- Current admin page chunk: `assets/js/AdminView-BdRTFg9H.js`
+- Current deployed entry bundle: `assets/js/index-jdLuCj01.js`
+- Current dashboard page chunk: `assets/js/MatrixDashboard-Bbh4Hp_g.js`
+- Current Doudian page chunk: `assets/js/DoudianView-D-P4KmNt.js`
+- Current Doudian source-detail page chunk: `assets/js/DoudianSourceDetailView-Ocp7qxV_.js`
+- Current WeChat store page chunk: `assets/js/MonetizationView-CkRJaS13.js`
+- Current WeChat source-detail page chunk: `assets/js/WechatSourceDetailView-BTCv9Gy0.js`
+- Current performance ladder page chunk: `assets/js/PerformanceLadderView-BzP0SDy9.js`
+- Current account list page chunk: `assets/js/AccountListView-zd10xbBk.js`
+- Current permission page chunk: `assets/js/PermissionView-C0rG_K3G.js`
+- Current login page chunk: `assets/js/LoginView-B1v1Lt4y.js`
+- Current MCP page chunk: `assets/js/MCPConnectionView-DZbuDl0Z.js`
+- Current admin page chunk: `assets/js/AdminView-3--CtRjq.js`
 - Local build source: `C:\Users\EDY\jujuju\frontend\dist`
+
+Latest deployment note: at 2026-08-24 14:58 Asia/Shanghai, shipped the daily Doudian reconciliation (每日自动对账). New backend scheduler `DailyReconciliationScheduler` runs at 09:10 Beijing and re-computes each Doudian store's previous day through two independent paths — the page caliber (`buildDoudianSummary`) and a pure-SQL recount — comparing six fields plus the 总订单=有效+退款 invariant. Mismatch → 🔴 Feishu anomaly push; match → ✅ pass summary (per-store 总/有效/退款/成交额/退款金额) so operators can eyeball against the Doudian platform. Manual trigger: `POST /api/v1/scheduler/trigger/reconciliation` or `py -3 scripts\trigger-reconciliation-once.py`. Also repaired four pre-existing failing backend test suites (test-only changes); the full backend suite is now green (33 suites / 303 tests). Backend deployed via `deploy-backend-safe.py --execute --skip-build` (backup `/opt/matrixflow/releases/backend/20260824145543`); live manual trigger at 06:58Z passed for both stores (一致) and pushed the ✅ Feishu message. WeChat counting logic untouched.
+
+Latest deployment note: at 2026-08-24 14:25-14:33 Asia/Shanghai, fixed the user-reported Doudian order-count data errors and shipped a prevention layer. (1) Counting fix (backend + frontend): refunds are now attributed by ORDER create date (cross-day refunds归订单日) and 有效订单 = 营收订单 − 退款订单 with 总订单 = 有效 + 退款 — no more double counting. Verified against production API: 披星教育 8/21 总14/有效11/退款3; 唐商披星 8/22 总49/有效35/退款14; per-source 卢慧-高维破局 8/21 总13/有效10/退款3, 8/22 总26/有效17/退款9. (2) Prevention layer: `docs/订单口径规范.md` is now the single source of truth for all order/refund counting semantics; `scripts/diagnose-production.py --remote` now fails on duplicate order/aftersale rows, orphan rows, negative amounts, or zero createTime (Doudian + WeChat) and on any Doudian store whose 30-day summary violates total = valid + refunded; DoudianView shows 退款按订单日归集. WeChat counting logic untouched. Backend backup `/opt/matrixflow/releases/backend/20260824142053`, frontend entry `assets/js/index-Y-HPc1-x.js` (all four refs matched), remote frontend backup `/tmp/matrixflow-frontend-dist-backup-20260824143339`.
+
+Latest deployment note: at 2026-08-21 17:25 Asia/Shanghai, deployed the post-audit defensive fix round (backend + frontend). Backend: `py -3 scripts\deploy-backend-safe.py --execute --skip-build` — replaced `/opt/matrixflow/backend` dist/prisma (backup `/opt/matrixflow/releases/backend/20260821172049`), Prisma generate + migrate status clean (`Database schema is up to date!`, 14 migrations), PM2 `matrixflow` restarted, local/public health `200`. Shipped: analytics median×20 outlier zeroing removed, WeChat Video period `net_fans` allowed negative (掉粉 -300 no longer clamped to 0), platforms delta fill allows negative followers increment. Frontend: `py -3 scripts\deploy-frontend-fast.py --skip-typecheck --allow-dirty-source` — public entry `assets/js/index-B2l8OQ1y.js` (remote backup `/tmp/matrixflow-frontend-dist-backup-20260821172134`), local/remote/origin/public refs all matched. Shipped: DoudianView latest-request-wins loadData guard + removed duplicate `@change` triggers + sync failure no longer hidden behind cached data; DoudianSourceDetailView same guard; AccountListView batch delete clears `selectedIds`; plus the earlier local-only frontend fixes (duplicate data-status tag removal, ladder operator unification). Store counting semantics (Doudian/WeChat) intentionally unchanged. Post-deploy `scripts/diagnose-production.py --remote`: DIAGNOSE OK (health 200, refs match, migrations up to date, PM2 online, data sanity 0 anomalies, api consistency ok).
 
 Latest deployment note: at 2026-08-21 10:42 Asia/Shanghai, deployed a frontend-only dashboard cleanup. The matrix dashboard keeps the `登录态` and `最新采集` columns, removes the redundant top warning about accounts having no displayable yesterday data, and fixes the trend chart legend from `??` / `???` placeholders to `粉丝` / `播放量` / `互动率(%)`. Verification: `npm run typecheck --workspace=frontend`, `npm run build --workspace=frontend`, and `py -3 scripts\deploy-frontend-fast.py --skip-typecheck --allow-dirty-source` passed; public HTML references `assets/js/index-Bh3_d0rd.js`, public `/api/v1/health` returned `200`, and remote frontend backup is `/tmp/matrixflow-frontend-dist-backup-20260821103940`.
 
@@ -48,7 +133,7 @@ Latest backend/companion release note: Backend guards prevent WeChat Video `sph.
 
 Latest Doudian/companion update note: Pixingyun Mate `3.2.66` is the current public companion release. It supersedes `3.2.65` only for packaging/icon stability: automatic updates use the lightweight ZIP `pixingyun-mate-portable-3.2.66.zip` (66,343,759 bytes, SHA256 `8910300781a5ed6cdc4306ade7a359ac42a0f5c56ebcf8c2b015d4a5430ad423`), while the full website/manual installer `pixingyun-mate-setup-3.2.66.exe` (394,599,436 bytes, SHA256 `280a83129587fc4c2a468192cec0acd08a07e9bfdb22237647cddc047a4b0ea1`) includes the dedicated Playwright Chromium under `_internal/ms-playwright/chromium-1223`. `3.2.66` fixes Windows shortcut icon instability by bundling `_internal\app_icon.ico` and making installer-created desktop/start-menu shortcuts plus uninstall display icon point to that fixed file instead of `{app}\pixingyun-mate.exe` or old versioned icon filenames. The `3.2.65` browser lifecycle behavior remains: context shutdowns time out instead of hanging, cleanup targets only Chrome/Edge processes whose command line contains a Pixingyun-owned profile path, Doudian launch retries profile-lock failures after targeted cleanup, and Doudian manual login/sync prefer real system Chrome/Edge to reduce captcha blank-screen risk. Public manifest version is `3.2.66`, main update URL points to the ZIP, installer metadata points to the full setup exe, and Range checks confirm the ZIP size `66,343,759` and setup size `394,599,436`. This release does not change collection, Doudian, captcha, or browser lifecycle logic.
 
-Latest edge performance note: Cloudflare Worker `matrixflow-origin-proxy` version `3c4ce7fa-7f50-40ee-8671-4edc86501c89` is active with conservative static-asset caching. `/assets/*` receives a 30-day immutable cache policy; `/api/*`, `/ws/*`, HTML, companion update manifests, and mutable companion download aliases are not cached as static content. The pre-change Worker source backup is `C:\Users\EDY\jujuju\backups\worker-cache-20260729-122830`.
+Latest edge performance note: Cloudflare Worker `matrixflow-origin-proxy` version `5834967d-dc1a-4128-a924-e031b297597e` is active (deployed via cached OAuth login, `--oauth` mode supported). Caching: `/assets/*` 30-day immutable; SPA HTML edge-cached 5 minutes (deploy purges it; origin serves `no-cache` + ETag so browsers revalidate with 304); `/uploads/*` 24h; `/downloads/*` 24h (mutable aliases bypass); `/api/*`, `/ws/*`, companion manifests uncached.
 
 Older frontend refs were removed from the public server and now return `404`.
 Do not use historical bundle names to decide what is current; verify the public
@@ -67,7 +152,7 @@ HTML entry bundle instead.
   - Current production Docker status: `matrixflow-db` and `matrixflow-redis` healthy on localhost-only ports, `matrixflow-tunnel` running, `matrixflow-frontend` running.
   - Cloudflare Worker `matrixflow-origin-proxy` is active on `ddddkiii.com/*` and `www.ddddkiii.com/*`; public health responses include `x-matrixflow-entry: cloudflare-worker`.
   - Worker origin resolution uses `origin.ddddkiii.com`, a proxied CNAME to the existing Cloudflare Tunnel target. Do not change it to the ECS public IP path; direct IP HTTP requests return the cloud provider ICP filing block instead of the app.
-  - 2026-07-27 repair note: public traffic returned Cloudflare `530/1033` because the tunnel edge transport was unstable while ECS origin health was `200`. The current stable tunnel container is managed by `/opt/matrixflow/docker-compose.yml` and uses `tunnel --region us --edge-ip-version 4 --protocol quic run --dns-resolver-addrs 100.100.2.136:53 --dns-resolver-addrs 100.100.2.138:53 --token ${CF_TUNNEL_TOKEN}`.
+  - 2026-08-27 repair note: public traffic returned intermittent Cloudflare `530/1033` and `502` while ECS origin health was `200`. The tunnel container is managed by `/opt/matrixflow/docker-compose.yml` and now uses `tunnel --region us --edge-ip-version 4 --protocol http2 run --token ${CF_TUNNEL_TOKEN}`. Do not restore the old custom `--dns-resolver-addrs 100.100.2.136:53/100.100.2.138:53` flags; they can make cloudflared fail to resolve the remote-managed ingress origin `localhost`.
   - The ECS host has `/etc/sysctl.d/99-cloudflared-quic.conf` with `net.core.rmem_max=7500000` and `net.core.wmem_max=7500000`; keep this for cloudflared QUIC stability.
   - The tunnel guard at `/etc/cron.d/matrixflow-tunnel-guard` runs every minute and now recreates the compose-managed tunnel using the same stable parameters after repeated public failures with healthy origin.
   - 2026-07-27 Worker repair note: a valid Cloudflare API token was provided, `matrixflow-origin-proxy` was redeployed, and Worker routes are active again. The Worker must use `ORIGIN_HOST=ddddkiii.com` with `ORIGIN_RESOLVE_HOST=origin.ddddkiii.com`; do not point the Worker directly at the ECS public IP because Cloudflare returns error `1003`.

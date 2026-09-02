@@ -63,6 +63,12 @@
   --ease-out: #{$ease-out};
   --ease-smooth: #{$ease-smooth};
   --ease-spring: #{$ease-spring};
+  --ease-standard: #{$motion-standard-ease};
+
+  // 动效节奏（全站统一时长）
+  --motion-fast: #{$motion-fast};
+  --motion-normal: #{$motion-normal};
+  --motion-slow: #{$motion-slow};
 
   // 字体
   --font-sans: #{$font-sans};
@@ -284,6 +290,33 @@ pre {
 }
 
 // ============================================================
+// 全局刷新呼吸：loading 遮罩期间主内容轻微压暗，结束自然恢复
+// ============================================================
+.app-layout__content > * {
+  transition: opacity var(--motion-normal) var(--ease-standard);
+}
+
+body.global-loading-active .app-layout__content > * {
+  opacity: 0.55;
+}
+
+// ============================================================
+// 删除列表项：先淡出、再收起高度（配合 JS 预置 max-height）
+// ============================================================
+.removing-item {
+  overflow: hidden;
+  opacity: 0 !important;
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  transition:
+    opacity var(--motion-normal) var(--ease-standard),
+    max-height var(--motion-normal) var(--ease-standard),
+    margin var(--motion-normal) var(--ease-standard) !important;
+  pointer-events: none;
+}
+
+// ============================================================
 // 工具类
 // ============================================================
 .card-default {
@@ -418,6 +451,20 @@ pre {
   .ci-section__header {
     flex-wrap: wrap;
     gap: 8px;
+  }
+}
+
+// ============================================================
+// 减少动态效果偏好：系统开启时最小化所有动画（保留功能）
+// ============================================================
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

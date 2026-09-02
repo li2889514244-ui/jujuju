@@ -603,6 +603,98 @@ describe('AnalyticsService', () => {
       expect(result[0].fans).toBe(1247851);
       expect(result[0].dataDate).toBe('2026-06-17');
     });
+
+    it('过期 periodMetrics 只能算历史数据，不能标 complete（防回归）', async () => {
+      // Date.now = 2026-06-18 12:00 北京；collectedAt=05-10 已超出周(06-11起)与月(05-19起)窗口
+      mockPrismaService.account.findMany.mockResolvedValue([
+        {
+          id: 'acc-001',
+          platform: Platform.WECHAT_VIDEO,
+          nickname: '过期视频号',
+          avatar: null,
+          followers: 100,
+          metadata: JSON.stringify({
+            periodMetrics: {
+              videoData: {
+                day_total: { play: 10, like: 1, comment: 1, share: 1, new_fans: 1 },
+                week_total: { play: 40, like: 4, comment: 4, share: 4, new_fans: 4 },
+                month_total: { play: 100, like: 10, comment: 10, share: 10, new_fans: 10 },
+                source: 'new_post_total_data_api',
+                collectedAt: '2026-05-10T12:00:00',
+              },
+            },
+          }),
+        },
+      ]);
+      mockPrismaService.dailyStats.findMany.mockResolvedValue([]);
+
+      const result = await service.getAccountDetailList('user-001');
+
+      expect(result[0].info.week_total).not.toBeNull();
+      expect(result[0].periodStatus?.week_total?.state).toBe('historical');
+      expect(result[0].periodStatus?.month_total?.state).toBe('historical');
+    });
+
+    it('窗口内但超过2天的 periodMetrics 应标 partial（数据不完整）', async () => {
+      // Date.now = 2026-06-18 12:00 北京；collectedAt=06-12 在周(06-11起)与月(05-19起)窗口内，但超过2天
+      mockPrismaService.account.findMany.mockResolvedValue([
+        {
+          id: 'acc-001',
+          platform: Platform.WECHAT_VIDEO,
+          nickname: '中间态视频号',
+          avatar: null,
+          followers: 100,
+          metadata: JSON.stringify({
+            periodMetrics: {
+              videoData: {
+                week_total: { play: 40, like: 4, comment: 4, share: 4, new_fans: 4 },
+                month_total: { play: 100, like: 10, comment: 10, share: 10, new_fans: 10 },
+                source: 'new_post_total_data_api',
+                collectedAt: '2026-06-12T12:00:00',
+              },
+            },
+          }),
+        },
+      ]);
+      mockPrismaService.dailyStats.findMany.mockResolvedValue([]);
+
+      const result = await service.getAccountDetailList('user-001');
+
+      expect(result[0].periodStatus?.week_total?.state).toBe('partial');
+      expect(result[0].periodStatus?.month_total?.state).toBe('partial');
+      expect(result[0].periodStatus?.month_total?.coveredDays).toBe(1);
+    });
+
+    it('窗口内的 periodMetrics 周/月值应标 complete（覆盖天数=期望天数）', async () => {
+      // collectedAt=06-17 在最近7天窗口内（weekStart=06-12 00:00 北京）
+      mockPrismaService.account.findMany.mockResolvedValue([
+        {
+          id: 'acc-001',
+          platform: Platform.WECHAT_VIDEO,
+          nickname: '新鲜视频号',
+          avatar: null,
+          followers: 100,
+          metadata: JSON.stringify({
+            periodMetrics: {
+              videoData: {
+                week_total: { play: 40, like: 4, comment: 4, share: 4, new_fans: 4 },
+                month_total: { play: 100, like: 10, comment: 10, share: 10, new_fans: 10 },
+                source: 'new_post_total_data_api',
+                collectedAt: '2026-06-17T12:00:00',
+              },
+            },
+          }),
+        },
+      ]);
+      mockPrismaService.dailyStats.findMany.mockResolvedValue([]);
+
+      const result = await service.getAccountDetailList('user-001');
+
+      expect(result[0].periodStatus?.week_total?.state).toBe('complete');
+      expect(result[0].periodStatus?.week_total?.coveredDays).toBe(7);
+      expect(result[0].periodStatus?.month_total?.state).toBe('complete');
+      expect(result[0].periodStatus?.month_total?.coveredDays).toBe(30);
+    });
   });
 
   describe('analytics day range normalization', () => {
