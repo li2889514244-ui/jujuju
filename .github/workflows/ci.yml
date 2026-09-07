@@ -77,9 +77,28 @@ jobs:
         working-directory: backend
         run: npx prisma generate
 
-      - name: Apply migrations to isolated CI database
+      - name: Bootstrap isolated CI database from release parent schema
         working-directory: backend
-        run: npx prisma migrate deploy
+        shell: bash
+        run: |
+          # The earliest migrations predate the PostgreSQL schema and contain
+          # SQLite-era SQL. Production already records those migrations as
+          # applied, so CI baselines the parent schema and validates the new
+          # release migration against a fresh PostgreSQL database.
+          git show "${GITHUB_SHA}^:backend/prisma/schema.prisma" > "${RUNNER_TEMP}/schema-before-release.prisma"
+          npx prisma db push --schema="${RUNNER_TEMP}/schema-before-release.prisma" --skip-generate
+          mapfile -t prior_migrations < <(find prisma/migrations -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | grep -v '^20260904000000_add_mcp_oauth$')
+          for migration in "${prior_migrations[@]}"; do
+            npx prisma migrate resolve --applied "$migration"
+          done
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/matrixflow_test
+
+      - name: Apply release migrations to isolated CI database
+        working-directory: backend
+        run: |
+          npx prisma migrate deploy
+          npx prisma migrate status
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/matrixflow_test
 

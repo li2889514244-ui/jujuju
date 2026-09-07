@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import dayjs from 'dayjs'
 import {
   buildDailySales,
   buildStatusBreakdown,
@@ -110,8 +111,10 @@ describe('wechatStoreMetrics', () => {
   })
 
   it('matches refund to order date in daily trends', () => {
+    const orderCreatedAt = dayjs('2026-06-16T12:00:00').unix()
+    const expectedOrderDate = dayjs.unix(orderCreatedAt).format('MM-DD')
     const entries = buildDailySales(
-      [{ order_id: 'refunded', status: 200, pay_amount: 29900, create_time: 1781539200 }],
+      [{ order_id: 'refunded', status: 200, pay_amount: 29900, create_time: orderCreatedAt }],
       [
         {
           id: 'refund-1',
@@ -123,8 +126,8 @@ describe('wechatStoreMetrics', () => {
       ],
     )
 
-    // Refund is attributed to the order's date (06-16), not the aftersale date (06-17)
-    expect(entries).toEqual([{ date: '06-16', gmv: 0, orders: 1 }])
+    // Refund is attributed to the order's date, not the aftersale date.
+    expect(entries).toEqual([{ date: expectedOrderDate, gmv: 0, orders: 1 }])
   })
 
   it('skips refunds for orders outside the dataset in daily trends', () => {
