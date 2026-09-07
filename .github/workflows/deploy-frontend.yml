@@ -15,6 +15,9 @@ concurrency:
 jobs:
   deploy:
     name: Build & Deploy Frontend
+    # Manual dispatch is allowed for inspection, but production deployment is
+    # intentionally restricted to the protected master branch.
+    if: github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,7 +52,7 @@ jobs:
             set -euo pipefail
             STAMP=$(date +%Y%m%d%H%M%S)
             TAR=/tmp/matrixflow-frontend-ci-$STAMP.tar.gz
-            TARGET=/opt/matrixflow/frontend/dist
+            TARGET=/opt/matrixflow/frontend-dist
             CONTAINER=matrixflow-frontend
             BACKUP=/tmp/matrixflow-frontend-dist-backup-$STAMP
 
@@ -80,22 +83,33 @@ jobs:
             STAMP=$(date +%Y%m%d%H%M%S)
             TAR=/tmp/matrixflow-frontend-ci.tar.gz
             TMP=/tmp/matrixflow-release-ci-$STAMP
-            TARGET=/opt/matrixflow/frontend/dist
+            TARGET=/opt/matrixflow/frontend-dist
             CONTAINER=matrixflow-frontend
             BACKUP=/tmp/matrixflow-frontend-dist-backup-$STAMP
+            PRESERVE=/tmp/matrixflow-frontend-preserve-$STAMP
 
             echo "=== Extracting ==="
             rm -rf "$TMP"
-            mkdir -p "$TMP" "$TARGET" "$BACKUP"
+            mkdir -p "$TMP" "$TARGET" "$BACKUP" "$PRESERVE"
             tar -xzf "$TAR" -C "$TMP"
             test -f "$TMP/dist/index.html" || { echo "ERROR: index.html not found"; exit 1; }
 
             echo "=== Backing up & replacing ==="
             if [ -d "$TARGET" ]; then
               cp -a "$TARGET/." "$BACKUP/" || true
+              for path in downloads companion-updates uploads; do
+                if [ -d "$TARGET/$path" ]; then
+                  cp -a "$TARGET/$path" "$PRESERVE/$path"
+                fi
+              done
               find "$TARGET" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
             fi
             cp -a "$TMP/dist/." "$TARGET/"
+            for path in downloads companion-updates uploads; do
+              if [ -d "$PRESERVE/$path" ]; then
+                cp -a "$PRESERVE/$path" "$TARGET/$path"
+              fi
+            done
             chmod -R a+rX "$TARGET"
 
             echo "=== Reloading nginx ==="
@@ -116,7 +130,7 @@ jobs:
 
             # Cleanup
             rm -f "$TAR"
-            rm -rf "$TMP"
+            rm -rf "$TMP" "$PRESERVE"
 
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ DEPLOY SUCCESS"

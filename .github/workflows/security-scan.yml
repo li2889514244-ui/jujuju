@@ -2,7 +2,7 @@ name: Security Scan
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Every Monday at 6 AM UTC
+    - cron: '0 6 * * 1' # Every Monday at 6 AM UTC
   push:
     branches: [main]
   pull_request:
@@ -35,12 +35,10 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
       - name: Run Snyk scan
         uses: snyk/actions/node@master
         if: ${{ env.SNYK_TOKEN != '' }}
-        continue-on-error: true
         env:
           SNYK_TOKEN: ${{ env.SNYK_TOKEN }}
         with:
