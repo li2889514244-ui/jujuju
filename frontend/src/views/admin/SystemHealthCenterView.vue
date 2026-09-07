@@ -131,10 +131,15 @@ const events = ref<SystemEvent[]>([])
 const healthCards = computed(() => {
   const cards = overview.value?.cards
   return [
-    { key: 'frontend', name: '前端网站', status: cards?.frontend.status, desc: `24h 错误 ${cards?.frontend.errors24h ?? 0}` },
-    { key: 'backend', name: '后端 API', status: cards?.backend.status, desc: `500 ${cards?.backend.errors24h ?? 0} · 慢接口 ${cards?.backend.slowApis24h ?? 0}` },
+    { key: 'frontend', name: '前端网站', status: cards?.frontend.status, desc: `当前故障 ${cards?.frontend.activeIncidents ?? 0} · 24h 错误 ${cards?.frontend.errors24h ?? 0}` },
+    { key: 'backend', name: '后端 API', status: cards?.backend.status, desc: `当前故障 ${cards?.backend.activeIncidents ?? 0} · 500 ${cards?.backend.errors24h ?? 0} · 慢接口 ${cards?.backend.slowApis24h ?? 0}` },
     { key: 'database', name: '数据库', status: cards?.database.status, desc: cards?.database.responseTimeMs ? `${cards.database.responseTimeMs}ms` : 'SELECT 1' },
-    { key: 'companion', name: '伴侣', status: cards?.companion.status, desc: `离线 ${cards?.companion.offline ?? 0} · 异常 ${cards?.companion.anomalies ?? 0}` },
+    {
+      key: 'companion',
+      name: '伴侣',
+      status: cards?.companion.status,
+      desc: `离线 ${cards?.companion.offline ?? 0} · 受影响 ${cards?.companion.anomalies ?? 0} · 未恢复故障 ${cards?.companion.activeIncidents ?? 0}`,
+    },
     { key: 'business', name: '业务数据', status: cards?.business.status, desc: cards?.business.note || '待接入' },
     { key: 'release', name: '发布版本', status: cards?.release.status, desc: cards?.release.note || '待接入' },
   ] as Array<{ key: string; name: string; status?: SystemHealthStatus; desc: string }>

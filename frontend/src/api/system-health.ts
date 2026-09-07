@@ -10,6 +10,7 @@ export interface SystemHealthCard {
   responseTimeMs?: number
   total?: number
   anomalies?: number
+  activeIncidents?: number
   offline?: number
   failedCollectOrSync?: number
   note?: string
@@ -43,6 +44,7 @@ export interface SystemHealthOverview {
     slowApis24h: number
     dbErrors24h: number
     companionAnomalies: number
+    companionActiveIncidents: number
     offlineCompanions: number
     failedCollectOrSync: number
     unresolvedIncidents: number

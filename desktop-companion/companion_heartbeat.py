@@ -390,9 +390,9 @@ def _send_heartbeat():
     if resp.status_code in (200, 201):
         with _lock:
             _http_error_counts.update({'count403': 0, 'count404': 0, 'count500': 0})
-            # 401 是登录态过期的瞬时错误：心跳恢复成功后自动清除，
-            # 避免监控中心一直显示一条已自愈的旧错误。
-            if _last_error.get('errorCode') == 'HEARTBEAT_401':
+            # 心跳网络/鉴权/内部错误都是心跳链路的瞬时错误：心跳恢复成功后清除，
+            # 避免监控中心一直显示一条已经自愈的旧错误。采集、同步等业务错误保留。
+            if str(_last_error.get('errorCode') or '').startswith('HEARTBEAT_'):
                 _last_error.update({'errorCode': '', 'message': '', 'at': None})
         return True
     if resp.status_code == 401:

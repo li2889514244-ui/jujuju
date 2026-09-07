@@ -118,8 +118,23 @@ describe('CompanionMonitorService', () => {
       expect(args.where).toEqual({ deviceId: 'device-0000000001' })
       expect(args.create.deviceId).toBe('device-0000000001')
       expect(args.create.healthStatus).toBe('online')
+      expect(args.create.lastCollectionAt).toBeNull()
+      expect(args.create.lastCollectionSuccess).toBeNull()
       expect(args.create.bootCount).toBe(1)
       expect(mockPrismaService.companionHeartbeat.create).toHaveBeenCalledTimes(1)
+    })
+
+    it('没有采集结果的后续心跳不应把状态改成采集失败', async () => {
+      const device = baseDevice({ lastCollectionSuccess: null, lastCollectionAt: null })
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(device)
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(device)
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6 })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.lastCollectionSuccess).toBeNull()
+      expect(args.update.lastCollectionAt).toBeNull()
     })
 
     it('非法 deviceId 应拒绝', async () => {

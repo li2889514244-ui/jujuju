@@ -189,8 +189,9 @@ export class SystemHealthService {
       slowApis,
       dbErrors,
       companionDevices,
-      companionAnomalies,
+      companionIncidents,
       openIncidents,
+      activeSystemIncidents,
       recoveringIncidents,
       todayResolved,
       unresolvedIncidents,
@@ -212,13 +213,27 @@ export class SystemHealthService {
       }),
       this.prisma.companionDevice.findMany({
         where: orgWhere,
-        select: { healthStatus: true, consecutiveSyncFailures: true, lastCollectionSuccess: true, lastSyncSuccess: true },
+        select: {
+          healthStatus: true,
+          consecutiveSyncFailures: true,
+          lastCollectionSuccess: true,
+          lastCollectionAt: true,
+          lastSyncSuccess: true,
+          lastSyncAt: true,
+        },
       }),
-      this.prisma.companionIncident.count({ where: { ...orgWhere, status: { in: ['open', 'recovering'] } } }),
+      this.prisma.companionIncident.findMany({
+        where: { ...orgWhere, status: { in: ['open', 'recovering'] } },
+        select: { deviceId: true, organizationId: true },
+      }),
       this.prisma.systemIncident.findMany({
         where: { ...this.incidentOrgWhere(user), status: 'OPEN', severity: { in: ['CRITICAL', 'ERROR'] } },
         orderBy: [{ severity: 'desc' }, { lastOccurredAt: 'desc' }],
         take: 8,
+      }),
+      this.prisma.systemIncident.findMany({
+        where: { ...this.incidentOrgWhere(user), status: { in: ['OPEN', 'RECOVERING'] } },
+        select: { sourceType: true },
       }),
       this.prisma.systemIncident.count({ where: { ...this.incidentOrgWhere(user), status: 'RECOVERING' } }),
       this.prisma.systemIncident.count({
@@ -238,8 +253,19 @@ export class SystemHealthService {
 
     const offlineCompanions = companionDevices.filter((device) => device.healthStatus === 'offline').length
     const failedCollectOrSync = companionDevices.filter(
-      (device) => device.lastCollectionSuccess === false || device.lastSyncSuccess === false || device.consecutiveSyncFailures >= 3,
+      (device) =>
+        (device.lastCollectionAt != null && device.lastCollectionSuccess === false) ||
+        (device.lastSyncAt != null && device.lastSyncSuccess === false) ||
+        device.consecutiveSyncFailures >= 3,
     ).length
+    const companionActiveIncidentCount = companionIncidents.length
+    const activeFrontendIncidents = activeSystemIncidents.filter((incident) => incident.sourceType === 'FRONTEND').length
+    const activeBackendIncidents = activeSystemIncidents.filter((incident) => incident.sourceType === 'BACKEND').length
+    // 一个设备可能同时有心跳、离线、版本等多条故障；健康卡展示受影响实体数，
+    // 另行返回故障条数，避免“异常 6”大于“设备总数 3”的歧义。
+    const affectedCompanionEntities = new Set(
+      companionIncidents.map((incident) => incident.deviceId || `org:${incident.organizationId || 'default'}`),
+    ).size
     const p0 = openCritical
     const p1 = openError
 
@@ -252,7 +278,7 @@ export class SystemHealthService {
           : unresolvedIncidents > 0 ||
               frontendErrors > 0 ||
               slowApis > 0 ||
-              companionAnomalies > 0 ||
+              companionActiveIncidentCount > 0 ||
               offlineCompanions > 0
             ? 'DEGRADED'
             : 'HEALTHY'
@@ -261,13 +287,19 @@ export class SystemHealthService {
       overallStatus,
       generatedAt: now.toISOString(),
       cards: {
-        frontend: { status: frontendErrors > 0 ? 'DEGRADED' : 'HEALTHY', errors24h: frontendErrors },
-        backend: { status: backendErrors > 0 ? 'INCIDENT' : slowApis > 0 ? 'DEGRADED' : 'HEALTHY', errors24h: backendErrors, slowApis24h: slowApis },
+        frontend: { status: activeFrontendIncidents > 0 ? 'DEGRADED' : 'HEALTHY', errors24h: frontendErrors, activeIncidents: activeFrontendIncidents },
+        backend: {
+          status: activeBackendIncidents > 0 ? 'INCIDENT' : slowApis > 0 ? 'DEGRADED' : 'HEALTHY',
+          errors24h: backendErrors,
+          slowApis24h: slowApis,
+          activeIncidents: activeBackendIncidents,
+        },
         database: { status: dbStatus.status === 'ok' ? 'HEALTHY' : 'CRITICAL', responseTimeMs: dbStatus.responseTimeMs },
         companion: {
-          status: companionAnomalies || offlineCompanions ? 'DEGRADED' : 'HEALTHY',
+          status: companionActiveIncidentCount || offlineCompanions ? 'DEGRADED' : 'HEALTHY',
           total: companionDevices.length,
-          anomalies: companionAnomalies,
+          anomalies: affectedCompanionEntities,
+          activeIncidents: companionActiveIncidentCount,
           offline: offlineCompanions,
           failedCollectOrSync,
         },
@@ -279,7 +311,8 @@ export class SystemHealthService {
         api50024h: backendErrors,
         slowApis24h: slowApis,
         dbErrors24h: dbErrors,
-        companionAnomalies,
+        companionAnomalies: affectedCompanionEntities,
+        companionActiveIncidents: companionActiveIncidentCount,
         offlineCompanions,
         failedCollectOrSync,
         unresolvedIncidents,

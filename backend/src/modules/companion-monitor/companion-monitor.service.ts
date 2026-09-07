@@ -158,7 +158,9 @@ export class CompanionMonitorService {
     const collectionEndedAt = str(collectionInfo.endedAt)
     const hasSync = Object.keys(lastSync).length > 0
     const hasError = Object.keys(lastError).length > 0
-    const hasCollection = Object.keys(collectionInfo).length > 0
+    // 心跳快照会始终带上 lastCollection，但首次运行时 success 为 null。
+    // 只有明确收到 true/false 才算一次采集结果，避免“尚未采集”被落库为失败。
+    const hasCollection = collectionInfo.success === true || collectionInfo.success === false
     const hasTaskDetail = Object.keys(readJson(payload.taskDetail)).length > 0
     const hasHttpErrors = Object.keys(readJson(payload.recentHttpErrors)).length > 0
     const startupDiagnostic = readJson(payload.startupDiagnostic)
@@ -234,8 +236,8 @@ export class CompanionMonitorService {
         currentTaskDetail: readJson(payload.taskDetail),
         taskStartedAt,
         platformSummary,
-        lastCollectionAt: collectionEndedAt && !Number.isNaN(new Date(collectionEndedAt).getTime()) ? new Date(collectionEndedAt) : null,
-        lastCollectionSuccess: collectionInfo.success === true ? true : false,
+        lastCollectionAt: hasCollection && collectionEndedAt && !Number.isNaN(new Date(collectionEndedAt).getTime()) ? new Date(collectionEndedAt) : null,
+        lastCollectionSuccess: hasCollection ? collectionInfo.success === true : null,
         lastCollectionAccountCount: Number(collectionInfo.accountCount) || 0,
         lastSyncAt: lastSyncAtRaw && !Number.isNaN(new Date(lastSyncAtRaw).getTime()) ? new Date(lastSyncAtRaw) : null,
         lastSyncSuccess: hasSync && (syncSuccess || syncFailed) ? syncSuccess : null,

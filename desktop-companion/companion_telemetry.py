@@ -65,7 +65,15 @@ def upload_logs_once(api_url: str, token: str, device_id: str, version: str) -> 
         except Exception:
             install_dir = ''
         headers = {'Authorization': f'Bearer {token}'} if token else {}
-        response = requests.post(
+        # 日志上传与心跳、鉴权使用同一条直连通道，避免系统代理故障把
+        # 诊断链路单独打断（历史上这里仍使用 requests.post，生产日志出现过 ProxyError）。
+        try:
+            from companion_auth import _no_proxy_session
+            session = _no_proxy_session()
+        except Exception:
+            session = requests.Session()
+            session.trust_env = False
+        response = session.post(
             f"{api_url.rstrip('/')}/platforms/report-logs",
             json={'deviceId': device_id, 'version': version, 'log': log_text, 'diag': diag_text, 'installDir': install_dir},
             headers=headers,

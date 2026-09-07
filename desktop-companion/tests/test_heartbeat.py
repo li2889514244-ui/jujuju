@@ -16,6 +16,7 @@ test_heartbeat.py — 伴侣监控中心心跳 Phase 2 回归测试
 
 import time
 import unittest
+from unittest.mock import patch
 
 import companion_heartbeat as hb
 import companion_state as state
@@ -138,6 +139,38 @@ class HeartbeatPhase2Test(unittest.TestCase):
             hb.send_shutdown_heartbeat()
         finally:
             hb._load_api = saved
+
+    def test_successful_heartbeat_clears_transient_heartbeat_error(self):
+        class _Response:
+            status_code = 200
+
+        class _Session:
+            def post(self, *args, **kwargs):
+                return _Response()
+
+        hb.record_error('HEARTBEAT_NETWORK', 'temporary timeout')
+        with patch.object(hb, '_load_api', return_value=('https://example.test/api/v1', 'token')), \
+             patch('companion_auth._no_proxy_session', return_value=_Session()):
+            self.assertTrue(hb._send_heartbeat())
+
+        payload = hb._build_payload()
+        self.assertEqual(payload['lastError']['errorCode'], '')
+        self.assertEqual(payload['lastError']['message'], '')
+
+    def test_successful_heartbeat_preserves_business_error(self):
+        class _Response:
+            status_code = 200
+
+        class _Session:
+            def post(self, *args, **kwargs):
+                return _Response()
+
+        hb.record_error('COLLECT_FAIL', 'no active accounts')
+        with patch.object(hb, '_load_api', return_value=('https://example.test/api/v1', 'token')), \
+             patch('companion_auth._no_proxy_session', return_value=_Session()):
+            self.assertTrue(hb._send_heartbeat())
+
+        self.assertEqual(hb._build_payload()['lastError']['errorCode'], 'COLLECT_FAIL')
 
 
 if __name__ == '__main__':
