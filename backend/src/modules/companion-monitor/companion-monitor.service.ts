@@ -17,6 +17,7 @@ export interface HeartbeatPayload {
   lastError?: unknown
   update?: unknown
   recentHttpErrors?: unknown
+  networkDiagnostic?: unknown
   resources?: unknown
   // Phase 2
   bootId?: unknown
@@ -158,6 +159,8 @@ export class CompanionMonitorService {
     const collectionEndedAt = str(collectionInfo.endedAt)
     const hasSync = Object.keys(lastSync).length > 0
     const hasError = Object.keys(lastError).length > 0
+    const previousErrorCode = str(existing?.lastErrorCode, 80)
+    const clearRecoveredHeartbeatError = !hasError && previousErrorCode.startsWith('HEARTBEAT_')
     // 心跳快照会始终带上 lastCollection，但首次运行时 success 为 null。
     // 只有明确收到 true/false 才算一次采集结果，避免“尚未采集”被落库为失败。
     const hasCollection = collectionInfo.success === true || collectionInfo.success === false
@@ -166,6 +169,29 @@ export class CompanionMonitorService {
     const startupDiagnostic = readJson(payload.startupDiagnostic)
     const hasStartupDiagnostic = Object.keys(startupDiagnostic).length > 0
     const lastProgressAt = validDate(str(payload.lastProgressAt))
+    const networkDiagnostic = readJson(payload.networkDiagnostic)
+    const hasNetworkDiagnostic = Object.keys(networkDiagnostic).length > 0
+
+    // A later heartbeat closes the evidence gap: retain one event describing
+    // the outage and the last transport diagnosis seen before it went silent.
+    // This is deliberately an event, not a new alert, so it does not weaken
+    // the existing stale-heartbeat threshold.
+    const previousHeartbeatAt = existing?.lastHeartbeatAt ? new Date(existing.lastHeartbeatAt).getTime() : 0
+    if (existing && previousHeartbeatAt > 0 && now.getTime() - previousHeartbeatAt > 5 * 60 * 1000) {
+      const previousNetwork = readJson(existing.networkDiagnostic)
+      const evidence = [
+        str(previousNetwork.lastErrorCode, 40),
+        str(previousNetwork.lastRoute, 30),
+      ].filter(Boolean).join('/')
+      await this.prisma.companionEvent.create({
+        data: {
+          deviceId,
+          type: 'HEARTBEAT_RECOVERED',
+          message: '心跳恢复，离线前网络证据：' + (evidence || '未记录'),
+          organizationId: existing.organizationId ?? null,
+        },
+      })
+    }
 
     const device = await this.prisma.companionDevice.upsert({
       where: { deviceId },
@@ -198,19 +224,22 @@ export class CompanionMonitorService {
         lastSyncSuccess: hasSync && (syncSuccess || syncFailed) ? syncSuccess : existing?.lastSyncSuccess,
         lastSyncUploadCount: hasSync ? Number(lastSync.uploadCount) || 0 : existing?.lastSyncUploadCount,
         lastSyncErrorCode: hasSync ? str(lastSync.errorCode, 80) : existing?.lastSyncErrorCode,
-        lastErrorCode: hasError ? str(lastError.errorCode, 80) : existing?.lastErrorCode,
-        lastErrorMessage: hasError ? str(lastError.message, 300) : existing?.lastErrorMessage,
+        lastErrorCode: hasError ? str(lastError.errorCode, 80) : clearRecoveredHeartbeatError ? null : existing?.lastErrorCode,
+        lastErrorMessage: hasError ? str(lastError.message, 300) : clearRecoveredHeartbeatError ? null : existing?.lastErrorMessage,
         lastErrorAt: hasError
           ? lastErrorAtRaw && !Number.isNaN(new Date(lastErrorAtRaw).getTime())
             ? new Date(lastErrorAtRaw)
             : existing?.lastErrorAt
-          : existing?.lastErrorAt,
+          : clearRecoveredHeartbeatError
+            ? null
+            : existing?.lastErrorAt,
         updateStatus: Object.keys(updateInfo).length ? updateInfo : ((existing?.updateStatus ?? {}) as any),
         cpuPercent: Number.isFinite(Number(resources.cpuPercent)) ? Number(resources.cpuPercent) : existing?.cpuPercent,
         memoryMb: Number.isFinite(Number(resources.memoryMb)) ? Number(resources.memoryMb) : existing?.memoryMb,
         processUptimeSeconds: Number(resources.processUptimeSeconds) || 0,
         consecutiveSyncFailures,
         recentHttpErrors: hasHttpErrors ? readJson(payload.recentHttpErrors) : ((existing?.recentHttpErrors ?? {}) as any),
+        networkDiagnostic: hasNetworkDiagnostic ? networkDiagnostic : ((existing?.networkDiagnostic ?? {}) as any),
         // Phase 2
         bootId: bootId ?? existing?.bootId,
         bootSeq: bootId && seq !== null ? seq : isNewBoot ? 0 : existing?.bootSeq ?? 0,
@@ -252,6 +281,7 @@ export class CompanionMonitorService {
         processUptimeSeconds: Number(resources.processUptimeSeconds) || 0,
         consecutiveSyncFailures,
         recentHttpErrors: readJson(payload.recentHttpErrors),
+        networkDiagnostic,
         bootId,
         bootSeq: seq ?? 0,
         bootCount: 1,
@@ -279,6 +309,7 @@ export class CompanionMonitorService {
           cpuPercent: device.cpuPercent,
           memoryMb: device.memoryMb,
           processUptimeSeconds: device.processUptimeSeconds,
+          networkDiagnostic: hasNetworkDiagnostic ? networkDiagnostic : ((device.networkDiagnostic ?? {}) as any),
           ownerName: device.ownerName,
           bootId: device.bootId,
           seq: device.bootSeq,
@@ -309,7 +340,7 @@ export class CompanionMonitorService {
     const last = await this.prisma.companionHeartbeat.findFirst({
       where: { deviceId: device.deviceId },
       orderBy: { receivedAt: 'desc' },
-      select: { receivedAt: true, taskStatus: true, lastSync: true, lastError: true, bootId: true },
+      select: { receivedAt: true, taskStatus: true, lastSync: true, lastError: true, bootId: true, networkDiagnostic: true },
     })
     if (!last) return true
     if (now.getTime() - last.receivedAt.getTime() >= HISTORY_WRITE_INTERVAL_MS) return true
@@ -322,6 +353,12 @@ export class CompanionMonitorService {
     const newErr = readJson(payload.lastError)
     const oldErr = readJson(last.lastError)
     if (str(newErr.errorCode) !== str(oldErr.errorCode) || str(newErr.message) !== str(oldErr.message)) return true
+    const newNetwork = readJson(payload.networkDiagnostic)
+    const oldNetwork = readJson(last.networkDiagnostic)
+    if (
+      str(newNetwork.lastErrorCode, 60) !== str(oldNetwork.lastErrorCode, 60) ||
+      str(newNetwork.lastRoute, 30) !== str(oldNetwork.lastRoute, 30)
+    ) return true
     const collection = readJson(payload.lastCollection)
     if (collection.success === true) return true
     const updateInfo = readJson(payload.update)
@@ -341,6 +378,7 @@ export class CompanionMonitorService {
         lastHeartbeatAt: true, healthStatus: true, currentTask: true, taskStartedAt: true,
         lastProgressAt: true, consecutiveSyncFailures: true, companionVersion: true, updateStatus: true,
         recentHttpErrors: true, platformSummary: true,
+        networkDiagnostic: true,
       },
     })
 

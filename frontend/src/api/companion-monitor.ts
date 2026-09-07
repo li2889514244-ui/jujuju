@@ -41,6 +41,7 @@ export interface CompanionDevice {
   processUptimeSeconds: number | null
   consecutiveSyncFailures: number
   recentHttpErrors: Record<string, unknown> | null
+  networkDiagnostic: Record<string, unknown> | null
 }
 
 export interface CompanionHeartbeat {
@@ -58,6 +59,7 @@ export interface CompanionHeartbeat {
   cpuPercent: number | null
   memoryMb: number | null
   processUptimeSeconds: number | null
+  networkDiagnostic: Record<string, unknown> | null
 }
 
 export interface CompanionAlert {

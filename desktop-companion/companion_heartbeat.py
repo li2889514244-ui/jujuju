@@ -288,12 +288,27 @@ def note_task_progress(task, detail):
 
 def _collect_ui_diagnostic():
     """UI 模式与启动诊断：为什么某台电脑以浏览器形式打开。"""
-    return {
+    diagnostic = {
         'uiMode': str(getattr(state, '_ui_mode', 'unknown') or 'unknown'),
         'fallbackReason': str(getattr(state, '_ui_fallback_reason', None) or ''),
         'fallbackAt': str(getattr(state, '_ui_fallback_at', None) or ''),
         'webview2RuntimeVersion': str(getattr(state, '_webview2_runtime_version', None) or ''),
     }
+    try:
+        from companion_runtime import get_diagnostic
+        diagnostic['runtime'] = get_diagnostic()
+    except Exception:
+        pass
+    return diagnostic
+
+
+def _collect_runtime_diagnostic():
+    """Return local transport evidence without collecting unrelated machine data."""
+    try:
+        from companion_network import get_network_diagnostics
+        return get_network_diagnostics()
+    except Exception:
+        return {}
 
 
 def _detect_state_errors():
@@ -340,6 +355,7 @@ def _build_payload():
         'lastProgressAt': last_progress_at,
         'uiMode': str(getattr(state, '_ui_mode', 'unknown') or 'unknown'),
         'startupDiagnostic': _collect_ui_diagnostic(),
+        'networkDiagnostic': _collect_runtime_diagnostic(),
         'platformSummary': _collect_platform_summary(),
         'lastCollection': collection,
         'lastSync': sync,
@@ -369,17 +385,11 @@ def _send_heartbeat():
     if not token:
         return False
     payload = _build_payload()
-    try:
-        from companion_auth import _no_proxy_session
-        session = _no_proxy_session()
-    except Exception:
-        import requests
-        session = requests.Session()
-        session.trust_env = False
     url = api_url + '/companion-monitor/heartbeat'
     try:
-        resp = session.post(
-            url,
+        from companion_network import request_with_network_fallback
+        resp = request_with_network_fallback(
+            'POST', url, channel='heartbeat',
             json=payload,
             headers={'Authorization': 'Bearer ' + token},
             timeout=POST_TIMEOUT_SECONDS,
@@ -388,6 +398,11 @@ def _send_heartbeat():
         record_error('HEARTBEAT_NETWORK', str(exc)[:200])
         return False
     if resp.status_code in (200, 201):
+        try:
+            from companion_runtime import mark_phase
+            mark_phase('heartbeat_ok', lastHeartbeatAt=_now_iso())
+        except Exception:
+            pass
         with _lock:
             _http_error_counts.update({'count403': 0, 'count404': 0, 'count500': 0})
             # 心跳网络/鉴权/内部错误都是心跳链路的瞬时错误：心跳恢复成功后清除，
@@ -402,6 +417,8 @@ def _send_heartbeat():
             _check_and_refresh_token()
         except Exception:
             pass
+    elif resp.status_code >= 400:
+        record_error('HEARTBEAT_HTTP', f'心跳上报 HTTP {resp.status_code}')
     return False
 
 
@@ -419,15 +436,9 @@ def send_shutdown_heartbeat():
             return
         payload = _build_payload()
         payload['exitState'] = 'clean'
-        try:
-            from companion_auth import _no_proxy_session
-            session = _no_proxy_session()
-        except Exception:
-            import requests
-            session = requests.Session()
-            session.trust_env = False
-        session.post(
-            api_url + '/companion-monitor/heartbeat',
+        from companion_network import request_with_network_fallback
+        request_with_network_fallback(
+            'POST', api_url + '/companion-monitor/heartbeat', channel='heartbeat_shutdown',
             json=payload,
             headers={'Authorization': 'Bearer ' + token},
             timeout=5,

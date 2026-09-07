@@ -11,12 +11,63 @@ APP_VERSION = state.APP_VERSION
 DEFAULT_UPDATE_MANIFEST_URL = state.DEFAULT_UPDATE_MANIFEST_URL
 
 _UPDATE_STATUS_LOCK = threading.Lock()
+_UPDATE_JOURNAL_LOCK = threading.Lock()
+_UPDATE_JOURNAL_PATH = Path(
+    os.environ.get('LOCALAPPDATA', str(Path.home()))
+) / 'MatrixFlow' / 'update-state.json'
+_LAST_JOURNAL_WRITE = 0.0
 
 # 更新检查与下载统一走“无系统代理”通道：同事机器若挂着 Clash/VPN，
 # 系统代理会把几百 MB 的更新包绕到代理节点，速度极慢。更新包必须直连。
 import urllib.request as _urllib_request
 
 _NO_PROXY_OPENER = _urllib_request.build_opener(_urllib_request.ProxyHandler({}))
+_SYSTEM_PROXY_OPENER = _urllib_request.build_opener()
+
+
+def _open_update_url(request, timeout: int):
+    """Open an update URL direct-first, then through the configured proxy.
+
+    A valid HTTP response (including 4xx/5xx) is returned/raised without a
+    second route attempt.  Only connection-level failures use the fallback,
+    preserving server-side errors and making corporate proxy environments
+    usable without regressing direct-connect environments.
+    """
+    import urllib.error
+
+    try:
+        response = _NO_PROXY_OPENER.open(request, timeout=timeout)
+        try:
+            from companion_network import record_success
+            record_success('updater', 'direct', getattr(response, 'status', None))
+        except Exception:
+            pass
+        return response
+    except urllib.error.HTTPError:
+        raise
+    except Exception as direct_exc:
+        try:
+            from companion_network import record_failure
+            record_failure('updater', 'direct', direct_exc)
+        except Exception:
+            pass
+        try:
+            response = _SYSTEM_PROXY_OPENER.open(request, timeout=timeout)
+            try:
+                from companion_network import record_success
+                record_success('updater', 'system_proxy', getattr(response, 'status', None))
+            except Exception:
+                pass
+            return response
+        except urllib.error.HTTPError:
+            raise
+        except Exception as proxy_exc:
+            try:
+                from companion_network import record_failure
+                record_failure('updater', 'system_proxy', proxy_exc)
+            except Exception:
+                pass
+            raise proxy_exc
 
 # 下载暂停/继续：用户点“暂停下载”置位，点“继续下载”清除；下载循环按块检查。
 _DOWNLOAD_PAUSE = threading.Event()
@@ -52,6 +103,43 @@ _UPDATE_STATUS = {
 }
 
 
+def _persist_update_journal(status: dict, force: bool = False) -> None:
+    """Persist update intent outside the process so crashes/reboots are explainable."""
+    global _LAST_JOURNAL_WRITE
+    now = time.time()
+    phase = str(status.get('phase') or '')
+    if not force and phase == 'downloading' and now - _LAST_JOURNAL_WRITE < 5:
+        return
+    journal = {
+        'phase': phase,
+        'target_version': str(status.get('target_version') or ''),
+        'package_url': str(status.get('package_url') or ''),
+        'package_path': str(status.get('package_path') or ''),
+        'log_path': str(status.get('log_path') or ''),
+        'downloaded': int(status.get('downloaded') or 0),
+        'total': int(status.get('total') or 0),
+        'error': str(status.get('error') or '')[:300],
+        'updated_at': str(status.get('updated_at') or _now_text()),
+    }
+    try:
+        with _UPDATE_JOURNAL_LOCK:
+            _UPDATE_JOURNAL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            tmp = _UPDATE_JOURNAL_PATH.with_suffix('.tmp')
+            tmp.write_text(json.dumps(journal, ensure_ascii=False, separators=(',', ':')), encoding='utf-8')
+            os.replace(tmp, _UPDATE_JOURNAL_PATH)
+            _LAST_JOURNAL_WRITE = now
+    except Exception as exc:
+        print(f'[Update] durable journal write failed: {exc}', flush=True)
+
+
+def _read_update_journal() -> dict:
+    try:
+        value = json.loads(_UPDATE_JOURNAL_PATH.read_text(encoding='utf-8'))
+        return value if isinstance(value, dict) else {}
+    except Exception:
+        return {}
+
+
 def _now_text() -> str:
     return time.strftime('%Y-%m-%d %H:%M:%S')
 
@@ -60,7 +148,9 @@ def _set_update_status(**updates) -> dict:
     with _UPDATE_STATUS_LOCK:
         _UPDATE_STATUS.update(updates)
         _UPDATE_STATUS['updated_at'] = _now_text()
-        return dict(_UPDATE_STATUS)
+        status = dict(_UPDATE_STATUS)
+    _persist_update_journal(status)
+    return status
 
 
 def _get_update_status() -> dict:
@@ -123,7 +213,7 @@ def _snooze_update_prompt(version: str, minutes: int = 30) -> dict:
 
 
 def _begin_update_status(target_version: str, package_url: str, total: int = 0) -> dict:
-    return _set_update_status(
+    status = _set_update_status(
         running=True,
         phase='queued',
         percent=0,
@@ -136,24 +226,89 @@ def _begin_update_status(target_version: str, package_url: str, total: int = 0) 
         error='',
         started_at=_now_text(),
     )
+    _persist_update_journal(status, force=True)
+    return status
 
 
 def _finish_update_status(phase: str = 'restarting', log_path: str = '') -> dict:
-    return _set_update_status(
+    status = _set_update_status(
         running=True,
         phase=phase,
         percent=100,
         log_path=str(log_path or ''),
         error='',
     )
+    _persist_update_journal(status, force=True)
+    return status
 
 
 def _fail_update_status(error: Exception | str) -> dict:
-    return _set_update_status(
+    status = _set_update_status(
         running=False,
         phase='error',
         error=str(error),
     )
+    _persist_update_journal(status, force=True)
+    return status
+
+
+def new_update_work_dir() -> Path:
+    """Create a persistent per-update directory; never hide an interrupted job in %TEMP%."""
+    root = _UPDATE_JOURNAL_PATH.parent / 'update-downloads'
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / time.strftime('%Y%m%d-%H%M%S')
+    suffix = 1
+    while path.exists():
+        path = root / f'{time.strftime("%Y%m%d-%H%M%S")}-{suffix}'
+        suffix += 1
+    path.mkdir(parents=True, exist_ok=False)
+    return path
+
+
+def _new_update_job_dir() -> Path:
+    """Keep the apply script and log after the process exits for diagnosis."""
+    root = _UPDATE_JOURNAL_PATH.parent / 'update-jobs'
+    root.mkdir(parents=True, exist_ok=True)
+    path = root / time.strftime('%Y%m%d-%H%M%S')
+    suffix = 1
+    while path.exists():
+        path = root / f'{time.strftime("%Y%m%d-%H%M%S")}-{suffix}'
+        suffix += 1
+    path.mkdir(parents=True, exist_ok=False)
+    return path
+
+
+def recover_pending_update() -> dict:
+    """Load an interrupted update as an actionable diagnostic, never auto-install it.
+
+    The next release can safely decide when to retry.  We intentionally do not
+    start an arbitrary package on boot: an interrupted download must be
+    verified again and an interrupted install must be handled by the scripted
+    rollback/health-check path.
+    """
+    journal = _read_update_journal()
+    if not journal:
+        return {}
+    phase = str(journal.get('phase') or '')
+    if phase in ('idle', 'error', 'completed', 'interrupted'):
+        if phase == 'error':
+            _set_update_status(running=False, phase='error', error=str(journal.get('error') or 'previous update failed'))
+        return journal
+    target = str(journal.get('target_version') or '')
+    if target and not _is_newer_version(target, APP_VERSION):
+        _set_update_status(running=False, phase='completed', target_version=target, error='')
+        return journal
+    message = '上次更新在 ' + (phase or 'unknown') + ' 阶段中断，请重新检查并验证更新包'
+    _set_update_status(
+        running=False,
+        phase='interrupted',
+        target_version=target,
+        package_url=str(journal.get('package_url') or ''),
+        package_path=str(journal.get('package_path') or ''),
+        error=message,
+    )
+    _persist_update_journal(_get_update_status(), force=True)
+    return journal
 
 
 def _friendly_update_failure(error: Exception | str) -> str:
@@ -235,7 +390,7 @@ def _fetch_update_manifest() -> dict:
             'Pragma': 'no-cache',
         },
     )
-    with _NO_PROXY_OPENER.open(req, timeout=45) as resp:
+    with _open_update_url(req, timeout=45) as resp:
         raw = resp.read(1024 * 1024)
     manifest = json.loads(raw.decode('utf-8-sig'))
     if not isinstance(manifest, dict):
@@ -256,7 +411,7 @@ def _supports_ranges(package_url: str) -> bool:
         package_url,
         headers={'User-Agent': f'pixingyun-mate/{APP_VERSION}', 'Range': 'bytes=0-0'},
     )
-    with _NO_PROXY_OPENER.open(req, timeout=30) as resp:
+    with _open_update_url(req, timeout=30) as resp:
         return resp.status == 206 and 'bytes' in (resp.headers.get('Content-Range') or '')
 
 
@@ -291,7 +446,7 @@ def _parallel_download(package_url: str, target: Path, total: int, workers: int,
                     'Cache-Control': 'no-cache',
                 },
             )
-            with _NO_PROXY_OPENER.open(req, timeout=300) as resp:
+            with _open_update_url(req, timeout=300) as resp:
                 with part_path.open('ab') as fh:
                     while True:
                         if is_download_paused():
@@ -351,7 +506,7 @@ def _sequential_probe(
         headers['Range'] = f'bytes={downloaded0}-'
     req = _urllib_request.Request(package_url, headers=headers)
     deadline = time.time() + probe_seconds
-    with _NO_PROXY_OPENER.open(req, timeout=180) as resp:
+    with _open_update_url(req, timeout=180) as resp:
         status = int(getattr(resp, 'status', 200) or 200)
         file_mode = 'ab' if downloaded0 > 0 and status == 206 else 'wb'
         if file_mode == 'wb':
@@ -443,7 +598,7 @@ def _download_update_package(
             headers['Range'] = f'bytes={downloaded}-'
         req = urllib.request.Request(package_url, headers=headers)
         try:
-            with _NO_PROXY_OPENER.open(req, timeout=180) as resp:
+            with _open_update_url(req, timeout=180) as resp:
                 status_code = int(getattr(resp, 'status', 200) or 200)
                 if downloaded > 0 and status_code != 206:
                     package_path.unlink(missing_ok=True)
@@ -595,7 +750,7 @@ def _start_exe_update_process(new_exe_path: Path, target_version: str = '') -> P
     if not getattr(sys, 'frozen', False):
         raise RuntimeError('self update is only available in the packaged app')
 
-    work_dir = Path(tempfile.mkdtemp(prefix='pixingyun-update-'))
+    work_dir = _new_update_job_dir()
     log_path = work_dir / 'exe-update.log'
     ps1_path = work_dir / 'apply_exe_update.ps1'
 
@@ -703,7 +858,7 @@ def _start_zip_update_process(zip_path: Path, target_version: str = '') -> Path:
 
     app_dir = Path(sys.executable).resolve().parent
     exe_path = Path(sys.executable).resolve()
-    work_dir = Path(tempfile.mkdtemp(prefix='pixingyun-update-'))
+    work_dir = _new_update_job_dir()
     stage_dir = work_dir / 'stage'
     log_path = work_dir / 'update.log'
     ps1_path = work_dir / 'apply_update.ps1'

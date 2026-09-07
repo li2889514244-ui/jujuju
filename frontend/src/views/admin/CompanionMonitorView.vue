@@ -132,6 +132,15 @@
             <span v-else class="cm-muted">-</span>
           </template>
         </el-table-column>
+        <el-table-column label="最后链路证据" min-width="145">
+          <template #default="{ row }">
+            <template v-if="networkDiagnosticText(row)">
+              <div :class="row.networkDiagnostic?.lastErrorCode ? 'cm-bad' : 'cm-ok'">{{ networkDiagnosticText(row) }}</div>
+              <div class="cm-cell-sub">{{ networkDiagnosticRoute(row) }}</div>
+            </template>
+            <span v-else class="cm-muted">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="资源" width="110">
           <template #default="{ row }">
             <div class="cm-cell-sub" v-if="row.cpuPercent !== null">CPU {{ row.cpuPercent }}%</div>
@@ -409,6 +418,20 @@ function syncBrief(value: any): string {
 function errorBrief(value: any): string {
   if (!value || !Object.keys(value).length || !value.message) return '-'
   return (value.errorCode ? value.errorCode + ' ' : '') + String(value.message).slice(0, 60)
+}
+
+function networkDiagnosticText(row: CompanionDevice): string {
+  const diagnostic = row.networkDiagnostic as Record<string, any> | null
+  if (!diagnostic || !Object.keys(diagnostic).length) return ''
+  return String(diagnostic.lastErrorCode || '链路可达')
+}
+
+function networkDiagnosticRoute(row: CompanionDevice): string {
+  const diagnostic = row.networkDiagnostic as Record<string, any> | null
+  if (!diagnostic) return ''
+  const route = diagnostic.lastRoute || '未知路径'
+  const at = diagnostic.lastFailureAt || diagnostic.lastSuccessAt || diagnostic.lastAttemptAt
+  return String(route) + (at ? ' · ' + fmtTime(String(at)) : '')
 }
 
 onMounted(async () => {

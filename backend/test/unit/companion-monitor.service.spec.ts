@@ -44,6 +44,7 @@ const baseDevice = (overrides: Record<string, any> = {}) => ({
   processUptimeSeconds: 3600,
   consecutiveSyncFailures: 0,
   recentHttpErrors: {},
+  networkDiagnostic: {},
   bootId: 'boot-1',
   bootSeq: 5,
   bootCount: 2,
@@ -70,6 +71,7 @@ const basePayload: Record<string, any> = {
   lastError: {},
   update: {},
   recentHttpErrors: {},
+  networkDiagnostic: {},
   resources: { cpuPercent: 1.2, memoryMb: 120, processUptimeSeconds: 3600 },
 }
 
@@ -135,6 +137,54 @@ describe('CompanionMonitorService', () => {
       const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
       expect(args.update.lastCollectionSuccess).toBeNull()
       expect(args.update.lastCollectionAt).toBeNull()
+    })
+
+    it('应持久化最后一次网络路径与错误类别', async () => {
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice())
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        networkDiagnostic: {
+          lastRoute: 'system_proxy',
+          lastErrorCode: 'NETWORK_TIMEOUT',
+          consecutiveFailures: 2,
+        },
+      })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.networkDiagnostic).toEqual({
+        lastRoute: 'system_proxy',
+        lastErrorCode: 'NETWORK_TIMEOUT',
+        consecutiveFailures: 2,
+      })
+    })
+
+    it('成功心跳应清除旧的瞬时心跳错误，但保留业务错误', async () => {
+      const device = baseDevice({
+        lastErrorCode: 'HEARTBEAT_NETWORK',
+        lastErrorMessage: 'timeout',
+        lastErrorAt: new Date(),
+      })
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(device)
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6 })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.lastErrorCode).toBeNull()
+      expect(args.update.lastErrorMessage).toBeNull()
+      expect(args.update.lastErrorAt).toBeNull()
+
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ lastErrorCode: 'COLLECT_FAIL', lastErrorMessage: 'business failure', lastErrorAt: new Date() }),
+      )
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 7 })
+      const businessArgs = mockPrismaService.companionDevice.upsert.mock.calls[1][0]
+      expect(businessArgs.update.lastErrorCode).toBe('COLLECT_FAIL')
     })
 
     it('非法 deviceId 应拒绝', async () => {

@@ -20,6 +20,7 @@ from unittest.mock import patch
 
 import companion_heartbeat as hb
 import companion_state as state
+import companion_network as network
 
 
 def _reset_heartbeat_state():
@@ -38,6 +39,7 @@ def _reset_heartbeat_state():
         hb._last_seen_task_detail = None
         hb._task_state.update({'status': 'idle', 'startedAt': None})
         hb._SEQ = 0
+    network.reset_network_diagnostics()
     state._ui_mode = 'unknown'
     state._ui_fallback_reason = None
     state._ui_fallback_at = None
@@ -150,7 +152,7 @@ class HeartbeatPhase2Test(unittest.TestCase):
 
         hb.record_error('HEARTBEAT_NETWORK', 'temporary timeout')
         with patch.object(hb, '_load_api', return_value=('https://example.test/api/v1', 'token')), \
-             patch('companion_auth._no_proxy_session', return_value=_Session()):
+             patch('companion_network.request_with_network_fallback', return_value=_Response()):
             self.assertTrue(hb._send_heartbeat())
 
         payload = hb._build_payload()
@@ -167,7 +169,7 @@ class HeartbeatPhase2Test(unittest.TestCase):
 
         hb.record_error('COLLECT_FAIL', 'no active accounts')
         with patch.object(hb, '_load_api', return_value=('https://example.test/api/v1', 'token')), \
-             patch('companion_auth._no_proxy_session', return_value=_Session()):
+             patch('companion_network.request_with_network_fallback', return_value=_Response()):
             self.assertTrue(hb._send_heartbeat())
 
         self.assertEqual(hb._build_payload()['lastError']['errorCode'], 'COLLECT_FAIL')

@@ -71,6 +71,7 @@ from companion_updater import (
     _begin_update_status, _finish_update_status, _fail_update_status,
     _friendly_update_failure,
     _get_update_status, _set_update_status,
+    new_update_work_dir, recover_pending_update,
     _should_prompt_update, _mark_update_prompt_shown, _snooze_update_prompt,
 )
 from companion_auth import _login_with_saved_credentials, _check_and_refresh_token, _start_token_refresh_daemon, _saved_identifier, _login_payload
@@ -1805,6 +1806,20 @@ def health():
         },
     }
     try:
+        from companion_runtime import get_diagnostic
+        diagnostics['runtime'] = get_diagnostic()
+    except Exception as exc:
+        diagnostics['runtime'] = {'error': str(exc)[:160]}
+    try:
+        from companion_network import get_network_diagnostics
+        diagnostics['network'] = get_network_diagnostics()
+    except Exception as exc:
+        diagnostics['network'] = {'error': str(exc)[:160]}
+    try:
+        diagnostics['update'] = _get_update_status()
+    except Exception as exc:
+        diagnostics['update'] = {'error': str(exc)[:160]}
+    try:
         from local_db import DB_PATH
         diagnostics['local_db'] = {
             'path': str(DB_PATH),
@@ -1983,7 +1998,10 @@ def apply_update():
             )
 
             # 下载工作目录持久化：暂停后继续时复用，实现断点续传
-            update_work_dir = Path(tempfile.mkdtemp(prefix='pixingyun-update-download-'))
+            update_work_dir = new_update_work_dir()
+            _set_update_status(
+                package_path=str(update_work_dir / ('update' + (Path(package_url).suffix or '.pkg'))),
+            )
 
             def _update_job():
                 try:
@@ -3056,6 +3074,23 @@ if __name__ == '__main__':
     except Exception as _hdr_err:
         print(f'[WARN] companion request headers init failed: {_hdr_err}')
 
+    try:
+        from companion_runtime import begin_startup, mark_phase
+        begin_startup()
+        mark_phase('headers_ready')
+    except Exception as _runtime_err:
+        print(f'[WARN] runtime journal init failed: {_runtime_err}', flush=True)
+
+    try:
+        recovered_update = recover_pending_update()
+        if recovered_update and recovered_update.get('phase') not in ('idle', 'completed'):
+            print(
+                f"[Update] previous update state recovered: phase={recovered_update.get('phase')}",
+                flush=True,
+            )
+    except Exception as _update_recovery_err:
+        print(f'[WARN] update recovery journal load failed: {_update_recovery_err}', flush=True)
+
     startup_silent = any(arg in ('--startup', '--silent', '--tray') for arg in sys.argv[1:])
     if startup_silent:
         os.environ['PIXINGYUN_STARTUP_SILENT'] = '1'
@@ -3066,6 +3101,11 @@ if __name__ == '__main__':
 
             repaired = repair_startup_path_if_enabled()
             print(f"[Startup] registry status: enabled={repaired.get('enabled')} path_ok={repaired.get('path_ok')}", flush=True)
+            try:
+                from companion_runtime import mark_phase
+                mark_phase('startup_recovery_ready', startupRecovery=repaired)
+            except Exception:
+                pass
         except Exception as exc:
             print(f'[Startup] auto repair failed: {exc}', flush=True)
     # ═══ v4.0: 原生窗口 + 按需浏览器架构 ═══
@@ -3116,9 +3156,22 @@ if __name__ == '__main__':
             time.sleep(0.5)
     if not flask_ready:
         print('[Main] 错误: Flask 启动超时（20秒）')
-        # 不退出，继续尝试（可能是首次启动慢）
-        # sys.exit(1)
-    print('[Main] Flask 就绪')
+        try:
+            from companion_runtime import mark_phase
+            mark_phase('flask_timeout', flaskReady=False)
+        except Exception:
+            pass
+        # Do not keep a half-started process alive: the startup recovery task
+        # will relaunch it and the server will never receive a false "online"
+        # heartbeat from a companion whose local API is not ready.
+        raise SystemExit(1)
+    else:
+        try:
+            from companion_runtime import mark_phase
+            mark_phase('flask_ready', flaskReady=True)
+        except Exception:
+            pass
+    print('[Main] Flask 就绪' if flask_ready else '[Main] Flask 仍未就绪，继续后台恢复')
     try:
         from local_db import cleanup_running_collection_runs
         cleaned_runs = cleanup_running_collection_runs()
