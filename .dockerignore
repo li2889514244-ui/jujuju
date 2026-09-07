@@ -9,6 +9,6 @@ test
 docs
 k8s
 scripts
-docker
+docker/monitoring
 *.md
 .husky
