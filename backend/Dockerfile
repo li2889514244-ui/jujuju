@@ -3,12 +3,14 @@ FROM node:20-slim AS builder
 WORKDIR /build
 RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 ENV HUSKY=0 CI=true
-COPY package.json package-lock.json* ./
-COPY prisma ./prisma
-RUN npm install --ignore-scripts
-RUN npx prisma generate
-COPY . .
-RUN npm run build
+COPY package.json package-lock.json ./
+COPY backend/package.json ./backend/package.json
+COPY frontend/package.json ./frontend/package.json
+COPY backend/prisma ./backend/prisma
+RUN npm ci --ignore-scripts
+RUN npm run db:generate
+COPY backend ./backend
+RUN npm run build:backend
 
 # ---- Production Stage ----
 FROM mcr.microsoft.com/playwright:v1.44.0-jammy AS production
@@ -20,9 +22,9 @@ RUN groupadd -g 1001 matrixflow && useradd -u 1001 -g matrixflow -m matrixflow
 WORKDIR /app
 
 # Copy Node backend
-COPY --from=builder --chown=matrixflow:matrixflow /build/package.json ./
-COPY --from=builder --chown=matrixflow:matrixflow /build/prisma ./prisma
-COPY --from=builder --chown=matrixflow:matrixflow /build/dist ./dist
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
+COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
 
 # Copy Python bridge
 COPY --chown=matrixflow:matrixflow bridge.py ./
@@ -49,4 +51,4 @@ ENV NODE_ENV=production PORT=3000 HUSKY=0
 EXPOSE 3000 8000
 
 ENTRYPOINT ["tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && python3 bridge.py & node dist/main.js"]
+CMD ["sh", "-c", "python3 bridge.py & exec node dist/main.js"]

@@ -345,7 +345,9 @@ export class OrderReportScheduler {
     ]
 
     const totalOrders = allStores.reduce((sum, s) => sum + s.totalOrderCount, 0)
-    const totalRevenueOrders = allStores.reduce((sum, s) => sum + s.orderCount, 0)
+    const totalRevenueOrders =
+      wechat.reduce((sum, s) => sum + s.orderCount, 0) +
+      doudian.reduce((sum, s) => sum + s.orderCount + s.refundCount, 0)
     const totalAmount = allStores.reduce((sum, s) => sum + s.totalAmount, 0)
     const totalRefunds = allStores.reduce((sum, s) => sum + s.refundCount, 0)
     const totalRefundAmount = allStores.reduce((sum, s) => sum + s.refundAmount, 0)
@@ -355,8 +357,8 @@ export class OrderReportScheduler {
     lines.push('')
     lines.push('【总览】')
     lines.push(`店铺：微信小店 ${wechat.length} 家 / 抖店 ${doudian.length} 家`)
-    lines.push(`总订单：${totalOrders} 单`)
-    lines.push(`成交/有效订单：${totalRevenueOrders} 单`)
+    lines.push(`出单：${totalOrders} 单`)
+    lines.push(`计入成交额：${totalRevenueOrders} 单`)
     lines.push(`成交额：¥${this.formatMoney(totalAmount)}（未扣退款）`)
     lines.push(`退款：${totalRefunds} 笔 / ¥${this.formatMoney(totalRefundAmount)}`)
     if (totalRefundAmount > 0) {
@@ -367,7 +369,7 @@ export class OrderReportScheduler {
     if (wechat.length > 0) {
       lines.push('【微信小店】')
       for (const s of wechat) {
-        this.appendStoreLines(lines, s)
+        this.appendStoreLines(lines, s, 'wechat')
       }
     }
 
@@ -375,21 +377,23 @@ export class OrderReportScheduler {
       if (wechat.length > 0) lines.push('')
       lines.push('【抖店】')
       for (const s of doudian) {
-        this.appendStoreLines(lines, s)
+        this.appendStoreLines(lines, s, 'doudian')
       }
     }
 
     lines.push('')
-    lines.push('口径：成交额未扣退款；退款仅统计成功退款。')
+    lines.push('口径：出单含关闭/取消；计入成交额不含关闭/取消，成交额未扣退款；退款仅统计成功退款。')
 
     return lines.join('\n')
   }
 
-  private appendStoreLines(lines: string[], store: StoreOrderSummary) {
+  private appendStoreLines(lines: string[], store: StoreOrderSummary, platform: 'wechat' | 'doudian') {
+    const revenueOrderCount =
+      platform === 'doudian' ? store.orderCount + store.refundCount : store.orderCount
     const countText =
-      store.totalOrderCount === store.orderCount
-        ? `${store.orderCount} 单`
-        : `${store.totalOrderCount} 总单 / ${store.orderCount} 成交有效`
+      store.totalOrderCount === revenueOrderCount
+        ? `${revenueOrderCount} 单`
+        : `${store.totalOrderCount} 出单 / ${revenueOrderCount} 计入成交额`
     lines.push(
       `- ${store.storeName}：${countText} / ¥${this.formatMoney(store.totalAmount)}` +
         (store.refundCount > 0
@@ -401,15 +405,14 @@ export class OrderReportScheduler {
 
   private appendSourceLines(lines: string[], sources: OrderSourceSummary[]) {
     if (sources.length === 0) {
-      lines.push('  来源：暂无')
+      lines.push('  达人/来源：暂无')
       return
     }
 
-    lines.push('  来源：')
+    lines.push('  达人/来源：')
     sources.forEach((source, index) => {
       lines.push(
-        `  ${index + 1}. ${source.name}${source.channel ? `（${this.compactChannel(source.channel)}）` : ''}` +
-          `：${source.orderCount}单 / ¥${this.formatMoney(source.totalAmount)}` +
+        `  ${index + 1}. ${source.name}：${source.orderCount}单 / ¥${this.formatMoney(source.totalAmount)}` +
           (source.refundCount > 0
             ? `；退${source.refundCount}笔 / ¥${this.formatMoney(source.refundAmount)}`
             : ''),

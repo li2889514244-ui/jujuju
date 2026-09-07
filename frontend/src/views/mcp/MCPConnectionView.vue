@@ -71,6 +71,53 @@
         </div>
       </section>
 
+      <!-- OAuth / ChatGPT -->
+      <section class="oauth-panel">
+        <div class="oauth-panel__header">
+          <div class="section-title">
+            <el-icon><Connection /></el-icon>
+            <span>ChatGPT / OAuth</span>
+          </div>
+          <el-button size="small" :loading="oauthChecking" @click="handleOAuthCheck">
+            <el-icon><Refresh /></el-icon>
+            测试 OAuth 配置
+          </el-button>
+        </div>
+        <div class="oauth-grid">
+          <div class="oauth-item">
+            <span>OAuth 状态</span>
+            <el-tag :type="oauthOverallOk ? 'success' : 'warning'" size="small">
+              {{ oauthOverallOk ? '正常' : '待测试' }}
+            </el-tag>
+          </div>
+          <div class="oauth-item">
+            <span>Protected Resource</span>
+            <el-tag :type="oauthHealth?.protectedResource.ok ? 'success' : 'info'" size="small">
+              {{ oauthHealth?.protectedResource.ok ? '正常' : '未确认' }}
+            </el-tag>
+          </div>
+          <div class="oauth-item">
+            <span>Authorization Server</span>
+            <el-tag :type="oauthHealth?.authorizationServer.ok ? 'success' : 'info'" size="small">
+              {{ oauthHealth?.authorizationServer.ok ? '正常' : '未确认' }}
+            </el-tag>
+          </div>
+          <div class="oauth-item">
+            <span>DCR</span>
+            <el-tag :type="oauthHealth?.dcr.ok ? 'success' : 'info'" size="small">
+              {{ oauthHealth?.dcr.ok ? '正常' : '未确认' }}
+            </el-tag>
+          </div>
+        </div>
+        <div class="copy-row oauth-copy-row">
+          <el-input :model-value="oauthDiscoveryUrl" readonly spellcheck="false" />
+          <el-button @click="copy(oauthDiscoveryUrl)">
+            <el-icon><CopyDocument /></el-icon>
+            复制
+          </el-button>
+        </div>
+      </section>
+
       <!-- Key 管理 -->
       <section class="keys-panel">
         <div class="section-title">
@@ -246,12 +293,14 @@ import {
   Select,
   WarningFilled,
 } from '@element-plus/icons-vue'
-import { mcpApi, type McpConnectionInfo, type McpKey } from '@/api/mcp'
+import { mcpApi, type McpConnectionInfo, type McpKey, type McpOAuthHealth } from '@/api/mcp'
 
 const loading = ref(false)
 const creating = ref(false)
+const oauthChecking = ref(false)
 const info = ref<McpConnectionInfo | null>(null)
 const keys = ref<McpKey[]>([])
+const oauthHealth = ref<McpOAuthHealth | null>(null)
 const selectedToken = ref<string>('')
 const newClientId = ref('')
 const activeTab = ref('cursor')
@@ -261,6 +310,13 @@ const allKeys = computed(() => keys.value)
 const activeToken = computed(() => selectedToken.value || keys.value[0]?.token || '<MCP key>')
 const displayToken = computed(() => maskToken(activeToken.value))
 const endpoint = computed(() => info.value?.endpoint || getFallbackEndpoint())
+const oauthDiscoveryUrl = computed(() => `${window.location.origin}/.well-known/oauth-protected-resource`)
+const oauthOverallOk = computed(
+  () =>
+    Boolean(oauthHealth.value?.protectedResource.ok) &&
+    Boolean(oauthHealth.value?.authorizationServer.ok) &&
+    Boolean(oauthHealth.value?.dcr.ok),
+)
 const sseEndpoint = computed(() => info.value?.sseEndpoint || `${getFallbackBaseUrl()}/mcp/sse`)
 const messagesEndpoint = computed(
   () => info.value?.messagesEndpoint || `${getFallbackBaseUrl()}/mcp/messages`,
@@ -365,10 +421,33 @@ onMounted(() => {
 async function loadAll() {
   loading.value = true
   try {
-    await Promise.all([loadConnectionInfo(), loadKeys()])
+    await Promise.all([loadConnectionInfo(), loadKeys(), checkOAuth({ silent: true })])
   } finally {
     loading.value = false
   }
+}
+
+async function checkOAuth(options: { silent?: boolean } = {}) {
+  oauthChecking.value = true
+  try {
+    oauthHealth.value = await mcpApi.checkOAuthHealth()
+    if (!options.silent) {
+      if (oauthOverallOk.value) {
+        ElMessage.success('OAuth 配置正常')
+      } else {
+        ElMessage.warning('OAuth 配置未完全就绪')
+      }
+    }
+  } catch {
+    oauthHealth.value = null
+    if (!options.silent) ElMessage.error('OAuth 配置检测失败')
+  } finally {
+    oauthChecking.value = false
+  }
+}
+
+function handleOAuthCheck() {
+  void checkOAuth()
 }
 
 async function loadConnectionInfo() {
@@ -548,6 +627,51 @@ function getFallbackEndpoint() {
 .connection-panel {
   padding: 18px;
   margin-bottom: 16px;
+}
+
+.oauth-panel {
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.oauth-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+
+  .section-title {
+    margin-bottom: 0;
+  }
+}
+
+.oauth-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.oauth-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid $border-subtle;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+
+  span {
+    color: $text-secondary;
+    font-size: 12px;
+  }
+}
+
+.oauth-copy-row {
+  margin-top: 4px;
 }
 
 .section-title {
@@ -775,6 +899,7 @@ function getFallbackEndpoint() {
   }
 
   .meta-grid,
+  .oauth-grid,
   .catalog-panel {
     grid-template-columns: 1fr;
   }
@@ -782,6 +907,7 @@ function getFallbackEndpoint() {
 
 @media (max-width: 640px) {
   .mcp-access__header,
+  .oauth-panel__header,
   .copy-row,
   .create-key-row,
   .key-item {

@@ -13,6 +13,7 @@ const STATIC_ASSET_PREFIX = '/assets/'
 const STATIC_ASSET_TTL_SECONDS = 30 * 24 * 60 * 60
 const DOWNLOAD_PREFIX = '/downloads/'
 const COMPANION_UPDATE_PREFIX = '/companion-updates/'
+const PLATFORM_AVATAR_PREFIX = '/api/v1/platforms/avatar/'
 const DOWNLOAD_TTL_SECONDS = 24 * 60 * 60
 const UPLOADS_PREFIX = '/uploads/'
 const UPLOADS_TTL_SECONDS = 24 * 60 * 60
@@ -24,6 +25,8 @@ const EXCLUDED_FROM_HTML_CACHE = [
   DOWNLOAD_PREFIX,
   COMPANION_UPDATE_PREFIX,
   UPLOADS_PREFIX,
+  '/.well-known',
+  '/oauth/',
   '/api/',
   '/ws/',
 ]
@@ -67,7 +70,20 @@ function isCompanionUpdateRequest(request) {
 
 function isApiRequest(request) {
   const url = new URL(request.url)
-  return url.pathname.startsWith('/api/') || url.pathname.startsWith('/ws/')
+  return (
+    url.pathname.startsWith('/api/') ||
+    url.pathname.startsWith('/ws/') ||
+    url.pathname.startsWith('/.well-known') ||
+    url.pathname.startsWith('/oauth/')
+  )
+}
+
+function isPlatformAvatarRequest(request) {
+  const url = new URL(request.url)
+  return (
+    (request.method === 'GET' || request.method === 'HEAD') &&
+    url.pathname.startsWith(PLATFORM_AVATAR_PREFIX)
+  )
 }
 
 function isUploadsRequest(request) {
@@ -225,9 +241,10 @@ export default {
     const downloadAsset = isDownloadRequest(request)
     const mutableDownloadAsset = isMutableDownloadRequest(request)
     const companionUpdateAsset = isCompanionUpdateRequest(request)
+    const platformAvatarAsset = isPlatformAvatarRequest(request)
     const apiRequest = isApiRequest(request)
     const originRequest = buildOriginRequest(request, env, {
-      publicStaticAsset: staticAsset || uploadsAsset || htmlPage || downloadAsset,
+      publicStaticAsset: staticAsset || uploadsAsset || htmlPage || downloadAsset || platformAvatarAsset,
       bustCache: mutableDownloadAsset || companionUpdateAsset,
     })
     const cf = buildCfOptions(request, env, originRequest)
@@ -256,6 +273,9 @@ export default {
         `public, max-age=3600, s-maxage=${DOWNLOAD_TTL_SECONDS}, stale-while-revalidate=86400`,
       )
       headers.set('x-matrixflow-cache-policy', 'downloads-1d')
+    } else if (platformAvatarAsset && finalResponse.ok) {
+      headers.set('cache-control', 'public, max-age=2592000, stale-while-revalidate=86400')
+      headers.set('x-matrixflow-cache-policy', 'platform-avatar-30d')
     } else if (apiRequest) {
       headers.set('cache-control', 'no-store')
       headers.set('x-matrixflow-cache-policy', 'dynamic-no-store')

@@ -22,9 +22,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
         run: npm ci
 
       - name: Run lint
@@ -66,10 +67,21 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
         run: npm ci
+
+      - name: Generate Prisma Client
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Apply migrations to isolated CI database
+        working-directory: backend
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://test:test@localhost:5432/matrixflow_test
 
       - name: Run tests
         working-directory: backend
@@ -89,9 +101,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
         run: npm ci
 
       - name: Type check
@@ -121,8 +134,19 @@ jobs:
       - name: Build image (smoke test)
         uses: docker/build-push-action@v5
         with:
-          context: backend
+          context: .
           file: backend/Dockerfile
           push: false
+          tags: matrixflow-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image (smoke test)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.frontend
+          push: false
+          tags: matrixflow-frontend:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max

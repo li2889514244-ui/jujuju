@@ -5,12 +5,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import * as z from 'zod/v4'
 import { PrismaService } from '../../prisma/prisma.service'
+import { McpAuthContext } from './mcp-auth-context'
 
-export interface McpClientAuth {
-  clientId: string
-  token: string
-  scopes: string[]
-}
+export type McpClientAuth = McpAuthContext
 
 export interface McpCatalogEntry {
   name: string
@@ -37,6 +34,7 @@ export interface ConfiguredKey {
   clientId: string
   token: string
   source: 'db' | 'env'
+  createdBy: string | null
 }
 
 type RankingMetric =
@@ -134,6 +132,7 @@ export class McpService {
         clientId: k.clientId,
         token: k.token,
         source: 'db' as const,
+        createdBy: k.createdBy,
       })),
       ...envExtras,
     ]
@@ -153,6 +152,7 @@ export class McpService {
             clientId: entry.slice(0, separator).trim(),
             token: entry.slice(separator + 1).trim(),
             source: 'env' as const,
+            createdBy: null,
           }
         }
         const fingerprint = createHash('sha256').update(entry).digest('hex').slice(0, 8)
@@ -161,6 +161,7 @@ export class McpService {
           clientId: `mcp-client-${index + 1}-${fingerprint}`,
           token: entry,
           source: 'env' as const,
+          createdBy: null,
         }
       })
       .filter((entry) => entry.token.length > 0)
@@ -283,7 +284,7 @@ export class McpService {
     )
   }
 
-  private registerTools(server: McpServer, _auth: McpClientAuth) {
+  private registerTools(server: McpServer, auth: McpClientAuth) {
     server.registerTool(
       'list_accounts',
       {
@@ -297,7 +298,7 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.listAccounts(args)),
+      async (args) => this.asToolResult(await this.listAccounts(auth, args)),
     )
 
     server.registerTool(
@@ -322,7 +323,7 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.queryAccountData(args)),
+      async (args) => this.asToolResult(await this.queryAccountData(auth, args)),
     )
 
     server.registerTool(
@@ -349,7 +350,7 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.getTopRankings(args)),
+      async (args) => this.asToolResult(await this.getTopRankings(auth, args)),
     )
 
     server.registerTool(
@@ -383,7 +384,7 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.compareAccounts(args)),
+      async (args) => this.asToolResult(await this.compareAccounts(auth, args)),
     )
 
     server.registerTool(
@@ -398,7 +399,7 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.generateReport(args)),
+      async (args) => this.asToolResult(await this.generateReport(auth, args)),
     )
 
     server.registerTool(
@@ -416,11 +417,11 @@ export class McpService {
         },
         annotations: { readOnlyHint: true },
       },
-      async (args) => this.asToolResult(await this.exportData(args)),
+      async (args) => this.asToolResult(await this.exportData(auth, args)),
     )
   }
 
-  private async listAccounts(args: {
+  private async listAccounts(auth: McpClientAuth, args: {
     platform?: string
     status?: string
     search?: string
@@ -433,6 +434,7 @@ export class McpService {
         ? { status: this.normalizeStatus(args.status) }
         : { status: 'ACTIVE' as any }),
       ...(args.search ? { nickname: { contains: args.search } } : {}),
+      ...this.accountScopeWhere(auth),
     }
 
     const accounts = await this.prisma.account.findMany({
@@ -449,7 +451,7 @@ export class McpService {
     }
   }
 
-  private async queryAccountData(args: {
+  private async queryAccountData(auth: McpClientAuth, args: {
     accountId?: string
     accountName?: string
     platform?: string
@@ -459,7 +461,7 @@ export class McpService {
   }) {
     const limit = this.clampLimit(args.limit, this.getMaxRows(), this.getMaxRows())
     const range = this.buildDateRange(args.startDate, args.endDate, 30)
-    const accounts = await this.findMatchingAccounts({
+    const accounts = await this.findMatchingAccounts(auth, {
       accountId: args.accountId,
       accountName: args.accountName,
       platform: args.platform,
@@ -501,7 +503,7 @@ export class McpService {
     }
   }
 
-  private async getTopRankings(args: {
+  private async getTopRankings(auth: McpClientAuth, args: {
     metric: RankingMetric
     period?: 'week' | 'month' | 'total'
     platform?: string
@@ -513,6 +515,7 @@ export class McpService {
     const accountWhere: Prisma.AccountWhereInput = {
       status: 'ACTIVE' as any,
       ...(args.platform ? { platform: this.normalizePlatform(args.platform) } : {}),
+      ...this.accountScopeWhere(auth),
     }
 
     const accounts = await this.prisma.account.findMany({
@@ -581,7 +584,7 @@ export class McpService {
     }
   }
 
-  private async compareAccounts(args: {
+  private async compareAccounts(auth: McpClientAuth, args: {
     accountNames: string[]
     metric: RankingMetric
     startDate?: string
@@ -598,6 +601,7 @@ export class McpService {
             nickname: { contains: name },
             status: 'ACTIVE' as any,
             ...(platform ? { platform } : {}),
+            ...this.accountScopeWhere(auth),
           },
           select: this.accountSelect(),
           orderBy: { followers: 'desc' },
@@ -661,7 +665,7 @@ export class McpService {
     )
   }
 
-  private async generateReport(args: {
+  private async generateReport(auth: McpClientAuth, args: {
     accountName?: string
     platform?: string
     period?: 'week' | 'month'
@@ -676,7 +680,7 @@ export class McpService {
     previousStart.setDate(previousStart.getDate() - (days - 1))
     previousStart.setHours(0, 0, 0, 0)
 
-    const accounts = await this.findMatchingAccounts({
+    const accounts = await this.findMatchingAccounts(auth, {
       accountName: args.accountName,
       platform: args.platform,
       limit: 500,
@@ -741,7 +745,7 @@ export class McpService {
     }
   }
 
-  private async exportData(args: {
+  private async exportData(auth: McpClientAuth, args: {
     accountName?: string
     platform?: string
     startDate: string
@@ -751,7 +755,7 @@ export class McpService {
   }) {
     const limit = this.clampLimit(args.limit, this.getMaxRows(), this.getMaxRows())
     const range = this.buildDateRange(args.startDate, args.endDate, 30)
-    const accounts = await this.findMatchingAccounts({
+    const accounts = await this.findMatchingAccounts(auth, {
       accountName: args.accountName,
       platform: args.platform,
       limit: 500,
@@ -796,7 +800,7 @@ export class McpService {
     }
   }
 
-  private async findMatchingAccounts(args: {
+  private async findMatchingAccounts(auth: McpClientAuth, args: {
     accountId?: string
     accountName?: string
     platform?: string
@@ -807,6 +811,7 @@ export class McpService {
       ...(args.accountId ? { id: args.accountId } : {}),
       ...(args.accountName ? { nickname: { contains: args.accountName } } : {}),
       ...(args.platform ? { platform: this.normalizePlatform(args.platform) } : {}),
+      ...this.accountScopeWhere(auth),
     }
 
     return this.prisma.account.findMany({
@@ -815,6 +820,12 @@ export class McpService {
       orderBy: [{ platform: 'asc' }, { followers: 'desc' }],
       take: args.limit,
     })
+  }
+
+  private accountScopeWhere(auth: McpClientAuth): Prisma.AccountWhereInput {
+    if (auth.isLegacyGlobalKey) return {}
+    if (auth.organizationId) return { organizationId: auth.organizationId }
+    return { id: '__mcp_no_access__' }
   }
 
   private accountSelect() {

@@ -208,6 +208,25 @@ export class PlatformsService {
     )
   }
 
+  private isExpiringCollectedAvatar(value: unknown): boolean {
+    if (typeof value !== 'string') return false
+    const text = value.trim()
+    if (!text) return false
+    let url: URL
+    try {
+      url = new URL(text)
+    } catch {
+      return false
+    }
+    const host = url.hostname.toLowerCase()
+    return (
+      host.includes('douyinpic.com') ||
+      host.includes('byteimg.com') ||
+      url.searchParams.has('x-expires') ||
+      url.searchParams.has('x-signature')
+    )
+  }
+
   private getSafeAvatarAccountId(accountId: string): string | null {
     const safe = String(accountId || '').trim()
     if (!/^[A-Za-z0-9_-]{6,96}$/.test(safe)) return null
@@ -251,6 +270,7 @@ export class PlatformsService {
           'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36',
           Accept: 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+          Referer: 'https://www.douyin.com/',
         },
       })
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
@@ -823,7 +843,14 @@ export class PlatformsService {
         this.logger.warn(`reportMetrics: ignored suspicious ${platform} nickname "${nickname}" for ${accountId}`)
       const avatar = metrics._avatar
       if (avatar && this.isSafeCollectedAvatar(avatar)) {
-        accountUpdates.avatar = (await this.cacheCollectedAvatar(accountId, avatar)) || avatar
+        const cachedAvatar = await this.cacheCollectedAvatar(accountId, avatar)
+        if (cachedAvatar) {
+          accountUpdates.avatar = cachedAvatar
+        } else if (!this.isExpiringCollectedAvatar(avatar)) {
+          accountUpdates.avatar = avatar
+        } else {
+          this.logger.warn(`reportMetrics: kept existing avatar because collected avatar is expiring and cache failed for ${accountId}`)
+        }
       }
       else if (avatar) this.logger.warn(`reportMetrics: ignored suspicious avatar "${avatar}" for ${accountId}`)
       if (metrics.storeScore !== undefined) accountUpdates.storeScore = metrics.storeScore

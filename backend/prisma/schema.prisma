@@ -803,6 +803,68 @@ model McpKey {
   @@index([token])
 }
 
+model McpOAuthClient {
+  id                      String    @id @default(cuid())
+  clientId                String    @unique
+  clientSecretHash        String?
+  redirectUris            Json
+  clientName              String?
+  grantTypes              Json
+  responseTypes           Json
+  tokenEndpointAuthMethod String    @default("none")
+  revokedAt               DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([revokedAt])
+}
+
+model McpOAuthAuthorizationCode {
+  id                  String    @id @default(cuid())
+  codeHash            String    @unique
+  clientId            String
+  userId              String
+  organizationId      String
+  redirectUri         String
+  scope               String
+  resource            String
+  codeChallenge       String
+  codeChallengeMethod String
+  expiresAt           DateTime
+  consumedAt          DateTime?
+  createdAt           DateTime  @default(now())
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([expiresAt])
+}
+
+model McpOAuthToken {
+  id               String    @id @default(cuid())
+  accessTokenHash  String    @unique
+  refreshTokenHash String    @unique
+  clientId         String
+  userId           String
+  organizationId   String
+  scope            String
+  resource         String
+  accessExpiresAt  DateTime
+  refreshExpiresAt DateTime
+  revokedAt        DateTime?
+  replacedById     String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([accessExpiresAt])
+  @@index([refreshExpiresAt])
+  @@index([revokedAt])
+}
+
 model CalendarEvent {
   id             String        @id @default(cuid())
   title          String

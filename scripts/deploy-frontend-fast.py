@@ -244,6 +244,7 @@ def purge_site_html_cache() -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Deploy frontend/dist to production nginx Docker mount.")
+    parser.add_argument("--plan", action="store_true", help="Print the deployment plan and exit without building or connecting.")
     parser.add_argument("--skip-typecheck", action="store_true")
     parser.add_argument("--skip-build", action="store_true")
     parser.add_argument("--skip-public-verify", action="store_true")
@@ -252,6 +253,15 @@ def main() -> None:
     parser.add_argument("--container", default=DEFAULT_CONTAINER)
     parser.add_argument("--public-url", default=DEFAULT_PUBLIC_URL)
     args = parser.parse_args()
+
+    if args.plan:
+        print("Frontend deployment plan")
+        print(f"1. Build frontend from {ROOT}")
+        print(f"2. Upload only frontend/dist to {args.target}")
+        print(f"3. Back up the current dist and reload {args.container}")
+        print(f"4. Verify the public bundle at {args.public_url}")
+        print("No production change will happen without removing --plan.")
+        return
 
     if args.skip_typecheck and args.skip_build:
         raise SystemExit("Refusing to skip both typecheck and build. Build from source or adjust the script intentionally.")

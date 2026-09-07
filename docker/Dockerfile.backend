@@ -1,25 +1,22 @@
 # MatrixFlow ERP - Backend Multi-Stage Build
 
 # Stage 1: Build
-FROM node:20-alpine AS builder
+FROM node:20-slim AS builder
 
 WORKDIR /app
 
-# Install build dependencies + OpenSSL (Prisma Alpine compatibility)
-RUN apk add --no-cache python3 make g++ openssl libc6-compat
+# Install build dependencies + OpenSSL for Prisma
+RUN apt-get update && apt-get install -y python3 make g++ openssl && rm -rf /var/lib/apt/lists/*
 
-# Copy workspace root config for monorepo context
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml ./
+# Copy workspace root config for the npm workspace context
+COPY package.json package-lock.json ./
 COPY backend/package.json ./backend/
+COPY frontend/package.json ./frontend/
 COPY backend/prisma ./backend/prisma/
 
-# Install pnpm (no corepack dependency, more stable)
-ENV HUSKY=0
-ENV CI=true
-RUN npm install -g pnpm@9
-
 # Install dependencies (--ignore-scripts avoids husky hooks)
-RUN pnpm install --frozen-lockfile --filter matrixflow-backend --ignore-scripts
+ENV HUSKY=0 CI=true
+RUN npm ci --ignore-scripts
 
 # Copy source
 COPY backend/ ./backend/
@@ -27,19 +24,14 @@ COPY backend/ ./backend/
 WORKDIR /app/backend
 
 # Generate Prisma Client and build
-RUN ./node_modules/.bin/prisma generate
-RUN ./node_modules/.bin/nest build
+RUN npm run db:generate
+RUN npm run build:backend
 
 # Stage 2: Production
-FROM node:20-alpine AS production
+FROM node:20-slim AS production
 
 # Install runtime dependencies + OpenSSL (Prisma needs it)
-RUN apk add --no-cache \
-    curl \
-    tini \
-    openssl \
-    libc6-compat \
-    && rm -rf /var/cache/apk/*
+RUN apt-get update && apt-get install -y curl tini openssl && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN addgroup -g 1001 -S matrixflow \
@@ -69,5 +61,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${PORT:-3000}/api/v1/health || exit 1
 
-ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["node", "dist/main.js"]

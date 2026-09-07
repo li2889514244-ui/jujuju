@@ -182,4 +182,34 @@ describe('PlatformsService reportMetrics', () => {
     expect(metadata.periodMetrics.followerData.day_total.net_fans).toBe(2)
     expect(metadata.periodMetrics.followerData.week_total.net_fans).toBe(7)
   })
+
+  it('keeps an existing avatar when a collected Douyin signed avatar cannot be cached', async () => {
+    const { service, prisma } = makeService()
+    const existingAvatar = '/api/v1/platforms/avatar/acc-1?v=old-cache'
+    prisma.account.findUnique.mockResolvedValue({
+      id: 'acc-1',
+      platform: 'DOUYIN',
+      avatar: existingAvatar,
+      metadata: null,
+    })
+    prisma.dailyStats.findFirst.mockResolvedValue(null)
+    jest.spyOn(global, 'fetch' as any).mockResolvedValue({
+      ok: false,
+      status: 403,
+    } as any)
+
+    await service.reportMetrics({
+      accountId: 'acc-1',
+      date: '2026-07-08',
+      metrics: {
+        followers: 1005,
+        _avatar: 'https://p3-sign.douyinpic.com/avatar.jpeg?x-expires=1788336000&x-signature=abc',
+      },
+    })
+
+    const updateArg = prisma.account.update.mock.calls
+      .map((call: any[]) => call[0])
+      .find((arg: any) => arg?.data?.lastSuccessfulCollectAt)
+    expect(updateArg.data.avatar).toBeUndefined()
+  })
 })

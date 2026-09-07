@@ -153,6 +153,19 @@ describe('AccountsService', () => {
         expect(createCall.data.nickname).not.toBe(noise);
       }
     });
+
+    it('does not persist expiring signed Douyin avatar URLs on create', async () => {
+      await service.create(
+        {
+          ...createDto,
+          avatar: 'https://p3-sign.douyinpic.com/avatar.jpeg?x-expires=1788336000&x-signature=abc',
+        },
+        'user-001',
+      );
+
+      const createCall = mockPrismaService.account.create.mock.calls[0][0];
+      expect(createCall.data.avatar).toBeUndefined();
+    });
   });
 
   // ==================== 查询账号测试 ====================
@@ -302,6 +315,20 @@ describe('AccountsService', () => {
       const updateCall = mockPrismaService.account.update.mock.calls[0][0];
       expect(updateCall.data.cookies).toContain(':');
       expect(updateCall.data.cookies).not.toBe('new_cookie_data');
+    });
+
+    it('does not overwrite an account avatar with an expiring signed Douyin URL', async () => {
+      mockPrismaService.account.findUnique.mockResolvedValue(mockAccounts.douyin);
+      mockPrismaService.account.update.mockResolvedValue(mockAccounts.douyin);
+
+      await service.update(
+        'acc-001',
+        { avatar: 'https://p3-sign.douyinpic.com/avatar.jpeg?x-expires=1788336000&x-signature=abc' },
+        'user-001',
+      );
+
+      const updateCall = mockPrismaService.account.update.mock.calls[0][0];
+      expect(updateCall.data.avatar).toBeUndefined();
     });
 
     it('账号不存在时应抛出 NotFoundException', async () => {

@@ -30,7 +30,7 @@ describe('McpController', () => {
     const controller = new McpController({
       getConfiguredKeys: jest.fn().mockResolvedValue([]),
       getCatalog: jest.fn().mockReturnValue({ tools: [], resources: [] }),
-    } as any)
+    } as any, { resolveAuthorization: jest.fn() } as any)
 
     const result = await controller.getConnectionInfo({
       headers: { host: 'matrixflow.local' },
@@ -47,5 +47,37 @@ describe('McpController', () => {
     for (const method of ['listKeys', 'createKey', 'deleteKey', 'getConnectionInfo'] as const) {
       expect(Reflect.getMetadata(ROLES_KEY, McpController.prototype[method])).toEqual(allowed)
     }
+  })
+
+  it('rejects SSE messages when bearer auth does not match the session auth context', async () => {
+    const sessionAuth = {
+      authType: 'mcp_key',
+      clientId: 'client-a',
+      token: 'token-a',
+      scopes: ['mcp:read'],
+      organizationId: 'org-a',
+      userId: 'user-a',
+      isLegacyGlobalKey: false,
+    }
+    const messageAuth = { ...sessionAuth, token: 'token-b' }
+    const transport = { handlePostMessage: jest.fn() }
+    const controller = new McpController({ getConfiguredKeys: jest.fn() } as any, {
+      resolveAuthorization: jest.fn(),
+    } as any)
+
+    ;(controller as any).sseSessions.set('session-1', { transport, auth: sessionAuth })
+    jest.spyOn(controller as any, 'authenticate').mockResolvedValue(messageAuth)
+
+    const res = {
+      headersSent: false,
+      setHeader: jest.fn(),
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    }
+
+    await controller.handleSseMessage({ headers: {}, body: {} } as any, res as any, 'session-1')
+
+    expect(transport.handlePostMessage).not.toHaveBeenCalled()
+    expect(res.status).toHaveBeenCalledWith(401)
   })
 })

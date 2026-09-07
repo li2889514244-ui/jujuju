@@ -233,6 +233,25 @@ export class ScanBindService {
     )
   }
 
+  private isExpiringAvatar(value: unknown): boolean {
+    if (typeof value !== 'string') return false
+    const text = value.trim()
+    if (!text) return false
+    let url: URL
+    try {
+      url = new URL(text)
+    } catch {
+      return false
+    }
+    const host = url.hostname.toLowerCase()
+    return (
+      host.includes('douyinpic.com') ||
+      host.includes('byteimg.com') ||
+      url.searchParams.has('x-expires') ||
+      url.searchParams.has('x-signature')
+    )
+  }
+
   /**
    * 安全检查：生产环境中禁止在服务器上启动 Playwright 浏览器。
    *
@@ -609,7 +628,13 @@ export class ScanBindService {
     const nickname = this.isSuspiciousAccountNickname(params.platform, params.nickname)
       ? params.platformUserId
       : params.nickname
-    const avatar = this.isSafeAvatar(params.avatar) ? params.avatar : undefined
+    const avatar =
+      this.isSafeAvatar(params.avatar) && !this.isExpiringAvatar(params.avatar)
+        ? params.avatar
+        : undefined
+    if (params.avatar && this.isExpiringAvatar(params.avatar)) {
+      this.logger.warn(`Ignored expiring scan-bind avatar for ${params.platform} ${params.platformUserId}`)
+    }
 
     const account = await this.prisma.account.upsert({
       where: {

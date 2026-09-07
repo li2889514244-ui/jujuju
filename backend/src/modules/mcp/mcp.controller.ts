@@ -20,13 +20,21 @@ import { Public } from '../../common/decorators/public.decorator'
 import { Roles } from '../../common/decorators/roles.decorator'
 import { Role } from '../../common/prisma-enums'
 import { McpService } from './mcp.service'
+import { McpAuthContext } from './mcp-auth-context'
+import { McpAuthResolverService } from './mcp-auth-resolver.service'
 
 @Controller('mcp')
 export class McpController {
   private readonly logger = new Logger(McpController.name)
-  private sseTransports = new Map<string, SSEServerTransport>()
+  private sseSessions = new Map<
+    string,
+    { transport: SSEServerTransport; auth: McpAuthContext }
+  >()
 
-  constructor(private readonly mcpService: McpService) {}
+  constructor(
+    private readonly mcpService: McpService,
+    private readonly mcpAuthResolver: McpAuthResolverService,
+  ) {}
 
   // ==================== Key 管理 (需要 JWT 登录) ====================
 
@@ -154,6 +162,10 @@ export class McpController {
         token: auth.token,
         clientId: auth.clientId,
         scopes: auth.scopes,
+        authType: auth.authType,
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        isLegacyGlobalKey: auth.isLegacyGlobalKey,
       }
 
       await server.connect(transport)
@@ -207,12 +219,12 @@ export class McpController {
     if (!auth) return
 
     const transport = new SSEServerTransport('/api/v1/mcp/messages', res)
-    this.sseTransports.set(transport.sessionId, transport)
+    this.sseSessions.set(transport.sessionId, { transport, auth })
 
     const server = this.mcpService.createServer(auth)
 
     res.on('close', () => {
-      this.sseTransports.delete(transport.sessionId)
+      this.sseSessions.delete(transport.sessionId)
       void server.close().catch(() => {})
     })
 
@@ -221,13 +233,17 @@ export class McpController {
         token: auth.token,
         clientId: auth.clientId,
         scopes: auth.scopes,
+        authType: auth.authType,
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        isLegacyGlobalKey: auth.isLegacyGlobalKey,
       }
       await server.connect(transport)
     } catch (error) {
       this.logger.error(
         `SSE connection failed for ${auth.clientId}: ${error instanceof Error ? error.message : 'unknown'}`,
       )
-      this.sseTransports.delete(transport.sessionId)
+      this.sseSessions.delete(transport.sessionId)
       if (!res.headersSent) {
         this.writeMcpError(res, HttpStatus.INTERNAL_SERVER_ERROR, -32603, 'Internal server error')
       }
@@ -244,9 +260,14 @@ export class McpController {
     const auth = await this.authenticate(req, res)
     if (!auth) return
 
-    const transport = this.sseTransports.get(sessionId)
-    if (!transport) {
+    const session = this.sseSessions.get(sessionId)
+    if (!session) {
       this.writeMcpError(res, HttpStatus.NOT_FOUND, -32000, `Session not found: ${sessionId}`)
+      return
+    }
+
+    if (!this.sameAuthContext(auth, session.auth)) {
+      this.writeAuthError(res, 'Bearer token does not match the SSE session.')
       return
     }
 
@@ -255,8 +276,12 @@ export class McpController {
         token: auth.token,
         clientId: auth.clientId,
         scopes: auth.scopes,
+        authType: auth.authType,
+        userId: auth.userId,
+        organizationId: auth.organizationId,
+        isLegacyGlobalKey: auth.isLegacyGlobalKey,
       }
-      await transport.handlePostMessage(req as any, res as any, req.body)
+      await session.transport.handlePostMessage(req as any, res as any, req.body)
     } catch (error) {
       this.logger.error(
         `SSE message handling failed for session ${sessionId}: ${error instanceof Error ? error.message : 'unknown'}`,
@@ -297,18 +322,16 @@ export class McpController {
       return null
     }
 
-    const key = configuredKeys.find((candidate) => this.safeTokenEquals(token, candidate.token))
-    if (!key) {
+    const auth = await this.mcpAuthResolver.resolveAuthorization(token)
+    if (!auth) {
       this.writeAuthError(res, 'Invalid bearer token.')
       return null
     }
 
-    this.logger.log(`MCP request authenticated for ${key.clientId} (source: ${key.source})`)
-    return {
-      clientId: key.clientId,
-      token,
-      scopes: ['mcp:read'],
-    }
+    this.logger.log(
+      `MCP request authenticated for ${auth.clientId} (type: ${auth.authType}, legacyGlobal: ${auth.isLegacyGlobalKey})`,
+    )
+    return auth
   }
 
   // ==================== 工具方法 ====================
@@ -327,6 +350,17 @@ export class McpController {
 
     if (actualBuffer.length !== expectedBuffer.length) return false
     return timingSafeEqual(actualBuffer, expectedBuffer)
+  }
+
+  private sameAuthContext(actual: McpAuthContext, expected: McpAuthContext): boolean {
+    return (
+      actual.authType === expected.authType &&
+      actual.clientId === expected.clientId &&
+      actual.userId === expected.userId &&
+      actual.organizationId === expected.organizationId &&
+      actual.isLegacyGlobalKey === expected.isLegacyGlobalKey &&
+      this.safeTokenEquals(actual.token, expected.token)
+    )
   }
 
   private isOriginAllowed(origin: string | undefined): boolean {

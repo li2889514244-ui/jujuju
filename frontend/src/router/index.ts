@@ -16,6 +16,12 @@ function isTokenExpired(token: string): boolean {
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/oauth/consent',
+    name: 'OAuthConsent',
+    component: () => import('@/views/oauth/OAuthConsentView.vue'),
+    meta: { title: 'OAuth 授权', requiresAuth: true },
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('@/views/login/LoginView.vue'),
@@ -221,7 +227,8 @@ router.beforeEach((to, _from, next) => {
 
   // 已登录用户不允许访问登录页
   if (to.name === 'Login' && userStore.token && !isFeishuCallback) {
-    next({ name: 'Dashboard' })
+    const redirect = typeof to.query.redirect === 'string' ? to.query.redirect : ''
+    next(redirect || { name: 'Dashboard' })
     return
   }
 

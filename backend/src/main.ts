@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core'
-import { ValidationPipe, Logger } from '@nestjs/common'
+import { RequestMethod, ValidationPipe, Logger } from '@nestjs/common'
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger'
 import * as compression from 'compression'
 import * as express from 'express'
@@ -34,7 +34,15 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', 1)
 
   // 全局前缀
-  app.setGlobalPrefix('api/v1')
+  app.setGlobalPrefix('api/v1', {
+    exclude: [
+      { path: '.well-known/oauth-protected-resource', method: RequestMethod.GET },
+      { path: '.well-known/oauth-authorization-server', method: RequestMethod.GET },
+      { path: 'oauth/register', method: RequestMethod.POST },
+      { path: 'oauth/authorize', method: RequestMethod.GET },
+      { path: 'oauth/token', method: RequestMethod.POST },
+    ],
+  })
 
   // #18 修复: CORS 配置 — 开发环境默认允许 localhost
   const corsOrigin = process.env.CORS_ORIGIN || ''

@@ -165,6 +165,25 @@ export class AccountsService {
     )
   }
 
+  private isExpiringAvatar(value: unknown): boolean {
+    if (typeof value !== 'string') return false
+    const text = value.trim()
+    if (!text) return false
+    let url: URL
+    try {
+      url = new URL(text)
+    } catch {
+      return false
+    }
+    const host = url.hostname.toLowerCase()
+    return (
+      host.includes('douyinpic.com') ||
+      host.includes('byteimg.com') ||
+      url.searchParams.has('x-expires') ||
+      url.searchParams.has('x-signature')
+    )
+  }
+
   /**
    * 修复: 加密Cookie — 使用 aes-256-gcm，每条记录独立随机IV
    */
@@ -244,7 +263,11 @@ export class AccountsService {
         ? '视频号'
         : dto.platformUserId
       : dto.nickname
-    const avatar = this.isSafeAvatar(dto.avatar) ? dto.avatar : undefined
+    const avatar =
+      this.isSafeAvatar(dto.avatar) && !this.isExpiringAvatar(dto.avatar) ? dto.avatar : undefined
+    if (dto.avatar && this.isExpiringAvatar(dto.avatar)) {
+      this.logger.warn(`Ignored expiring avatar on account create: ${dto.platform} ${dto.platformUserId}`)
+    }
 
     // upsert: update if same platform+userId exists, create if not
     const account = await this.prisma.account.upsert({
@@ -416,7 +439,7 @@ export class AccountsService {
       delete updateData.nickname
       this.logger.warn(`Ignored suspicious ${account.platform} nickname update "${dto.nickname}" for ${id}`)
     }
-    if (dto.avatar !== undefined && !this.isSafeAvatar(dto.avatar)) {
+    if (dto.avatar !== undefined && (!this.isSafeAvatar(dto.avatar) || this.isExpiringAvatar(dto.avatar))) {
       delete updateData.avatar
       this.logger.warn(`Ignored suspicious avatar update "${dto.avatar}" for ${id}`)
     }
