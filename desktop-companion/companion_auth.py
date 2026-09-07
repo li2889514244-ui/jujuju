@@ -21,15 +21,22 @@ def _login_payload(identifier: str, password: str) -> dict:
     return {'identifier': identifier.strip(), 'password': password}
 
 def _no_proxy_session():
-    """出站 HTTP 会话：显式禁用系统代理（Clash/VPN 等）。
+    """Return the legacy direct-only session for callers that need a session.
 
-    伴侣到披星云服务器必须直连；系统代理节点故障时，
-    登录/刷新会被 TCP RST 打断，导致数据上传整链路失败。
+    New request paths should use :func:`_request_with_network_fallback` so the
+    companion works both behind a managed corporate proxy and on machines
+    where a broken local proxy must be bypassed.
     """
     import requests as req
     session = req.Session()
     session.trust_env = False
     return session
+
+
+def _request_with_network_fallback(method: str, url: str, **kwargs):
+    from companion_network import request_with_network_fallback
+
+    return request_with_network_fallback(method, url, channel='auth', **kwargs)
 
 
 def _login_with_saved_credentials(cfg: dict) -> str:
@@ -51,8 +58,9 @@ def _login_with_saved_credentials(cfg: dict) -> str:
             except Exception as _e:
                 print(f'[WARN] {type(_e).__name__}: {_e}')
         try:
-            with _no_proxy_session() as _s:
-                r = _s.post(f'{api_url}/auth/login', json=_login_payload(identifier, password), timeout=15)
+            r = _request_with_network_fallback(
+                'POST', f'{api_url}/auth/login', json=_login_payload(identifier, password), timeout=15,
+            )
             if r.status_code in (200, 201):
                 body = r.json()
                 inner = body.get('data') or body
@@ -76,8 +84,9 @@ def _login_with_saved_credentials(cfg: dict) -> str:
     refresh_token = cfg.get('refreshToken') or cfg.get('refresh_token')
     if refresh_token:
         try:
-            with _no_proxy_session() as _s:
-                r = _s.post(f'{api_url}/auth/refresh', json={'refreshToken': refresh_token}, timeout=15)
+            r = _request_with_network_fallback(
+                'POST', f'{api_url}/auth/refresh', json={'refreshToken': refresh_token}, timeout=15,
+            )
             if r.status_code in (200, 201):
                 body = r.json()
                 inner = body.get('data') or body
@@ -99,8 +108,9 @@ def _login_with_saved_credentials(cfg: dict) -> str:
         try:
             key = _get_encryption_key()
             password = _decrypt_password(pw, key)
-            with _no_proxy_session() as _s:
-                r = _s.post(f'{api_url}/auth/login', json=_login_payload(identifier, password), timeout=15)
+            r = _request_with_network_fallback(
+                'POST', f'{api_url}/auth/login', json=_login_payload(identifier, password), timeout=15,
+            )
             if r.status_code in (200, 201):
                 body = r.json()
                 inner = body.get('data') or body

@@ -341,7 +341,9 @@ describe('SystemHealthService', () => {
       mockPrismaService.companionIncident.findMany.mockResolvedValue([companionIncident])
       let created = false
       const createdRow = inc({ dedupeKey: 'COMPANION|default|device-1|SYNC_FAIL_3X' })
-      mockPrismaService.systemIncident.findFirst.mockImplementation(async () => (created ? createdRow : null))
+      mockPrismaService.systemIncident.findFirst.mockImplementation(async () =>
+        created ? createdRow : null,
+      )
       mockPrismaService.systemIncident.create.mockImplementation(async () => {
         created = true
         return createdRow
@@ -359,7 +361,15 @@ describe('SystemHealthService', () => {
   })
 
   describe('getOverview 计数', () => {
-    function setupOverview(overrides: { critical?: number; error?: number; unresolved?: number; frontendErrors?: number; dbOk?: boolean } = {}) {
+    function setupOverview(
+      overrides: {
+        critical?: number
+        error?: number
+        unresolved?: number
+        frontendErrors?: number
+        dbOk?: boolean
+      } = {},
+    ) {
       mockPrismaService.systemEvent.count.mockResolvedValue(overrides.frontendErrors ?? 0)
       mockPrismaService.companionDevice.findMany.mockResolvedValue([])
       mockPrismaService.companionIncident.findMany.mockResolvedValue([])
@@ -372,7 +382,9 @@ describe('SystemHealthService', () => {
         .mockResolvedValueOnce(overrides.unresolved ?? 0)
         .mockResolvedValueOnce(overrides.critical ?? 0)
         .mockResolvedValueOnce(overrides.error ?? 0)
-      mockPrismaService.$queryRaw.mockResolvedValue(overrides.dbOk === false ? Promise.reject(new Error('db down')) : [])
+      mockPrismaService.$queryRaw.mockResolvedValue(
+        overrides.dbOk === false ? Promise.reject(new Error('db down')) : [],
+      )
     }
 
     it('P0/P1/未解决取真实计数而不是 Top8 截断列表', async () => {
@@ -393,6 +405,42 @@ describe('SystemHealthService', () => {
 
       setupOverview({ critical: 0, error: 0, unresolved: 0, frontendErrors: 5, dbOk: true })
       expect((await service.getOverview(adminUser)).overallStatus).toBe('DEGRADED')
+    })
+
+    it('尚未执行采集不计为失败，且异常设备数与故障条数分开统计', async () => {
+      setupOverview({ critical: 0, error: 0, unresolved: 0, frontendErrors: 0, dbOk: true })
+      mockPrismaService.companionDevice.findMany.mockResolvedValue([
+        {
+          healthStatus: 'online',
+          consecutiveSyncFailures: 0,
+          lastCollectionSuccess: false,
+          lastCollectionAt: null,
+          lastSyncSuccess: null,
+          lastSyncAt: null,
+        },
+      ])
+      mockPrismaService.companionIncident.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
+        { deviceId: 'device-1', organizationId: null },
+        { deviceId: 'device-1', organizationId: null },
+        { deviceId: 'device-2', organizationId: null },
+      ])
+
+      const overview = await service.getOverview(adminUser)
+      expect(overview.cards.companion.failedCollectOrSync).toBe(0)
+      expect(overview.cards.companion.anomalies).toBe(2)
+      expect(overview.cards.companion.activeIncidents).toBe(3)
+      expect(overview.counters.companionAnomalies).toBe(2)
+      expect(overview.counters.companionActiveIncidents).toBe(3)
+    })
+
+    it('已恢复的前端错误只保留为24小时趋势，不继续把卡片标成降级', async () => {
+      setupOverview({ critical: 0, error: 0, unresolved: 0, frontendErrors: 3, dbOk: true })
+      mockPrismaService.systemIncident.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+
+      const overview = await service.getOverview(adminUser)
+      expect(overview.cards.frontend.status).toBe('HEALTHY')
+      expect(overview.cards.frontend.errors24h).toBe(3)
+      expect(overview.cards.frontend.activeIncidents).toBe(0)
     })
   })
 })

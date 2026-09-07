@@ -41,6 +41,7 @@ export interface CompanionDevice {
   processUptimeSeconds: number | null
   consecutiveSyncFailures: number
   recentHttpErrors: Record<string, unknown> | null
+  networkDiagnostic: Record<string, unknown> | null
 }
 
 export interface CompanionHeartbeat {
@@ -58,6 +59,7 @@ export interface CompanionHeartbeat {
   cpuPercent: number | null
   memoryMb: number | null
   processUptimeSeconds: number | null
+  networkDiagnostic: Record<string, unknown> | null
 }
 
 export interface CompanionAlert {
@@ -82,7 +84,9 @@ export interface CompanionOverview {
 
 /** 设备列表（filter: all/online/offline/abnormal/version_outdated/collecting/syncing） */
 export function fetchCompanionDevices(filter?: string) {
-  return get<{ devices: CompanionDevice[]; total: number }>('/companion-monitor/devices', { filter })
+  return get<{ devices: CompanionDevice[]; total: number }>('/companion-monitor/devices', {
+    filter,
+  })
 }
 
 /** 健康总览 */
@@ -102,8 +106,9 @@ export function acknowledgeCompanionAlert(id: string) {
 
 /** 单设备历史（心跳 + 告警） */
 export function fetchCompanionDeviceHistory(deviceId: string, days = 7) {
-  return get<{ device: CompanionDevice; heartbeats: CompanionHeartbeat[]; alerts: CompanionAlert[] }>(
-    `/companion-monitor/devices/${deviceId}/history`,
-    { days },
-  )
+  return get<{
+    device: CompanionDevice
+    heartbeats: CompanionHeartbeat[]
+    alerts: CompanionAlert[]
+  }>(`/companion-monitor/devices/${deviceId}/history`, { days })
 }

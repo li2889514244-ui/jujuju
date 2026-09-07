@@ -17,14 +17,54 @@
 
     <!-- 健康总览 -->
     <el-row :gutter="12" class="cm-overview">
-      <el-col :span="4"><div class="cm-card"><div class="cm-card__num">{{ overview.deviceTotal }}</div><div class="cm-card__label">设备总数</div></div></el-col>
-      <el-col :span="4"><div class="cm-card cm-card--ok"><div class="cm-card__num">{{ overview.counts.normal }}</div><div class="cm-card__label">正常</div></div></el-col>
-      <el-col :span="4"><div class="cm-card cm-card--warn"><div class="cm-card__num">{{ overview.counts.abnormal }}</div><div class="cm-card__label">异常</div></div></el-col>
-      <el-col :span="4"><div class="cm-card cm-card--off"><div class="cm-card__num">{{ overview.counts.offline }}</div><div class="cm-card__label">离线</div></div></el-col>
-      <el-col :span="4"><div class="cm-card cm-card--old"><div class="cm-card__num">{{ overview.counts.versionOutdated }}</div><div class="cm-card__label">版本过旧</div></div></el-col>
-      <el-col :span="4"><div class="cm-card"><div class="cm-card__num">{{ rateText(overview.todayCollectionRate) }}</div><div class="cm-card__label">今日采集成功率</div></div></el-col>
-      <el-col :span="4"><div class="cm-card"><div class="cm-card__num">{{ rateText(overview.todaySyncRate) }}</div><div class="cm-card__label">今日同步成功率</div></div></el-col>
-      <el-col :span="4"><div class="cm-card"><div class="cm-card__num cm-card__num--sm">{{ overview.latestVersion || '-' }}</div><div class="cm-card__label">最新伴侣版本</div></div></el-col>
+      <el-col :span="4"
+        ><div class="cm-card">
+          <div class="cm-card__num">{{ overview.deviceTotal }}</div>
+          <div class="cm-card__label">设备总数</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card cm-card--ok">
+          <div class="cm-card__num">{{ overview.counts.normal }}</div>
+          <div class="cm-card__label">正常</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card cm-card--warn">
+          <div class="cm-card__num">{{ overview.counts.abnormal }}</div>
+          <div class="cm-card__label">异常</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card cm-card--off">
+          <div class="cm-card__num">{{ overview.counts.offline }}</div>
+          <div class="cm-card__label">离线</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card cm-card--old">
+          <div class="cm-card__num">{{ overview.counts.versionOutdated }}</div>
+          <div class="cm-card__label">版本过旧</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card">
+          <div class="cm-card__num">{{ rateText(overview.todayCollectionRate) }}</div>
+          <div class="cm-card__label">今日采集成功率</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card">
+          <div class="cm-card__num">{{ rateText(overview.todaySyncRate) }}</div>
+          <div class="cm-card__label">今日同步成功率</div>
+        </div></el-col
+      >
+      <el-col :span="4"
+        ><div class="cm-card">
+          <div class="cm-card__num cm-card__num--sm">{{ overview.latestVersion || '-' }}</div>
+          <div class="cm-card__label">最新伴侣版本</div>
+        </div></el-col
+      >
     </el-row>
 
     <!-- 告警 -->
@@ -38,7 +78,9 @@
       <div v-for="alert in alerts" :key="alert.id" class="cm-alert-item">
         <el-tag :type="alertType(alert.type)" size="small">{{ alertTypeLabel(alert.type) }}</el-tag>
         <span class="cm-alert-item__msg">{{ alert.message }}</span>
-        <span v-if="alert.deviceId" class="cm-alert-item__dev">{{ deviceNameOf(alert.deviceId) }}</span>
+        <span v-if="alert.deviceId" class="cm-alert-item__dev">{{
+          deviceNameOf(alert.deviceId)
+        }}</span>
         <span class="cm-alert-item__time">{{ fmtTime(alert.createdAt) }}</span>
         <el-button size="small" @click="ackAlert(alert)">知道了</el-button>
       </div>
@@ -72,17 +114,28 @@
         </el-table-column>
         <el-table-column label="版本" width="90">
           <template #default="{ row }">
-            <el-tag :type="row.companionVersion === overview.latestVersion ? 'success' : 'warning'" size="small">{{ row.companionVersion || '-' }}</el-tag>
+            <el-tag
+              :type="row.companionVersion === overview.latestVersion ? 'success' : 'warning'"
+              size="small"
+              >{{ row.companionVersion || '-' }}</el-tag
+            >
           </template>
         </el-table-column>
         <el-table-column label="在线状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="healthTagType(row.healthStatus)" size="small">{{ healthLabel(row.healthStatus) }}</el-tag>
+            <el-tag :type="healthTagType(row.healthStatus)" size="small">{{
+              healthLabel(row.healthStatus)
+            }}</el-tag>
           </template>
         </el-table-column>
         <el-table-column label="当前任务" width="130">
           <template #default="{ row }">
-            <el-tag v-if="row.currentTask && row.currentTask !== 'idle'" :type="taskTagType(row.currentTask)" size="small">{{ taskLabel(row.currentTask) }}</el-tag>
+            <el-tag
+              v-if="row.currentTask && row.currentTask !== 'idle'"
+              :type="taskTagType(row.currentTask)"
+              size="small"
+              >{{ taskLabel(row.currentTask) }}</el-tag
+            >
             <span v-else class="cm-muted">空闲</span>
             <div v-if="taskDetailText(row)" class="cm-cell-sub">{{ taskDetailText(row) }}</div>
           </template>
@@ -90,7 +143,12 @@
         <el-table-column label="平台状态" min-width="160">
           <template #default="{ row }">
             <div v-if="platformTags(row).length" class="cm-platforms">
-              <span v-for="(p, idx) in platformTags(row)" :key="idx" class="cm-platform" :class="'cm-platform--' + p.cls">
+              <span
+                v-for="(p, idx) in platformTags(row)"
+                :key="idx"
+                class="cm-platform"
+                :class="'cm-platform--' + p.cls"
+              >
                 {{ p.label }}
               </span>
             </div>
@@ -101,11 +159,13 @@
           <template #default="{ row }">
             <div v-if="row.lastCollectionAt">{{ timeAgo(row.lastCollectionAt) }}</div>
             <span v-else class="cm-muted">-</span>
-            <div class="cm-cell-sub" v-if="row.lastCollectionAt">
+            <div v-if="row.lastCollectionAt" class="cm-cell-sub">
               <span :class="row.lastCollectionSuccess ? 'cm-ok' : 'cm-bad'">
                 {{ row.lastCollectionSuccess ? '成功' : '失败' }}
               </span>
-              <span v-if="row.lastCollectionAccountCount">· {{ row.lastCollectionAccountCount }} 账号</span>
+              <span v-if="row.lastCollectionAccountCount"
+                >· {{ row.lastCollectionAccountCount }} 账号</span
+              >
             </div>
           </template>
         </el-table-column>
@@ -113,8 +173,10 @@
           <template #default="{ row }">
             <div v-if="row.lastSyncAt">{{ timeAgo(row.lastSyncAt) }}</div>
             <span v-else class="cm-muted">-</span>
-            <div class="cm-cell-sub" v-if="row.lastSyncAt">
-              <span :class="row.lastSyncSuccess ? 'cm-ok' : 'cm-bad'">{{ row.lastSyncSuccess ? '成功' : '失败' }}</span>
+            <div v-if="row.lastSyncAt" class="cm-cell-sub">
+              <span :class="row.lastSyncSuccess ? 'cm-ok' : 'cm-bad'">{{
+                row.lastSyncSuccess ? '成功' : '失败'
+              }}</span>
               <span v-if="row.lastSyncUploadCount">· 上传 {{ row.lastSyncUploadCount }}</span>
               <span v-if="row.lastSyncErrorCode" class="cm-bad">· {{ row.lastSyncErrorCode }}</span>
             </div>
@@ -132,15 +194,30 @@
             <span v-else class="cm-muted">-</span>
           </template>
         </el-table-column>
+        <el-table-column label="最后链路证据" min-width="145">
+          <template #default="{ row }">
+            <template v-if="networkDiagnosticText(row)">
+              <div :class="row.networkDiagnostic?.lastErrorCode ? 'cm-bad' : 'cm-ok'">
+                {{ networkDiagnosticText(row) }}
+              </div>
+              <div class="cm-cell-sub">{{ networkDiagnosticRoute(row) }}</div>
+            </template>
+            <span v-else class="cm-muted">-</span>
+          </template>
+        </el-table-column>
         <el-table-column label="资源" width="110">
           <template #default="{ row }">
-            <div class="cm-cell-sub" v-if="row.cpuPercent !== null">CPU {{ row.cpuPercent }}%</div>
-            <div class="cm-cell-sub" v-if="row.memoryMb !== null">内存 {{ row.memoryMb }}MB</div>
-            <div class="cm-cell-sub" v-if="row.processUptimeSeconds">运行 {{ uptimeText(row.processUptimeSeconds) }}</div>
+            <div v-if="row.cpuPercent !== null" class="cm-cell-sub">CPU {{ row.cpuPercent }}%</div>
+            <div v-if="row.memoryMb !== null" class="cm-cell-sub">内存 {{ row.memoryMb }}MB</div>
+            <div v-if="row.processUptimeSeconds" class="cm-cell-sub">
+              运行 {{ uptimeText(row.processUptimeSeconds) }}
+            </div>
           </template>
         </el-table-column>
         <el-table-column label="最后心跳" width="110">
-          <template #default="{ row }">{{ row.lastHeartbeatAt ? timeAgo(row.lastHeartbeatAt) : '-' }}</template>
+          <template #default="{ row }">{{
+            row.lastHeartbeatAt ? timeAgo(row.lastHeartbeatAt) : '-'
+          }}</template>
         </el-table-column>
         <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
@@ -179,7 +256,9 @@
           <template #default="{ row }">{{ errorBrief(row.lastError) }}</template>
         </el-table-column>
         <el-table-column label="CPU" width="70">
-          <template #default="{ row }">{{ row.cpuPercent !== null ? row.cpuPercent + '%' : '-' }}</template>
+          <template #default="{ row }">{{
+            row.cpuPercent !== null ? row.cpuPercent + '%' : '-'
+          }}</template>
         </el-table-column>
         <el-table-column label="内存MB" width="80">
           <template #default="{ row }">{{ row.memoryMb !== null ? row.memoryMb : '-' }}</template>
@@ -316,7 +395,12 @@ function rateText(value: number | null): string {
 }
 
 function healthLabel(status: string): string {
-  const map: Record<string, string> = { online: '在线', unstable: '连接不稳定', offline: '离线', unknown: '未知' }
+  const map: Record<string, string> = {
+    online: '在线',
+    unstable: '连接不稳定',
+    offline: '离线',
+    unknown: '未知',
+  }
   return map[status] || status
 }
 
@@ -329,8 +413,13 @@ function healthTagType(status: string): 'success' | 'warning' | 'danger' | 'info
 
 function taskLabel(task: string): string {
   const map: Record<string, string> = {
-    idle: '空闲', collecting: '采集中', syncing: '同步中', uploading: '上传中',
-    queued: '排队中', updating: '更新中', error: '任务异常',
+    idle: '空闲',
+    collecting: '采集中',
+    syncing: '同步中',
+    uploading: '上传中',
+    queued: '排队中',
+    updating: '更新中',
+    error: '任务异常',
   }
   return map[task] || task
 }
@@ -353,7 +442,11 @@ function taskDetailText(row: CompanionDevice): string {
 }
 
 const PLATFORM_NAMES: Record<string, string> = {
-  DOUYIN: '抖音', XIAOHONGSHU: '小红书', KUAISHOU: '快手', WECHAT_VIDEO: '视频号', DOUDIAN: '抖店',
+  DOUYIN: '抖音',
+  XIAOHONGSHU: '小红书',
+  KUAISHOU: '快手',
+  WECHAT_VIDEO: '视频号',
+  DOUDIAN: '抖店',
 }
 
 function platformTags(row: CompanionDevice) {
@@ -362,7 +455,8 @@ function platformTags(row: CompanionDevice) {
     const p = summary[key] || {}
     const name = PLATFORM_NAMES[key] || key
     const cls = p.status === 'ok' ? 'ok' : p.status === 'expired' ? 'expired' : 'bad'
-    const label = name + (p.status === 'ok' ? '·正常' : p.status === 'expired' ? '·登录失效' : '·异常')
+    const label =
+      name + (p.status === 'ok' ? '·正常' : p.status === 'expired' ? '·登录失效' : '·异常')
     return { label, cls }
   })
 }
@@ -403,12 +497,30 @@ function collectionBrief(value: any): string {
 function syncBrief(value: any): string {
   if (!value || !Object.keys(value).length) return '-'
   const ok = value.success === true || value.success === 'true'
-  return (ok ? '成功' : '失败') + (value.uploadCount ? '·上传' + value.uploadCount : '') + (value.errorCode ? '·' + value.errorCode : '')
+  return (
+    (ok ? '成功' : '失败') +
+    (value.uploadCount ? '·上传' + value.uploadCount : '') +
+    (value.errorCode ? '·' + value.errorCode : '')
+  )
 }
 
 function errorBrief(value: any): string {
   if (!value || !Object.keys(value).length || !value.message) return '-'
   return (value.errorCode ? value.errorCode + ' ' : '') + String(value.message).slice(0, 60)
+}
+
+function networkDiagnosticText(row: CompanionDevice): string {
+  const diagnostic = row.networkDiagnostic as Record<string, any> | null
+  if (!diagnostic || !Object.keys(diagnostic).length) return ''
+  return String(diagnostic.lastErrorCode || '链路可达')
+}
+
+function networkDiagnosticRoute(row: CompanionDevice): string {
+  const diagnostic = row.networkDiagnostic as Record<string, any> | null
+  if (!diagnostic) return ''
+  const route = diagnostic.lastRoute || '未知路径'
+  const at = diagnostic.lastFailureAt || diagnostic.lastSuccessAt || diagnostic.lastAttemptAt
+  return String(route) + (at ? ' · ' + fmtTime(String(at)) : '')
 }
 
 onMounted(async () => {
@@ -424,40 +536,168 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.companion-monitor { padding: 16px 20px; }
-.cm-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 14px; }
-.cm-header__title h2 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
-.cm-header__title p { color: #8a8f99; font-size: 12px; margin: 0; }
-.cm-header__actions { display: flex; align-items: center; gap: 10px; }
-.cm-refresh-at { color: #8a8f99; font-size: 12px; }
-.cm-overview { margin-bottom: 12px; }
-.cm-overview .el-col { margin-bottom: 12px; }
-.cm-card { background: #fff; border: 1px solid #eef0f3; border-radius: 8px; padding: 12px 14px; text-align: center; }
-.cm-card__num { font-size: 22px; font-weight: 700; line-height: 1.3; }
-.cm-card__num--sm { font-size: 14px; padding-top: 6px; }
-.cm-card__label { color: #8a8f99; font-size: 12px; margin-top: 2px; }
-.cm-card--ok .cm-card__num { color: #34c759; }
-.cm-card--warn .cm-card__num { color: #e6a23c; }
-.cm-card--off .cm-card__num { color: #e05050; }
-.cm-card--old .cm-card__num { color: #b06ab3; }
-.cm-alerts { margin-bottom: 12px; }
-.cm-alerts__head { display: flex; justify-content: space-between; align-items: center; }
-.cm-alert-item { display: flex; align-items: center; gap: 10px; padding: 6px 0; border-bottom: 1px dashed #f0f2f5; font-size: 13px; }
-.cm-alert-item:last-child { border-bottom: none; }
-.cm-alert-item__msg { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-alert-item__dev { color: #8a8f99; font-size: 12px; white-space: nowrap; }
-.cm-alert-item__time { color: #b0b4bb; font-size: 12px; white-space: nowrap; }
-.cm-devices__head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
-.cm-cell-name { font-weight: 600; }
-.cm-cell-sub { color: #8a8f99; font-size: 11px; }
-.cm-muted { color: #b0b4bb; }
-.cm-ok { color: #34c759; }
-.cm-bad { color: #e05050; }
-.cm-ellipsis { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cm-platforms { display: flex; flex-wrap: wrap; gap: 4px; }
-.cm-platform { font-size: 11px; padding: 1px 6px; border-radius: 4px; border: 1px solid; }
-.cm-platform--ok { color: #34c759; border-color: #d5f0dd; background: #f2fbf5; }
-.cm-platform--expired { color: #e6a23c; border-color: #f3e4c8; background: #fdf7ec; }
-.cm-platform--bad { color: #e05050; border-color: #f3d2d2; background: #fdf3f3; }
-.cm-history-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.companion-monitor {
+  padding: 16px 20px;
+}
+.cm-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  margin-bottom: 14px;
+}
+.cm-header__title h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 4px;
+}
+.cm-header__title p {
+  color: #8a8f99;
+  font-size: 12px;
+  margin: 0;
+}
+.cm-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cm-refresh-at {
+  color: #8a8f99;
+  font-size: 12px;
+}
+.cm-overview {
+  margin-bottom: 12px;
+}
+.cm-overview .el-col {
+  margin-bottom: 12px;
+}
+.cm-card {
+  background: #fff;
+  border: 1px solid #eef0f3;
+  border-radius: 8px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.cm-card__num {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.cm-card__num--sm {
+  font-size: 14px;
+  padding-top: 6px;
+}
+.cm-card__label {
+  color: #8a8f99;
+  font-size: 12px;
+  margin-top: 2px;
+}
+.cm-card--ok .cm-card__num {
+  color: #34c759;
+}
+.cm-card--warn .cm-card__num {
+  color: #e6a23c;
+}
+.cm-card--off .cm-card__num {
+  color: #e05050;
+}
+.cm-card--old .cm-card__num {
+  color: #b06ab3;
+}
+.cm-alerts {
+  margin-bottom: 12px;
+}
+.cm-alerts__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cm-alert-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed #f0f2f5;
+  font-size: 13px;
+}
+.cm-alert-item:last-child {
+  border-bottom: none;
+}
+.cm-alert-item__msg {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-alert-item__dev {
+  color: #8a8f99;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cm-alert-item__time {
+  color: #b0b4bb;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.cm-devices__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.cm-cell-name {
+  font-weight: 600;
+}
+.cm-cell-sub {
+  color: #8a8f99;
+  font-size: 11px;
+}
+.cm-muted {
+  color: #b0b4bb;
+}
+.cm-ok {
+  color: #34c759;
+}
+.cm-bad {
+  color: #e05050;
+}
+.cm-ellipsis {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.cm-platform {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.cm-platform--ok {
+  color: #34c759;
+  border-color: #d5f0dd;
+  background: #f2fbf5;
+}
+.cm-platform--expired {
+  color: #e6a23c;
+  border-color: #f3e4c8;
+  background: #fdf7ec;
+}
+.cm-platform--bad {
+  color: #e05050;
+  border-color: #f3d2d2;
+  background: #fdf3f3;
+}
+.cm-history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
 </style>

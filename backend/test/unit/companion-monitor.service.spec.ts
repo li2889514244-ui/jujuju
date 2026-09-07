@@ -44,6 +44,7 @@ const baseDevice = (overrides: Record<string, any> = {}) => ({
   processUptimeSeconds: 3600,
   consecutiveSyncFailures: 0,
   recentHttpErrors: {},
+  networkDiagnostic: {},
   bootId: 'boot-1',
   bootSeq: 5,
   bootCount: 2,
@@ -70,6 +71,7 @@ const basePayload: Record<string, any> = {
   lastError: {},
   update: {},
   recentHttpErrors: {},
+  networkDiagnostic: {},
   resources: { cpuPercent: 1.2, memoryMb: 120, processUptimeSeconds: 3600 },
 }
 
@@ -93,10 +95,7 @@ describe('CompanionMonitorService', () => {
     resetPrismaMocks()
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        CompanionMonitorService,
-        { provide: PrismaService, useValue: mockPrismaService },
-      ],
+      providers: [CompanionMonitorService, { provide: PrismaService, useValue: mockPrismaService }],
     }).compile()
 
     service = module.get<CompanionMonitorService>(CompanionMonitorService)
@@ -118,45 +117,127 @@ describe('CompanionMonitorService', () => {
       expect(args.where).toEqual({ deviceId: 'device-0000000001' })
       expect(args.create.deviceId).toBe('device-0000000001')
       expect(args.create.healthStatus).toBe('online')
+      expect(args.create.lastCollectionAt).toBeNull()
+      expect(args.create.lastCollectionSuccess).toBeNull()
       expect(args.create.bootCount).toBe(1)
       expect(mockPrismaService.companionHeartbeat.create).toHaveBeenCalledTimes(1)
     })
 
-    it('非法 deviceId 应拒绝', async () => {
-      await expect(service.processHeartbeat(user, { ...basePayload, deviceId: '短' })).rejects.toBeInstanceOf(
-        ForbiddenException,
+    it('没有采集结果的后续心跳不应把状态改成采集失败', async () => {
+      const device = baseDevice({ lastCollectionSuccess: null, lastCollectionAt: null })
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(device)
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(device)
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6 })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.lastCollectionSuccess).toBeNull()
+      expect(args.update.lastCollectionAt).toBeNull()
+    })
+
+    it('应持久化最后一次网络路径与错误类别', async () => {
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice())
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        networkDiagnostic: {
+          lastRoute: 'system_proxy',
+          lastErrorCode: 'NETWORK_TIMEOUT',
+          consecutiveFailures: 2,
+        },
+      })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.networkDiagnostic).toEqual({
+        lastRoute: 'system_proxy',
+        lastErrorCode: 'NETWORK_TIMEOUT',
+        consecutiveFailures: 2,
+      })
+    })
+
+    it('成功心跳应清除旧的瞬时心跳错误，但保留业务错误', async () => {
+      const device = baseDevice({
+        lastErrorCode: 'HEARTBEAT_NETWORK',
+        lastErrorMessage: 'timeout',
+        lastErrorAt: new Date(),
+      })
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(device)
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
+
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6 })
+
+      const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
+      expect(args.update.lastErrorCode).toBeNull()
+      expect(args.update.lastErrorMessage).toBeNull()
+      expect(args.update.lastErrorAt).toBeNull()
+
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({
+          lastErrorCode: 'COLLECT_FAIL',
+          lastErrorMessage: 'business failure',
+          lastErrorAt: new Date(),
+        }),
       )
+      mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
+      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 7 })
+      const businessArgs = mockPrismaService.companionDevice.upsert.mock.calls[1][0]
+      expect(businessArgs.update.lastErrorCode).toBe('COLLECT_FAIL')
+    })
+
+    it('非法 deviceId 应拒绝', async () => {
+      await expect(
+        service.processHeartbeat(user, { ...basePayload, deviceId: '短' }),
+      ).rejects.toBeInstanceOf(ForbiddenException)
       expect(mockPrismaService.companionDevice.upsert).not.toHaveBeenCalled()
     })
 
     it('同步失败应递增连续失败次数', async () => {
-      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice({ consecutiveSyncFailures: 2 }))
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ consecutiveSyncFailures: 2 }),
+      )
       mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
       mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
 
-      await service.processHeartbeat(user, { ...basePayload, lastSync: { success: false, errorCode: 'E_NETWORK' } })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        lastSync: { success: false, errorCode: 'E_NETWORK' },
+      })
 
       const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
       expect(args.update.consecutiveSyncFailures).toBe(3)
     })
 
     it('同步成功后应清零连续失败次数', async () => {
-      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice({ consecutiveSyncFailures: 2 }))
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ consecutiveSyncFailures: 2 }),
+      )
       mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
       mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
 
-      await service.processHeartbeat(user, { ...basePayload, lastSync: { success: true, uploadCount: 5 } })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        lastSync: { success: true, uploadCount: 5 },
+      })
 
       const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
       expect(args.update.consecutiveSyncFailures).toBe(0)
     })
 
     it('lastSync.success 为 null（尚无同步）时不应计入失败', async () => {
-      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice({ consecutiveSyncFailures: 1 }))
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ consecutiveSyncFailures: 1 }),
+      )
       mockPrismaService.companionDevice.upsert.mockResolvedValue(baseDevice())
       mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
 
-      await service.processHeartbeat(user, { ...basePayload, lastSync: { success: null, uploadCount: 0 } })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        lastSync: { success: null, uploadCount: 0 },
+      })
 
       const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
       expect(args.update.consecutiveSyncFailures).toBe(1)
@@ -190,16 +271,27 @@ describe('CompanionMonitorService', () => {
         bootId: 'boot-1',
       })
 
-      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6, taskStatus: 'collecting' })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        bootId: 'boot-1',
+        seq: 6,
+        taskStatus: 'collecting',
+      })
       expect(mockPrismaService.companionHeartbeat.create).toHaveBeenCalledTimes(1)
     })
   })
 
   describe('processHeartbeat Phase 2: 防旧心跳覆盖 / 崩溃检测', () => {
     it('同一 bootId 且 seq 未递增 → 视为迟到旧心跳，不回写状态', async () => {
-      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice({ bootId: 'boot-1', bootSeq: 5 }))
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ bootId: 'boot-1', bootSeq: 5 }),
+      )
 
-      const result = await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 4 })
+      const result = await service.processHeartbeat(user, {
+        ...basePayload,
+        bootId: 'boot-1',
+        seq: 4,
+      })
 
       expect(result.stale).toBe(true)
       expect(mockPrismaService.companionDevice.upsert).not.toHaveBeenCalled()
@@ -238,7 +330,9 @@ describe('CompanionMonitorService', () => {
       expect(args.update.bootId).toBe('boot-2')
       expect(args.update.bootSeq).toBe(1)
       expect(args.update.bootCount).toBe(3)
-      const eventTypes = mockPrismaService.companionEvent.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const eventTypes = mockPrismaService.companionEvent.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(eventTypes).toContain('BOOT_STARTED')
     })
 
@@ -259,9 +353,16 @@ describe('CompanionMonitorService', () => {
       mockPrismaService.companionAlert.findFirst.mockResolvedValue(null)
       mockPrismaService.companionAlert.create.mockResolvedValue({ id: 'al-1' })
 
-      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-2', seq: 1, startedAt: new Date().toISOString() })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        bootId: 'boot-2',
+        seq: 1,
+        startedAt: new Date().toISOString(),
+      })
 
-      const incidentTypes = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const incidentTypes = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(incidentTypes).toContain('CRASH_SUSPECTED')
     })
 
@@ -277,9 +378,16 @@ describe('CompanionMonitorService', () => {
       mockPrismaService.companionDevice.upsert.mockResolvedValue(device)
       mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
 
-      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-2', seq: 1, startedAt: new Date().toISOString() })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        bootId: 'boot-2',
+        seq: 1,
+        startedAt: new Date().toISOString(),
+      })
 
-      const incidentTypes = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const incidentTypes = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(incidentTypes).not.toContain('CRASH_SUSPECTED')
     })
 
@@ -289,7 +397,12 @@ describe('CompanionMonitorService', () => {
       mockPrismaService.companionDevice.upsert.mockResolvedValue(device)
       mockPrismaService.companionHeartbeat.findFirst.mockResolvedValue(null)
 
-      await service.processHeartbeat(user, { ...basePayload, bootId: 'boot-1', seq: 6, exitState: 'clean' })
+      await service.processHeartbeat(user, {
+        ...basePayload,
+        bootId: 'boot-1',
+        seq: 6,
+        exitState: 'clean',
+      })
 
       const args = mockPrismaService.companionDevice.upsert.mock.calls[0][0]
       expect(args.update.exitState).toBe('clean')
@@ -337,7 +450,9 @@ describe('CompanionMonitorService', () => {
 
   describe('getDeviceHistory', () => {
     it('越权访问其他组织设备应拒绝', async () => {
-      mockPrismaService.companionDevice.findUnique.mockResolvedValue(baseDevice({ organizationId: 'org-other' }))
+      mockPrismaService.companionDevice.findUnique.mockResolvedValue(
+        baseDevice({ organizationId: 'org-other' }),
+      )
 
       await expect(
         service.getDeviceHistory({ role: 'ADMIN', organizationId: 'org-a' }, 'device-0000000001'),
@@ -368,7 +483,9 @@ describe('CompanionMonitorService', () => {
       expect(mockPrismaService.companionDevice.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: 'dev-id-1' }, data: { healthStatus: 'offline' } }),
       )
-      const types = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const types = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(types).toContain('HEARTBEAT_STALE')
       expect(mockPrismaService.companionEvent.create).toHaveBeenCalled()
     })
@@ -377,7 +494,9 @@ describe('CompanionMonitorService', () => {
       const stale = baseDevice({ lastHeartbeatAt: new Date(Date.now() - 10 * 60 * 1000) })
       setupEvalDevices([stale])
       mockPrismaService.companionIncident.findFirst.mockResolvedValue({
-        id: 'inc-1', status: 'open', occurrences: 2,
+        id: 'inc-1',
+        status: 'open',
+        occurrences: 2,
       })
 
       await service.evaluateHealthAndAlerts()
@@ -399,7 +518,9 @@ describe('CompanionMonitorService', () => {
 
       await service.evaluateHealthAndAlerts()
 
-      const types = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const types = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(types).toContain('SYNC_FAIL_3X')
     })
   })
@@ -415,7 +536,9 @@ describe('CompanionMonitorService', () => {
 
       await service.evaluateHealthAndAlerts()
 
-      const types = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const types = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(types).toContain('TASK_STUCK')
     })
 
@@ -429,7 +552,9 @@ describe('CompanionMonitorService', () => {
 
       await service.evaluateHealthAndAlerts()
 
-      const types = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const types = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(types).not.toContain('TASK_STUCK')
     })
 
@@ -444,7 +569,9 @@ describe('CompanionMonitorService', () => {
 
       await service.evaluateHealthAndAlerts()
 
-      const types = mockPrismaService.companionIncident.create.mock.calls.map((c: any[]) => c[0].data.type)
+      const types = mockPrismaService.companionIncident.create.mock.calls.map(
+        (c: any[]) => c[0].data.type,
+      )
       expect(types).not.toContain('TASK_STUCK')
     })
   })
@@ -453,11 +580,17 @@ describe('CompanionMonitorService', () => {
     it('故障不再发生 → open 转 recovering', async () => {
       const healthy = baseDevice()
       setupEvalDevices([healthy])
-      mockPrismaService.companionIncident.findMany.mockResolvedValue([{
-        id: 'inc-1', deviceId: 'device-0000000001', type: 'SYNC_FAIL_3X',
-        organizationId: 'default-tenant', status: 'open', recoveringSince: null,
-        firstOccurredAt: new Date(Date.now() - 60 * 60 * 1000),
-      }])
+      mockPrismaService.companionIncident.findMany.mockResolvedValue([
+        {
+          id: 'inc-1',
+          deviceId: 'device-0000000001',
+          type: 'SYNC_FAIL_3X',
+          organizationId: 'default-tenant',
+          status: 'open',
+          recoveringSince: null,
+          firstOccurredAt: new Date(Date.now() - 60 * 60 * 1000),
+        },
+      ])
 
       await service.evaluateHealthAndAlerts()
 
@@ -472,19 +605,27 @@ describe('CompanionMonitorService', () => {
     it('recovering 超过2分钟无复发 → resolved + 时长 + 自动关闭告警', async () => {
       const healthy = baseDevice()
       setupEvalDevices([healthy])
-      mockPrismaService.companionIncident.findMany.mockResolvedValue([{
-        id: 'inc-1', deviceId: 'device-0000000001', type: 'SYNC_FAIL_3X',
-        organizationId: 'default-tenant', status: 'recovering',
-        recoveringSince: new Date(Date.now() - 3 * 60 * 1000),
-        firstOccurredAt: new Date(Date.now() - 60 * 60 * 1000),
-      }])
+      mockPrismaService.companionIncident.findMany.mockResolvedValue([
+        {
+          id: 'inc-1',
+          deviceId: 'device-0000000001',
+          type: 'SYNC_FAIL_3X',
+          organizationId: 'default-tenant',
+          status: 'recovering',
+          recoveringSince: new Date(Date.now() - 3 * 60 * 1000),
+          firstOccurredAt: new Date(Date.now() - 60 * 60 * 1000),
+        },
+      ])
 
       await service.evaluateHealthAndAlerts()
 
       expect(mockPrismaService.companionIncident.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: 'inc-1' },
-          data: expect.objectContaining({ status: 'resolved', durationSeconds: expect.any(Number) }),
+          data: expect.objectContaining({
+            status: 'resolved',
+            durationSeconds: expect.any(Number),
+          }),
         }),
       )
       expect(mockPrismaService.companionAlert.updateMany).toHaveBeenCalledWith(
@@ -496,7 +637,9 @@ describe('CompanionMonitorService', () => {
       const stale = baseDevice({ lastHeartbeatAt: new Date(Date.now() - 10 * 60 * 1000) })
       setupEvalDevices([stale])
       mockPrismaService.companionIncident.findFirst.mockResolvedValue({
-        id: 'inc-1', status: 'recovering', occurrences: 2,
+        id: 'inc-1',
+        status: 'recovering',
+        occurrences: 2,
       })
 
       await service.evaluateHealthAndAlerts()
@@ -513,10 +656,30 @@ describe('CompanionMonitorService', () => {
   describe('getOverview', () => {
     it('应统计正常/异常/离线/版本过旧', async () => {
       const devices = [
-        baseDevice({ id: 'd1', healthStatus: 'online', companionVersion: '3.2.102', updateStatus: { latest: '3.2.102' } }),
-        baseDevice({ id: 'd2', healthStatus: 'offline', companionVersion: '3.2.100', updateStatus: { latest: '3.2.102' } }),
-        baseDevice({ id: 'd3', healthStatus: 'unstable', companionVersion: '3.2.102', updateStatus: {} }),
-        baseDevice({ id: 'd4', healthStatus: 'online', companionVersion: '3.2.100', updateStatus: {} }),
+        baseDevice({
+          id: 'd1',
+          healthStatus: 'online',
+          companionVersion: '3.2.102',
+          updateStatus: { latest: '3.2.102' },
+        }),
+        baseDevice({
+          id: 'd2',
+          healthStatus: 'offline',
+          companionVersion: '3.2.100',
+          updateStatus: { latest: '3.2.102' },
+        }),
+        baseDevice({
+          id: 'd3',
+          healthStatus: 'unstable',
+          companionVersion: '3.2.102',
+          updateStatus: {},
+        }),
+        baseDevice({
+          id: 'd4',
+          healthStatus: 'online',
+          companionVersion: '3.2.100',
+          updateStatus: {},
+        }),
       ]
       mockPrismaService.companionDevice.findMany.mockResolvedValue(devices)
 

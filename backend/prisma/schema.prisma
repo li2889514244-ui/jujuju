@@ -924,7 +924,8 @@ model CompanionDevice {
   memoryMb                   Float?
   processUptimeSeconds       Int?
   consecutiveSyncFailures    Int                  @default(0)
-  recentHttpErrors           Json?
+    recentHttpErrors           Json?
+    networkDiagnostic          Json?
   // Phase 2: 运行周期 / 崩溃检测 / UI 模式 / 进度时间戳
   bootId                     String?
   bootSeq                    Int                  @default(0)
@@ -960,7 +961,8 @@ model CompanionHeartbeat {
   processUptimeSeconds Int?
   ownerName            String?
   bootId               String?
-  seq                  Int?
+    seq                  Int?
+    networkDiagnostic    Json?
 
   device CompanionDevice @relation(fields: [deviceId], references: [deviceId], onDelete: Cascade)
 

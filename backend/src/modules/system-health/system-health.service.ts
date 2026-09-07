@@ -69,8 +69,11 @@ export class SystemHealthService {
       this.buildErrorCode('FRONTEND', eventType, route || this.cleanText(payload.name, 80))
     const message = this.cleanText(payload.message, 500) || eventType
     if (this.isIgnoredFrontendNoise(message)) return { accepted: true, ignored: true }
-    const stackFingerprint = this.cleanText(payload.stackFingerprint, 80) || this.fingerprint(message)
-    const dedupeKey = [sourceType, errorCode, route, frontendVersion, stackFingerprint].filter(Boolean).join('|')
+    const stackFingerprint =
+      this.cleanText(payload.stackFingerprint, 80) || this.fingerprint(message)
+    const dedupeKey = [sourceType, errorCode, route, frontendVersion, stackFingerprint]
+      .filter(Boolean)
+      .join('|')
 
     await this.recordEvent({
       sourceType,
@@ -130,10 +133,21 @@ export class SystemHealthService {
     if (!slow && !failed) return
 
     const severity = input.statusCode >= 500 ? 'ERROR' : 'WARNING'
-    const eventType = input.statusCode >= 500 ? 'HTTP_5XX' : failed ? 'HTTP_4XX' : input.durationMs >= 3000 ? 'HTTP_SLOW' : 'HTTP_LATENCY'
+    const eventType =
+      input.statusCode >= 500
+        ? 'HTTP_5XX'
+        : failed
+          ? 'HTTP_4XX'
+          : input.durationMs >= 3000
+            ? 'HTTP_SLOW'
+            : 'HTTP_LATENCY'
     const errorCode =
       input.errorName ||
-      (input.statusCode >= 500 ? 'BACKEND_HTTP_5XX' : failed ? `BACKEND_HTTP_${input.statusCode}` : 'BACKEND_HTTP_SLOW')
+      (input.statusCode >= 500
+        ? 'BACKEND_HTTP_5XX'
+        : failed
+          ? `BACKEND_HTTP_${input.statusCode}`
+          : 'BACKEND_HTTP_SLOW')
     const routeKey = `${input.method.toUpperCase()} ${this.routeFingerprint(input.url)}`
     const message = `${routeKey} ${input.statusCode} ${input.durationMs}ms`
 
@@ -189,8 +203,9 @@ export class SystemHealthService {
       slowApis,
       dbErrors,
       companionDevices,
-      companionAnomalies,
+      companionIncidents,
       openIncidents,
+      activeSystemIncidents,
       recoveringIncidents,
       todayResolved,
       unresolvedIncidents,
@@ -199,30 +214,74 @@ export class SystemHealthService {
       dbStatus,
     ] = await Promise.all([
       this.prisma.systemEvent.count({
-        where: { ...scopedWhere, sourceType: 'FRONTEND', severity: { in: ['ERROR', 'CRITICAL'] }, occurredAt: { gte: since24h } },
+        where: {
+          ...scopedWhere,
+          sourceType: 'FRONTEND',
+          severity: { in: ['ERROR', 'CRITICAL'] },
+          occurredAt: { gte: since24h },
+        },
       }),
       this.prisma.systemEvent.count({
-        where: { ...scopedWhere, sourceType: 'BACKEND', eventType: 'HTTP_5XX', occurredAt: { gte: since24h } },
+        where: {
+          ...scopedWhere,
+          sourceType: 'BACKEND',
+          eventType: 'HTTP_5XX',
+          occurredAt: { gte: since24h },
+        },
       }),
       this.prisma.systemEvent.count({
-        where: { ...scopedWhere, sourceType: 'BACKEND', eventType: { in: ['HTTP_SLOW', 'HTTP_LATENCY'] }, occurredAt: { gte: since24h } },
+        where: {
+          ...scopedWhere,
+          sourceType: 'BACKEND',
+          eventType: { in: ['HTTP_SLOW', 'HTTP_LATENCY'] },
+          occurredAt: { gte: since24h },
+        },
       }),
       this.prisma.systemEvent.count({
-        where: { ...scopedWhere, sourceType: 'DATABASE', severity: { in: ['ERROR', 'CRITICAL'] }, occurredAt: { gte: since24h } },
+        where: {
+          ...scopedWhere,
+          sourceType: 'DATABASE',
+          severity: { in: ['ERROR', 'CRITICAL'] },
+          occurredAt: { gte: since24h },
+        },
       }),
       this.prisma.companionDevice.findMany({
         where: orgWhere,
-        select: { healthStatus: true, consecutiveSyncFailures: true, lastCollectionSuccess: true, lastSyncSuccess: true },
+        select: {
+          healthStatus: true,
+          consecutiveSyncFailures: true,
+          lastCollectionSuccess: true,
+          lastCollectionAt: true,
+          lastSyncSuccess: true,
+          lastSyncAt: true,
+        },
       }),
-      this.prisma.companionIncident.count({ where: { ...orgWhere, status: { in: ['open', 'recovering'] } } }),
+      this.prisma.companionIncident.findMany({
+        where: { ...orgWhere, status: { in: ['open', 'recovering'] } },
+        select: { deviceId: true, organizationId: true },
+      }),
       this.prisma.systemIncident.findMany({
-        where: { ...this.incidentOrgWhere(user), status: 'OPEN', severity: { in: ['CRITICAL', 'ERROR'] } },
+        where: {
+          ...this.incidentOrgWhere(user),
+          status: 'OPEN',
+          severity: { in: ['CRITICAL', 'ERROR'] },
+        },
         orderBy: [{ severity: 'desc' }, { lastOccurredAt: 'desc' }],
         take: 8,
       }),
-      this.prisma.systemIncident.count({ where: { ...this.incidentOrgWhere(user), status: 'RECOVERING' } }),
+      this.prisma.systemIncident.findMany({
+        where: { ...this.incidentOrgWhere(user), status: { in: ['OPEN', 'RECOVERING'] } },
+        select: { sourceType: true },
+      }),
       this.prisma.systemIncident.count({
-        where: { ...this.incidentOrgWhere(user), status: 'RESOLVED', resolvedAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) } },
+        where: { ...this.incidentOrgWhere(user), status: 'RECOVERING' },
+      }),
+      this.prisma.systemIncident.count({
+        where: {
+          ...this.incidentOrgWhere(user),
+          status: 'RESOLVED',
+          resolvedAt: { gte: new Date(now.getFullYear(), now.getMonth(), now.getDate()) },
+        },
       }),
       this.prisma.systemIncident.count({
         where: { ...this.incidentOrgWhere(user), status: { in: ['OPEN', 'RECOVERING'] } },
@@ -236,10 +295,29 @@ export class SystemHealthService {
       this.checkDatabase(),
     ])
 
-    const offlineCompanions = companionDevices.filter((device) => device.healthStatus === 'offline').length
-    const failedCollectOrSync = companionDevices.filter(
-      (device) => device.lastCollectionSuccess === false || device.lastSyncSuccess === false || device.consecutiveSyncFailures >= 3,
+    const offlineCompanions = companionDevices.filter(
+      (device) => device.healthStatus === 'offline',
     ).length
+    const failedCollectOrSync = companionDevices.filter(
+      (device) =>
+        (device.lastCollectionAt != null && device.lastCollectionSuccess === false) ||
+        (device.lastSyncAt != null && device.lastSyncSuccess === false) ||
+        device.consecutiveSyncFailures >= 3,
+    ).length
+    const companionActiveIncidentCount = companionIncidents.length
+    const activeFrontendIncidents = activeSystemIncidents.filter(
+      (incident) => incident.sourceType === 'FRONTEND',
+    ).length
+    const activeBackendIncidents = activeSystemIncidents.filter(
+      (incident) => incident.sourceType === 'BACKEND',
+    ).length
+    // 一个设备可能同时有心跳、离线、版本等多条故障；健康卡展示受影响实体数，
+    // 另行返回故障条数，避免“异常 6”大于“设备总数 3”的歧义。
+    const affectedCompanionEntities = new Set(
+      companionIncidents.map(
+        (incident) => incident.deviceId || `org:${incident.organizationId || 'default'}`,
+      ),
+    ).size
     const p0 = openCritical
     const p1 = openError
 
@@ -247,12 +325,12 @@ export class SystemHealthService {
     const overallStatus =
       p0 > 0 || dbStatus.status === 'error'
         ? 'CRITICAL'
-          : p1 > 0
+        : p1 > 0
           ? 'INCIDENT'
           : unresolvedIncidents > 0 ||
               frontendErrors > 0 ||
               slowApis > 0 ||
-              companionAnomalies > 0 ||
+              companionActiveIncidentCount > 0 ||
               offlineCompanions > 0
             ? 'DEGRADED'
             : 'HEALTHY'
@@ -261,13 +339,26 @@ export class SystemHealthService {
       overallStatus,
       generatedAt: now.toISOString(),
       cards: {
-        frontend: { status: frontendErrors > 0 ? 'DEGRADED' : 'HEALTHY', errors24h: frontendErrors },
-        backend: { status: backendErrors > 0 ? 'INCIDENT' : slowApis > 0 ? 'DEGRADED' : 'HEALTHY', errors24h: backendErrors, slowApis24h: slowApis },
-        database: { status: dbStatus.status === 'ok' ? 'HEALTHY' : 'CRITICAL', responseTimeMs: dbStatus.responseTimeMs },
+        frontend: {
+          status: activeFrontendIncidents > 0 ? 'DEGRADED' : 'HEALTHY',
+          errors24h: frontendErrors,
+          activeIncidents: activeFrontendIncidents,
+        },
+        backend: {
+          status: activeBackendIncidents > 0 ? 'INCIDENT' : slowApis > 0 ? 'DEGRADED' : 'HEALTHY',
+          errors24h: backendErrors,
+          slowApis24h: slowApis,
+          activeIncidents: activeBackendIncidents,
+        },
+        database: {
+          status: dbStatus.status === 'ok' ? 'HEALTHY' : 'CRITICAL',
+          responseTimeMs: dbStatus.responseTimeMs,
+        },
         companion: {
-          status: companionAnomalies || offlineCompanions ? 'DEGRADED' : 'HEALTHY',
+          status: companionActiveIncidentCount || offlineCompanions ? 'DEGRADED' : 'HEALTHY',
           total: companionDevices.length,
-          anomalies: companionAnomalies,
+          anomalies: affectedCompanionEntities,
+          activeIncidents: companionActiveIncidentCount,
           offline: offlineCompanions,
           failedCollectOrSync,
         },
@@ -279,7 +370,8 @@ export class SystemHealthService {
         api50024h: backendErrors,
         slowApis24h: slowApis,
         dbErrors24h: dbErrors,
-        companionAnomalies,
+        companionAnomalies: affectedCompanionEntities,
+        companionActiveIncidents: companionActiveIncidentCount,
         offlineCompanions,
         failedCollectOrSync,
         unresolvedIncidents,
@@ -508,7 +600,10 @@ export class SystemHealthService {
         storeId: this.nullable(input.storeId, 80),
         platform: this.nullable(input.platform, 40),
         frontendVersion: this.nullable(input.frontendVersion, 80),
-        backendVersion: this.nullable(input.backendVersion || process.env.npm_package_version || '1.0.0', 80),
+        backendVersion: this.nullable(
+          input.backendVersion || process.env.npm_package_version || '1.0.0',
+          80,
+        ),
         companionVersion: this.nullable(input.companionVersion, 80),
         eventType: this.cleanText(input.eventType, 100) || 'UNKNOWN_EVENT',
         severity: this.normalizeSeverity(input.severity, 'INFO'),
@@ -567,7 +662,8 @@ export class SystemHealthService {
         lastOccurredAt: now,
         title: this.cleanText(input.title, 180) || '系统异常',
         summary: this.cleanText(input.summary, 1000) || '系统异常',
-        dedupeKey: this.cleanText(input.dedupeKey, 260) || this.fingerprint(input.title + input.summary),
+        dedupeKey:
+          this.cleanText(input.dedupeKey, 260) || this.fingerprint(input.title + input.summary),
         metadata: this.sanitizeMetadata(input.metadata || {}) as any,
       },
     })
@@ -611,7 +707,15 @@ export class SystemHealthService {
 
   private mapCompanionSeverity(type: string): Severity {
     if (['OFFLINE_24H', 'LOGIN_EXPIRED_MASS', 'CRASH_SUSPECTED'].includes(type)) return 'ERROR'
-    if (['HEARTBEAT_STALE', 'TASK_STUCK', 'SYNC_FAIL_3X', 'UPDATE_FAILED', 'HTTP_ERROR_SPIKE'].includes(type)) {
+    if (
+      [
+        'HEARTBEAT_STALE',
+        'TASK_STUCK',
+        'SYNC_FAIL_3X',
+        'UPDATE_FAILED',
+        'HTTP_ERROR_SPIKE',
+      ].includes(type)
+    ) {
       return 'WARNING'
     }
     return 'INFO'
@@ -684,7 +788,9 @@ export class SystemHealthService {
   }
 
   private isIgnoredFrontendNoise(message: string): boolean {
-    return /ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)/i.test(message)
+    return /ResizeObserver loop (?:limit exceeded|completed with undelivered notifications)/i.test(
+      message,
+    )
   }
 
   private sanitizePath(value: string): string {
@@ -715,7 +821,10 @@ export class SystemHealthService {
   }
 
   private fingerprint(value: string): string {
-    return crypto.createHash('sha1').update(value || 'unknown').digest('hex')
+    return crypto
+      .createHash('sha1')
+      .update(value || 'unknown')
+      .digest('hex')
   }
 
   private titleForEvent(sourceType: SourceType, eventType: string, message: string): string {

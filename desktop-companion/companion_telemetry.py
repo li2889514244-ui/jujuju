@@ -29,8 +29,6 @@ def _redact(text: str, secrets) -> str:
 
 def upload_logs_once(api_url: str, token: str, device_id: str, version: str) -> bool:
     try:
-        import requests
-
         # 打包版（frozen）下 stdout 重定向到 exe 同目录的 companion.log；
         # 源码运行则是模块目录。按两种场景各取一次，优先取非空的那个。
         import sys as _sys
@@ -65,8 +63,11 @@ def upload_logs_once(api_url: str, token: str, device_id: str, version: str) -> 
         except Exception:
             install_dir = ''
         headers = {'Authorization': f'Bearer {token}'} if token else {}
-        response = requests.post(
-            f"{api_url.rstrip('/')}/platforms/report-logs",
+        # 日志诊断也必须兼容公司代理：直连优先，只有传输失败才回退
+        # 系统代理；HTTP 错误仍原样上报，不会被“重试成功”掩盖。
+        from companion_network import request_with_network_fallback
+        response = request_with_network_fallback(
+            'POST', f"{api_url.rstrip('/')}/platforms/report-logs", channel='telemetry',
             json={'deviceId': device_id, 'version': version, 'log': log_text, 'diag': diag_text, 'installDir': install_dir},
             headers=headers,
             timeout=30,

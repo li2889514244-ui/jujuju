@@ -17,6 +17,7 @@ export interface HeartbeatPayload {
   lastError?: unknown
   update?: unknown
   recentHttpErrors?: unknown
+  networkDiagnostic?: unknown
   resources?: unknown
   // Phase 2
   bootId?: unknown
@@ -27,15 +28,32 @@ export interface HeartbeatPayload {
   lastProgressAt?: unknown
 }
 
-const VALID_TASKS = ['idle', 'collecting', 'syncing', 'uploading', 'queued', 'updating', 'error'] as const
+const VALID_TASKS = [
+  'idle',
+  'collecting',
+  'syncing',
+  'uploading',
+  'queued',
+  'updating',
+  'error',
+] as const
 // Phase 2: 卡死判定阈值——任务长时间「无进展」才算卡死（有进度则正常）
-const STUCK_NO_PROGRESS_MINUTES: Record<string, number> = { collecting: 15, syncing: 10, uploading: 10, updating: 30 }
+const STUCK_NO_PROGRESS_MINUTES: Record<string, number> = {
+  collecting: 15,
+  syncing: 10,
+  uploading: 10,
+  updating: 30,
+}
 const HISTORY_WRITE_INTERVAL_MS = 5 * 60 * 1000
 const CRASH_WINDOW_MS = 10 * 60 * 1000 // 上次心跳距新启动 ≤10 分钟 → 视为「运行中突然死亡」
 const RECOVERY_GRACE_MS = 2 * 60 * 1000 // 连续 2 分钟不再复发才 RESOLVED
 
 function parseVersion(value: unknown): number[] {
-  return String(value || '').trim().split('.').map((part) => parseInt(part, 10)).filter((n) => Number.isFinite(n))
+  return String(value || '')
+    .trim()
+    .split('.')
+    .map((part) => parseInt(part, 10))
+    .filter((n) => Number.isFinite(n))
 }
 
 function compareVersions(a: string, b: string): number {
@@ -73,7 +91,10 @@ export class CompanionMonitorService {
 
   // ── 心跳接收 ──
 
-  async processHeartbeat(user: { id: string; name?: string; organizationId?: string | null }, payload: HeartbeatPayload) {
+  async processHeartbeat(
+    user: { id: string; name?: string; organizationId?: string | null },
+    payload: HeartbeatPayload,
+  ) {
     const deviceId = str(payload.deviceId, 128).trim()
     if (!/^[A-Za-z0-9_-]{8,128}$/.test(deviceId)) {
       throw new ForbiddenException('无效的 deviceId')
@@ -97,7 +118,11 @@ export class CompanionMonitorService {
       if (bootId === existing.bootId) {
         // 同一运行周期：seq 必须严格递增，否则是迟到的旧心跳
         if (seq !== null && (existing.bootSeq || 0) > 0 && seq <= existing.bootSeq) isStale = true
-      } else if (startedAt && existing.startedAt && startedAt.getTime() < new Date(existing.startedAt).getTime()) {
+      } else if (
+        startedAt &&
+        existing.startedAt &&
+        startedAt.getTime() < new Date(existing.startedAt).getTime()
+      ) {
         // 不同 bootId 且 startedAt 更早：上一个运行周期迟到的旧心跳
         isStale = true
       } else {
@@ -158,12 +183,44 @@ export class CompanionMonitorService {
     const collectionEndedAt = str(collectionInfo.endedAt)
     const hasSync = Object.keys(lastSync).length > 0
     const hasError = Object.keys(lastError).length > 0
-    const hasCollection = Object.keys(collectionInfo).length > 0
+    const previousErrorCode = str(existing?.lastErrorCode, 80)
+    const clearRecoveredHeartbeatError = !hasError && previousErrorCode.startsWith('HEARTBEAT_')
+    // 心跳快照会始终带上 lastCollection，但首次运行时 success 为 null。
+    // 只有明确收到 true/false 才算一次采集结果，避免“尚未采集”被落库为失败。
+    const hasCollection = collectionInfo.success === true || collectionInfo.success === false
     const hasTaskDetail = Object.keys(readJson(payload.taskDetail)).length > 0
     const hasHttpErrors = Object.keys(readJson(payload.recentHttpErrors)).length > 0
     const startupDiagnostic = readJson(payload.startupDiagnostic)
     const hasStartupDiagnostic = Object.keys(startupDiagnostic).length > 0
     const lastProgressAt = validDate(str(payload.lastProgressAt))
+    const networkDiagnostic = readJson(payload.networkDiagnostic)
+    const hasNetworkDiagnostic = Object.keys(networkDiagnostic).length > 0
+
+    // A later heartbeat closes the evidence gap: retain one event describing
+    // the outage and the last transport diagnosis seen before it went silent.
+    // This is deliberately an event, not a new alert, so it does not weaken
+    // the existing stale-heartbeat threshold.
+    const previousHeartbeatAt = existing?.lastHeartbeatAt
+      ? new Date(existing.lastHeartbeatAt).getTime()
+      : 0
+    if (
+      existing &&
+      previousHeartbeatAt > 0 &&
+      now.getTime() - previousHeartbeatAt > 5 * 60 * 1000
+    ) {
+      const previousNetwork = readJson(existing.networkDiagnostic)
+      const evidence = [str(previousNetwork.lastErrorCode, 40), str(previousNetwork.lastRoute, 30)]
+        .filter(Boolean)
+        .join('/')
+      await this.prisma.companionEvent.create({
+        data: {
+          deviceId,
+          type: 'HEARTBEAT_RECOVERED',
+          message: '心跳恢复，离线前网络证据：' + (evidence || '未记录'),
+          organizationId: existing.organizationId ?? null,
+        },
+      })
+    }
 
     const device = await this.prisma.companionDevice.upsert({
       where: { deviceId },
@@ -177,45 +234,81 @@ export class CompanionMonitorService {
         lastSeenAt: now,
         lastHeartbeatAt: now,
         currentTask: taskStatus,
-        currentTaskDetail: hasTaskDetail ? readJson(payload.taskDetail) : ((existing?.currentTaskDetail ?? {}) as any),
+        currentTaskDetail: hasTaskDetail
+          ? readJson(payload.taskDetail)
+          : ((existing?.currentTaskDetail ?? {}) as any),
         taskStartedAt:
           payload.taskStartedAt !== undefined && payload.taskStartedAt !== null
             ? taskStartedAt
-            : existing?.taskStartedAt ?? null,
-        platformSummary: Object.keys(platformSummary).length ? platformSummary : ((existing?.platformSummary ?? {}) as any),
+            : (existing?.taskStartedAt ?? null),
+        platformSummary: Object.keys(platformSummary).length
+          ? platformSummary
+          : ((existing?.platformSummary ?? {}) as any),
         lastCollectionAt: hasCollection
           ? collectionEndedAt && !Number.isNaN(new Date(collectionEndedAt).getTime())
             ? new Date(collectionEndedAt)
             : existing?.lastCollectionAt
           : existing?.lastCollectionAt,
-        lastCollectionSuccess: hasCollection ? collectionInfo.success === true : existing?.lastCollectionSuccess,
+        lastCollectionSuccess: hasCollection
+          ? collectionInfo.success === true
+          : existing?.lastCollectionSuccess,
         lastCollectionAccountCount: hasCollection
           ? Number(collectionInfo.accountCount) || 0
           : existing?.lastCollectionAccountCount,
-        lastSyncAt: lastSyncAtRaw && !Number.isNaN(new Date(lastSyncAtRaw).getTime()) ? new Date(lastSyncAtRaw) : existing?.lastSyncAt,
-        lastSyncSuccess: hasSync && (syncSuccess || syncFailed) ? syncSuccess : existing?.lastSyncSuccess,
-        lastSyncUploadCount: hasSync ? Number(lastSync.uploadCount) || 0 : existing?.lastSyncUploadCount,
+        lastSyncAt:
+          lastSyncAtRaw && !Number.isNaN(new Date(lastSyncAtRaw).getTime())
+            ? new Date(lastSyncAtRaw)
+            : existing?.lastSyncAt,
+        lastSyncSuccess:
+          hasSync && (syncSuccess || syncFailed) ? syncSuccess : existing?.lastSyncSuccess,
+        lastSyncUploadCount: hasSync
+          ? Number(lastSync.uploadCount) || 0
+          : existing?.lastSyncUploadCount,
         lastSyncErrorCode: hasSync ? str(lastSync.errorCode, 80) : existing?.lastSyncErrorCode,
-        lastErrorCode: hasError ? str(lastError.errorCode, 80) : existing?.lastErrorCode,
-        lastErrorMessage: hasError ? str(lastError.message, 300) : existing?.lastErrorMessage,
+        lastErrorCode: hasError
+          ? str(lastError.errorCode, 80)
+          : clearRecoveredHeartbeatError
+            ? null
+            : existing?.lastErrorCode,
+        lastErrorMessage: hasError
+          ? str(lastError.message, 300)
+          : clearRecoveredHeartbeatError
+            ? null
+            : existing?.lastErrorMessage,
         lastErrorAt: hasError
           ? lastErrorAtRaw && !Number.isNaN(new Date(lastErrorAtRaw).getTime())
             ? new Date(lastErrorAtRaw)
             : existing?.lastErrorAt
-          : existing?.lastErrorAt,
-        updateStatus: Object.keys(updateInfo).length ? updateInfo : ((existing?.updateStatus ?? {}) as any),
-        cpuPercent: Number.isFinite(Number(resources.cpuPercent)) ? Number(resources.cpuPercent) : existing?.cpuPercent,
-        memoryMb: Number.isFinite(Number(resources.memoryMb)) ? Number(resources.memoryMb) : existing?.memoryMb,
+          : clearRecoveredHeartbeatError
+            ? null
+            : existing?.lastErrorAt,
+        updateStatus: Object.keys(updateInfo).length
+          ? updateInfo
+          : ((existing?.updateStatus ?? {}) as any),
+        cpuPercent: Number.isFinite(Number(resources.cpuPercent))
+          ? Number(resources.cpuPercent)
+          : existing?.cpuPercent,
+        memoryMb: Number.isFinite(Number(resources.memoryMb))
+          ? Number(resources.memoryMb)
+          : existing?.memoryMb,
         processUptimeSeconds: Number(resources.processUptimeSeconds) || 0,
         consecutiveSyncFailures,
-        recentHttpErrors: hasHttpErrors ? readJson(payload.recentHttpErrors) : ((existing?.recentHttpErrors ?? {}) as any),
+        recentHttpErrors: hasHttpErrors
+          ? readJson(payload.recentHttpErrors)
+          : ((existing?.recentHttpErrors ?? {}) as any),
+        networkDiagnostic: hasNetworkDiagnostic
+          ? networkDiagnostic
+          : ((existing?.networkDiagnostic ?? {}) as any),
         // Phase 2
         bootId: bootId ?? existing?.bootId,
-        bootSeq: bootId && seq !== null ? seq : isNewBoot ? 0 : existing?.bootSeq ?? 0,
-        bootCount: isNewBoot ? (existing?.bootCount ?? 0) + 1 : existing?.bootCount ?? 0,
-        exitState: exitState !== null ? exitState : isNewBoot ? null : existing?.exitState ?? null,
+        bootSeq: bootId && seq !== null ? seq : isNewBoot ? 0 : (existing?.bootSeq ?? 0),
+        bootCount: isNewBoot ? (existing?.bootCount ?? 0) + 1 : (existing?.bootCount ?? 0),
+        exitState:
+          exitState !== null ? exitState : isNewBoot ? null : (existing?.exitState ?? null),
         uiMode: str(payload.uiMode, 20) || existing?.uiMode || '',
-        startupDiagnostic: hasStartupDiagnostic ? startupDiagnostic : ((existing?.startupDiagnostic ?? {}) as any),
+        startupDiagnostic: hasStartupDiagnostic
+          ? startupDiagnostic
+          : ((existing?.startupDiagnostic ?? {}) as any),
         lastProgressAt: lastProgressAt ? lastProgressAt : existing?.lastProgressAt,
       },
       create: {
@@ -234,22 +327,34 @@ export class CompanionMonitorService {
         currentTaskDetail: readJson(payload.taskDetail),
         taskStartedAt,
         platformSummary,
-        lastCollectionAt: collectionEndedAt && !Number.isNaN(new Date(collectionEndedAt).getTime()) ? new Date(collectionEndedAt) : null,
-        lastCollectionSuccess: collectionInfo.success === true ? true : false,
+        lastCollectionAt:
+          hasCollection && collectionEndedAt && !Number.isNaN(new Date(collectionEndedAt).getTime())
+            ? new Date(collectionEndedAt)
+            : null,
+        lastCollectionSuccess: hasCollection ? collectionInfo.success === true : null,
         lastCollectionAccountCount: Number(collectionInfo.accountCount) || 0,
-        lastSyncAt: lastSyncAtRaw && !Number.isNaN(new Date(lastSyncAtRaw).getTime()) ? new Date(lastSyncAtRaw) : null,
+        lastSyncAt:
+          lastSyncAtRaw && !Number.isNaN(new Date(lastSyncAtRaw).getTime())
+            ? new Date(lastSyncAtRaw)
+            : null,
         lastSyncSuccess: hasSync && (syncSuccess || syncFailed) ? syncSuccess : null,
         lastSyncUploadCount: Number(lastSync.uploadCount) || 0,
         lastSyncErrorCode: str(lastSync.errorCode, 80),
         lastErrorCode: str(lastError.errorCode, 80),
         lastErrorMessage: str(lastError.message, 300),
-        lastErrorAt: lastErrorAtRaw && !Number.isNaN(new Date(lastErrorAtRaw).getTime()) ? new Date(lastErrorAtRaw) : null,
+        lastErrorAt:
+          lastErrorAtRaw && !Number.isNaN(new Date(lastErrorAtRaw).getTime())
+            ? new Date(lastErrorAtRaw)
+            : null,
         updateStatus: updateInfo,
-        cpuPercent: Number.isFinite(Number(resources.cpuPercent)) ? Number(resources.cpuPercent) : null,
+        cpuPercent: Number.isFinite(Number(resources.cpuPercent))
+          ? Number(resources.cpuPercent)
+          : null,
         memoryMb: Number.isFinite(Number(resources.memoryMb)) ? Number(resources.memoryMb) : null,
         processUptimeSeconds: Number(resources.processUptimeSeconds) || 0,
         consecutiveSyncFailures,
         recentHttpErrors: readJson(payload.recentHttpErrors),
+        networkDiagnostic,
         bootId,
         bootSeq: seq ?? 0,
         bootCount: 1,
@@ -260,7 +365,13 @@ export class CompanionMonitorService {
       },
     })
 
-    const shouldWriteHistory = await this.shouldWriteHistory(device, payload, taskStatus, now, bootId)
+    const shouldWriteHistory = await this.shouldWriteHistory(
+      device,
+      payload,
+      taskStatus,
+      now,
+      bootId,
+    )
     if (shouldWriteHistory) {
       await this.prisma.companionHeartbeat.create({
         data: {
@@ -277,6 +388,9 @@ export class CompanionMonitorService {
           cpuPercent: device.cpuPercent,
           memoryMb: device.memoryMb,
           processUptimeSeconds: device.processUptimeSeconds,
+          networkDiagnostic: hasNetworkDiagnostic
+            ? networkDiagnostic
+            : ((device.networkDiagnostic ?? {}) as any),
           ownerName: device.ownerName,
           bootId: device.bootId,
           seq: device.bootSeq,
@@ -307,7 +421,14 @@ export class CompanionMonitorService {
     const last = await this.prisma.companionHeartbeat.findFirst({
       where: { deviceId: device.deviceId },
       orderBy: { receivedAt: 'desc' },
-      select: { receivedAt: true, taskStatus: true, lastSync: true, lastError: true, bootId: true },
+      select: {
+        receivedAt: true,
+        taskStatus: true,
+        lastSync: true,
+        lastError: true,
+        bootId: true,
+        networkDiagnostic: true,
+      },
     })
     if (!last) return true
     if (now.getTime() - last.receivedAt.getTime() >= HISTORY_WRITE_INTERVAL_MS) return true
@@ -319,7 +440,18 @@ export class CompanionMonitorService {
     if (Boolean(newSync.success) !== Boolean(oldSync.success)) return true
     const newErr = readJson(payload.lastError)
     const oldErr = readJson(last.lastError)
-    if (str(newErr.errorCode) !== str(oldErr.errorCode) || str(newErr.message) !== str(oldErr.message)) return true
+    if (
+      str(newErr.errorCode) !== str(oldErr.errorCode) ||
+      str(newErr.message) !== str(oldErr.message)
+    )
+      return true
+    const newNetwork = readJson(payload.networkDiagnostic)
+    const oldNetwork = readJson(last.networkDiagnostic)
+    if (
+      str(newNetwork.lastErrorCode, 60) !== str(oldNetwork.lastErrorCode, 60) ||
+      str(newNetwork.lastRoute, 30) !== str(oldNetwork.lastRoute, 30)
+    )
+      return true
     const collection = readJson(payload.lastCollection)
     if (collection.success === true) return true
     const updateInfo = readJson(payload.update)
@@ -335,10 +467,21 @@ export class CompanionMonitorService {
     const devices = await this.prisma.companionDevice.findMany({
       where: { lastHeartbeatAt: { not: null } },
       select: {
-        id: true, deviceId: true, organizationId: true, deviceName: true,
-        lastHeartbeatAt: true, healthStatus: true, currentTask: true, taskStartedAt: true,
-        lastProgressAt: true, consecutiveSyncFailures: true, companionVersion: true, updateStatus: true,
-        recentHttpErrors: true, platformSummary: true,
+        id: true,
+        deviceId: true,
+        organizationId: true,
+        deviceName: true,
+        lastHeartbeatAt: true,
+        healthStatus: true,
+        currentTask: true,
+        taskStartedAt: true,
+        lastProgressAt: true,
+        consecutiveSyncFailures: true,
+        companionVersion: true,
+        updateStatus: true,
+        recentHttpErrors: true,
+        platformSummary: true,
+        networkDiagnostic: true,
       },
     })
 
@@ -361,11 +504,18 @@ export class CompanionMonitorService {
       if (gap > staleMs) health = 'offline'
       else if (gap > unstableMs) health = 'unstable'
       if (health !== d.healthStatus) {
-        await this.prisma.companionDevice.update({ where: { id: d.id }, data: { healthStatus: health } })
+        await this.prisma.companionDevice.update({
+          where: { id: d.id },
+          data: { healthStatus: health },
+        })
       }
 
       if (health === 'offline') {
-        await this.recordIncident(d, 'HEARTBEAT_STALE', '心跳超过5分钟未收到（最后心跳 ' + d.lastHeartbeatAt + '）')
+        await this.recordIncident(
+          d,
+          'HEARTBEAT_STALE',
+          '心跳超过5分钟未收到（最后心跳 ' + d.lastHeartbeatAt + '）',
+        )
         firingKeys.add(d.deviceId + '|HEARTBEAT_STALE')
       }
       if (gap > offline24hMs) {
@@ -373,12 +523,23 @@ export class CompanionMonitorService {
         firingKeys.add(d.deviceId + '|OFFLINE_24H')
       }
       if (d.consecutiveSyncFailures >= 3) {
-        await this.recordIncident(d, 'SYNC_FAIL_3X', '连续 ' + d.consecutiveSyncFailures + ' 次同步失败')
+        await this.recordIncident(
+          d,
+          'SYNC_FAIL_3X',
+          '连续 ' + d.consecutiveSyncFailures + ' 次同步失败',
+        )
         firingKeys.add(d.deviceId + '|SYNC_FAIL_3X')
       }
       // Phase 2: 卡死判定——按「无进展时长」而非总运行时长
-      if (health !== 'offline' && d.currentTask && STUCK_NO_PROGRESS_MINUTES[d.currentTask] && d.taskStartedAt) {
-        const progressAt = d.lastProgressAt ? new Date(d.lastProgressAt).getTime() : new Date(d.taskStartedAt).getTime()
+      if (
+        health !== 'offline' &&
+        d.currentTask &&
+        STUCK_NO_PROGRESS_MINUTES[d.currentTask] &&
+        d.taskStartedAt
+      ) {
+        const progressAt = d.lastProgressAt
+          ? new Date(d.lastProgressAt).getTime()
+          : new Date(d.taskStartedAt).getTime()
         const noProgressMs = now.getTime() - progressAt
         const thresholdMs = STUCK_NO_PROGRESS_MINUTES[d.currentTask] * 60 * 1000
         if (noProgressMs > thresholdMs) {
@@ -395,14 +556,29 @@ export class CompanionMonitorService {
         await this.recordIncident(d, 'UPDATE_FAILED', '伴侣自动更新失败')
         firingKeys.add(d.deviceId + '|UPDATE_FAILED')
       }
-      if (latestReported && d.companionVersion && compareVersions(d.companionVersion, latestReported) < 0) {
-        await this.recordIncident(d, 'VERSION_OUTDATED', '版本过旧：' + d.companionVersion + ' < ' + latestReported)
+      if (
+        latestReported &&
+        d.companionVersion &&
+        compareVersions(d.companionVersion, latestReported) < 0
+      ) {
+        await this.recordIncident(
+          d,
+          'VERSION_OUTDATED',
+          '版本过旧：' + d.companionVersion + ' < ' + latestReported,
+        )
         firingKeys.add(d.deviceId + '|VERSION_OUTDATED')
       }
       const httpErrors = readJson(d.recentHttpErrors)
-      const httpTotal = Number(httpErrors.count403 || 0) + Number(httpErrors.count404 || 0) + Number(httpErrors.count500 || 0)
+      const httpTotal =
+        Number(httpErrors.count403 || 0) +
+        Number(httpErrors.count404 || 0) +
+        Number(httpErrors.count500 || 0)
       if (httpTotal >= 10) {
-        await this.recordIncident(d, 'HTTP_ERROR_SPIKE', '近期 403/404/500 异常请求 ' + httpTotal + ' 次')
+        await this.recordIncident(
+          d,
+          'HTTP_ERROR_SPIKE',
+          '近期 403/404/500 异常请求 ' + httpTotal + ' 次',
+        )
         firingKeys.add(d.deviceId + '|HTTP_ERROR_SPIKE')
       }
     }
@@ -443,20 +619,35 @@ export class CompanionMonitorService {
   // ── Event + Incident：故障聚合与生命周期 ──
 
   private async recordIncident(
-    device: { deviceId?: string | null; organizationId?: string | null; deviceName?: string | null },
+    device: {
+      deviceId?: string | null
+      organizationId?: string | null
+      deviceName?: string | null
+    },
     type: string,
     message: string,
   ) {
     const now = new Date()
     const incidentWhere: any = device.deviceId
       ? { deviceId: device.deviceId, type, status: { in: ['open', 'recovering'] } }
-      : { deviceId: null, organizationId: device.organizationId ?? null, type, status: { in: ['open', 'recovering'] } }
+      : {
+          deviceId: null,
+          organizationId: device.organizationId ?? null,
+          type,
+          status: { in: ['open', 'recovering'] },
+        }
 
     const existing = await this.prisma.companionIncident.findFirst({ where: incidentWhere })
     if (existing) {
       const data =
         existing.status === 'recovering'
-          ? { occurrences: existing.occurrences + 1, lastOccurredAt: now, message, status: 'open', recoveringSince: null }
+          ? {
+              occurrences: existing.occurrences + 1,
+              lastOccurredAt: now,
+              message,
+              status: 'open',
+              recoveringSince: null,
+            }
           : { lastOccurredAt: now, message, status: 'open', recoveringSince: null }
       await this.prisma.companionIncident.update({
         where: { id: existing.id },
@@ -465,15 +656,30 @@ export class CompanionMonitorService {
       // 事件只在「新发作段」开始记一条（恢复后复发才算新发作段）
       if (existing.status === 'recovering') {
         await this.prisma.companionEvent.create({
-          data: { deviceId: device.deviceId ?? null, type, message, organizationId: device.organizationId ?? null },
+          data: {
+            deviceId: device.deviceId ?? null,
+            type,
+            message,
+            organizationId: device.organizationId ?? null,
+          },
         })
       }
     } else {
       await this.prisma.companionIncident.create({
-        data: { deviceId: device.deviceId ?? null, type, message, organizationId: device.organizationId ?? null },
+        data: {
+          deviceId: device.deviceId ?? null,
+          type,
+          message,
+          organizationId: device.organizationId ?? null,
+        },
       })
       await this.prisma.companionEvent.create({
-        data: { deviceId: device.deviceId ?? null, type, message, organizationId: device.organizationId ?? null },
+        data: {
+          deviceId: device.deviceId ?? null,
+          type,
+          message,
+          organizationId: device.organizationId ?? null,
+        },
       })
     }
 
@@ -484,7 +690,12 @@ export class CompanionMonitorService {
     const existsAlert = await this.prisma.companionAlert.findFirst({ where: alertWhere })
     if (!existsAlert) {
       await this.prisma.companionAlert.create({
-        data: { deviceId: device.deviceId ?? null, type, message, organizationId: device.organizationId ?? null },
+        data: {
+          deviceId: device.deviceId ?? null,
+          type,
+          message,
+          organizationId: device.organizationId ?? null,
+        },
       })
     }
   }
@@ -492,7 +703,15 @@ export class CompanionMonitorService {
   private async sweepRecovery(firingKeys: Set<string>, now: Date) {
     const incidents = await this.prisma.companionIncident.findMany({
       where: { status: { in: ['open', 'recovering'] } },
-      select: { id: true, deviceId: true, type: true, organizationId: true, status: true, recoveringSince: true, firstOccurredAt: true },
+      select: {
+        id: true,
+        deviceId: true,
+        type: true,
+        organizationId: true,
+        status: true,
+        recoveringSince: true,
+        firstOccurredAt: true,
+      },
     })
     for (const inc of incidents) {
       const key = inc.deviceId
@@ -537,13 +756,20 @@ export class CompanionMonitorService {
   @Cron('30 3 * * *', { timeZone: 'Asia/Shanghai' })
   async cleanupOldRecords() {
     const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const hb = await this.prisma.companionHeartbeat.deleteMany({ where: { receivedAt: { lt: cutoff } } })
-    const events = await this.prisma.companionEvent.deleteMany({ where: { createdAt: { lt: cutoff } } })
+    const hb = await this.prisma.companionHeartbeat.deleteMany({
+      where: { receivedAt: { lt: cutoff } },
+    })
+    const events = await this.prisma.companionEvent.deleteMany({
+      where: { createdAt: { lt: cutoff } },
+    })
     const alerts = await this.prisma.companionAlert.deleteMany({
       where: {
         OR: [
           { createdAt: { lt: cutoff } },
-          { status: 'acknowledged', createdAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) } },
+          {
+            status: 'acknowledged',
+            createdAt: { lt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) },
+          },
         ],
       },
     })
@@ -551,14 +777,22 @@ export class CompanionMonitorService {
       where: { status: 'resolved', resolvedAt: { lt: cutoff } },
     })
     this.logger.log(
-      'Companion monitor cleanup: heartbeats=' + hb.count + ' events=' + events.count + ' alerts=' + alerts.count + ' incidents=' + incidents.count,
+      'Companion monitor cleanup: heartbeats=' +
+        hb.count +
+        ' events=' +
+        events.count +
+        ' alerts=' +
+        alerts.count +
+        ' incidents=' +
+        incidents.count,
     )
   }
 
   // ── 查询接口 ──
 
   async listDevices(user: { role?: string; organizationId?: string | null }, filter?: string) {
-    const orgWhere = user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
+    const orgWhere =
+      user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
     const where: any = { ...orgWhere }
     if (filter === 'online') where.healthStatus = 'online'
     if (filter === 'offline') where.healthStatus = 'offline'
@@ -572,7 +806,10 @@ export class CompanionMonitorService {
         { lastErrorCode: { not: null } },
       ]
     }
-    const devices = await this.prisma.companionDevice.findMany({ where, orderBy: { lastHeartbeatAt: 'desc' } })
+    const devices = await this.prisma.companionDevice.findMany({
+      where,
+      orderBy: { lastHeartbeatAt: 'desc' },
+    })
     if (filter === 'version_outdated') {
       let latest = process.env.COMPANION_LATEST_VERSION || ''
       for (const d of devices) {
@@ -580,17 +817,27 @@ export class CompanionMonitorService {
         if (reported && (!latest || compareVersions(reported, latest) > 0)) latest = reported
       }
       const filtered = latest
-        ? devices.filter((d) => d.companionVersion && compareVersions(d.companionVersion, latest) < 0)
+        ? devices.filter(
+            (d) => d.companionVersion && compareVersions(d.companionVersion, latest) < 0,
+          )
         : []
       return { devices: filtered, total: filtered.length }
     }
     return { devices, total: devices.length }
   }
 
-  async getDeviceHistory(user: { role?: string; organizationId?: string | null }, deviceId: string, days = 7) {
+  async getDeviceHistory(
+    user: { role?: string; organizationId?: string | null },
+    deviceId: string,
+    days = 7,
+  ) {
     const device = await this.prisma.companionDevice.findUnique({ where: { deviceId } })
     if (!device) throw new NotFoundException('设备不存在')
-    if (user.role !== UserRole.SUPER_ADMIN && device.organizationId && device.organizationId !== (user.organizationId || null)) {
+    if (
+      user.role !== UserRole.SUPER_ADMIN &&
+      device.organizationId &&
+      device.organizationId !== (user.organizationId || null)
+    ) {
       throw new ForbiddenException('No access to this device')
     }
     const start = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
@@ -611,13 +858,19 @@ export class CompanionMonitorService {
   }
 
   async getOverview(user: { role?: string; organizationId?: string | null }) {
-    const orgWhere = user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
+    const orgWhere =
+      user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
     const devices = await this.prisma.companionDevice.findMany({
       where: orgWhere,
       select: {
-        healthStatus: true, consecutiveSyncFailures: true, lastCollectionSuccess: true,
-        lastSyncSuccess: true, companionVersion: true, updateStatus: true,
-        lastCollectionAt: true, lastSyncAt: true,
+        healthStatus: true,
+        consecutiveSyncFailures: true,
+        lastCollectionSuccess: true,
+        lastSyncSuccess: true,
+        companionVersion: true,
+        updateStatus: true,
+        lastCollectionAt: true,
+        lastSyncAt: true,
       },
     })
     const now = new Date()
@@ -626,27 +879,46 @@ export class CompanionMonitorService {
     let latestReported = process.env.COMPANION_LATEST_VERSION || ''
     for (const d of devices) {
       const reported = str((readJson(d.updateStatus) as any).latest, 40)
-      if (reported && (!latestReported || compareVersions(reported, latestReported) > 0)) latestReported = reported
+      if (reported && (!latestReported || compareVersions(reported, latestReported) > 0))
+        latestReported = reported
     }
     for (const d of devices) {
       if (d.healthStatus === 'offline') counts.offline += 1
       else if (d.consecutiveSyncFailures >= 3 || d.healthStatus === 'unstable') counts.abnormal += 1
       else counts.normal += 1
-      if (latestReported && d.companionVersion && compareVersions(d.companionVersion, latestReported) < 0) counts.versionOutdated += 1
+      if (
+        latestReported &&
+        d.companionVersion &&
+        compareVersions(d.companionVersion, latestReported) < 0
+      )
+        counts.versionOutdated += 1
     }
-    const todayCollection = devices.filter((d) => d.lastCollectionAt && new Date(d.lastCollectionAt) >= todayStart)
+    const todayCollection = devices.filter(
+      (d) => d.lastCollectionAt && new Date(d.lastCollectionAt) >= todayStart,
+    )
     const todaySync = devices.filter((d) => d.lastSyncAt && new Date(d.lastSyncAt) >= todayStart)
     return {
       counts,
-      todayCollectionRate: todayCollection.length ? Math.round((todayCollection.filter((d) => d.lastCollectionSuccess === true).length / todayCollection.length) * 100) : null,
-      todaySyncRate: todaySync.length ? Math.round((todaySync.filter((d) => d.lastSyncSuccess === true).length / todaySync.length) * 100) : null,
+      todayCollectionRate: todayCollection.length
+        ? Math.round(
+            (todayCollection.filter((d) => d.lastCollectionSuccess === true).length /
+              todayCollection.length) *
+              100,
+          )
+        : null,
+      todaySyncRate: todaySync.length
+        ? Math.round(
+            (todaySync.filter((d) => d.lastSyncSuccess === true).length / todaySync.length) * 100,
+          )
+        : null,
       deviceTotal: devices.length,
       latestVersion: latestReported,
     }
   }
 
   async listAlerts(user: { role?: string; organizationId?: string | null }, status = 'open') {
-    const orgWhere = user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
+    const orgWhere =
+      user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
     const where: any = { ...orgWhere }
     if (status && status !== 'all') where.status = status
     return this.prisma.companionAlert.findMany({
@@ -656,8 +928,12 @@ export class CompanionMonitorService {
     })
   }
 
-  async acknowledgeAlert(id: string, user?: { id?: string; role?: string; organizationId?: string | null }) {
-    const orgWhere = user?.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user?.organizationId || null }
+  async acknowledgeAlert(
+    id: string,
+    user?: { id?: string; role?: string; organizationId?: string | null },
+  ) {
+    const orgWhere =
+      user?.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user?.organizationId || null }
     const alert = await this.prisma.companionAlert.findFirst({ where: { id, ...orgWhere } })
     if (!alert) throw new NotFoundException('告警不存在')
     return this.prisma.companionAlert.update({
@@ -673,7 +949,8 @@ export class CompanionMonitorService {
   // Phase 2 查询：故障与事件
 
   async listIncidents(user: { role?: string; organizationId?: string | null }, status = 'open') {
-    const orgWhere = user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
+    const orgWhere =
+      user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
     const where: any = { ...orgWhere }
     if (status && status !== 'all') where.status = status
     return this.prisma.companionIncident.findMany({
@@ -683,8 +960,13 @@ export class CompanionMonitorService {
     })
   }
 
-  async listEvents(user: { role?: string; organizationId?: string | null }, deviceId?: string, take = 100) {
-    const orgWhere = user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
+  async listEvents(
+    user: { role?: string; organizationId?: string | null },
+    deviceId?: string,
+    take = 100,
+  ) {
+    const orgWhere =
+      user.role === UserRole.SUPER_ADMIN ? {} : { organizationId: user.organizationId || null }
     const where: any = { ...orgWhere }
     if (deviceId) where.deviceId = deviceId
     return this.prisma.companionEvent.findMany({
