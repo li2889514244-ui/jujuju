@@ -30,6 +30,7 @@ COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
 COPY --from=runtime-deps --chown=matrixflow:matrixflow /build/node_modules ./node_modules
+COPY --from=runtime-deps --chown=matrixflow:matrixflow /build/backend/node_modules ./node_modules
 
 # Copy Python bridge
 COPY --chown=matrixflow:matrixflow bridge.py ./
