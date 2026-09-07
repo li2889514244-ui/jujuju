@@ -27,6 +27,10 @@ WORKDIR /app/backend
 RUN npm run db:generate
 RUN npm run build:backend
 
+# Reuse the lockfile-backed install after removing workspace dev dependencies.
+FROM builder AS runtime-deps
+RUN npm prune --omit=dev --ignore-scripts
+
 # Stage 2: Production
 FROM node:20-slim AS production
 
@@ -43,9 +47,9 @@ WORKDIR /app
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/dist ./dist
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /app/backend/prisma ./prisma
+COPY --from=runtime-deps --chown=matrixflow:matrixflow /app/node_modules ./node_modules
 
-# Install production dependencies with npm (flat node_modules, no broken symlinks)
-RUN npm install --omit=dev --ignore-scripts
+RUN ./node_modules/.bin/prisma generate --schema=prisma/schema.prisma
 
 # Create logs and uploads directories
 RUN mkdir -p /app/logs /app/uploads && chown -R matrixflow:matrixflow /app/logs /app/uploads

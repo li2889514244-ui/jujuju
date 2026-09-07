@@ -12,6 +12,10 @@ RUN npm run db:generate
 COPY backend ./backend
 RUN npm run build:backend
 
+# Reuse the lockfile-backed install after removing workspace dev dependencies.
+FROM builder AS runtime-deps
+RUN npm prune --omit=dev --ignore-scripts
+
 # ---- Production Stage ----
 FROM mcr.microsoft.com/playwright:v1.44.0-jammy AS production
 
@@ -25,6 +29,7 @@ WORKDIR /app
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/package.json ./
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/prisma ./prisma
 COPY --from=builder --chown=matrixflow:matrixflow /build/backend/dist ./dist
+COPY --from=runtime-deps --chown=matrixflow:matrixflow /build/node_modules ./node_modules
 
 # Copy Python bridge
 COPY --chown=matrixflow:matrixflow bridge.py ./
@@ -33,9 +38,8 @@ COPY --chown=matrixflow:matrixflow requirements.txt ./
 # Clone social-auto-upload (10k stars, battle-tested platform uploaders)
 RUN git clone --depth 1 https://github.com/dreammis/social-auto-upload.git ./social-auto-upload
 
-# Install Node deps
-RUN npm install --omit=dev --ignore-scripts
-RUN npx prisma generate
+# Regenerate from the copied, lockfile-backed runtime dependencies.
+RUN ./node_modules/.bin/prisma generate --schema=prisma/schema.prisma
 ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
 
 # Install Python deps
